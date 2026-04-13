@@ -5,10 +5,12 @@ import { config } from './config.js';
 import { errorHandler } from './middleware/error.js';
 import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
+import { usersRouter } from './routes/users.js';
 import { leadsRouter } from './routes/leads.js';
 import { clientsRouter } from './routes/clients.js';
 import { disputesRouter } from './routes/disputes.js';
 import { billingRouter } from './routes/billing.js';
+import { progressRouter } from './routes/progress.js';
 
 const app = express();
 
@@ -22,10 +24,12 @@ app.get('/', (_req, res) => {
 
 app.use('/health', healthRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
 app.use('/api/leads', leadsRouter);
 app.use('/api/clients', clientsRouter);
 app.use('/api/disputes', disputesRouter);
 app.use('/api/billing', billingRouter);
+app.use('/api/progress', progressRouter);
 
 app.use(errorHandler);
 

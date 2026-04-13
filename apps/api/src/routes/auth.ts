@@ -28,7 +28,17 @@ authRouter.post('/register', async (req, res, next) => {
         passwordHash,
         firstName: data.firstName,
         lastName: data.lastName,
-        phone: data.phone
+        phone: data.phone,
+        client: {
+          create: {
+            status: 'LEAD',
+            progress: {
+              create: {
+                onboarding: { status: 'pending', signupAt: new Date().toISOString(), completedAt: null }
+              }
+            }
+          }
+        }
       }
     });
 

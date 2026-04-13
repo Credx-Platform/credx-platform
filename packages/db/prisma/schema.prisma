@@ -133,6 +133,26 @@ model Client {
   notes                Note[]
   creditReports        CreditReport[]
   activities           ActivityEvent[]
+  progress             ClientProgress?
+}
+
+model ClientProgress {
+  id                String   @id @default(uuid())
+  clientId          String   @unique
+  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  completedDays     String[] @default([])
+  passedQuizzes     String[] @default([])
+  uploadedDocs      Json     @default("[]")
+  disputes          Json     @default("[]")
+  scores            Json     @default("{\"equifax\":null,\"experian\":null,\"transunion\":null}")
+  onboarding        Json     @default("{\"status\":\"pending\",\"signupAt\":null,\"completedAt\":null}")
+  workflow          Json     @default("{\"stage\":\"signup_received\",\"updatedAt\":null,\"next\":[\"complete_onboarding\",\"upload_credit_report\"]}")
+  analysis          Json?
+  disputeStrategy   Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([clientId])
 }
 
 model CreditReport {
