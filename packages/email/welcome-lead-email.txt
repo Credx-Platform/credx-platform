@@ -1,0 +1,22 @@
+Subject: Welcome to CredX — Here’s Your Next Step
+
+Hi {{first_name}},
+
+Welcome to CredX.
+
+We’re excited to support you on your credit repair and financial rebuilding journey. Your inquiry has been received, and the next step is to complete your CredX service agreement so we can begin your onboarding process properly.
+
+Next Steps:
+1. Review and sign your CredX contract.
+2. Prepare your most recent credit report.
+3. Complete any requested intake details.
+4. Watch for your next CredX update.
+
+Complete Your Signup:
+{{contract_link}}
+
+If you have any questions, simply reply to this email and the CredX team will help you.
+
+CredX
+Credit Repair & Financial Strategy Support
+Sent from hello@credxme.com

@@ -1,0 +1,244 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  STAFF
+  ADMIN
+}
+
+enum ClientStatus {
+  LEAD
+  CONTRACT_SENT
+  ACTIVE
+  PAST_DUE
+  RESTRICTED
+  CANCELLED
+}
+
+enum ServiceTier {
+  ESSENTIAL
+  AGGRESSIVE
+  FAMILY
+}
+
+enum Bureau {
+  EXPERIAN
+  TRANSUNION
+  EQUIFAX
+}
+
+enum DisputeStatus {
+  PENDING
+  LETTER_SENT
+  RESPONSE_DUE
+  COMPLETED
+  REJECTED
+}
+
+enum PaymentType {
+  SETUP_FEE
+  MONTHLY
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum AgreementStatus {
+  DRAFT
+  SENT
+  SIGNED
+  VOIDED
+}
+
+enum DocumentType {
+  IDENTITY
+  PROOF_OF_ADDRESS
+  CREDIT_REPORT
+  CONTRACT
+  OTHER
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  role         Role          @default(CLIENT)
+  firstName    String
+  lastName     String
+  phone        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  client       Client?
+  auditLogs    AuditLog[]
+}
+
+model Lead {
+  id         String   @id @default(uuid())
+  firstName  String
+  lastName   String
+  email      String
+  phone      String?
+  creditGoal String?
+  createdAt  DateTime @default(now())
+  notes      String?
+}
+
+model Client {
+  id                   String          @id @default(uuid())
+  userId               String          @unique
+  user                 User            @relation(fields: [userId], references: [id])
+  ssnEncrypted         String?
+  ssnLast4             String?
+  dobEncrypted         String?
+  status               ClientStatus    @default(LEAD)
+  serviceTier          ServiceTier     @default(ESSENTIAL)
+  currentAddressLine1  String?
+  currentAddressLine2  String?
+  currentCity          String?
+  currentState         String?
+  currentPostalCode    String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  setupFeePaid         Boolean         @default(false)
+  portalRestricted     Boolean         @default(false)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  disputes             Dispute[]
+  payments             Payment[]
+  documents            Document[]
+  agreements           Agreement[]
+  tasks                Task[]
+  notes                Note[]
+  creditReports        CreditReport[]
+  activities           ActivityEvent[]
+}
+
+model CreditReport {
+  id          String      @id @default(uuid())
+  clientId    String
+  client      Client      @relation(fields: [clientId], references: [id])
+  bureau      Bureau
+  source      String?
+  pulledAt    DateTime    @default(now())
+  rawPayload  Json?
+  createdAt   DateTime    @default(now())
+  tradelines  Tradeline[]
+}
+
+model Tradeline {
+  id             String       @id @default(uuid())
+  creditReportId String
+  creditReport   CreditReport @relation(fields: [creditReportId], references: [id])
+  creditorName   String
+  accountNumber  String?
+  accountType    String?
+  status         String?
+  balance        Decimal?
+  isNegative     Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+}
+
+model Dispute {
+  id            String        @id @default(uuid())
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id])
+  creditorName  String
+  accountNumber String?
+  bureau        Bureau
+  round         Int           @default(1)
+  status        DisputeStatus @default(PENDING)
+  reason        String?
+  letterSentAt  DateTime?
+  responseDueAt DateTime?
+  createdAt     DateTime      @default(now())
+}
+
+model Payment {
+  id                    String        @id @default(uuid())
+  clientId              String
+  client                Client        @relation(fields: [clientId], references: [id])
+  amount                Decimal
+  currency              String        @default("USD")
+  type                  PaymentType
+  status                PaymentStatus
+  stripePaymentIntentId String?
+  stripeInvoiceId       String?
+  attemptCount          Int           @default(0)
+  dueAt                 DateTime?
+  paidAt                DateTime?
+  createdAt             DateTime      @default(now())
+}
+
+model Agreement {
+  id               String          @id @default(uuid())
+  clientId         String
+  client           Client          @relation(fields: [clientId], references: [id])
+  docusignEnvelopeId String?
+  status           AgreementStatus @default(DRAFT)
+  sentAt           DateTime?
+  signedAt         DateTime?
+  createdAt        DateTime        @default(now())
+}
+
+model Document {
+  id            String       @id @default(uuid())
+  clientId      String
+  client        Client       @relation(fields: [clientId], references: [id])
+  type          DocumentType
+  fileName      String
+  s3Key         String
+  contentType   String?
+  uploadedAt    DateTime     @default(now())
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  title       String
+  description String?
+  completed   Boolean  @default(false)
+  dueAt       DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Note {
+  id         String   @id @default(uuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id])
+  body       String
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
+
+model ActivityEvent {
+  id         String   @id @default(uuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id])
+  type       String
+  message    String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}

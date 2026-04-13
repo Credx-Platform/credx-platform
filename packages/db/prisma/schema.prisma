@@ -1,0 +1,350 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  STAFF
+  ADMIN
+}
+
+enum ClientStatus {
+  LEAD
+  CONTRACT_SENT
+  INTAKE_RECEIVED
+  ANALYSIS_READY
+  UPGRADE_OFFERED
+  ACTIVE
+  PAST_DUE
+  RESTRICTED
+  CANCELLED
+}
+
+enum ServiceTier {
+  ESSENTIAL
+  AGGRESSIVE
+  FAMILY
+}
+
+enum Bureau {
+  EXPERIAN
+  TRANSUNION
+  EQUIFAX
+}
+
+enum DisputeStatus {
+  PENDING
+  LETTER_SENT
+  RESPONSE_DUE
+  COMPLETED
+  REJECTED
+}
+
+enum PaymentType {
+  SETUP_FEE
+  MONTHLY
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum AgreementStatus {
+  DRAFT
+  SENT
+  SIGNED
+  VOIDED
+}
+
+enum DocumentType {
+  IDENTITY
+  PROOF_OF_ADDRESS
+  CREDIT_REPORT
+  CONTRACT
+  OTHER
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  role         Role          @default(CLIENT)
+  firstName    String
+  lastName     String
+  phone        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  client       Client?
+  auditLogs    AuditLog[]
+}
+
+model Lead {
+  id         String   @id @default(uuid())
+  firstName  String
+  lastName   String
+  email      String
+  phone      String?
+  creditGoal String?
+  createdAt  DateTime @default(now())
+  notes      String?
+}
+
+model Client {
+  id                   String          @id @default(uuid())
+  userId               String          @unique
+  user                 User            @relation(fields: [userId], references: [id])
+  ssnEncrypted         String?
+  ssnLast4             String?
+  dobEncrypted         String?
+  status               ClientStatus    @default(LEAD)
+  serviceTier          ServiceTier     @default(ESSENTIAL)
+  currentAddressLine1  String?
+  currentAddressLine2  String?
+  currentCity          String?
+  currentState         String?
+  currentPostalCode    String?
+  analysisSummary      String?
+  disputePlanSummary   String?
+  estimatedTimelineMonths Int?
+  upgradeOfferedAt     DateTime?
+  activatedAt          DateTime?
+  flaggedAt            DateTime?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  setupFeePaid         Boolean         @default(false)
+  portalRestricted     Boolean         @default(false)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  disputes             Dispute[]
+  disputeItems         DisputeItem[]   @relation(name: "ClientDisputeItems")
+  payments             Payment[]
+  documents            Document[]
+  agreements           Agreement[]
+  tasks                Task[]
+  notes                Note[]
+  creditReports        CreditReport[]
+  activities           ActivityEvent[]
+}
+
+model CreditReport {
+  id          String      @id @default(uuid())
+  clientId    String
+  client      Client      @relation(fields: [clientId], references: [id])
+  bureau      Bureau
+  source      String?
+  pulledAt    DateTime    @default(now())
+  rawPayload  Json?
+  createdAt   DateTime    @default(now())
+  tradelines  Tradeline[]
+}
+
+model Tradeline {
+  id             String       @id @default(uuid())
+  creditReportId String
+  creditReport   CreditReport @relation(fields: [creditReportId], references: [id])
+  creditorName   String
+  accountNumber  String?
+  accountType    String?
+  status         String?
+  balance        Decimal?
+  isNegative     Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+}
+
+enum DisputeItemStatus {
+  PENDING
+  IN_DISPUTE
+  DELETED
+  UPDATED
+  VERIFIED
+}
+
+enum FurnisherType {
+  CREDITOR
+  COLLECTOR
+  BUREAU
+}
+
+enum AccountType {
+  LATE_PAYMENT
+  COLLECTION
+  CHARGE_OFF
+  INQUIRY
+  OTHER
+}
+
+model Dispute {
+  id            String        @id @default(uuid())
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id])
+  creditorName  String
+  accountNumber String?
+  bureau        Bureau
+  round         Int           @default(1)
+  status        DisputeStatus @default(PENDING)
+  reason        String?
+  letterSentAt  DateTime?
+  responseDueAt DateTime?
+  createdAt     DateTime      @default(now())
+  
+  // New fields for CDM
+  accountType   AccountType?
+  balance       Decimal?
+  dateAdded     DateTime?
+  disputeEquifax   Boolean @default(false)
+  disputeExperian  Boolean @default(false)
+  disputeTransunion Boolean @default(false)
+  customInstruction String?
+}
+
+// New: Detailed dispute item tracking (CDM-style)
+model DisputeItem {
+  id                String           @id @default(uuid())
+  clientId          String
+  client            Client           @relation(fields: [clientId], references: [id], name: "ClientDisputeItems")
+  
+  // Account details
+  furnisher         String           // Creditor/Collector name
+  accountNumber     String?
+  accountType       AccountType      @default(OTHER)
+  balance           Decimal?
+  dateAdded         DateTime?        // When appeared on report
+  
+  // Bureau dispute flags
+  disputeEquifax    Boolean          @default(false)
+  disputeExperian   Boolean          @default(false)
+  disputeTransunion Boolean          @default(false)
+  
+  // Dispute details
+  reason            String
+  customInstruction String?
+  
+  // Round tracking
+  currentRound      Int              @default(1)
+  status            DisputeItemStatus @default(PENDING)
+  
+  // Dates
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  dueDate           DateTime?        // For tracking overdue
+  
+  // Relations
+  rounds            DisputeRound[]
+}
+
+// New: Track each round of disputes
+model DisputeRound {
+  id             String   @id @default(uuid())
+  disputeItemId  String
+  disputeItem    DisputeItem @relation(fields: [disputeItemId], references: [id], onDelete: Cascade)
+  
+  roundNumber    Int
+  sentDate       DateTime
+  dueDate        DateTime
+  status         String   @default("PENDING") // PENDING, RESPONSE_RECEIVED, NO_RESPONSE, ARCHIVED
+  notes          String?
+  
+  // Bureau-specific tracking
+  equifaxStatus  String?  // PENDING, SENT, RESPONSE_RECEIVED
+  experianStatus String?
+  transunionStatus String?
+  
+  createdAt      DateTime @default(now())
+}
+
+// New: Furnisher database for dropdown
+model Furnisher {
+  id        String       @id @default(uuid())
+  name      String       @unique
+  type      FurnisherType @default(CREDITOR)
+  address   String?
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+}
+
+model Payment {
+  id                    String        @id @default(uuid())
+  clientId              String
+  client                Client        @relation(fields: [clientId], references: [id])
+  amount                Decimal
+  currency              String        @default("USD")
+  type                  PaymentType
+  status                PaymentStatus
+  stripePaymentIntentId String?
+  stripeInvoiceId       String?
+  attemptCount          Int           @default(0)
+  dueAt                 DateTime?
+  paidAt                DateTime?
+  createdAt             DateTime      @default(now())
+}
+
+model Agreement {
+  id                 String          @id @default(uuid())
+  clientId           String
+  client             Client          @relation(fields: [clientId], references: [id])
+  docusignEnvelopeId String?
+  status             AgreementStatus @default(DRAFT)
+  sentAt             DateTime?
+  signedAt           DateTime?
+  createdAt          DateTime        @default(now())
+}
+
+model Document {
+  id          String       @id @default(uuid())
+  clientId    String
+  client      Client       @relation(fields: [clientId], references: [id])
+  type        DocumentType
+  fileName    String
+  s3Key       String
+  contentType String?
+  uploadedAt  DateTime     @default(now())
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  title       String
+  description String?
+  completed   Boolean  @default(false)
+  dueAt       DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Note {
+  id         String   @id @default(uuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id])
+  body       String
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
+
+model ActivityEvent {
+  id         String   @id @default(uuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id])
+  type       String
+  message    String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}

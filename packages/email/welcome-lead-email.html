@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to CredX</title>
+  <style>
+    body { margin: 0; padding: 0; background: #0d1420; font-family: Arial, Helvetica, sans-serif; color: #e9eef6; }
+    table { border-collapse: collapse; }
+    .wrapper { width: 100%; background: #0d1420; padding: 32px 16px; }
+    .container { max-width: 640px; margin: 0 auto; background: #111a28; border: 1px solid #243247; border-radius: 18px; overflow: hidden; }
+    .header { background: linear-gradient(135deg, #111a28, #1b2739); padding: 34px 32px 26px; text-align: center; border-bottom: 1px solid #243247; }
+    .brand { font-size: 30px; font-weight: 800; color: #ffffff; letter-spacing: 0.03em; }
+    .tag { margin-top: 8px; color: #c8d3e1; font-size: 14px; }
+    .goldbar { height: 6px; background: #c9a227; }
+    .content { padding: 32px; }
+    h1 { margin: 0 0 12px; font-size: 28px; color: #ffffff; }
+    p { margin: 0 0 14px; color: #d5dfeb; font-size: 16px; line-height: 1.65; }
+    .steps { margin: 24px 0; padding: 0; list-style: none; }
+    .steps li { margin-bottom: 14px; padding: 14px 16px; background: #162132; border: 1px solid #243247; border-radius: 12px; color: #e9eef6; }
+    .step-number { display: inline-block; width: 28px; height: 28px; line-height: 28px; text-align: center; border-radius: 999px; background: #c9a227; color: #101418; font-weight: 800; margin-right: 10px; }
+    .cta-wrap { text-align: center; padding: 10px 0 4px; }
+    .cta {
+      display: inline-block;
+      background: #6b7280;
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 15px 28px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 16px;
+      border: 1px solid #7a8290;
+      box-shadow: inset 0 -2px 0 rgba(0,0,0,0.15);
+    }
+    .cta:hover,
+    .cta:active {
+      background: #7fd0ff;
+      color: #0d1420 !important;
+      border-color: #7fd0ff;
+    }
+    .note { margin-top: 22px; padding: 16px 18px; background: #0f1826; border: 1px solid #243247; border-radius: 12px; color: #c8d3e1; font-size: 14px; }
+    .footer { padding: 24px 32px 32px; color: #9fb0c5; font-size: 13px; line-height: 1.6; border-top: 1px solid #243247; }
+    .footer strong { color: #ffffff; }
+    @media only screen and (max-width: 640px) {
+      .content, .header, .footer { padding-left: 20px; padding-right: 20px; }
+      h1 { font-size: 24px; }
+      p { font-size: 15px; }
+      .cta { width: 100%; box-sizing: border-box; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="goldbar"></div>
+      <div class="header">
+        <div class="brand">CredX</div>
+        <div class="tag">Credit Repair & Financial Strategy Support</div>
+      </div>
+      <div class="content">
+        <h1>Welcome to CredX</h1>
+        <p>Hi {{first_name}},</p>
+        <p>Welcome to CredX. We’re excited to support you on your credit repair and financial rebuilding journey.</p>
+        <p>Your inquiry has been received, and the next step is to complete your CredX service agreement so we can begin your onboarding process properly.</p>
+
+        <ul class="steps">
+          <li><span class="step-number">1</span><strong>Review and sign your CredX contract</strong><br />This is the first step required to begin your onboarding process.</li>
+          <li><span class="step-number">2</span><strong>Prepare your most recent credit report</strong><br />Once your contract is complete, you’ll be guided through the next report intake step.</li>
+          <li><span class="step-number">3</span><strong>Complete any requested intake details</strong><br />If we need anything else, we’ll walk you through it step by step.</li>
+          <li><span class="step-number">4</span><strong>Watch for your next CredX update</strong><br />After your agreement is signed, we’ll move you into the next stage of onboarding.</li>
+        </ul>
+
+        <div class="cta-wrap">
+          <a href="{{contract_link}}" class="cta">Complete Your Signup</a>
+        </div>
+
+        <div class="note">
+          If you have any questions, simply reply to this email and the CredX team will help you.
+        </div>
+      </div>
+      <div class="footer">
+        <strong>CredX</strong><br />
+        Credit Repair & Financial Strategy Support<br />
+        Sent from hello@credxme.com
+      </div>
+    </div>
+  </div>
+</body>
+</html>

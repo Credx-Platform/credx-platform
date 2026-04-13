@@ -1,0 +1,21 @@
+{
+  "name": "credx-platform",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @credx/api",
+    "build": "npm run build:api && npm run build:web",
+    "build:api": "npm run build --workspace @credx/api",
+    "build:web": "npm run build --workspace @credx/web",
+    "start": "npm run start:api",
+    "start:api": "npm run start --workspace @credx/api",
+    "start:web": "npm run start --workspace @credx/web",
+    "prisma:generate": "npm run prisma:generate --workspace @credx/db",
+    "prisma:migrate": "npm run prisma:migrate --workspace @credx/db",
+    "railway:dbpush": "npx prisma db push --schema packages/db/prisma/schema.prisma"
+  }
+}

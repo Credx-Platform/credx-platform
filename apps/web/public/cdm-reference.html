@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CredX - CDM Reference Gallery</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 2rem;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid #334155;
+    }
+    .header h1 {
+      font-size: 2rem;
+      color: #3b82f6;
+      margin-bottom: 0.5rem;
+    }
+    .header p {
+      color: #94a3b8;
+    }
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 1.5rem;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+    .screenshot-card {
+      background: #1e293b;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #334155;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .screenshot-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    }
+    .screenshot-card img {
+      width: 100%;
+      height: auto;
+      display: block;
+      cursor: pointer;
+    }
+    .screenshot-info {
+      padding: 1rem;
+    }
+    .screenshot-info h3 {
+      font-size: 1rem;
+      color: #60a5fa;
+      margin-bottom: 0.25rem;
+    }
+    .screenshot-info p {
+      font-size: 0.875rem;
+      color: #64748b;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.95);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+    }
+    .modal.active {
+      display: flex;
+    }
+    .modal img {
+      max-width: 95%;
+      max-height: 95%;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      font-size: 2rem;
+      color: #fff;
+      cursor: pointer;
+      background: rgba(255,255,255,0.1);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+    }
+    .modal-close:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .tabs-reference {
+      max-width: 1600px;
+      margin: 2rem auto;
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 1.5rem;
+      border: 1px solid #334155;
+    }
+    .tabs-reference h2 {
+      color: #3b82f6;
+      margin-bottom: 1rem;
+      font-size: 1.25rem;
+    }
+    .tabs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    .tab-item {
+      background: #0f172a;
+      padding: 1rem;
+      border-radius: 8px;
+      border-left: 4px solid #3b82f6;
+    }
+    .tab-item h4 {
+      color: #60a5fa;
+      margin-bottom: 0.5rem;
+    }
+    .tab-item p {
+      font-size: 0.875rem;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🧾 Client Dispute Manager Reference</h1>
+    <p>Target UI screenshots for CredX dispute workflow implementation</p>
+  </div>
+
+  <div class="gallery">
+    <div class="screenshot-card">
+      <img src="/assets/cdm-reference/01-respond-tab.jpg" alt="Respond Tab" onclick="openModal(this.src)">
+      <div class="screenshot-info">
+        <h3>1. RESPOND Tab</h3>
+        <p>Respond to bureaus, collectors, or creditors</p>
+      </div>
+    </div>
+
+    <div class="screenshot-card">
+      <img src="/assets/cdm-reference/02-results-tab.jpg" alt="Results Tab" onclick="openModal(this.src)">
+      <div class="screenshot-info">
+        <h3>2. RESULTS Tab</h3>
+        <p>Update client accounts with deletions and corrections</p>
+      </div>
+    </div>
+
+    <div class="screenshot-card">
+      <img src="/assets/cdm-reference/03-add-item-with-data.jpg" alt="Add Item Tab" onclick="openModal(this.src)">
+      <div class="screenshot-info">
+        <h3>3. ADD ITEM Tab (with data)</h3>
+        <p>10 accounts in dispute with per-bureau checkboxes</p>
+      </div>
+    </div>
+
+    <div class="screenshot-card">
+      <img src="/assets/cdm-reference/04-add-item-with-data-2.jpg" alt="Add Item Tab 2" onclick="openModal(this.src)">
+      <div class="screenshot-info">
+        <h3>4. ADD ITEM Tab (alternate view)</h3>
+        <p>Full dispute item builder with SAVE/DISPUTE buttons</p>
+      </div>
+    </div>
+
+    <div class="screenshot-card">
+      <img src="/assets/cdm-reference/05-import-report.jpg" alt="Import Report" onclick="openModal(this.src)">
+      <div class="screenshot-info">
+        <h3>5. IMPORT REPORT Tab</h3>
+        <p>Import from Identity IQ, Smart Credit, MyFreeScore Now</p>
+      </div>
+    </div>
+
+    <div class="screenshot-card">
+      <img src="/assets/cdm-reference/06-bureaus-tab.jpg" alt="Bureaus Tab" onclick="openModal(this.src)">
+      <div class="screenshot-info">
+        <h3>6. BUREAUS Tab</h3>
+        <p>Dispute inaccurate items with Dispute Strategies & Letter Guide</p>
+      </div>
+    </div>
+
+    <div class="screenshot-card">
+      <img src="/assets/cdm-reference/07-creditors-tab.jpg" alt="Creditors Tab" onclick="openModal(this.src)">
+      <div class="screenshot-info">
+        <h3>7. CREDITORS Tab</h3>
+        <p>Create disputes directly for creditors with AI Rewriter</p>
+      </div>
+    </div>
+
+    <div class="screenshot-card">
+      <img src="/assets/cdm-reference/08-collectors-tab.jpg" alt="Collectors Tab" onclick="openModal(this.src)">
+      <div class="screenshot-info">
+        <h3>8. COLLECTORS Tab</h3>
+        <p>Collection agency disputes with Dunning Letter Response</p>
+      </div>
+    </div>
+
+    <div class="screenshot-card">
+      <img src="/assets/cdm-reference/09-tracking-tab.jpg" alt="Tracking Tab" onclick="openModal(this.src)">
+      <div class="screenshot-info">
+        <h3>9. TRACKING Tab</h3>
+        <p>Track all letters sent with due dates (red when overdue)</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs-reference">
+    <h2>8-Tab Workflow Overview</h2>
+    <div class="tabs-grid">
+      <div class="tab-item">
+        <h4>IMPORT REPORT</h4>
+        <p>Import credit reports from monitoring services</p>
+      </div>
+      <div class="tab-item">
+        <h4>ADD ITEM</h4>
+        <p>Add unlimited accounts and initiate disputes</p>
+      </div>
+      <div class="tab-item">
+        <h4>BUREAUS</h4>
+        <p>Dispute inaccurate items on client's credit report</p>
+      </div>
+      <div class="tab-item">
+        <h4>CREDITORS</h4>
+        <p>Create disputes directly for creditors</p>
+      </div>
+      <div class="tab-item">
+        <h4>COLLECTORS</h4>
+        <p>Collection agency dispute management</p>
+      </div>
+      <div class="tab-item">
+        <h4>RESPOND</h4>
+        <p>Respond to bureaus, collectors, or creditors</p>
+      </div>
+      <div class="tab-item">
+        <h4>TRACKING</h4>
+        <p>Track letters sent and their due dates</p>
+      </div>
+      <div class="tab-item">
+        <h4>RESULTS</h4>
+        <p>Update accounts with deletions and corrections</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal" onclick="closeModal()">
+    <button class="modal-close">&times;</button>
+    <img id="modal-img" src="" alt="Fullscreen">
+  </div>
+
+  <script>
+    function openModal(src) {
+      document.getElementById('modal-img').src = src;
+      document.getElementById('modal').classList.add('active');
+    }
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+  </script>
+</body>
+</html>
