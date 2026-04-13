@@ -121,7 +121,7 @@ async function completeOnboardingWorkflow(clientId: string, creditReportDoc: { n
     'Set payment arrangement after analysis review'
   ];
   const existingTasks = await prisma.task.findMany({ where: { clientId }, select: { title: true } });
-  const existingTitles = new Set(existingTasks.map((t) => t.title));
+  const existingTitles = new Set(existingTasks.map((t: { title: string }) => t.title));
 
   for (const title of taskTitles) {
     if (!existingTitles.has(title)) {
