@@ -152,6 +152,74 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange }: AddIt
     }
   };
 
+  const handleSaveAndDispute = async () => {
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+    if (!formData.furnisher) {
+      alert('Please enter a furnisher name');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // First save the item
+      const url = editingItem 
+        ? `${API_BASE}/api/disputes/items/${editingItem.id}`
+        : `${API_BASE}/api/disputes/items`;
+      
+      const method = editingItem ? 'PUT' : 'POST';
+      
+      const saveResponse = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...formData,
+          clientId: selectedClient,
+          balance: formData.balance ? parseFloat(formData.balance) : null
+        })
+      });
+
+      if (!saveResponse.ok) throw new Error('Save failed');
+      const savedItem = await saveResponse.json();
+      
+      // Then initiate dispute for the item
+      const itemId = savedItem.id || editingItem?.id;
+      if (itemId) {
+        const disputeResponse = await fetch(`${API_BASE}/api/disputes/initiate`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            itemId: itemId,
+            clientId: selectedClient,
+            bureaus: {
+              equifax: formData.disputeEquifax,
+              experian: formData.disputeExperian,
+              transunion: formData.disputeTransunion
+            }
+          })
+        });
+
+        if (!disputeResponse.ok) throw new Error('Dispute initiation failed');
+      }
+      
+      resetForm();
+      onItemCreated();
+      alert('Item saved and dispute initiated successfully!');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Save and dispute failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
     
@@ -614,7 +682,7 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange }: AddIt
           </button>
           <button 
             className="btn btn-success" 
-            onClick={handleSave}
+            onClick={handleSaveAndDispute}
             disabled={saving || !selectedClient}
           >
             {editingItem ? 'Update & Dispute' : 'Save & Dispute'}

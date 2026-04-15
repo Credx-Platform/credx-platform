@@ -1,0 +1,5 @@
+[phases.build]
+cmds = ["npm install", "npm run prisma:generate", "npm run build:api"]
+
+[start]
+cmd = "npm run start:api"

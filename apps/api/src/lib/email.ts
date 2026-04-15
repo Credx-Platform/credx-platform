@@ -87,6 +87,49 @@ export async function sendWelcomeLeadEmail(params: { firstName: string; email: s
   return email;
 }
 
+export async function sendEmail(params: { to: string; subject: string; html?: string; text?: string }): Promise<{ id?: string; provider?: string; skipped?: boolean; reason?: string }> {
+  const sendgridApiKey = process.env.SENDGRID_API_KEY;
+  const sendgridFrom = process.env.SENDGRID_FROM_EMAIL || process.env.FROM_EMAIL || 'CredX <hello@credxme.com>';
+
+  if (!sendgridApiKey) {
+    console.log('EMAIL_PREVIEW', { to: params.to, subject: params.subject, reason: 'SENDGRID_API_KEY not configured' });
+    return { skipped: true, reason: 'SENDGRID_API_KEY not configured' };
+  }
+
+  const fromEmail = sendgridFrom.includes('<') ? sendgridFrom.match(/<([^>]+)>/ )?.[1] || sendgridFrom : sendgridFrom;
+  const fromName = sendgridFrom.includes('<') ? sendgridFrom.split('<')[0].trim().replace(/^"|"$/g, '') : 'CredX';
+
+  try {
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sendgridApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: params.to }] }],
+        from: { email: fromEmail, name: fromName || 'CredX' },
+        subject: params.subject,
+        content: [
+          ...(params.text ? [{ type: 'text/plain', value: params.text }] : []),
+          ...(params.html ? [{ type: 'text/html', value: params.html }] : [])
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.warn('SENDGRID_SEND_FAILED', response.status, body);
+      return { skipped: true, reason: `SENDGRID_SEND_FAILED:${response.status}:${body}` };
+    }
+
+    return { id: response.headers.get('x-message-id') || 'sendgrid-accepted', provider: 'sendgrid' };
+  } catch (error) {
+    console.warn('SENDGRID_EXCEPTION', error instanceof Error ? error.message : String(error));
+    return { skipped: true, reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 export async function notifyNewLead(params: { firstName: string; lastName: string; email: string; phone?: string }) {
   console.log('NEW_LEAD_NOTIFICATION_PREVIEW', {
     to: 'jmalloy@credxme.com',

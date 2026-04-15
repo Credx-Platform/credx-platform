@@ -39,15 +39,20 @@ export function ResultsTab({ token, items, onItemsChange }: ResultsTabProps) {
     setSelectedItems(newSet);
   };
 
-  const handleUpdateStatus = async (itemId: string, status: string) => {
+  const handleUpdateStatus = async (itemId: string, status: string, bureau?: 'efx' | 'xpn' | 'tu') => {
     try {
-      const response = await fetch(`${API_BASE}/api/disputes/items/${itemId}`, {
+      const body: any = { status };
+      if (bureau) {
+        body.bureau = bureau;
+      }
+      
+      const response = await fetch(`${API_BASE}/api/disputes/items/${itemId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ status })
+        body: JSON.stringify(body)
       });
 
       if (!response.ok) throw new Error('Update failed');
@@ -441,8 +446,8 @@ export function ResultsTab({ token, items, onItemsChange }: ResultsTabProps) {
                         <td>
                           <select 
                             className="bureau-status-select"
-                            value={item.disputeEquifax ? 'PENDING' : 'PENDING'}
-                            onChange={(e) => {}}
+                            value={item.efxStatus || 'PENDING'}
+                            onChange={(e) => handleUpdateStatus(item.id, e.target.value, 'efx')}
                           >
                             <option value="PENDING">Pending</option>
                             <option value="DELETED">Deleted</option>
@@ -453,8 +458,8 @@ export function ResultsTab({ token, items, onItemsChange }: ResultsTabProps) {
                         <td>
                           <select 
                             className="bureau-status-select"
-                            value={item.disputeExperian ? 'PENDING' : 'PENDING'}
-                            onChange={(e) => {}}
+                            value={item.xpnStatus || 'PENDING'}
+                            onChange={(e) => handleUpdateStatus(item.id, e.target.value, 'xpn')}
                           >
                             <option value="PENDING">Pending</option>
                             <option value="DELETED">Deleted</option>
@@ -465,8 +470,8 @@ export function ResultsTab({ token, items, onItemsChange }: ResultsTabProps) {
                         <td>
                           <select 
                             className="bureau-status-select"
-                            value={item.disputeTransunion ? 'PENDING' : 'PENDING'}
-                            onChange={(e) => {}}
+                            value={item.tuStatus || 'PENDING'}
+                            onChange={(e) => handleUpdateStatus(item.id, e.target.value, 'tu')}
                           >
                             <option value="PENDING">Pending</option>
                             <option value="DELETED">Deleted</option>

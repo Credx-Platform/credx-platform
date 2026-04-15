@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface ImportReportTabProps {
   token: string;
@@ -16,14 +16,14 @@ export function ImportReportTab({ token, onImportComplete }: ImportReportTabProp
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch clients on mount
-  useState(() => {
+  useEffect(() => {
     fetch(`${API_BASE}/api/clients`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
       .then(data => setClients(data.clients || []))
       .catch(console.error);
-  });
+  }, [token]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { signToken } from '../lib/jwt.js';
 import { notifyNewClientSignup } from '../lib/openclaw.js';
+import { sendEmail, sendWelcomeLeadEmail } from '../lib/email.js';
+import { config } from '../config.js';
 
 export const authRouter = Router();
 
@@ -51,8 +53,22 @@ authRouter.post('/register', async (req, res, next) => {
       source: 'credx-platform-api-register'
     });
 
+    const contractLink = `${config.appUrl.replace(/\/$/, '')}/#contract`;
+    const welcomeEmail = await sendWelcomeLeadEmail({
+      firstName: user.firstName || '',
+      email: user.email,
+      contractLink
+    });
+
+    const emailResult = await sendEmail({
+      to: user.email,
+      subject: welcomeEmail.subject,
+      html: welcomeEmail.html,
+      text: welcomeEmail.text
+    });
+
     const token = signToken({ sub: user.id, role: user.role });
-    return res.status(201).json({ user, token });
+    return res.status(201).json({ user, token, welcomeEmail: emailResult });
   } catch (error) {
     next(error);
   }

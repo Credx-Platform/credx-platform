@@ -177,12 +177,40 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
 }
 
 function Clients({ clients }: { clients: ClientRecord[] }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const filteredClients = useMemo(() => {
+    if (!searchQuery.trim()) return clients;
+    const query = searchQuery.toLowerCase();
+    return clients.filter(client => 
+      client.user.firstName.toLowerCase().includes(query) ||
+      client.user.lastName.toLowerCase().includes(query) ||
+      client.user.email.toLowerCase().includes(query) ||
+      client.status.toLowerCase().includes(query)
+    );
+  }, [clients, searchQuery]);
+
   return (
     <section className="panel">
       <div className="panel-header">
         <div>
           <p className="eyebrow">Client Management</p>
           <h2>Customers</h2>
+        </div>
+        <div className="search-box">
+          <input
+            type="text"
+            placeholder="Search clients..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              padding: '0.5rem 1rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              fontSize: '0.875rem',
+              minWidth: '250px'
+            }}
+          />
         </div>
       </div>
       <table className="data-table">
@@ -198,7 +226,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
           </tr>
         </thead>
         <tbody>
-          {clients.length ? clients.map((client) => (
+          {filteredClients.length ? filteredClients.map((client) => (
             <tr key={client.id}>
               <td>
                 <strong>{client.user.firstName} {client.user.lastName}</strong>
@@ -213,7 +241,9 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
             </tr>
           )) : (
             <tr>
-              <td colSpan={7} className="empty-row">No clients yet.</td>
+              <td colSpan={7} className="empty-row">
+                {searchQuery ? 'No clients match your search.' : 'No clients yet.'}
+              </td>
             </tr>
           )}
         </tbody>

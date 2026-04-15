@@ -368,3 +368,171 @@ disputesRouter.post('/bulk/delete', requireAuth, requireRole(['STAFF', 'ADMIN'])
     next(error);
   }
 });
+
+// ---------- Dispute Initiation ----------
+
+const initiateSchema = z.object({
+  itemId: z.string().uuid(),
+  clientId: z.string().uuid(),
+  bureaus: z.object({
+    equifax: z.boolean().default(false),
+    experian: z.boolean().default(false),
+    transunion: z.boolean().default(false)
+  })
+});
+
+// Initiate a dispute for an item
+disputesRouter.post('/initiate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const { itemId, clientId, bureaus } = initiateSchema.parse(req.body);
+    
+    // Get the dispute item
+    const item = await prisma.disputeItem.findUnique({
+      where: { id: itemId },
+      include: { rounds: true }
+    });
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Dispute item not found' });
+    }
+    
+    // Calculate next round number
+    const nextRound = item.currentRound + 1;
+    
+    // Calculate due date (35 days from now)
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 35);
+    
+    // Create dispute round
+    const round = await prisma.disputeRound.create({
+      data: {
+        disputeItemId: itemId,
+        roundNumber: nextRound,
+        sentDate: new Date(),
+        dueDate,
+        equifaxStatus: bureaus.equifax ? 'SENT' : 'PENDING',
+        experianStatus: bureaus.experian ? 'SENT' : 'PENDING',
+        transunionStatus: bureaus.transunion ? 'SENT' : 'PENDING',
+        notes: `Round ${nextRound} initiated via admin portal`
+      }
+    });
+    
+    // Update dispute item status
+    const updatedItem = await prisma.disputeItem.update({
+      where: { id: itemId },
+      data: {
+        status: 'IN_DISPUTE',
+        currentRound: nextRound
+      },
+      include: {
+        client: {
+          include: { user: true }
+        },
+        rounds: {
+          orderBy: { roundNumber: 'desc' }
+        }
+      }
+    });
+    
+    // Create activity event
+    await prisma.activityEvent.create({
+      data: {
+        clientId,
+        type: 'DISPUTE_INITIATED',
+        message: `Dispute initiated for ${item.furnisher} (Round ${nextRound})`,
+        metadata: {
+          furnisher: item.furnisher,
+          round: nextRound,
+          bureaus: Object.keys(bureaus).filter(k => bureaus[k as keyof typeof bureaus])
+        }
+      }
+    });
+    
+    return res.status(201).json({
+      success: true,
+      item: updatedItem,
+      round
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------- Bureau Status Updates ----------
+
+const bureauStatusSchema = z.object({
+  status: z.enum(['PENDING', 'DELETED', 'UPDATED', 'VERIFIED']),
+  bureau: z.enum(['efx', 'xpn', 'tu']).optional()
+});
+
+// Update dispute item with bureau-specific status
+disputesRouter.put('/items/:id/status', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const { status, bureau } = bureauStatusSchema.parse(req.body);
+    
+    // Get current item
+    const item = await prisma.disputeItem.findUnique({
+      where: { id },
+      include: { rounds: { orderBy: { roundNumber: 'desc' }, take: 1 } }
+    });
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Dispute item not found' });
+    }
+    
+    const updateData: any = { status };
+    
+    // If bureau specified, update bureau-specific status on latest round
+    if (bureau && item.rounds.length > 0) {
+      const latestRound = item.rounds[0];
+      const bureauField = bureau === 'efx' ? 'equifaxStatus' : 
+                         bureau === 'xpn' ? 'experianStatus' : 'transunionStatus';
+      
+      await prisma.disputeRound.update({
+        where: { id: latestRound.id },
+        data: { [bureauField]: status === 'DELETED' ? 'RESPONSE_RECEIVED' : status }
+      });
+      
+      // Also update the main item status based on bureau results
+      if (status === 'DELETED') {
+        updateData.status = 'DELETED';
+      } else if (status === 'UPDATED') {
+        updateData.status = 'UPDATED';
+      } else if (status === 'VERIFIED') {
+        updateData.status = 'VERIFIED';
+      }
+    }
+    
+    const updatedItem = await prisma.disputeItem.update({
+      where: { id },
+      data: updateData,
+      include: {
+        client: {
+          include: { user: true }
+        },
+        rounds: {
+          orderBy: { roundNumber: 'desc' }
+        }
+      }
+    });
+    
+    // Create activity event
+    await prisma.activityEvent.create({
+      data: {
+        clientId: item.clientId,
+        type: 'DISPUTE_STATUS_UPDATED',
+        message: `Dispute status updated to ${status}${bureau ? ` (${bureau.toUpperCase()})` : ''}`,
+        metadata: {
+          furnisher: item.furnisher,
+          status,
+          bureau: bureau || null
+        }
+      }
+    });
+    
+    return res.json({ item: updatedItem });
+  } catch (error) {
+    next(error);
+  }
+});
