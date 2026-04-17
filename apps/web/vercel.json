@@ -1,6 +1,7 @@
 {
   "version": 2,
   "routes": [
+    { "src": "/adminportal/(.*)", "dest": "/index.html" },
     { "handle": "filesystem" },
     { "src": "/.*", "dest": "/index.html" }
   ]
