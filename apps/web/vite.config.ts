@@ -12,7 +12,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        adminportal: resolve(__dirname, 'adminportal.html')
+        adminportal: resolve(__dirname, 'adminportal.html'),
+        portal: resolve(__dirname, 'portal.html')
       }
     }
   }
