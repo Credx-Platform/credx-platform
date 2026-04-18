@@ -33,9 +33,24 @@ function serveFile(res, path) {
 
 const server = createServer(async (req, res) => {
   const requestPath = new URL(req.url ?? '/', 'http://localhost').pathname;
-  const relativePath = requestPath === '/' ? 'index.html' : requestPath.replace(/^\//, '');
-  const filePath = safePath(relativePath);
 
+  if (requestPath === '/' || requestPath === '/index.html') {
+    const landingPath = join(rootDir, 'index.html');
+    if (existsSync(landingPath)) return serveFile(res, landingPath);
+  }
+
+  if (requestPath === '/portal' || requestPath === '/portal/') {
+    const portalPath = join(rootDir, 'portal.html');
+    if (existsSync(portalPath)) return serveFile(res, portalPath);
+  }
+
+  if (requestPath === '/adminportal' || requestPath === '/adminportal/') {
+    const adminPortalPath = join(rootDir, 'adminportal.html');
+    if (existsSync(adminPortalPath)) return serveFile(res, adminPortalPath);
+  }
+
+  const relativePath = requestPath.replace(/^\//, '');
+  const filePath = safePath(relativePath);
   if (existsSync(filePath)) {
     const fileStat = await stat(filePath);
     if (fileStat.isFile()) {
@@ -43,20 +58,19 @@ const server = createServer(async (req, res) => {
     }
   }
 
-  const adminAssetPath = requestPath.startsWith('/adminportal/')
-    ? safePath(requestPath.replace(/^\/adminportal\//, ''))
-    : null;
-
-  if (adminAssetPath && existsSync(adminAssetPath)) {
-    const fileStat = await stat(adminAssetPath);
-    if (fileStat.isFile()) {
-      return serveFile(res, adminAssetPath);
-    }
+  if (requestPath.startsWith('/portal/')) {
+    const portalPath = join(rootDir, 'portal.html');
+    if (existsSync(portalPath)) return serveFile(res, portalPath);
   }
 
-  const indexPath = join(rootDir, 'index.html');
-  if (existsSync(indexPath)) {
-    return serveFile(res, indexPath);
+  if (requestPath.startsWith('/adminportal/')) {
+    const adminPortalPath = join(rootDir, 'adminportal.html');
+    if (existsSync(adminPortalPath)) return serveFile(res, adminPortalPath);
+  }
+
+  const landingPath = join(rootDir, 'index.html');
+  if (existsSync(landingPath)) {
+    return serveFile(res, landingPath);
   }
 
   res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
