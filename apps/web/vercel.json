@@ -3,6 +3,6 @@
   "cleanUrls": false,
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/adminportal(?:/(.*))?", "dest": "/index.html" }
+    { "src": "/adminportal(?:/(.*))?", "dest": "/adminportal.html" }
   ]
 }
