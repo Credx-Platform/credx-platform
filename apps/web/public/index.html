@@ -115,7 +115,8 @@ async function submitForm(){
   if(!document.getElementById('cb_final').checked){showToast('Please confirm your information is accurate.','error');return}
   btn.disabled=true;btn.textContent='Submitting...';
   try{
-    const res=await fetch('/api/leads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const API_BASE = 'https://credxapi-production.up.railway.app';
+    const res=await fetch(`${API_BASE}/api/leads`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const body=await res.json().catch(()=>null);
     if(!res.ok) throw new Error(body?.error||'Submission failed');
     document.getElementById('success').style.display='block';
