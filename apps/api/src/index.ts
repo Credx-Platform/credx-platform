@@ -5,6 +5,9 @@ import { config } from './config.js';
 import { errorHandler } from './middleware/error.js';
 import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
+import { contractsRouter } from './routes/contracts.js';
+import { applicationsRouter } from './routes/applications.js';
+import { monitoringRouter } from './routes/monitoring.js';
 import { usersRouter } from './routes/users.js';
 import { leadsRouter } from './routes/leads.js';
 import { clientsRouter } from './routes/clients.js';
@@ -24,6 +27,9 @@ app.get('/', (_req, res) => {
 
 app.use('/health', healthRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/contracts', contractsRouter);
+app.use('/api/applications', applicationsRouter);
+app.use('/api/monitoring', monitoringRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/leads', leadsRouter);
 app.use('/api/clients', clientsRouter);

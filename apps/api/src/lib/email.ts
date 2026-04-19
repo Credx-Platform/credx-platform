@@ -1,3 +1,5 @@
+import { Resend } from 'resend';
+
 function renderWelcomeLeadEmail(params: { firstName: string; contractLink: string }) {
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -88,16 +90,47 @@ export async function sendWelcomeLeadEmail(params: { firstName: string; email: s
 }
 
 export async function sendEmail(params: { to: string; subject: string; html?: string; text?: string }): Promise<{ id?: string; provider?: string; skipped?: boolean; reason?: string }> {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const resendFrom = process.env.RESEND_FROM_EMAIL || process.env.FROM_EMAIL || 'CredX <onboarding@updates.credxme.com>';
   const sendgridApiKey = process.env.SENDGRID_API_KEY;
   const sendgridFrom = process.env.SENDGRID_FROM_EMAIL || process.env.FROM_EMAIL || 'CredX <hello@credxme.com>';
 
-  if (!sendgridApiKey) {
-    console.log('EMAIL_PREVIEW', { to: params.to, subject: params.subject, reason: 'SENDGRID_API_KEY not configured' });
-    return { skipped: true, reason: 'SENDGRID_API_KEY not configured' };
+  const parseFrom = (value: string) => {
+    const email = value.includes('<') ? value.match(/<([^>]+)>/ )?.[1] || value : value;
+    const name = value.includes('<') ? value.split('<')[0].trim().replace(/^"|"$/g, '') : 'CredX';
+    return { email, name: name || 'CredX' };
+  };
+
+  if (resendApiKey) {
+    try {
+      const resend = new Resend(resendApiKey);
+      const from = parseFrom(resendFrom);
+      const result = await resend.emails.send({
+        from: from.name ? `${from.name} <${from.email}>` : from.email,
+        to: [params.to],
+        subject: params.subject,
+        ...(params.html ? { html: params.html } : {}),
+        ...(params.text ? { text: params.text } : { text: '' })
+      });
+
+      if (result.error) {
+        console.warn('RESEND_SEND_FAILED', result.error);
+        return { skipped: true, reason: `RESEND_SEND_FAILED:${JSON.stringify(result.error)}` };
+      }
+
+      return { id: result.data?.id, provider: 'resend' };
+    } catch (error) {
+      console.warn('RESEND_EXCEPTION', error instanceof Error ? error.message : String(error));
+      return { skipped: true, reason: error instanceof Error ? error.message : String(error) };
+    }
   }
 
-  const fromEmail = sendgridFrom.includes('<') ? sendgridFrom.match(/<([^>]+)>/ )?.[1] || sendgridFrom : sendgridFrom;
-  const fromName = sendgridFrom.includes('<') ? sendgridFrom.split('<')[0].trim().replace(/^"|"$/g, '') : 'CredX';
+  if (!sendgridApiKey) {
+    console.log('EMAIL_PREVIEW', { to: params.to, subject: params.subject, reason: 'No email provider configured' });
+    return { skipped: true, reason: 'No email provider configured' };
+  }
+
+  const from = parseFrom(sendgridFrom);
 
   try {
     const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -108,7 +141,7 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: params.to }] }],
-        from: { email: fromEmail, name: fromName || 'CredX' },
+        from: { email: from.email, name: from.name },
         subject: params.subject,
         content: [
           ...(params.text ? [{ type: 'text/plain', value: params.text }] : []),

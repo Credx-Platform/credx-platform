@@ -1,16 +1,44 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 
 export const disputesRouter = Router();
+
+function getProgressDisputes(progress: any) {
+  return Array.isArray(progress?.disputes) ? progress.disputes : [];
+}
+
+async function getClientWithProgress(userId: string) {
+  return prisma.client.findUnique({
+    where: { userId },
+    include: { progress: true }
+  });
+}
 
 // ============================================
 // LEGACY ROUTES (keep for backward compatibility)
 // ============================================
 
-disputesRouter.get('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (_req, res, next) => {
+disputesRouter.get('/', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
+    if (req.auth?.role === 'CLIENT') {
+      const client = await getClientWithProgress(req.auth.sub);
+      if (!client) return res.status(404).json({ error: 'Client not found' });
+
+      const progress = client.progress as any;
+      return res.json({
+        analysis: progress?.analysis ?? null,
+        disputeStrategy: progress?.disputeStrategy ?? null,
+        disputes: getProgressDisputes(progress),
+        workflow: progress?.workflow ?? null
+      });
+    }
+
+    if (!req.auth || !['STAFF', 'ADMIN'].includes(req.auth.role)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const disputes = await prisma.dispute.findMany({
       include: {
         client: {
@@ -36,8 +64,106 @@ const disputeSchema = z.object({
   reason: z.string().optional()
 });
 
-disputesRouter.post('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+disputesRouter.post('/seed-case', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
+    if (req.auth?.role !== 'CLIENT') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const presetId = String(req.body?.presetId || '').trim().toLowerCase();
+    if (presetId !== 'galloway') {
+      return res.status(400).json({ error: 'Unsupported preset' });
+    }
+
+    const client = await getClientWithProgress(req.auth.sub);
+    if (!client || !client.progress) return res.status(404).json({ error: 'Client not found' });
+
+    const now = new Date().toISOString();
+    const disputes = [
+      { id: crypto.randomUUID(), title: 'Capital One dispute', bureau: 'Experian', status: 'drafted', priority: 'high', type: 'bureau_packet', createdAt: now },
+      { id: crypto.randomUUID(), title: 'Midland Credit validation', bureau: 'Experian / TransUnion', status: 'drafted', priority: 'high', type: 'collector_validation', createdAt: now },
+      { id: crypto.randomUUID(), title: 'Personal information cleanup', bureau: 'All 3 Bureaus', status: 'drafted', priority: 'high', type: 'bureau_packet', createdAt: now }
+    ];
+    const analysis = {
+      caseId: 'galloway',
+      clientName: 'Sharon Galloway',
+      findings: [
+        'Very high utilization is suppressing scores.',
+        'Negative reporting is heavier on Experian and TransUnion.',
+        'Several tradelines appear to need factual verification.'
+      ]
+    };
+    const disputeStrategy = {
+      objective: 'Start with factual inconsistencies and documentation-backed disputes.',
+      phases: ['Personal information cleanup', 'Round-one bureau disputes', 'Collector validation where needed']
+    };
+    const progress = client.progress as any;
+
+    await prisma.clientProgress.update({
+      where: { clientId: client.id },
+      data: {
+        analysis,
+        disputeStrategy,
+        disputes,
+        workflow: {
+          ...(progress.workflow || {}),
+          stage: 'round_one_disputes_ready',
+          updatedAt: now,
+          next: ['mail_round_one_packets', 'wait_for_responses', 'review_for_cfpb_or_mov']
+        }
+      }
+    });
+
+    return res.json({ analysis, disputeStrategy, disputes, workflow: { stage: 'round_one_disputes_ready', updatedAt: now } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+disputesRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    if (req.auth?.role === 'CLIENT') {
+      const client = await getClientWithProgress(req.auth.sub);
+      if (!client || !client.progress) return res.status(404).json({ error: 'Client not found' });
+
+      const createdAt = new Date().toISOString();
+      const dispute = {
+        id: crypto.randomUUID(),
+        title: `${String(req.body?.accountName || 'Manual dispute').trim()} dispute`,
+        bureau: String(req.body?.bureau || 'All 3 Bureaus'),
+        status: 'drafted',
+        priority: 'medium',
+        type: 'manual',
+        accountName: String(req.body?.accountName || '').trim(),
+        accountNumber: String(req.body?.accountNumber || '').trim(),
+        reason: String(req.body?.reason || 'Inaccurate reporting').trim(),
+        request: String(req.body?.request || 'Reinvestigate and correct or delete if inaccurate.').trim(),
+        notes: String(req.body?.notes || '').trim(),
+        createdAt
+      };
+
+      const progress = client.progress as any;
+      const disputes = [...getProgressDisputes(progress), dispute];
+      await prisma.clientProgress.update({
+        where: { clientId: client.id },
+        data: {
+          disputes,
+          workflow: {
+            ...(progress.workflow || {}),
+            stage: 'round_one_disputes_ready',
+            updatedAt: createdAt,
+            next: ['mail_round_one_packets', 'wait_for_responses', 'review_for_cfpb_or_mov']
+          }
+        }
+      });
+
+      return res.status(201).json(dispute);
+    }
+
+    if (!req.auth || !['STAFF', 'ADMIN'].includes(req.auth.role)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const data = disputeSchema.parse(req.body);
     const dispute = await prisma.dispute.create({ data });
     return res.status(201).json({ dispute });

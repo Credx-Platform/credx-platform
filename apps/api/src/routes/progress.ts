@@ -227,7 +227,7 @@ const docSchema = z.object({
   fileName: z.string().optional()
 });
 
-progressRouter.post('/me/docs', requireAuth, async (req: AuthedRequest, res, next) => {
+async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
   try {
     const data = docSchema.parse(req.body);
     const client = await prisma.client.findUnique({ where: { userId: req.auth!.sub }, include: { progress: true } });
@@ -265,4 +265,7 @@ progressRouter.post('/me/docs', requireAuth, async (req: AuthedRequest, res, nex
   } catch (error) {
     next(error);
   }
-});
+}
+
+progressRouter.post('/me/docs', requireAuth, handleDocUpload);
+progressRouter.post('/docs', requireAuth, handleDocUpload);

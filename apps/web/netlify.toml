@@ -1,0 +1,23 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[[redirects]]
+  from = "/portal"
+  to = "/portal.html"
+  status = 200
+
+[[redirects]]
+  from = "/portal/*"
+  to = "/portal.html"
+  status = 200
+
+[[redirects]]
+  from = "/adminportal"
+  to = "/adminportal.html"
+  status = 200
+
+[[redirects]]
+  from = "/adminportal/*"
+  to = "/adminportal.html"
+  status = 200

@@ -6,6 +6,7 @@ import { signToken } from '../lib/jwt.js';
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { sendEmail, sendWelcomeLeadEmail } from '../lib/email.js';
 import { config } from '../config.js';
+import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 
 export const authRouter = Router();
 
@@ -90,6 +91,27 @@ authRouter.post('/login', async (req, res, next) => {
 
     const token = signToken({ sub: user.id, role: user.role });
     return res.json({ user, token });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.get('/me', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.auth!.sub },
+      include: { client: { include: { progress: true } } }
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const { passwordHash, client, ...safeUser } = user;
+    return res.json({
+      ...safeUser,
+      leadId: client?.id ?? null,
+      portalUnlocked: !client?.portalRestricted,
+      progress: client?.progress ?? null,
+      client
+    });
   } catch (error) {
     next(error);
   }
