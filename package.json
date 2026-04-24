@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "npm run prisma:generate",
+    "postinstall": "if [ -n \"$SKIP_PRISMA_GENERATE\" ]; then echo 'Skipping prisma generate'; else npm run prisma:generate; fi",
     "dev": "npm run dev --workspace @credx/api",
     "build": "npm run build:api && npm run build:web",
     "build:api": "npm run build --workspace @credx/api",

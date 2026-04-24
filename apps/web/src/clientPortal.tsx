@@ -37,12 +37,50 @@ type LoginResponse = {
   token: string;
 };
 
+type ContractTextResponse = {
+  agreement: string;
+  disclosure: string;
+  company?: { name?: string; address?: string };
+};
+
+type WizardState = {
+  fullName: string;
+  email: string;
+  phone: string;
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  zip: string;
+  dob: string;
+  ssn: string;
+  provider: string;
+  monitorUsername: string;
+  monitorPassword: string;
+};
+
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() ||
   (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
     ? 'http://localhost:3000'
     : '');
 const TOKEN_KEY = 'credx-client-token';
 const USER_KEY = 'credx-client-user';
+
+const defaultWizardState: WizardState = {
+  fullName: '',
+  email: '',
+  phone: '',
+  address1: '',
+  address2: '',
+  city: '',
+  state: '',
+  zip: '',
+  dob: '',
+  ssn: '',
+  provider: '',
+  monitorUsername: '',
+  monitorPassword: ''
+};
 
 async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
   if (!API_BASE) throw new Error('Missing VITE_API_URL for this deployment');
@@ -102,6 +140,242 @@ function ClientLogin({
         <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</button>
       </form>
     </div>
+  );
+}
+
+function OnboardingWizard({
+  token,
+  user,
+  progress,
+  onProgressUpdated
+}: {
+  token: string;
+  user: User;
+  progress: Progress | null;
+  onProgressUpdated: (nextProgress: Progress) => void;
+}) {
+  const [contractText, setContractText] = useState<ContractTextResponse | null>(null);
+  const [loadingContract, setLoadingContract] = useState(true);
+  const [busyStep, setBusyStep] = useState<string | null>(null);
+  const [wizardError, setWizardError] = useState<string | null>(null);
+  const [signatureName, setSignatureName] = useState(`${user.firstName} ${user.lastName}`.trim());
+  const [contractAgreed, setContractAgreed] = useState(false);
+  const [docName, setDocName] = useState('');
+  const [docType, setDocType] = useState('credit_report');
+  const [wizardState, setWizardState] = useState<WizardState>({
+    ...defaultWizardState,
+    fullName: `${user.firstName} ${user.lastName}`.trim(),
+    email: user.email
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingContract(true);
+    apiFetch<ContractTextResponse>('/api/contracts/text', token)
+      .then((response) => {
+        if (!cancelled) setContractText(response);
+      })
+      .catch((error) => {
+        if (!cancelled) setWizardError(error.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingContract(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const stage = progress?.workflow?.stage || 'signup_received';
+  const completedAt = progress?.onboarding?.completedAt;
+  const needsContract = ['signup_received', 'contract_pending'].includes(stage);
+  const needsApplication = ['contract_signed', 'application_pending'].includes(stage);
+  const needsMonitoring = stage === 'application_completed';
+  const needsUpload = ['portal_unlocked', 'upload_credit_report', 'credit_report_received'].includes(stage) && !completedAt;
+
+  async function refreshProgress() {
+    const nextProgress = await apiFetch<Progress>('/api/progress/me', token);
+    onProgressUpdated(nextProgress);
+  }
+
+  function setField<K extends keyof WizardState>(key: K, value: WizardState[K]) {
+    setWizardState((current) => ({ ...current, [key]: value }));
+  }
+
+  async function submitContract(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWizardError(null);
+    setBusyStep('contract');
+    try {
+      await apiFetch('/api/contracts', token, {
+        method: 'POST',
+        body: JSON.stringify({ signed_name: signatureName, agreed: contractAgreed })
+      });
+      await refreshProgress();
+    } catch (error) {
+      setWizardError(error instanceof Error ? error.message : 'Unable to sign contract');
+    } finally {
+      setBusyStep(null);
+    }
+  }
+
+  async function submitApplication(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWizardError(null);
+    setBusyStep('application');
+    try {
+      await apiFetch('/api/applications', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          full_name: wizardState.fullName,
+          email: wizardState.email,
+          phone: wizardState.phone,
+          address_line1: wizardState.address1,
+          address_line2: wizardState.address2,
+          city: wizardState.city,
+          state: wizardState.state,
+          zip: wizardState.zip,
+          dob: wizardState.dob,
+          ssn: wizardState.ssn
+        })
+      });
+      await refreshProgress();
+    } catch (error) {
+      setWizardError(error instanceof Error ? error.message : 'Unable to save intake');
+    } finally {
+      setBusyStep(null);
+    }
+  }
+
+  async function submitMonitoring(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWizardError(null);
+    setBusyStep('monitoring');
+    try {
+      await apiFetch('/api/monitoring', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          provider: wizardState.provider,
+          username: wizardState.monitorUsername,
+          password: wizardState.monitorPassword
+        })
+      });
+      await refreshProgress();
+    } catch (error) {
+      setWizardError(error instanceof Error ? error.message : 'Unable to save monitoring');
+    } finally {
+      setBusyStep(null);
+    }
+  }
+
+  async function submitDocument(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWizardError(null);
+    setBusyStep('upload');
+    try {
+      await apiFetch('/api/progress/me/docs', token, {
+        method: 'POST',
+        body: JSON.stringify({ name: docName, fileName: docName, type: docType })
+      });
+      setDocName('');
+      await refreshProgress();
+    } catch (error) {
+      setWizardError(error instanceof Error ? error.message : 'Unable to save document');
+    } finally {
+      setBusyStep(null);
+    }
+  }
+
+  return (
+    <section className="panel" id="onboarding">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Onboarding</p>
+          <h2>Finish your CredX setup</h2>
+        </div>
+      </div>
+      {wizardError ? <div className="error-banner">{wizardError}</div> : null}
+      <div className="dispute-list">
+        {loadingContract ? <div className="empty-state-card">Loading your agreement...</div> : null}
+
+        {needsContract && contractText ? (
+          <form className="dispute-card-live" onSubmit={submitContract}>
+            <div className="dispute-card-top"><strong>Step 1, sign your agreement</strong></div>
+            <div className="dispute-meta" style={{ display: 'block' }}>
+              <p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.agreement}</p>
+              <p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.disclosure}</p>
+              <input className="chat-input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your full name" />
+              <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginTop: '1rem' }}>
+                <input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} />
+                <span>I have read and agree to the contract and disclosures.</span>
+              </label>
+              <button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim()} style={{ marginTop: '1rem' }}>
+                {busyStep === 'contract' ? 'Signing...' : 'Sign contract'}
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {needsApplication ? (
+          <form className="dispute-card-live" onSubmit={submitApplication}>
+            <div className="dispute-card-top"><strong>Step 2, complete intake</strong></div>
+            <div className="dispute-meta" style={{ display: 'grid', gap: '.75rem' }}>
+              <input className="chat-input" value={wizardState.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Full name" />
+              <input className="chat-input" value={wizardState.email} onChange={(e) => setField('email', e.target.value)} placeholder="Email" />
+              <input className="chat-input" value={wizardState.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="Phone" />
+              <input className="chat-input" value={wizardState.address1} onChange={(e) => setField('address1', e.target.value)} placeholder="Address line 1" />
+              <input className="chat-input" value={wizardState.address2} onChange={(e) => setField('address2', e.target.value)} placeholder="Address line 2" />
+              <input className="chat-input" value={wizardState.city} onChange={(e) => setField('city', e.target.value)} placeholder="City" />
+              <input className="chat-input" value={wizardState.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" />
+              <input className="chat-input" value={wizardState.zip} onChange={(e) => setField('zip', e.target.value)} placeholder="ZIP" />
+              <input className="chat-input" value={wizardState.dob} onChange={(e) => setField('dob', e.target.value)} placeholder="Date of birth (YYYY-MM-DD)" />
+              <input className="chat-input" value={wizardState.ssn} onChange={(e) => setField('ssn', e.target.value)} placeholder="SSN" />
+              <button className="ghost-button" type="submit" disabled={busyStep === 'application'}>
+                {busyStep === 'application' ? 'Saving...' : 'Save intake'}
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {needsMonitoring ? (
+          <form className="dispute-card-live" onSubmit={submitMonitoring}>
+            <div className="dispute-card-top"><strong>Step 3, set your monitoring account</strong></div>
+            <div className="dispute-meta" style={{ display: 'grid', gap: '.75rem' }}>
+              <select className="chat-input" value={wizardState.provider} onChange={(e) => setField('provider', e.target.value)}>
+                <option value="">Select provider</option>
+                <option value="IdentityIQ">IdentityIQ</option>
+                <option value="MyFreeScoreNow">MyFreeScoreNow</option>
+              </select>
+              <input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" />
+              <input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" />
+              <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>
+                {busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {needsUpload ? (
+          <form className="dispute-card-live" onSubmit={submitDocument}>
+            <div className="dispute-card-top"><strong>Step 4, upload your documents</strong></div>
+            <div className="dispute-meta" style={{ display: 'grid', gap: '.75rem' }}>
+              <input className="chat-input" value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="Document name, for example experian-report.pdf" />
+              <select className="chat-input" value={docType} onChange={(e) => setDocType(e.target.value)}>
+                <option value="credit_report">Credit report</option>
+                <option value="identity">Driver's license or ID</option>
+                <option value="proof_of_address">Proof of address</option>
+                <option value="other">Other</option>
+              </select>
+              <button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docName.trim()}>
+                {busyStep === 'upload' ? 'Uploading...' : 'Save document'}
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {completedAt ? <div className="empty-state-card">Onboarding complete. Your file is now in review.</div> : null}
+      </div>
+    </section>
   );
 }
 
@@ -212,6 +486,7 @@ export default function ClientPortalApp() {
         <div className="brand">CredX</div>
         <nav>
           <a className="active" href="#overview">Overview</a>
+          <a href="#onboarding">Onboarding</a>
           <a href="#tasks">Tasks</a>
           <a href="#activity">Activity</a>
           <a href="#disputes">Disputes</a>
@@ -249,6 +524,10 @@ export default function ClientPortalApp() {
               <div className="stat-card"><span>Disputes</span><strong>{disputes.length}</strong></div>
             </div>
           </section>
+
+          {!progress?.onboarding?.completedAt && user ? (
+            <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} />
+          ) : null}
 
           <section className="panel two-col">
             <div>
