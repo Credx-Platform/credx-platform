@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { config } from '../config.js';
-import { notifyNewLead, sendWelcomeLeadEmail } from '../lib/email.js';
+import { notifyNewLead, sendWelcomeLeadEmail, sendEmail } from '../lib/email.js';
 
 export const leadsRouter = Router();
 
@@ -20,10 +20,17 @@ leadsRouter.post('/', async (req, res, next) => {
     const lead = await prisma.lead.create({ data });
     const contractLink = `${config.appUrl.replace(/\/$/, '')}/contract`;
 
-    await sendWelcomeLeadEmail({
+    const welcomeEmail = await sendWelcomeLeadEmail({
       firstName: data.firstName,
       email: data.email,
       contractLink
+    });
+
+    const emailResult = await sendEmail({
+      to: data.email,
+      subject: welcomeEmail.subject,
+      html: welcomeEmail.html,
+      text: welcomeEmail.text
     });
 
     await notifyNewLead({
@@ -36,7 +43,8 @@ leadsRouter.post('/', async (req, res, next) => {
     return res.status(201).json({
       lead,
       message: 'Lead created and welcome flow triggered.',
-      contractLink
+      contractLink,
+      welcomeEmail: emailResult
     });
   } catch (error) {
     next(error);

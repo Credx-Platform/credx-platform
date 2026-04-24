@@ -80,13 +80,21 @@ export async function sendWelcomeLeadEmail(params: { firstName: string; email: s
     contractLink: params.contractLink
   });
 
-  console.log('WELCOME_EMAIL_PREVIEW', {
+  const result = await sendEmail({
     to: params.email,
     subject: email.subject,
-    contractLink: params.contractLink
+    html: email.html,
+    text: email.text
   });
 
-  return email;
+  console.log('WELCOME_EMAIL_SEND_RESULT', {
+    to: params.email,
+    subject: email.subject,
+    contractLink: params.contractLink,
+    result
+  });
+
+  return { ...email, delivery: result };
 }
 
 export async function sendEmail(params: { to: string; subject: string; html?: string; text?: string }): Promise<{ id?: string; provider?: string; skipped?: boolean; reason?: string }> {
@@ -164,8 +172,29 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
 }
 
 export async function notifyNewLead(params: { firstName: string; lastName: string; email: string; phone?: string }) {
-  console.log('NEW_LEAD_NOTIFICATION_PREVIEW', {
+  const subject = `New CredX lead: ${params.firstName} ${params.lastName}`;
+  const html = `
+    <div style="font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.6;">
+      <h2 style="margin-bottom:12px;">New CredX lead received</h2>
+      <p><strong>Name:</strong> ${params.firstName} ${params.lastName}</p>
+      <p><strong>Email:</strong> ${params.email}</p>
+      <p><strong>Phone:</strong> ${params.phone || 'Not provided'}</p>
+    </div>
+  `;
+  const text = `New CredX lead received\n\nName: ${params.firstName} ${params.lastName}\nEmail: ${params.email}\nPhone: ${params.phone || 'Not provided'}`;
+
+  const result = await sendEmail({
     to: 'jmalloy@credxme.com',
-    lead: params
+    subject,
+    html,
+    text
   });
+
+  console.log('NEW_LEAD_NOTIFICATION_SEND_RESULT', {
+    to: 'jmalloy@credxme.com',
+    lead: params,
+    result
+  });
+
+  return result;
 }
