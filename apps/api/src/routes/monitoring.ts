@@ -1,8 +1,23 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
+import { config } from '../config.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { sendPortalReadyEmail } from '../lib/email.js';
+import { buildPasswordSetupLink, issuePasswordSetupToken } from '../lib/passwordSetup.js';
 
 export const monitoringRouter = Router();
+
+const PORTAL_READY_GUARD_KEY = 'portalReadyEmailSentAt';
+
+function isContractSigned(progress: any) {
+  const stage = progress?.workflow?.stage;
+  if (stage === 'contract_signed') return true;
+  return ['contract_signed', 'application_completed', 'portal_unlocked'].includes(stage);
+}
+
+function isProfileFilled(client: { ssnLast4: string | null; currentAddressLine1: string | null; dobEncrypted: string | null }) {
+  return Boolean(client.ssnLast4 && client.currentAddressLine1 && client.dobEncrypted);
+}
 
 monitoringRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
@@ -13,7 +28,7 @@ monitoringRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) =>
 
     const client = await prisma.client.findUnique({
       where: { userId: req.auth!.sub },
-      include: { progress: true }
+      include: { progress: true, user: true }
     });
     if (!client || !client.progress) return res.status(404).json({ error: 'Client not found' });
 
@@ -44,6 +59,54 @@ monitoringRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) =>
       data: { portalRestricted: false }
     });
 
+    const gatesPassed =
+      isContractSigned(progress) &&
+      isProfileFilled(client) &&
+      hasCredentials;
+    const alreadySent = Boolean((progress.onboarding || {})[PORTAL_READY_GUARD_KEY]);
+
+    let emailNotification: { status: string; reason?: string; deliveryId?: string } = {
+      status: 'skipped',
+      reason: !gatesPassed
+        ? 'gates_not_passed'
+        : alreadySent
+          ? 'already_sent'
+          : undefined
+    };
+
+    if (gatesPassed && !alreadySent) {
+      try {
+        const { rawToken } = await issuePasswordSetupToken({
+          userId: client.user.id,
+          purpose: 'setup'
+        });
+        const loginLink = `${config.appUrl.replace(/\/$/, '')}/portal`;
+        const setupLink = buildPasswordSetupLink(config.appUrl, rawToken);
+        const result = await sendPortalReadyEmail({
+          to: client.user.email,
+          firstName: client.user.firstName,
+          loginLink,
+          setupLink
+        });
+        await prisma.clientProgress.update({
+          where: { clientId: client.id },
+          data: {
+            onboarding: {
+              ...(updated.onboarding as any),
+              [PORTAL_READY_GUARD_KEY]: submittedAt
+            }
+          }
+        });
+        emailNotification = {
+          status: 'sent',
+          deliveryId: (result.delivery as any)?.id
+        };
+      } catch (emailError) {
+        console.warn('PORTAL_READY_EMAIL_FAILED', emailError instanceof Error ? emailError.message : emailError);
+        emailNotification = { status: 'failed', reason: emailError instanceof Error ? emailError.message : String(emailError) };
+      }
+    }
+
     return res.json({
       success: true,
       monitoring_id: monitoringId,
@@ -55,7 +118,7 @@ monitoringRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) =>
         submittedAt
       },
       progress: updated,
-      emailNotification: 'skipped'
+      emailNotification
     });
   } catch (error) {
     next(error);

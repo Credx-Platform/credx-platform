@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { config } from '../config.js';
-import { notifyNewLead, sendWelcomeLeadEmail, sendEmail } from '../lib/email.js';
+import { notifyNewLead, sendWelcomeLeadEmail } from '../lib/email.js';
 
 export const leadsRouter = Router();
 
@@ -26,13 +26,6 @@ leadsRouter.post('/', async (req, res, next) => {
       contractLink
     });
 
-    const emailResult = await sendEmail({
-      to: data.email,
-      subject: welcomeEmail.subject,
-      html: welcomeEmail.html,
-      text: welcomeEmail.text
-    });
-
     await notifyNewLead({
       firstName: data.firstName,
       lastName: data.lastName,
@@ -44,7 +37,7 @@ leadsRouter.post('/', async (req, res, next) => {
       lead,
       message: 'Lead created and welcome flow triggered.',
       contractLink,
-      welcomeEmail: emailResult
+      welcomeEmail: welcomeEmail.delivery
     });
   } catch (error) {
     next(error);

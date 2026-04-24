@@ -74,17 +74,32 @@ enum DocumentType {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  passwordHash String
-  role         Role          @default(CLIENT)
-  firstName    String
-  lastName     String
-  phone        String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  client       Client?
-  auditLogs    AuditLog[]
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  passwordHash        String
+  role                Role                 @default(CLIENT)
+  firstName           String
+  lastName            String
+  phone               String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  client              Client?
+  auditLogs           AuditLog[]
+  passwordSetupTokens PasswordSetupToken[]
+}
+
+model PasswordSetupToken {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  purpose    String    @default("setup")
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Lead {

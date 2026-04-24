@@ -4,7 +4,13 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { signToken } from '../lib/jwt.js';
 import { notifyNewClientSignup } from '../lib/openclaw.js';
-import { sendEmail, sendWelcomeLeadEmail } from '../lib/email.js';
+import { sendWelcomeLeadEmail, sendPasswordSetupEmail } from '../lib/email.js';
+import {
+  buildPasswordSetupLink,
+  consumeToken,
+  findActiveTokenRecord,
+  issuePasswordSetupToken
+} from '../lib/passwordSetup.js';
 import { config } from '../config.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 
@@ -61,15 +67,8 @@ authRouter.post('/register', async (req, res, next) => {
       contractLink
     });
 
-    const emailResult = await sendEmail({
-      to: user.email,
-      subject: welcomeEmail.subject,
-      html: welcomeEmail.html,
-      text: welcomeEmail.text
-    });
-
     const token = signToken({ sub: user.id, role: user.role });
-    return res.status(201).json({ user, token, welcomeEmail: emailResult });
+    return res.status(201).json({ user, token, welcomeEmail: welcomeEmail.delivery });
   } catch (error) {
     next(error);
   }
@@ -91,6 +90,83 @@ authRouter.post('/login', async (req, res, next) => {
 
     const token = signToken({ sub: user.id, role: user.role });
     return res.json({ user, token });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const passwordSetupRequestSchema = z.object({
+  email: z.string().email(),
+  purpose: z.enum(['setup', 'reset']).optional()
+});
+
+authRouter.post('/password-setup/request', async (req, res, next) => {
+  try {
+    const data = passwordSetupRequestSchema.parse(req.body);
+    const user = await prisma.user.findUnique({ where: { email: data.email.toLowerCase() } });
+
+    if (user) {
+      const { rawToken, expiresAt } = await issuePasswordSetupToken({
+        userId: user.id,
+        purpose: data.purpose ?? 'setup'
+      });
+      const link = buildPasswordSetupLink(config.appUrl, rawToken);
+      await sendPasswordSetupEmail({
+        to: user.email,
+        firstName: user.firstName,
+        setupLink: link,
+        purpose: data.purpose ?? 'setup',
+        expiresAt
+      });
+    }
+
+    return res.json({ success: true, message: 'If an account exists for that email, a setup link has been sent.' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.get('/password-setup/verify', async (req, res, next) => {
+  try {
+    const token = String(req.query?.token ?? '');
+    if (!token) return res.status(400).json({ error: 'Token is required' });
+
+    const record = await findActiveTokenRecord(token);
+    if (!record) return res.status(410).json({ error: 'Token is invalid or expired' });
+
+    return res.json({
+      valid: true,
+      email: record.user.email,
+      firstName: record.user.firstName,
+      purpose: record.purpose,
+      expiresAt: record.expiresAt.toISOString()
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const passwordSetupCompleteSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8)
+});
+
+authRouter.post('/password-setup/complete', async (req, res, next) => {
+  try {
+    const data = passwordSetupCompleteSchema.parse(req.body);
+    const record = await findActiveTokenRecord(data.token);
+    if (!record) return res.status(410).json({ error: 'Token is invalid or expired' });
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    await prisma.user.update({
+      where: { id: record.userId },
+      data: { passwordHash }
+    });
+    await consumeToken(record.id);
+
+    const token = signToken({ sub: record.user.id, role: record.user.role });
+    const { passwordHash: _omit, ...safeUser } = record.user;
+    return res.json({ user: safeUser, token });
   } catch (error) {
     next(error);
   }

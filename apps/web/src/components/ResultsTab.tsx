@@ -72,6 +72,17 @@ export function ResultsTab({ token, items, onItemsChange }: ResultsTabProps) {
     alert(`Updating score history for ${selectedItems.size} items...`);
   };
 
+  const getBureauStatus = (item: DisputeItem, bureau: 'efx' | 'xpn' | 'tu'): string => {
+    const round = item.rounds?.[0];
+    if (!round) return 'PENDING';
+    const raw = bureau === 'efx' ? round.equifaxStatus
+              : bureau === 'xpn' ? round.experianStatus
+              : round.transunionStatus;
+    if (!raw || raw === 'PENDING' || raw === 'SENT') return 'PENDING';
+    if (raw === 'RESPONSE_RECEIVED') return item.status === 'DELETED' ? 'DELETED' : 'PENDING';
+    return raw;
+  };
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, { bg: string; text: string }> = {
       PENDING: { bg: '#f3f4f6', text: '#6b7280' },
@@ -446,7 +457,7 @@ export function ResultsTab({ token, items, onItemsChange }: ResultsTabProps) {
                         <td>
                           <select 
                             className="bureau-status-select"
-                            value={item.efxStatus || 'PENDING'}
+                            value={getBureauStatus(item, 'efx')}
                             onChange={(e) => handleUpdateStatus(item.id, e.target.value, 'efx')}
                           >
                             <option value="PENDING">Pending</option>
@@ -458,7 +469,7 @@ export function ResultsTab({ token, items, onItemsChange }: ResultsTabProps) {
                         <td>
                           <select 
                             className="bureau-status-select"
-                            value={item.xpnStatus || 'PENDING'}
+                            value={getBureauStatus(item, 'xpn')}
                             onChange={(e) => handleUpdateStatus(item.id, e.target.value, 'xpn')}
                           >
                             <option value="PENDING">Pending</option>
@@ -470,7 +481,7 @@ export function ResultsTab({ token, items, onItemsChange }: ResultsTabProps) {
                         <td>
                           <select 
                             className="bureau-status-select"
-                            value={item.tuStatus || 'PENDING'}
+                            value={getBureauStatus(item, 'tu')}
                             onChange={(e) => handleUpdateStatus(item.id, e.target.value, 'tu')}
                           >
                             <option value="PENDING">Pending</option>

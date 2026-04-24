@@ -171,6 +171,189 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
   }
 }
 
+function renderPasswordSetupEmail(params: {
+  firstName: string;
+  setupLink: string;
+  purpose: 'setup' | 'reset';
+  expiresAt: Date;
+}) {
+  const isReset = params.purpose === 'reset';
+  const headline = isReset ? 'Reset your CredX password' : 'Set up your CredX password';
+  const subject = isReset ? 'Reset your CredX password' : 'Set up your CredX portal password';
+  const intro = isReset
+    ? 'We received a request to reset the password on your CredX account. Use the secure link below to choose a new password.'
+    : 'Your CredX portal is ready. Use the secure link below to set a password and log in for the first time.';
+  const expiresLabel = params.expiresAt.toUTCString();
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${headline}</title>
+</head>
+<body style="margin:0;padding:0;background:#0d1420;font-family:Arial,Helvetica,sans-serif;color:#e9eef6;">
+  <div style="width:100%;background:#0d1420;padding:32px 16px;">
+    <div style="max-width:640px;margin:0 auto;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
+      <div style="height:6px;background:#c9a227;"></div>
+      <div style="background:linear-gradient(135deg,#111a28,#1b2739);padding:34px 32px 26px;text-align:center;border-bottom:1px solid #243247;">
+        <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
+        <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">Secure access to your client portal</div>
+      </div>
+      <div style="padding:32px;">
+        <h1 style="margin:0 0 12px;font-size:26px;color:#ffffff;">${headline}</h1>
+        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Hi ${params.firstName || 'there'},</p>
+        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">${intro}</p>
+        <div style="text-align:center;padding:18px 0 6px;">
+          <a href="${params.setupLink}" style="display:inline-block;background:#c9a227;color:#111a28;text-decoration:none;padding:15px 28px;border-radius:12px;font-weight:800;font-size:16px;">${isReset ? 'Reset password' : 'Set my password'}</a>
+        </div>
+        <p style="margin:20px 0 8px;color:#9fb0c5;font-size:13px;line-height:1.6;">This link expires on ${expiresLabel}. For your security, it can only be used once.</p>
+        <p style="margin:0 0 8px;color:#9fb0c5;font-size:13px;line-height:1.6;">If you didn't request this, you can safely ignore the email.</p>
+      </div>
+      <div style="padding:24px 32px 32px;color:#9fb0c5;font-size:13px;line-height:1.6;border-top:1px solid #243247;">
+        <strong style="color:#ffffff;">CredX</strong><br />
+        Credit Repair & Financial Strategy Support<br />
+        Sent from hello@credxme.com
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const text = `${headline}
+
+Hi ${params.firstName || 'there'},
+
+${intro}
+
+${isReset ? 'Reset password' : 'Set your password'}: ${params.setupLink}
+
+This link expires on ${expiresLabel}. For your security, it can only be used once.
+If you didn't request this, you can safely ignore the email.
+
+CredX
+Credit Repair & Financial Strategy Support`;
+
+  return { subject, html, text };
+}
+
+export async function sendPasswordSetupEmail(params: {
+  to: string;
+  firstName: string;
+  setupLink: string;
+  purpose: 'setup' | 'reset';
+  expiresAt: Date;
+}) {
+  const email = renderPasswordSetupEmail({
+    firstName: params.firstName,
+    setupLink: params.setupLink,
+    purpose: params.purpose,
+    expiresAt: params.expiresAt
+  });
+
+  const result = await sendEmail({
+    to: params.to,
+    subject: email.subject,
+    html: email.html,
+    text: email.text
+  });
+
+  console.log('PASSWORD_SETUP_EMAIL_SEND_RESULT', {
+    to: params.to,
+    purpose: params.purpose,
+    expiresAt: params.expiresAt.toISOString(),
+    result
+  });
+
+  return { ...email, delivery: result };
+}
+
+function renderPortalReadyEmail(params: {
+  firstName: string;
+  loginLink: string;
+  setupLink: string;
+}) {
+  const subject = 'Your CredX portal is ready';
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${subject}</title>
+</head>
+<body style="margin:0;padding:0;background:#0d1420;font-family:Arial,Helvetica,sans-serif;color:#e9eef6;">
+  <div style="width:100%;background:#0d1420;padding:32px 16px;">
+    <div style="max-width:640px;margin:0 auto;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
+      <div style="height:6px;background:#c9a227;"></div>
+      <div style="background:linear-gradient(135deg,#111a28,#1b2739);padding:34px 32px 26px;text-align:center;border-bottom:1px solid #243247;">
+        <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
+        <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">Your portal is ready</div>
+      </div>
+      <div style="padding:32px;">
+        <h1 style="margin:0 0 12px;font-size:26px;color:#ffffff;">You're all set, ${params.firstName || 'there'}.</h1>
+        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Your contract is signed, your profile is on file, and your credit monitoring credentials are connected. Your CredX portal is now fully unlocked.</p>
+        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Cesar, your CredX guide, will greet you the first time you log in and walk you through what happens next — including how to share your latest credit report so we can build your dispute strategy.</p>
+        <div style="text-align:center;padding:18px 0 6px;">
+          <a href="${params.loginLink}" style="display:inline-block;background:#c9a227;color:#111a28;text-decoration:none;padding:15px 28px;border-radius:12px;font-weight:800;font-size:16px;">Open my portal</a>
+        </div>
+        <p style="margin:22px 0 8px;color:#9fb0c5;font-size:13px;line-height:1.6;">Need to set or reset your password? Use this secure link: <a href="${params.setupLink}" style="color:#c9a227;">${params.setupLink}</a></p>
+      </div>
+      <div style="padding:24px 32px 32px;color:#9fb0c5;font-size:13px;line-height:1.6;border-top:1px solid #243247;">
+        <strong style="color:#ffffff;">CredX</strong><br />
+        Credit Repair & Financial Strategy Support<br />
+        Sent from hello@credxme.com
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const text = `Your CredX portal is ready
+
+Hi ${params.firstName || 'there'},
+
+Your contract is signed, your profile is on file, and your credit monitoring credentials are connected. Your CredX portal is now fully unlocked.
+
+Cesar, your CredX guide, will greet you the first time you log in and walk you through what happens next — including how to share your latest credit report so we can build your dispute strategy.
+
+Open your portal: ${params.loginLink}
+
+Need to set or reset your password? Use this secure link: ${params.setupLink}
+
+CredX
+Credit Repair & Financial Strategy Support`;
+
+  return { subject, html, text };
+}
+
+export async function sendPortalReadyEmail(params: {
+  to: string;
+  firstName: string;
+  loginLink: string;
+  setupLink: string;
+}) {
+  const email = renderPortalReadyEmail({
+    firstName: params.firstName,
+    loginLink: params.loginLink,
+    setupLink: params.setupLink
+  });
+
+  const result = await sendEmail({
+    to: params.to,
+    subject: email.subject,
+    html: email.html,
+    text: email.text
+  });
+
+  console.log('PORTAL_READY_EMAIL_SEND_RESULT', {
+    to: params.to,
+    loginLink: params.loginLink,
+    result
+  });
+
+  return { ...email, delivery: result };
+}
+
 export async function notifyNewLead(params: { firstName: string; lastName: string; email: string; phone?: string }) {
   const subject = `New CredX lead: ${params.firstName} ${params.lastName}`;
   const html = `
