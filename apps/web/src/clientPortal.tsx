@@ -380,7 +380,13 @@ function OnboardingWizard({
 }
 
 export default function ClientPortalApp() {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const urlToken = new URLSearchParams(window.location.search).get('token');
+      if (urlToken) return urlToken;
+    }
+    return localStorage.getItem(TOKEN_KEY);
+  });
   const [user, setUser] = useState<User | null>(() => {
     const raw = localStorage.getItem(USER_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -395,6 +401,14 @@ export default function ClientPortalApp() {
 
   useEffect(() => {
     if (!token) return;
+
+    localStorage.setItem(TOKEN_KEY, token);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('token')) {
+      url.searchParams.delete('token');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+
     let cancelled = false;
     setDataLoading(true);
     setError(null);

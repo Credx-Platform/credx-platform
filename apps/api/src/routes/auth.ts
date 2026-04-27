@@ -60,14 +60,14 @@ authRouter.post('/register', async (req, res, next) => {
       source: 'credx-platform-api-register'
     });
 
-    const contractLink = `${config.appUrl.replace(/\/$/, '')}/#contract`;
+    const token = signToken({ sub: user.id, role: user.role });
+    const contractLink = `${config.appUrl.replace(/\/$/, '')}/portal?token=${encodeURIComponent(token)}#onboarding`;
     const welcomeEmail = await sendWelcomeLeadEmail({
       firstName: user.firstName || '',
       email: user.email,
       contractLink
     });
 
-    const token = signToken({ sub: user.id, role: user.role });
     return res.status(201).json({ user, token, welcomeEmail: welcomeEmail.delivery });
   } catch (error) {
     next(error);
