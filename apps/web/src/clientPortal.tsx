@@ -379,7 +379,7 @@ function OnboardingWizard({
   );
 }
 
-export default function ClientPortalApp() {
+export default function ClientPortalApp({ onboardingOnly = false }: { onboardingOnly?: boolean }) {
   const [token, setToken] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       const urlToken = new URLSearchParams(window.location.search).get('token');
@@ -414,11 +414,14 @@ export default function ClientPortalApp() {
     setError(null);
 
     Promise.all([
+      apiFetch<User>('/api/users/me', token),
       apiFetch<{ client: Client | null }>('/api/clients/me', token),
       apiFetch<Progress>('/api/progress/me', token)
     ])
-      .then(([clientResponse, progressResponse]) => {
+      .then(([userResponse, clientResponse, progressResponse]) => {
         if (cancelled) return;
+        setUser(userResponse);
+        localStorage.setItem(USER_KEY, JSON.stringify(userResponse));
         setClient(clientResponse.client);
         setProgress(progressResponse);
       })
@@ -481,6 +484,18 @@ export default function ClientPortalApp() {
   const scoreEntries = progress?.scores || {};
 
   if (!token) {
+    if (onboardingOnly) {
+      return (
+        <div className="auth-shell client-auth-shell">
+          <div className="auth-card client-auth-card">
+            <p className="eyebrow">CredX Onboarding</p>
+            <h1>Continue your signup</h1>
+            <p className="helper-text">Use the secure link from your welcome email to review your agreement and finish your intake.</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <ClientLogin
         email={email}
@@ -491,6 +506,33 @@ export default function ClientPortalApp() {
         loading={loading}
         error={error}
       />
+    );
+  }
+
+  if (onboardingOnly) {
+    return (
+      <div className="shell client-shell">
+        <main className="main" style={{ marginLeft: 0 }}>
+          <header className="topbar">
+            <div>
+              <p className="eyebrow">CredX Onboarding</p>
+              <h1 className="top-title">Complete your signup</h1>
+              <p className="helper-text">Review your agreement, finish your intake, and connect your credit monitoring provider.</p>
+            </div>
+          </header>
+          {error ? <div className="error-banner">{error}</div> : null}
+          {!progress?.onboarding?.completedAt && user ? (
+            <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} />
+          ) : null}
+          {progress?.onboarding?.completedAt ? (
+            <section className="panel">
+              <div className="empty-state-card">
+                Signup complete. Check your email for the password setup link to access your client portal.
+              </div>
+            </section>
+          ) : null}
+        </main>
+      </div>
     );
   }
 

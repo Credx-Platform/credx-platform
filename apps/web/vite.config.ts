@@ -13,7 +13,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         adminportal: resolve(__dirname, 'adminportal.html'),
-        portal: resolve(__dirname, 'portal.html')
+        portal: resolve(__dirname, 'portal.html'),
+        start: resolve(__dirname, 'start.html')
       }
     }
   }

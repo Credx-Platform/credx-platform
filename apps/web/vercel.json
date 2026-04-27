@@ -3,6 +3,7 @@
   "cleanUrls": false,
   "routes": [
     { "handle": "filesystem" },
+    { "src": "/start(?:/(.*))?", "dest": "/start.html" },
     { "src": "/portal(?:/(.*))?", "dest": "/portal.html" },
     { "src": "/adminportal(?:/(.*))?", "dest": "/adminportal.html" }
   ]

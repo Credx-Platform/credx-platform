@@ -61,7 +61,7 @@ authRouter.post('/register', async (req, res, next) => {
     });
 
     const token = signToken({ sub: user.id, role: user.role });
-    const contractLink = `${config.appUrl.replace(/\/$/, '')}/portal?token=${encodeURIComponent(token)}#onboarding`;
+    const contractLink = `${config.appUrl.replace(/\/$/, '')}/start?token=${encodeURIComponent(token)}#onboarding`;
     const welcomeEmail = await sendWelcomeLeadEmail({
       firstName: user.firstName || '',
       email: user.email,
