@@ -342,6 +342,8 @@ model Document {
   s3Key       String
   contentType String?
   uploadedAt  DateTime     @default(now())
+
+  @@unique([clientId, fileName], name: "clientId_fileName")
 }
 
 model Task {

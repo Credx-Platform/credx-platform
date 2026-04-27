@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { config } from '../config.js';
+import type { DocumentType } from '@prisma/client';
 
 export const progressRouter = Router();
 
@@ -14,6 +15,19 @@ function inferDocumentType(input = ''): string {
   if (value.includes('driver') || value.includes('license') || value.includes('passport') || value.includes('id')) return 'identity';
   if (value.includes('utility') || value.includes('address') || value.includes('bill')) return 'proof_of_address';
   return 'other';
+}
+
+function toPrismaDocumentType(docType: string): DocumentType {
+  switch (docType) {
+    case 'credit_report':
+      return 'CREDIT_REPORT';
+    case 'identity':
+      return 'IDENTITY';
+    case 'proof_of_address':
+      return 'PROOF_OF_ADDRESS';
+    default:
+      return 'OTHER';
+  }
 }
 
 function formatField(value: string | null | undefined, fallback = 'Not provided'): string {
@@ -254,6 +268,29 @@ async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
     await prisma.clientProgress.update({
       where: { clientId: client.id },
       data: { uploadedDocs, workflow }
+    });
+
+    await prisma.document.upsert({
+      where: {
+        clientId_fileName: {
+          clientId: client.id,
+          fileName: doc.fileName
+        }
+      },
+      update: {
+        type: toPrismaDocumentType(docType),
+        s3Key: doc.url || doc.fileName,
+        contentType: docType === 'credit_report' ? 'application/pdf' : null,
+        uploadedAt: new Date(doc.uploadedAt)
+      },
+      create: {
+        clientId: client.id,
+        type: toPrismaDocumentType(docType),
+        fileName: doc.fileName,
+        s3Key: doc.url || doc.fileName,
+        contentType: docType === 'credit_report' ? 'application/pdf' : null,
+        uploadedAt: new Date(doc.uploadedAt)
+      }
     });
 
     let workflowResult = null;
