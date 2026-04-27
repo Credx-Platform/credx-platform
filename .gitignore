@@ -6,3 +6,4 @@ coverage
 .prisma
 *.log
 .vercel
+vercel.json.bak.haunted
