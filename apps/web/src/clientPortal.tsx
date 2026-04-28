@@ -65,6 +65,7 @@ const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() ||
     : '');
 const TOKEN_KEY = 'credx-client-token';
 const USER_KEY = 'credx-client-user';
+const BRAND_LOGO = '/images/credx-logo-1.jpg';
 
 const defaultWizardState: WizardState = {
   fullName: '',
@@ -125,6 +126,9 @@ function ClientLogin({
   return (
     <div className="auth-shell client-auth-shell">
       <form className="auth-card client-auth-card" onSubmit={onSubmit}>
+        <div className="brand-mark brand-mark--centered">
+          <img src={BRAND_LOGO} alt="CredX" className="brand-logo" />
+        </div>
         <p className="eyebrow">CredX Client Access</p>
         <h1>Client Portal Login</h1>
         <p className="helper-text">Sign in to see your workflow stage, tasks, activity, and current dispute progress.</p>
@@ -488,6 +492,9 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
       return (
         <div className="auth-shell client-auth-shell">
           <div className="auth-card client-auth-card">
+            <div className="brand-mark brand-mark--centered">
+              <img src={BRAND_LOGO} alt="CredX" className="brand-logo" />
+            </div>
             <p className="eyebrow">CredX Onboarding</p>
             <h1>Continue your signup</h1>
             <p className="helper-text">Use the secure link from your welcome email to review your agreement and finish your intake.</p>
@@ -515,7 +522,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         <main className="main" style={{ marginLeft: 0 }}>
           <header className="topbar">
             <div>
-              <p className="eyebrow">CredX Onboarding</p>
+              <div className="brand-row">
+                <img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" />
+                <p className="eyebrow">CredX Onboarding</p>
+              </div>
               <h1 className="top-title">Complete your signup</h1>
               <p className="helper-text">Review your agreement, finish your intake, and connect your credit monitoring provider.</p>
             </div>
@@ -539,7 +549,9 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   return (
     <div className="shell client-shell">
       <aside className="sidebar">
-        <div className="brand">CredX</div>
+        <div className="brand-mark">
+          <img src={BRAND_LOGO} alt="CredX" className="brand-logo" />
+        </div>
         <nav>
           <a className="active" href="#overview">Overview</a>
           <a href="#onboarding">Onboarding</a>
@@ -551,7 +563,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
       <main className="main">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Client Portal</p>
+            <div className="brand-row">
+              <img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" />
+              <p className="eyebrow">Client Portal</p>
+            </div>
             <h1 className="top-title">Welcome back{user ? `, ${user.firstName}` : ''}</h1>
             {dataLoading ? <p className="helper-text">Refreshing your latest CredX progress...</p> : null}
           </div>

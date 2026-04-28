@@ -266,6 +266,8 @@ function DisputesRoute({ token }: { token: string }) {
   );
 }
 
+const BRAND_LOGO = '/images/credx-logo-1.jpg';
+
 function LoginScreen({
   email,
   password,
@@ -286,6 +288,9 @@ function LoginScreen({
   return (
     <div className="auth-shell">
       <form className="auth-card" onSubmit={onSubmit}>
+        <div className="brand-mark brand-mark--centered">
+          <img src={BRAND_LOGO} alt="CredX" className="brand-logo" />
+        </div>
         <p className="eyebrow">CredX Staff Access</p>
         <h1>Admin Portal Login</h1>
         <p className="helper-text">
@@ -409,7 +414,9 @@ export default function App() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand">CredX</div>
+        <div className="brand-mark">
+          <img src={BRAND_LOGO} alt="CredX" className="brand-logo" />
+        </div>
         <nav>
           <NavLink to="/" end>Overview</NavLink>
           <NavLink to="/clients">Clients</NavLink>
@@ -419,8 +426,11 @@ export default function App() {
       <main className="main">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Admin Portal</p>
-            <h1 className="top-title">credxme.com/adminportal/</h1>
+            <div className="brand-row">
+              <img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" />
+              <p className="eyebrow">Admin Portal</p>
+            </div>
+            <h1 className="top-title">Operations Dashboard</h1>
             {dataLoading ? <p className="helper-text">Refreshing live CredX data...</p> : null}
           </div>
           <div className="topbar-actions">
