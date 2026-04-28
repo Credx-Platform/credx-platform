@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>CredX — Credit Repair & Financial Strategy | The Malloy Group Financial</title>
-<meta name="description" content="CredX is a full-service credit repair and wealth platform. Free credit analysis, dispute management, and score tracking.">
+<meta name="description" content="CredX is a software-powered credit improvement platform with full program support, AI coaching, and a 5-Day Masterclass for DIY financial freedom.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -86,6 +86,15 @@ section{padding:100px clamp(16px,4vw,48px)}
 .plan-cta:hover{border-color:var(--cyan);color:var(--cyan)}
 .plan.feat .plan-cta:hover{background:var(--cyan2)}
 .plan-guarantee{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:11px;color:var(--muted)}
+.offer-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:rgba(0,198,251,.08);border:1px solid var(--border-c);font-size:11px;color:var(--cyan);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:16px}
+.cur-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:36px}
+.cur-card{background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:22px;position:relative;overflow:hidden}
+.cur-n{position:absolute;top:12px;right:14px;font-family:'Outfit';font-size:40px;font-weight:900;color:rgba(255,255,255,.04)}
+.cur-badge{display:inline-flex;padding:5px 10px;border-radius:999px;background:rgba(0,198,251,.12);color:var(--cyan);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px}
+.cur-title{font-family:'Outfit';font-size:20px;font-weight:800;margin:12px 0 8px}
+.cur-desc{font-size:13px;color:var(--muted);line-height:1.65}
+.tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.tag{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg);font-size:11px;color:var(--muted)}
+.masterclass-note{margin-top:14px;font-size:12px;color:var(--muted)}
 .form-section{background:var(--bg);position:relative;overflow:hidden}
 .form-section::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(0,198,251,.05) 0%,transparent 70%);pointer-events:none}
 .form-wrap{max-width:640px;margin:48px auto 0;background:var(--bg3);border:1px solid var(--border-c);border-radius:20px;padding:40px 40px 28px;position:relative;z-index:2;overflow:visible}
@@ -278,18 +287,33 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   <p class="ssub">Positioning can be refined later, but this version gives you a clean public presentation now.</p>
   <div class="plans">
    <div class="plan">
+    <div class="offer-pill">DIY Path</div>
+    <div class="plan-name">5-Day Masterclass</div>
+    <div class="plan-price">$97 <span>one time</span></div>
+    <div class="plan-detail">A guided DIY system with your 5-day masterclass, bonus day, and affiliate resource stack. Free for new clients who subscribe within 48 hours of first touch.</div>
+    <ul class="plan-features">
+     <li>Full 5-day curriculum + bonus wealth day</li>
+     <li>DIY roadmap to credit, business credit, and financial freedom</li>
+     <li>Affiliate tools and recommended resources</li>
+     <li>Client portal access for education tracking</li>
+    </ul>
+    <a href="#analysis" class="plan-cta" onclick="selectOffer('masterclass')">Join the Masterclass</a>
+   </div>
+   <div class="plan feat">
+    <div class="offer-pill">Done With You</div>
     <div class="plan-name">Essential</div>
     <div class="plan-price">$150 <span>setup</span></div>
-    <div class="plan-detail">$75/month after setup for clients who need a clear starting point and guided cleanup.</div>
+    <div class="plan-detail">$75/month after setup with AI coaching, your coaching, and the core CredX software workflow.</div>
     <ul class="plan-features">
      <li>Initial file review and priority map</li>
      <li>Client portal access</li>
+     <li>AI coaching plus human coaching support</li>
      <li>Dispute workflow visibility</li>
      <li>Monthly progress tracking</li>
     </ul>
-    <a href="#analysis" class="plan-cta">Start with Essential</a>
+    <a href="#analysis" class="plan-cta" onclick="selectOffer('program')">Start with Essential</a>
    </div>
-   <div class="plan feat">
+   <div class="plan">
     <div class="plan-badge">Most Popular</div>
     <div class="plan-name">Aggressive</div>
     <div class="plan-price">$500 <span>setup</span></div>
@@ -301,7 +325,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
      <li>Best for complex files or urgent repositioning</li>
      <li class="note">Monthly continuation is discussed after review based on file complexity and service fit.</li>
     </ul>
-    <a href="#analysis" class="plan-cta">Apply for Aggressive</a>
+    <a href="#analysis" class="plan-cta" onclick="selectOffer('program')">Apply for Aggressive</a>
    </div>
    <div class="plan">
     <div class="plan-name">Family</div>
@@ -313,9 +337,25 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
      <li>Coordinated rebuild and dispute support</li>
      <li>Ideal for couples or family financial recovery</li>
     </ul>
-    <a href="#analysis" class="plan-cta">Ask About Family Plan</a>
+    <a href="#analysis" class="plan-cta" onclick="selectOffer('program')">Ask About Family Plan</a>
    </div>
   </div>
+ </div>
+</section>
+<section class="pricing" id="masterclass-curriculum">
+ <div class="container">
+  <div class="stag">The System</div>
+  <h2 class="stitle">5-Day Masterclass + Bonus Day</h2>
+  <p class="ssub">Each day builds on the last so the DIY client gets a complete credit, business credit, and wealth-building roadmap inside CredX.</p>
+  <div class="cur-grid">
+   <div class="cur-card"><div class="cur-n">01</div><div class="cur-badge">Day 1</div><h3 class="cur-title">Credit Fundamentals</h3><p class="cur-desc">How scores work, what factors matter, and how to read reports correctly.</p><div class="tags"><span class="tag">FICO</span><span class="tag">Reports</span><span class="tag">Bureaus</span></div></div>
+   <div class="cur-card"><div class="cur-n">02</div><div class="cur-badge">Day 2</div><h3 class="cur-title">Disputes & Removals</h3><p class="cur-desc">609 letters, FCRA rights, and lawful dispute workflow principles.</p><div class="tags"><span class="tag">609</span><span class="tag">FCRA</span><span class="tag">Disputes</span></div></div>
+   <div class="cur-card"><div class="cur-n">03</div><div class="cur-badge">Day 3</div><h3 class="cur-title">Advanced Strategies</h3><p class="cur-desc">Goodwill letters, pay-for-delete awareness, rescoring, and sequencing.</p><div class="tags"><span class="tag">Strategy</span><span class="tag">Rescoring</span><span class="tag">Negotiation</span></div></div>
+   <div class="cur-card"><div class="cur-n">04</div><div class="cur-badge">Day 4</div><h3 class="cur-title">Credit Building</h3><p class="cur-desc">Secured cards, builder loans, utilization, and profile rebuilding habits.</p><div class="tags"><span class="tag">Secured Cards</span><span class="tag">Builder Loans</span><span class="tag">Utilization</span></div></div>
+   <div class="cur-card"><div class="cur-n">05</div><div class="cur-badge">Day 5</div><h3 class="cur-title">Business Credit</h3><p class="cur-desc">LLC, EIN, DUNS, Net-30 accounts, and funding-readiness basics.</p><div class="tags"><span class="tag">LLC/EIN</span><span class="tag">DUNS</span><span class="tag">Funding</span></div></div>
+   <div class="cur-card"><div class="cur-n">★</div><div class="cur-badge">Bonus Day</div><h3 class="cur-title">Generational Wealth</h3><p class="cur-desc">Real estate, investing, passive income, and long-term wealth structure.</p><div class="tags"><span class="tag">Real Estate</span><span class="tag">Investing</span><span class="tag">Legacy</span></div></div>
+  </div>
+  <p class="masterclass-note">New clients who come in through ads or referrals can unlock the masterclass free when they subscribe within 48 hours of first touch.</p>
  </div>
 </section>
 <section class="form-section" id="analysis">
@@ -334,7 +374,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
      <div class="form-group"><label for="email">Email</label><input id="email" type="email" placeholder="Email address"></div>
      <div class="form-group"><label for="phone">Phone</label><input id="phone" type="tel" placeholder="Phone number"></div>
     </div>
-    <div class="form-row single">
+   <div class="form-row single">
      <div class="form-group">
       <label for="creditGoal">Primary Goal</label>
       <select id="creditGoal">
@@ -344,6 +384,15 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
        <option value="Rebuild after collections or charge-offs">Rebuild after collections or charge-offs</option>
        <option value="General credit improvement">General credit improvement</option>
       </select>
+     </div>
+    </div>
+    <div class="form-row single">
+     <div class="form-group">
+      <label>Which CredX offer are you interested in?</label>
+      <div class="choice-group" id="offerInterestGroup">
+       <label class="choice-card"><input type="radio" name="offerInterest" value="program"><span class="choice-dot"></span><span>CredX Program + AI + Coaching</span></label>
+       <label class="choice-card"><input type="radio" name="offerInterest" value="masterclass"><span class="choice-dot"></span><span>5-Day Masterclass DIY Guide</span></label>
+      </div>
      </div>
     </div>
     <div class="form-row single">
@@ -454,11 +503,17 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 <div class="toast" id="toast"></div>
 <script>
 const API_BASE='https://credxapi-production.up.railway.app';
+let selectedOfferInterest='program';
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>{t.className='toast';},3200);}
 const faqItems=document.querySelectorAll('.faq-item');faqItems.forEach(item=>{item.querySelector('.faq-q').addEventListener('click',()=>item.classList.toggle('open'));});
 const heardAboutInputs=[...document.querySelectorAll('input[name="heardAbout"]')];
+const offerInterestInputs=[...document.querySelectorAll('input[name="offerInterest"]')];
 const referralNameWrap=document.getElementById('referralNameWrap');
 const heardAboutOtherWrap=document.getElementById('heardAboutOtherWrap');
+function syncOfferInterestUI(){
+ offerInterestInputs.forEach(input=>input.closest('.choice-card').classList.toggle('active',input.checked));
+ selectedOfferInterest=offerInterestInputs.find(input=>input.checked)?.value||'program';
+}
 function syncHeardAboutUI(){
  const selected=heardAboutInputs.find(input=>input.checked)?.value||'';
  heardAboutInputs.forEach(input=>input.closest('.choice-card').classList.toggle('active',input.checked));
@@ -468,7 +523,14 @@ function syncHeardAboutUI(){
  if(selected!=='Other') document.getElementById('heardAboutOther').value='';
 }
 heardAboutInputs.forEach(input=>input.addEventListener('change',syncHeardAboutUI));
+offerInterestInputs.forEach(input=>input.addEventListener('change',syncOfferInterestUI));
 syncHeardAboutUI();
+if(offerInterestInputs[0]) offerInterestInputs[0].checked=true;
+syncOfferInterestUI();
+function selectOffer(value){
+ const target=offerInterestInputs.find(input=>input.value===value);
+ if(target){ target.checked=true; syncOfferInterestUI(); }
+}
 async function submitForm(){
  const btn=document.getElementById('submitBtn');
  const heardAbout=heardAboutInputs.find(input=>input.checked)?.value||'';
@@ -478,6 +540,7 @@ async function submitForm(){
   email:document.getElementById('email').value.trim(),
   phone:document.getElementById('phone').value.trim()||undefined,
   creditGoal:document.getElementById('creditGoal').value||undefined,
+  offerInterest:selectedOfferInterest,
   referralSource:heardAbout||undefined,
   referralName:document.getElementById('referralName').value.trim()||undefined,
   referralOther:document.getElementById('heardAboutOther').value.trim()||undefined

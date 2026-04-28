@@ -14,13 +14,20 @@ const createLeadSchema = z.object({
   creditGoal: z.string().optional(),
   referralSource: z.string().optional(),
   referralName: z.string().optional(),
-  referralOther: z.string().optional()
+  referralOther: z.string().optional(),
+  offerInterest: z.enum(['program', 'masterclass']).optional()
 });
 
 leadsRouter.post('/', async (req, res, next) => {
   try {
     const data = createLeadSchema.parse(req.body);
-    const lead = await prisma.lead.create({ data });
+    const offerEligibleUntil = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const lead = await prisma.lead.create({
+      data: {
+        ...data,
+        offerEligibleUntil
+      }
+    });
     const contractLink = `${config.appUrl.replace(/\/$/, '')}/contract`;
 
     const welcomeEmail = await sendWelcomeLeadEmail({
@@ -45,7 +52,8 @@ leadsRouter.post('/', async (req, res, next) => {
       lead,
       message: 'Lead created and welcome flow triggered.',
       contractLink,
-      welcomeEmail: welcomeEmail.delivery
+      welcomeEmail: welcomeEmail.delivery,
+      offerEligibleUntil
     });
   } catch (error) {
     next(error);

@@ -112,6 +112,8 @@ model Lead {
   referralSource String?
   referralName String?
   referralOther String?
+  offerInterest String?
+  offerEligibleUntil DateTime?
   createdAt  DateTime @default(now())
   notes      String?
 }
@@ -165,6 +167,7 @@ model ClientProgress {
   scores            Json     @default("{\"equifax\":null,\"experian\":null,\"transunion\":null}")
   onboarding        Json     @default("{\"status\":\"pending\",\"signupAt\":null,\"completedAt\":null}")
   workflow          Json     @default("{\"stage\":\"signup_received\",\"updatedAt\":null,\"next\":[\"complete_onboarding\",\"upload_credit_report\"]}")
+  education         Json     @default("{\"masterclassEnrolled\":false,\"masterclassAccess\":false,\"masterclassProgress\":[],\"affiliateLinks\":[]}")
   analysis          Json?
   disputeStrategy   Json?
   createdAt         DateTime @default(now())

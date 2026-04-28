@@ -21,7 +21,8 @@ const registerSchema = z.object({
   password: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  phone: z.string().optional()
+  phone: z.string().optional(),
+  offerInterest: z.enum(['program', 'masterclass']).optional()
 });
 
 authRouter.post('/register', async (req, res, next) => {
@@ -43,7 +44,14 @@ authRouter.post('/register', async (req, res, next) => {
             status: 'LEAD',
             progress: {
               create: {
-                onboarding: { status: 'pending', signupAt: new Date().toISOString(), completedAt: null }
+                onboarding: { status: 'pending', signupAt: new Date().toISOString(), completedAt: null },
+                education: {
+                  masterclassEnrolled: data.offerInterest === 'masterclass',
+                  masterclassAccess: data.offerInterest === 'masterclass',
+                  masterclassProgress: [],
+                  affiliateLinks: [],
+                  enrolledAt: data.offerInterest === 'masterclass' ? new Date().toISOString() : null
+                }
               }
             }
           }

@@ -188,6 +188,7 @@ progressRouter.get('/me', requireAuth, async (req: AuthedRequest, res, next) => 
       scores: (progress as any).scores || { equifax: null, experian: null, transunion: null },
       onboarding: (progress as any).onboarding || { status: 'pending', signupAt: null, completedAt: null },
       workflow: (progress as any).workflow || { stage: 'signup_received', updatedAt: null, next: [] },
+      education: (progress as any).education || { masterclassEnrolled: false, masterclassAccess: false, masterclassProgress: [], affiliateLinks: [] },
       analysis: (progress as any).analysis || null,
       disputeStrategy: (progress as any).disputeStrategy || null,
       tasks: client.tasks,
@@ -203,7 +204,8 @@ const updateProgressSchema = z.object({
   passedQuiz: z.string().optional(),
   scores: z.object({ equifax: z.number().nullable().optional(), experian: z.number().nullable().optional(), transunion: z.number().nullable().optional() }).optional(),
   dispute: z.object({}).passthrough().optional(),
-  workflow: z.object({}).passthrough().optional()
+  workflow: z.object({}).passthrough().optional(),
+  education: z.object({}).passthrough().optional()
 });
 
 progressRouter.post('/me', requireAuth, async (req: AuthedRequest, res, next) => {
@@ -218,6 +220,7 @@ progressRouter.post('/me', requireAuth, async (req: AuthedRequest, res, next) =>
     const disputes = Array.isArray(progress.disputes) ? [...progress.disputes] : [];
     const scores = { ...(progress.scores || {}), ...(data.scores || {}) };
     const workflow = { ...(progress.workflow || {}), ...(data.workflow || {}), updatedAt: new Date().toISOString() };
+    const education = { ...(progress.education || {}), ...(data.education || {}) };
 
     if (data.completedDay && !completedDays.includes(data.completedDay)) {
       completedDays.push(data.completedDay);
@@ -231,7 +234,7 @@ progressRouter.post('/me', requireAuth, async (req: AuthedRequest, res, next) =>
 
     const updated = await prisma.clientProgress.update({
       where: { clientId: client.id },
-      data: { completedDays, passedQuizzes, scores, disputes, workflow }
+      data: { completedDays, passedQuizzes, scores, disputes, workflow, education }
     });
 
     return res.json(updated);
