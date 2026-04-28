@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ImportReportTab } from './ImportReportTab';
 import { AddItemTab } from './AddItemTab';
+import { BureausTab } from './BureausTab';
 import { TrackingTab } from './TrackingTab';
 import { ResultsTab } from './ResultsTab';
 
@@ -55,7 +56,7 @@ export type Furnisher = {
   isActive: boolean;
 };
 
-type Tab = 'import' | 'add' | 'tracking' | 'results';
+type Tab = 'import' | 'add' | 'bureaus' | 'tracking' | 'results';
 
 interface DisputeManagerProps {
   token: string;
@@ -66,6 +67,7 @@ const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
 export function DisputeManager({ token }: DisputeManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>('add');
   const [items, setItems] = useState<DisputeItem[]>([]);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +105,7 @@ export function DisputeManager({ token }: DisputeManagerProps) {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'import', label: 'IMPORT REPORT' },
     { id: 'add', label: 'ADD ITEM' },
+    { id: 'bureaus', label: 'BUREAUS' },
     { id: 'tracking', label: 'TRACKING' },
     { id: 'results', label: 'RESULTS' }
   ];
@@ -219,6 +222,18 @@ export function DisputeManager({ token }: DisputeManagerProps) {
                 items={items}
                 onItemCreated={handleItemCreated}
                 onItemsChange={fetchItems}
+                selectedItemIds={selectedItemIds}
+                onSelectionChange={setSelectedItemIds}
+                onOpenBureaus={() => setActiveTab('bureaus')}
+              />
+            )}
+
+            {activeTab === 'bureaus' && (
+              <BureausTab
+                items={items}
+                selectedItemIds={selectedItemIds}
+                onBackToItems={() => setActiveTab('add')}
+                onOpenTracking={() => setActiveTab('tracking')}
               />
             )}
             

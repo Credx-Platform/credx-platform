@@ -6,6 +6,9 @@ interface AddItemTabProps {
   items: DisputeItem[];
   onItemCreated: () => void;
   onItemsChange: () => void;
+  selectedItemIds: string[];
+  onSelectionChange: (ids: string[]) => void;
+  onOpenBureaus: () => void;
 }
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
@@ -29,13 +32,13 @@ const disputeReasons = [
   'Other'
 ];
 
-export function AddItemTab({ token, items, onItemCreated, onItemsChange }: AddItemTabProps) {
+export function AddItemTab({ token, items, onItemCreated, onItemsChange, selectedItemIds, onSelectionChange, onOpenBureaus }: AddItemTabProps) {
   const [clients, setClients] = useState<any[]>([]);
   const [furnishers, setFurnishers] = useState<Furnisher[]>([]);
   const [selectedClient, setSelectedClient] = useState('');
   const [editingItem, setEditingItem] = useState<DisputeItem | null>(null);
   const [saving, setSaving] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(selectedItemIds));
   
   const [formData, setFormData] = useState({
     furnisher: '',
@@ -67,6 +70,10 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange }: AddIt
       .catch(console.error);
   }, [token]);
 
+  useEffect(() => {
+    setSelectedItems(new Set(selectedItemIds));
+  }, [selectedItemIds]);
+
   const resetForm = () => {
     setFormData({
       furnisher: '',
@@ -85,9 +92,12 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange }: AddIt
 
   const handleCheckAll = (checked: boolean) => {
     if (checked) {
-      setSelectedItems(new Set(items.map(i => i.id)));
+      const next = new Set(items.map(i => i.id));
+      setSelectedItems(next);
+      onSelectionChange(Array.from(next));
     } else {
       setSelectedItems(new Set());
+      onSelectionChange([]);
     }
   };
 
@@ -99,6 +109,7 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange }: AddIt
       newSet.delete(id);
     }
     setSelectedItems(newSet);
+    onSelectionChange(Array.from(newSet));
   };
 
   const handleCheckAllBureaus = (checked: boolean) => {
@@ -252,6 +263,7 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange }: AddIt
 
       if (!response.ok) throw new Error('Bulk delete failed');
       setSelectedItems(new Set());
+      onSelectionChange([]);
       onItemsChange();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Bulk delete failed');
@@ -514,9 +526,18 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange }: AddIt
           display: flex;
           align-items: center;
           gap: 1rem;
+          justify-content: space-between;
+          flex-wrap: wrap;
           padding: 0.75rem;
           background: #f8fafc;
           border-bottom: 1px solid #e2e8f0;
+        }
+
+        .bulk-actions-group {
+          display: flex;
+          gap: 0.75rem;
+          align-items: center;
+          flex-wrap: wrap;
         }
 
         .empty-state {
@@ -698,10 +719,15 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange }: AddIt
       <div className="items-table-container">
         {selectedItems.size > 0 && (
           <div className="bulk-actions">
-            <span>{selectedItems.size} selected</span>
-            <button className="btn btn-danger" onClick={handleBulkDelete}>
-              Delete Selected
-            </button>
+            <span>{selectedItems.size} selected for dispute staging</span>
+            <div className="bulk-actions-group">
+              <button className="btn btn-primary" onClick={onOpenBureaus}>
+                Add Selected to Bureaus
+              </button>
+              <button className="btn btn-danger" onClick={handleBulkDelete}>
+                Delete Selected
+              </button>
+            </div>
           </div>
         )}
         
