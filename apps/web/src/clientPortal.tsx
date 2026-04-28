@@ -656,10 +656,12 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     if (typeof window !== 'undefined') {
       const urlToken = new URLSearchParams(window.location.search).get('token');
       if (urlToken) return urlToken;
+      if (window.location.pathname.startsWith('/start')) return null;
     }
     return localStorage.getItem(TOKEN_KEY);
   });
   const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/start')) return null;
     const raw = localStorage.getItem(USER_KEY);
     return raw ? JSON.parse(raw) : null;
   });
@@ -685,6 +687,13 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     setClient(clientResponse.client);
     setProgress(progressResponse);
   }
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/start')) {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     if (!token) return;
