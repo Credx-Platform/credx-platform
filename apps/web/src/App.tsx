@@ -97,6 +97,66 @@ function statusClass(status: string) {
   return `status-badge status-${status.toLowerCase()}`;
 }
 
+function bureauLabel(bureau: DisputeRecord['bureau']) {
+  return bureau === 'TRANSUNION' ? 'TransUnion' : bureau === 'EQUIFAX' ? 'Equifax' : 'Experian';
+}
+
+function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
+  const active = disputes.filter((item) => !['COMPLETED', 'REJECTED'].includes(item.status));
+  const responseDue = disputes.filter((item) => item.status === 'RESPONSE_DUE').length;
+  const lettersSent = disputes.filter((item) => item.status === 'LETTER_SENT').length;
+  const recent = [...disputes]
+    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+    .slice(0, 5);
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Dispute Section</p>
+          <h2>Live dispute pipeline</h2>
+          <p className="helper-text">Track what is active, what is due, and which client files need the next move.</p>
+        </div>
+      </div>
+
+      <div className="dispute-summary-grid">
+        <div className="stat-card"><span>Active disputes</span><strong>{active.length}</strong></div>
+        <div className="stat-card"><span>Response due</span><strong>{responseDue}</strong></div>
+        <div className="stat-card"><span>Letters sent</span><strong>{lettersSent}</strong></div>
+        <div className="stat-card"><span>Total dispute items</span><strong>{disputes.length}</strong></div>
+      </div>
+
+      <div className="dispute-spotlight-grid">
+        {recent.length ? recent.map((dispute) => (
+          <article key={dispute.id} className="dispute-spotlight-card">
+            <div className="dispute-card-top">
+              <div>
+                <strong>{dispute.creditorName}</strong>
+                <div className="cell-subtext">{dispute.client.user.firstName} {dispute.client.user.lastName}</div>
+              </div>
+              <span className={statusClass(dispute.status)}>{dispute.status.replace('_', ' ')}</span>
+            </div>
+            <div className="dispute-meta">
+              <span>{bureauLabel(dispute.bureau)}</span>
+              <span>Round {dispute.round}</span>
+              <span>{formatDate(dispute.createdAt)}</span>
+            </div>
+            <div className="change-chip">
+              <span>Reason</span>
+              <strong>{dispute.reason || 'Dispute reason pending update.'}</strong>
+            </div>
+          </article>
+        )) : (
+          <div className="empty-state-card">
+            <strong>No dispute items yet</strong>
+            <p>Imported and created dispute items will appear here for the admin team.</p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; disputes: DisputeRecord[]; plans: Plan[] }) {
   const newLeads = clients.filter((client) => client.status === 'LEAD').length;
   const activeClients = clients.filter((client) => client.status === 'ACTIVE').length;
@@ -172,6 +232,8 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
           <p className="helper-text">Clients should receive analysis and a rough dispute timeline before service upgrade and active dispute work begin.</p>
         </div>
       </section>
+
+      <DisputeSnapshot disputes={disputes} />
     </div>
   );
 }
@@ -252,17 +314,83 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
   );
 }
 
-function DisputesRoute({ token }: { token: string }) {
+function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRecord[] }) {
+  const active = disputes.filter((item) => !['COMPLETED', 'REJECTED'].includes(item.status));
+  const completed = disputes.filter((item) => item.status === 'COMPLETED').length;
+  const responseDue = disputes.filter((item) => item.status === 'RESPONSE_DUE').length;
+
   return (
-    <section className="panel">
-      <div className="panel-header">
+    <div className="page-grid">
+      <section className="hero-card hero-card--compact">
         <div>
-          <p className="eyebrow">Dispute Manager</p>
-          <h2>Client Dispute Operations</h2>
+          <p className="eyebrow">Dispute Desk</p>
+          <h1>Dispute Operations</h1>
+          <p>Run imports, add accounts, track bureau status, and monitor live dispute movement from one admin section.</p>
         </div>
-      </div>
-      <DisputeManager token={token} />
-    </section>
+        <div className="hero-stats">
+          <div className="stat-card"><span>Active</span><strong>{active.length}</strong></div>
+          <div className="stat-card"><span>Response due</span><strong>{responseDue}</strong></div>
+          <div className="stat-card"><span>Completed</span><strong>{completed}</strong></div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Dispute Section</p>
+            <h2>Recent dispute queue</h2>
+            <p className="helper-text">A quick view of the newest dispute items before you jump into the full manager.</p>
+          </div>
+        </div>
+
+        <div className="dispute-route-table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Client</th>
+                <th>Creditor</th>
+                <th>Bureau</th>
+                <th>Status</th>
+                <th>Round</th>
+                <th>Opened</th>
+              </tr>
+            </thead>
+            <tbody>
+              {disputes.length ? [...disputes]
+                .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+                .slice(0, 8)
+                .map((dispute) => (
+                  <tr key={dispute.id}>
+                    <td>
+                      <strong>{dispute.client.user.firstName} {dispute.client.user.lastName}</strong>
+                      <div className="cell-subtext">{dispute.client.user.email}</div>
+                    </td>
+                    <td>{dispute.creditorName}</td>
+                    <td>{bureauLabel(dispute.bureau)}</td>
+                    <td><span className={statusClass(dispute.status)}>{dispute.status.replace('_', ' ')}</span></td>
+                    <td>Round {dispute.round}</td>
+                    <td>{formatDate(dispute.createdAt)}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={6} className="empty-row">No dispute items yet.</td>
+                  </tr>
+                )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Dispute Manager</p>
+            <h2>Client Dispute Operations</h2>
+          </div>
+        </div>
+        <DisputeManager token={token} />
+      </section>
+    </div>
   );
 }
 
@@ -442,7 +570,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Overview clients={clients} disputes={disputes} plans={plans} />} />
           <Route path="/clients" element={<Clients clients={clients} />} />
-          <Route path="/disputes" element={<DisputesRoute token={token} />} />
+          <Route path="/disputes" element={<DisputesRoute token={token} disputes={disputes} />} />
         </Routes>
       </main>
     </div>

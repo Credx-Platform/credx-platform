@@ -167,12 +167,16 @@ h1, h2, h3, .eyebrow, .top-title, button { font-family: 'Outfit', sans-serif; }
     linear-gradient(120deg, rgba(6,10,18,.9), rgba(16,26,43,.86)),
     url('/images/credx-hero-bg.jpg') center/cover no-repeat;
 }
+.hero-card--compact {
+  min-height: 0;
+}
 .hero-card h1, .panel h2, .panel h3, .auth-card h1 {
   margin: 8px 0 10px;
   color: var(--white);
 }
 .hero-card p, .panel p, .auth-card p { color: var(--muted); }
 .hero-stats,
+.dispute-summary-grid,
 .quick-actions--plans {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -198,6 +202,27 @@ h1, h2, h3, .eyebrow, .top-title, button { font-family: 'Outfit', sans-serif; }
 .activity-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
 .activity-list strong, .plan-card strong, .dispute-card-live strong { display: block; margin-bottom: 4px; color: var(--white); }
 .plan-card small { display: block; margin-top: 8px; color: var(--muted); line-height: 1.45; }
+.dispute-spotlight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+.dispute-spotlight-card {
+  background: linear-gradient(180deg, rgba(16,26,43,.96), rgba(11,18,32,.96));
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.015);
+}
+.dispute-route-table-wrap {
+  overflow-x: auto;
+}
+.dispute-route-table-wrap .data-table {
+  min-width: 760px;
+}
 
 button,
 .panel-header button,
