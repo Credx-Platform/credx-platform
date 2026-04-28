@@ -88,7 +88,7 @@ section{padding:100px clamp(16px,4vw,48px)}
 .plan-guarantee{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:11px;color:var(--muted)}
 .form-section{background:var(--bg);position:relative;overflow:hidden}
 .form-section::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(0,198,251,.05) 0%,transparent 70%);pointer-events:none}
-.form-wrap{max-width:640px;margin:48px auto 0;background:var(--bg3);border:1px solid var(--border-c);border-radius:20px;padding:40px;position:relative;z-index:2}
+.form-wrap{max-width:640px;margin:48px auto 0;background:var(--bg3);border:1px solid var(--border-c);border-radius:20px;padding:40px 40px 28px;position:relative;z-index:2}
 .form-head{text-align:center;margin-bottom:32px}
 .form-head h2{font-size:26px;font-weight:800;margin-bottom:6px}
 .form-head p{font-size:14px;color:var(--muted)}
@@ -105,24 +105,25 @@ textarea{resize:vertical;min-height:72px}
 .cb-row{display:flex;align-items:flex-start;gap:8px;margin:16px 0}
 .cb-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--cyan);flex-shrink:0;margin-top:2px;padding:0;background:none;border:none}
 .cb-row label{font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400;cursor:pointer}
-.choice-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
-.choice-card{position:relative;display:flex;align-items:center;gap:10px;padding:14px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg);cursor:pointer;transition:border-color .2s,transform .2s,box-shadow .2s;color:var(--white);font-size:14px;text-transform:none;letter-spacing:0;font-weight:600}
+.choice-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}
+.choice-card{position:relative;display:flex;align-items:center;gap:12px;min-height:58px;padding:15px 16px;border:1px solid var(--border);border-radius:14px;background:var(--bg);cursor:pointer;transition:border-color .2s,transform .2s,box-shadow .2s,background .2s;color:var(--white);font-size:14px;text-transform:none;letter-spacing:0;font-weight:700}
 .choice-card:hover{border-color:var(--cyan);transform:translateY(-1px)}
 .choice-card input{position:absolute;opacity:0;pointer-events:none}
 .choice-card.active{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(0,198,251,.2),0 0 24px rgba(0,198,251,.08);background:linear-gradient(180deg,rgba(0,198,251,.08),rgba(255,255,255,.02))}
 .choice-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--muted2);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
 .choice-card.active .choice-dot{border-color:var(--cyan)}
 .choice-card.active .choice-dot::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--cyan)}
-.conditional-field{display:none;margin-top:12px}
+.choice-card span:last-child{line-height:1.3}
+.conditional-field{display:none;margin-top:14px}
 .conditional-field.show{display:block}
-.submit-wrap{position:sticky;bottom:0;padding-top:10px;background:linear-gradient(180deg,rgba(16,22,34,0),rgba(16,22,34,.92) 30%,rgba(16,22,34,.98))}
+.submit-wrap{display:block;margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06);background:none}
 .upload-area{border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:border-color .2s;background:var(--bg);margin-bottom:14px}
 .upload-area:hover{border-color:var(--cyan)}
 .upload-area input{display:none}
 .upload-title{font-family:'Outfit';font-size:14px;font-weight:700;margin-bottom:2px}
 .upload-sub{font-size:12px;color:var(--muted)}
 .file-display{display:none;align-items:center;gap:8px;padding:10px 14px;background:var(--cyan-dim);border:1px solid var(--border-c);border-radius:8px;font-size:12px;color:var(--cyan);margin-bottom:14px}
-.form-submit{width:100%;height:48px;background:var(--cyan);color:var(--bg);font-family:'Outfit';font-weight:800;font-size:15px;border:none;border-radius:8px;cursor:pointer;transition:all .25s;box-shadow:0 0 20px rgba(0,198,251,.15);margin-top:8px}
+.form-submit{display:flex;width:100%;height:52px;background:var(--cyan);color:var(--bg);font-family:'Outfit';font-weight:800;font-size:15px;border:none;border-radius:10px;cursor:pointer;transition:all .25s;box-shadow:0 0 20px rgba(0,198,251,.15);margin-top:0;position:relative;z-index:3}
 .form-submit:hover{background:var(--cyan2);box-shadow:0 0 32px var(--cyan-glow)}
 .form-submit:disabled{opacity:.5;cursor:not-allowed}
 .success-panel{display:none;text-align:center;padding:20px 0}
@@ -206,6 +207,9 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
  .about-inner{grid-template-columns:1fr;text-align:center}
  .about-photo{max-width:240px;margin:0 auto}
  .form-row{grid-template-columns:1fr}
+ .choice-group{grid-template-columns:1fr}
+ .choice-card{min-height:54px;padding:14px 15px}
+ .form-wrap{padding:28px 18px 22px}
  .footer-inner{flex-direction:column;gap:24px}
 }
 </style>
