@@ -196,16 +196,20 @@ function ClientLogin({
   onEmailChange,
   onPasswordChange,
   onSubmit,
+  onResetPassword,
   error,
-  loading
+  loading,
+  resetMessage
 }: {
   email: string;
   password: string;
   onEmailChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onResetPassword: () => void;
   error: string | null;
   loading: boolean;
+  resetMessage: string | null;
 }) {
   return (
     <div className="auth-shell client-auth-shell">
@@ -225,7 +229,9 @@ function ClientLogin({
           <input type="password" value={password} onChange={(event) => onPasswordChange(event.target.value)} placeholder="Password" />
         </label>
         {error ? <div className="error-banner">{error}</div> : null}
+        {resetMessage ? <div className="helper-text">{resetMessage}</div> : null}
         <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</button>
+        <button type="button" className="ghost-button" onClick={onResetPassword} disabled={loading} style={{ width: '100%' }}>Reset password</button>
       </form>
     </div>
   );
@@ -665,6 +671,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PortalTab>('overview');
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   async function refreshAll() {
     if (!token) return;
@@ -740,6 +747,29 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!email.trim()) {
+      setError('Enter your email first so I know where to send the reset link.');
+      setResetMessage(null);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setResetMessage(null);
+      const response = await apiFetch<{ success: boolean; message: string }>('/api/auth/password-setup/request', undefined, {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim(), purpose: 'reset' })
+      });
+      setResetMessage(response.message || 'If that account exists, a reset link has been sent.');
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : 'Unable to send reset link.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     setToken(null);
     setUser(null);
@@ -758,7 +788,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     if (onboardingOnly) {
       return <div className="auth-shell client-auth-shell"><div className="auth-card client-auth-card"><div className="brand-mark brand-mark--centered"><img src={BRAND_LOGO} alt="CredX" className="brand-logo" /></div><p className="eyebrow">CredX Onboarding</p><h1>Continue your signup</h1><p className="helper-text">Use the secure link from your welcome email to review your agreement and finish your intake.</p></div></div>;
     }
-    return <ClientLogin email={email} password={password} onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleLogin} loading={loading} error={error} />;
+    return <ClientLogin email={email} password={password} onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleLogin} onResetPassword={handleResetPassword} loading={loading} error={error} resetMessage={resetMessage} />;
   }
 
   if (onboardingOnly) {
