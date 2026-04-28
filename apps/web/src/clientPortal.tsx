@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 
 type User = {
   id: string;
@@ -71,6 +71,11 @@ type WizardState = {
 
 type PortalTab = 'overview' | 'monitoring' | 'disputes' | 'activity' | 'profile' | 'tasks';
 
+type SecureUploadState = {
+  file: File | null;
+  type: string;
+};
+
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() ||
   (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
     ? 'http://localhost:3000'
@@ -109,6 +114,19 @@ async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Pr
   return body as T;
 }
 
+async function apiUpload<T>(path: string, token: string, formData: FormData): Promise<T> {
+  if (!API_BASE) throw new Error('Missing VITE_API_URL for this deployment');
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` },
+    body: formData
+  });
+  const text = await response.text();
+  const body = text ? JSON.parse(text) : null;
+  if (!response.ok) throw new Error(body?.error ?? `Request failed: ${response.status}`);
+  return body as T;
+}
+
 function prettyStatus(value?: string | null) {
   return (value || 'unknown').toLowerCase().replace(/_/g, ' ');
 }
@@ -127,6 +145,20 @@ function maskDob(value?: string | null) {
   if (!value) return 'Not saved';
   const [year, month] = value.split('-');
   return month && year ? `••/${month}/${year}` : 'Saved securely';
+}
+
+function maskSensitiveInput(value: string, mode: 'ssn' | 'dob') {
+  if (!value) return '';
+  if (mode === 'ssn') {
+    const digits = value.replace(/\D/g, '').slice(0, 9);
+    if (digits.length <= 4) return digits;
+    return `***-**-${digits.slice(-4)}`;
+  }
+  if (mode === 'dob') {
+    const trimmed = value.slice(0, 10);
+    return trimmed.length >= 7 ? `••/${trimmed.slice(5, 7)}/${trimmed.slice(0, 4)}` : 'Saved securely';
+  }
+  return value;
 }
 
 function normalizeDisputes(client: Client | null, progress: Progress | null) {
@@ -327,8 +359,7 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
 }
 
 function CreditMonitoringSection({ token, client, progress, refreshAll }: { token: string; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; }) {
-  const [docName, setDocName] = useState('');
-  const [docType, setDocType] = useState('credit_report');
+  const [upload, setUpload] = useState<SecureUploadState>({ file: null, type: 'credit_report' });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -338,12 +369,19 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
 
   async function submitDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!upload.file) {
+      setError('Choose a file first.');
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      await apiFetch('/api/progress/me/docs', token, { method: 'POST', body: JSON.stringify({ name: docName, fileName: docName, type: docType }) });
-      setDocName('');
+      const formData = new FormData();
+      formData.append('file', upload.file);
+      formData.append('type', upload.type);
+      await apiUpload('/api/progress/me/docs/upload', token, formData);
+      setUpload({ file: null, type: 'credit_report' });
       setMessage('Document saved.');
       await refreshAll();
     } catch (uploadError) {
@@ -387,14 +425,15 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
           <h2>Upload credit report</h2>
           <form className="dispute-card-live" onSubmit={submitDocument}>
             <div className="field-grid">
-              <input className="chat-input" value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="experian-report.pdf" />
-              <select className="chat-input" value={docType} onChange={(e) => setDocType(e.target.value)}>
+              <input className="chat-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => setUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} />
+              <select className="chat-input" value={upload.type} onChange={(e) => setUpload((current) => ({ ...current, type: e.target.value }))}>
                 <option value="credit_report">Credit report</option>
                 <option value="other">Monitoring screenshot / other</option>
               </select>
-              <button className="ghost-button" type="submit" disabled={saving || !docName.trim()}>{saving ? 'Saving...' : 'Save report'}</button>
+              <button className="ghost-button" type="submit" disabled={saving || !upload.file}>{saving ? 'Saving...' : 'Upload securely'}</button>
             </div>
           </form>
+          <p className="helper-text">Files are submitted through the secured client portal flow and recorded as protected documents.</p>
           {message ? <div className="helper-text" style={{ marginTop: '10px' }}>{message}</div> : null}
           {error ? <div className="error-banner" style={{ marginTop: '10px' }}>{error}</div> : null}
           <div className="dispute-list" style={{ marginTop: '12px' }}>
@@ -402,7 +441,7 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
               <div key={`${doc.fileName || doc.name}-${index}`} className="plan-card">
                 <strong>{doc.fileName || doc.name || 'Credit report'}</strong>
                 <span>{prettyStatus(doc.type)}</span>
-                <small>Uploaded {formatDateTime(doc.uploadedAt)}</small>
+                <small>Uploaded {formatDateTime(doc.uploadedAt)}{(doc as any).secure ? ' · secure' : ''}</small>
               </div>
             )) : <div className="empty-state-card">No credit report is on file yet.</div>}
           </div>
@@ -442,7 +481,11 @@ function DisputesSection({ client, progress }: { client: Client | null; progress
             <div className="dispute-card-top"><strong>{dispute.account}</strong><span className={`status-badge status-${String(dispute.status).toLowerCase()}`}>{prettyStatus(dispute.status)}</span></div>
             <div className="dispute-meta"><span>{dispute.bureau} · Round {dispute.round}</span><span>{dispute.accountNumber ? `Acct ${dispute.accountNumber}` : 'Account number not shown'}</span></div>
             <div className="dispute-meta"><span><strong>Current status:</strong> {prettyStatus(dispute.status)}</span><span><strong>What changed:</strong> {dispute.changed}</span></div>
-            <div className="cell-subtext">{dispute.reason}</div>
+            <div className="dispute-change-grid">
+              <div className="change-chip"><span>Reason</span><strong>{dispute.reason}</strong></div>
+              <div className="change-chip"><span>Last movement</span><strong>{dispute.changed}</strong></div>
+              <div className="change-chip"><span>Next step</span><strong>{String(dispute.status).toUpperCase() === 'COMPLETED' ? 'Monitor bureau update' : 'Continue investigation and await response'}</strong></div>
+            </div>
           </div>
         )) : <div className="empty-state-card">No dispute accounts have been published to your portal yet.</div>}
       </div>
@@ -465,6 +508,7 @@ function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { to
   });
   const [docName, setDocName] = useState('');
   const [docType, setDocType] = useState('identity');
+  const [verificationUpload, setVerificationUpload] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -518,12 +562,20 @@ function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { to
 
   async function uploadVerificationDoc(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!verificationUpload) {
+      setError('Choose a file first.');
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      await apiFetch('/api/progress/me/docs', token, { method: 'POST', body: JSON.stringify({ name: docName, fileName: docName, type: docType }) });
+      const formData = new FormData();
+      formData.append('file', verificationUpload);
+      formData.append('type', docType);
+      await apiUpload('/api/progress/me/docs/upload', token, formData);
       setDocName('');
+      setVerificationUpload(null);
       await refreshAll();
       setMessage('Verification document saved.');
     } catch (uploadError) {
@@ -549,10 +601,11 @@ function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { to
               <input className="chat-input" value={profile.state} onChange={(e) => setProfile((c) => ({ ...c, state: e.target.value }))} placeholder="State" />
               <input className="chat-input" value={profile.zip} onChange={(e) => setProfile((c) => ({ ...c, zip: e.target.value }))} placeholder="ZIP" />
               <input className="chat-input" value={profile.dob} onChange={(e) => setProfile((c) => ({ ...c, dob: e.target.value }))} placeholder="Date of birth (YYYY-MM-DD)" />
-              <input className="chat-input" value={profile.ssn} onChange={(e) => setProfile((c) => ({ ...c, ssn: e.target.value }))} placeholder="Full SSN to replace stored value" />
+              <input className="chat-input" value={profile.ssn} onChange={(e) => setProfile((c) => ({ ...c, ssn: e.target.value.replace(/\D/g, '').slice(0, 9) }))} placeholder="Full SSN to replace stored value" />
               <button className="ghost-button" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save profile'}</button>
             </div>
           </form>
+          <div className="helper-text" style={{ marginTop: '10px' }}>DOB preview: {maskSensitiveInput(profile.dob, 'dob')} · SSN preview: {maskSensitiveInput(profile.ssn, 'ssn') || 'Not entered'}</div>
           {message ? <div className="helper-text" style={{ marginTop: '10px' }}>{message}</div> : null}
           {error ? <div className="error-banner" style={{ marginTop: '10px' }}>{error}</div> : null}
         </div>
@@ -570,20 +623,21 @@ function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { to
           <div className="panel-header"><div><p className="eyebrow">Verification Documents</p><h2>Upload secure documents</h2></div></div>
           <form className="dispute-card-live" onSubmit={uploadVerificationDoc}>
             <div className="field-grid">
-              <input className="chat-input" value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="driver-license.pdf" />
+              <input className="chat-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0] || null; setVerificationUpload(file); setDocName(file?.name || ''); }} />
               <select className="chat-input" value={docType} onChange={(e) => setDocType(e.target.value)}>
                 <option value="identity">Identity document</option>
                 <option value="proof_of_address">Proof of address</option>
                 <option value="other">Other verification</option>
               </select>
-              <button className="ghost-button" type="submit" disabled={saving || !docName.trim()}>{saving ? 'Saving...' : 'Save document'}</button>
+              <button className="ghost-button" type="submit" disabled={saving || !verificationUpload}>{saving ? 'Saving...' : 'Upload securely'}</button>
             </div>
           </form>
+          <p className="helper-text">Sensitive verification files move through the same secured phase-two style flow as the protected onboarding details.</p>
         </div>
         <div>
           <div className="panel-header"><div><p className="eyebrow">Files on Record</p><h2>Uploaded verification documents</h2></div></div>
           <div className="dispute-list">
-            {verificationDocs.length ? verificationDocs.map((doc) => <div key={doc.id} className="plan-card"><strong>{doc.fileName}</strong><span>{prettyStatus(doc.type)}</span><small>Uploaded {formatDateTime(doc.uploadedAt)}</small></div>) : <div className="empty-state-card">No verification documents uploaded yet.</div>}
+            {verificationDocs.length ? verificationDocs.map((doc) => <div key={doc.id} className="plan-card"><strong>{doc.fileName}</strong><span>{prettyStatus(doc.type)}</span><small>Uploaded {formatDateTime(doc.uploadedAt)} · secure</small></div>) : <div className="empty-state-card">No verification documents uploaded yet.</div>}
           </div>
         </div>
       </section>

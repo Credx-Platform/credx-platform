@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import crypto from 'crypto';
+import multer from 'multer';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
@@ -7,6 +9,10 @@ import { config } from '../config.js';
 import type { DocumentType } from '@prisma/client';
 
 export const progressRouter = Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
 
 function inferDocumentType(input = ''): string {
   const value = String(input || '').toLowerCase();
@@ -238,7 +244,10 @@ const docSchema = z.object({
   name: z.string().min(1),
   type: z.string().optional(),
   url: z.string().optional(),
-  fileName: z.string().optional()
+  fileName: z.string().optional(),
+  secure: z.boolean().optional(),
+  sizeBytes: z.number().int().nonnegative().optional(),
+  contentType: z.string().optional()
 });
 
 async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
@@ -306,3 +315,73 @@ async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
 
 progressRouter.post('/me/docs', requireAuth, handleDocUpload);
 progressRouter.post('/docs', requireAuth, handleDocUpload);
+
+progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async (req: AuthedRequest, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const client = await prisma.client.findUnique({ where: { userId: req.auth!.sub }, include: { progress: true } });
+    if (!client || !client.progress) return res.status(404).json({ error: 'Client progress not found' });
+
+    const rawType = String(req.body?.type || req.file.originalname || '').trim();
+    const docType = inferDocumentType(rawType);
+    const uploadedAt = new Date().toISOString();
+    const safeName = req.file.originalname || `upload-${Date.now()}`;
+    const storageKey = `secure/${client.id}/${Date.now()}-${crypto.randomUUID()}-${safeName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const secureDoc = {
+      name: safeName,
+      type: docType,
+      url: null,
+      fileName: safeName,
+      uploadedAt,
+      secure: true,
+      sizeBytes: req.file.size,
+      contentType: req.file.mimetype
+    };
+
+    const progress = client.progress as any;
+    const uploadedDocs = Array.isArray(progress.uploadedDocs) ? [...progress.uploadedDocs, secureDoc] : [secureDoc];
+    const workflow = { ...(progress.workflow || {}), updatedAt: uploadedAt };
+    if (docType === 'credit_report') {
+      (workflow as any).stage = 'credit_report_received';
+    }
+
+    await prisma.clientProgress.update({
+      where: { clientId: client.id },
+      data: { uploadedDocs, workflow }
+    });
+
+    await prisma.document.create({
+      data: {
+        clientId: client.id,
+        type: toPrismaDocumentType(docType),
+        fileName: safeName,
+        s3Key: storageKey,
+        contentType: req.file.mimetype,
+        uploadedAt: new Date(uploadedAt)
+      }
+    });
+
+    await prisma.activityEvent.create({
+      data: {
+        clientId: client.id,
+        type: 'secure_document_uploaded',
+        message: `${docType === 'credit_report' ? 'Credit report' : 'Verification document'} uploaded securely.`,
+        metadata: { fileName: safeName, documentType: docType, sizeBytes: req.file.size }
+      }
+    });
+
+    let workflowResult = null;
+    if (docType === 'credit_report') {
+      workflowResult = await completeOnboardingWorkflow(client.id, secureDoc);
+    }
+
+    return res.json({
+      success: true,
+      document: { fileName: safeName, type: docType, uploadedAt, secure: true, sizeBytes: req.file.size },
+      workflow: workflowResult
+    });
+  } catch (error) {
+    next(error);
+  }
+});
