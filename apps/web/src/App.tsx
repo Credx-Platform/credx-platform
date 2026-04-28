@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DisputeManager } from './components/DisputeManager';
 
 type Plan = {
@@ -122,6 +122,7 @@ function bureauLabel(bureau: DisputeRecord['bureau']) {
 }
 
 function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
+  const navigate = useNavigate();
   const active = disputes.filter((item) => !['COMPLETED', 'REJECTED'].includes(item.status));
   const responseDue = disputes.filter((item) => item.status === 'RESPONSE_DUE').length;
   const lettersSent = disputes.filter((item) => item.status === 'LETTER_SENT').length;
@@ -148,7 +149,7 @@ function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
 
       <div className="dispute-spotlight-grid">
         {recent.length ? recent.map((dispute) => (
-          <article key={dispute.id} className="dispute-spotlight-card">
+          <article key={dispute.id} className="dispute-spotlight-card clickable-card" onClick={() => navigate(`/clients/${dispute.client.id}?tab=disputes`)}>
             <div className="dispute-card-top">
               <div>
                 <strong>{dispute.creditorName}</strong>
@@ -178,6 +179,7 @@ function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
 }
 
 function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; disputes: DisputeRecord[]; plans: Plan[] }) {
+  const navigate = useNavigate();
   const newLeads = clients.filter((client) => client.status === 'LEAD').length;
   const activeClients = clients.filter((client) => client.status === 'ACTIVE').length;
   const analysisReady = clients.filter((client) => ['ANALYSIS_READY', 'UPGRADE_OFFERED'].includes(client.status)).length;
@@ -189,6 +191,7 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
       if (client.activities.length) {
         return client.activities.map((activity) => ({
           id: activity.id,
+          clientId: client.id,
           name: `${client.user.firstName} ${client.user.lastName}`,
           text: activity.message,
           createdAt: activity.createdAt
@@ -198,6 +201,7 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
       return [
         {
           id: `client-${client.id}`,
+          clientId: client.id,
           name: `${client.user.firstName} ${client.user.lastName}`,
           text: `Client record updated, status ${client.status.toLowerCase().replace('_', ' ')}`,
           createdAt: client.updatedAt
@@ -218,10 +222,10 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
           </p>
         </div>
         <div className="hero-stats">
-          <div className="stat-card"><span>New Leads</span><strong>{newLeads}</strong></div>
-          <div className="stat-card"><span>Analysis Ready</span><strong>{analysisReady}</strong></div>
-          <div className="stat-card"><span>Active Clients</span><strong>{activeClients}</strong></div>
-          <div className="stat-card"><span>Pending Disputes</span><strong>{pendingDisputes}</strong></div>
+          <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=LEAD')}><span>New Leads</span><strong>{newLeads}</strong></button>
+          <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ANALYSIS_READY')}><span>Analysis Ready</span><strong>{analysisReady}</strong></button>
+          <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ACTIVE')}><span>Active Clients</span><strong>{activeClients}</strong></button>
+          <button className="stat-card stat-card--interactive" onClick={() => navigate('/disputes')}><span>Pending Disputes</span><strong>{pendingDisputes}</strong></button>
         </div>
       </section>
 
@@ -230,7 +234,7 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
           <h2>Recent Client Activity</h2>
           <ul className="activity-list">
             {recentActivity.length ? recentActivity.map((item) => (
-              <li key={item.id}>
+              <li key={item.id} className="clickable-card" onClick={() => navigate(`/clients/${item.clientId}?tab=activity`)}>
                 <strong>{item.name}</strong>
                 <span>{item.text}</span>
               </li>
@@ -241,7 +245,7 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
           <h2>Analysis to Upgrade Pipeline</h2>
           <div className="quick-actions quick-actions--plans">
             {clients.filter((client) => ['INTAKE_RECEIVED', 'ANALYSIS_READY', 'UPGRADE_OFFERED', 'PAST_DUE', 'RESTRICTED'].includes(client.status)).slice(0, 4).map((client) => (
-              <div key={client.id} className="plan-card">
+              <div key={client.id} className="plan-card clickable-card" onClick={() => navigate(`/clients/${client.id}?tab=overview`)}>
                 <strong>{client.user.firstName} {client.user.lastName}</strong>
                 <span>Status {client.status.replace('_', ' ')}</span>
                 <span>Timeline {client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} months` : 'Pending analysis'}</span>
@@ -260,18 +264,24 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
 
 function Clients({ clients }: { clients: ClientRecord[] }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
+  const statusFilter = searchParams.get('status');
   
   const filteredClients = useMemo(() => {
-    if (!searchQuery.trim()) return clients;
+    let next = clients;
+    if (statusFilter) {
+      next = next.filter((client) => client.status === statusFilter);
+    }
+    if (!searchQuery.trim()) return next;
     const query = searchQuery.toLowerCase();
-    return clients.filter(client => 
+    return next.filter(client => 
       client.user.firstName.toLowerCase().includes(query) ||
       client.user.lastName.toLowerCase().includes(query) ||
       client.user.email.toLowerCase().includes(query) ||
       client.status.toLowerCase().includes(query)
     );
-  }, [clients, searchQuery]);
+  }, [clients, searchQuery, statusFilter]);
 
   return (
     <section className="panel">
@@ -279,6 +289,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
         <div>
           <p className="eyebrow">Client Management</p>
           <h2>Customers</h2>
+          {statusFilter ? <p className="helper-text">Filtered by {statusFilter.replace('_', ' ')}.</p> : null}
         </div>
         <div className="search-box">
           <input
@@ -340,12 +351,18 @@ type ClientWorkspaceTab = 'overview' | 'profile' | 'documents' | 'disputes' | 'a
 function ClientDetailRoute({ token }: { token: string }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [client, setClient] = useState<ClientDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ClientWorkspaceTab>('overview');
+  const requestedTab = searchParams.get('tab') as ClientWorkspaceTab | null;
+  const [activeTab, setActiveTab] = useState<ClientWorkspaceTab>(requestedTab || 'overview');
   const [statusValue, setStatusValue] = useState('LEAD');
+
+  useEffect(() => {
+    if (requestedTab) setActiveTab(requestedTab);
+  }, [requestedTab]);
 
   useEffect(() => {
     if (!id) return;
