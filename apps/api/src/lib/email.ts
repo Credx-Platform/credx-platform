@@ -273,7 +273,7 @@ function renderPortalReadyEmail(params: {
   loginLink: string;
   setupLink: string;
 }) {
-  const subject = 'Your CredX portal is ready';
+  const subject = 'Set your CredX password to access your portal';
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -291,12 +291,13 @@ function renderPortalReadyEmail(params: {
       </div>
       <div style="padding:32px;">
         <h1 style="margin:0 0 12px;font-size:26px;color:#ffffff;">You're all set, ${params.firstName || 'there'}.</h1>
-        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Your contract is signed, your profile is on file, and your credit monitoring credentials are connected. Your CredX portal is now fully unlocked.</p>
-        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Cesar, your CredX guide, will greet you the first time you log in and walk you through what happens next — including how to share your latest credit report so we can build your dispute strategy.</p>
+        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Your contract is signed, your profile is on file, and your credit monitoring credentials are connected. Your CredX portal is ready.</p>
+        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Before you can enter the portal, you need to create your password using the secure button below.</p>
         <div style="text-align:center;padding:18px 0 6px;">
-          <a href="${params.loginLink}" style="display:inline-block;background:#c9a227;color:#111a28;text-decoration:none;padding:15px 28px;border-radius:12px;font-weight:800;font-size:16px;">Open my portal</a>
+          <a href="${params.setupLink}" style="display:inline-block;background:#c9a227;color:#111a28;text-decoration:none;padding:15px 28px;border-radius:12px;font-weight:800;font-size:16px;">Set my password</a>
         </div>
-        <p style="margin:22px 0 8px;color:#9fb0c5;font-size:13px;line-height:1.6;">Need to set or reset your password? Use this secure link: <a href="${params.setupLink}" style="color:#c9a227;">${params.setupLink}</a></p>
+        <p style="margin:18px 0 8px;color:#d5dfeb;font-size:14px;line-height:1.6;">After your password is set, you can sign in to your portal here: <a href="${params.loginLink}" style="color:#c9a227;">${params.loginLink}</a></p>
+        <p style="margin:12px 0 8px;color:#9fb0c5;font-size:13px;line-height:1.6;">If you ever need to reset it again, use this secure link: <a href="${params.setupLink}" style="color:#c9a227;">${params.setupLink}</a></p>
       </div>
       <div style="padding:24px 32px 32px;color:#9fb0c5;font-size:13px;line-height:1.6;border-top:1px solid #243247;">
         <strong style="color:#ffffff;">CredX</strong><br />
@@ -308,17 +309,17 @@ function renderPortalReadyEmail(params: {
 </body>
 </html>`;
 
-  const text = `Your CredX portal is ready
+  const text = `Set your CredX password to access your portal
 
 Hi ${params.firstName || 'there'},
 
-Your contract is signed, your profile is on file, and your credit monitoring credentials are connected. Your CredX portal is now fully unlocked.
+Your contract is signed, your profile is on file, and your credit monitoring credentials are connected. Your CredX portal is ready.
 
-Cesar, your CredX guide, will greet you the first time you log in and walk you through what happens next — including how to share your latest credit report so we can build your dispute strategy.
+Before you can enter the portal, create your password here:
+${params.setupLink}
 
-Open your portal: ${params.loginLink}
-
-Need to set or reset your password? Use this secure link: ${params.setupLink}
+After your password is set, sign in here:
+${params.loginLink}
 
 CredX
 Credit Repair & Financial Strategy Support`;
