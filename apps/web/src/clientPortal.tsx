@@ -38,6 +38,14 @@ type Progress = {
   activities?: Array<{ id: string; message: string; createdAt: string; type?: string }>;
   disputes?: Array<Record<string, unknown>>;
   scores?: { equifax?: number | null; experian?: number | null; transunion?: number | null };
+  education?: {
+    masterclassEnrolled?: boolean;
+    masterclassAccess?: boolean;
+    masterclassProgress?: string[];
+    affiliateLinks?: Array<{ label: string; url: string; category?: string }>;
+    enrolledAt?: string | null;
+    offerEligibleUntil?: string | null;
+  };
   analysis?: { findings?: string[]; [key: string]: unknown } | null;
   disputeStrategy?: { objective?: string; phases?: string[]; [key: string]: unknown } | null;
 };
@@ -69,7 +77,7 @@ type WizardState = {
   monitorPassword: string;
 };
 
-type PortalTab = 'overview' | 'monitoring' | 'disputes' | 'activity' | 'profile' | 'tasks';
+type PortalTab = 'overview' | 'monitoring' | 'education' | 'disputes' | 'activity' | 'profile' | 'tasks';
 
 type SecureUploadState = {
   file: File | null;
@@ -499,6 +507,73 @@ function DisputesSection({ client, progress }: { client: Client | null; progress
   );
 }
 
+function EducationSection({ token, progress, refreshAll }: { token: string; progress: Progress | null; refreshAll: () => Promise<void>; }) {
+  const education = progress?.education || {};
+  const completed = education.masterclassProgress || [];
+  const days = [
+    { id: 'day1', title: 'Day 1 · Credit Fundamentals', desc: 'How scores work, what factors matter, and how to read your reports.' },
+    { id: 'day2', title: 'Day 2 · Disputes & Removals', desc: 'Learn dispute workflow, 609 concepts, and lawful strategy basics.' },
+    { id: 'day3', title: 'Day 3 · Advanced Strategies', desc: 'Goodwill, sequencing, and leverage points that matter most.' },
+    { id: 'day4', title: 'Day 4 · Credit Building', desc: 'Secured cards, utilization, and sustainable rebuild tactics.' },
+    { id: 'day5', title: 'Day 5 · Business Credit', desc: 'Business setup, vendor accounts, and funding-readiness basics.' },
+    { id: 'bonus', title: 'Bonus Day · Generational Wealth', desc: 'Long-term asset and legacy thinking beyond score recovery.' }
+  ];
+
+  async function markComplete(dayId: string) {
+    const next = Array.from(new Set([...(education.masterclassProgress || []), dayId]));
+    await apiFetch('/api/progress/me', token, { method: 'PATCH', body: JSON.stringify({ education: { ...education, masterclassProgress: next } }) });
+    await refreshAll();
+  }
+
+  return (
+    <div className="page-grid">
+      <section className="hero-card">
+        <div>
+          <p className="eyebrow">Education</p>
+          <h1>5-Day Masterclass</h1>
+          <p>Your DIY roadmap to credit improvement, business credit, and financial freedom — now built directly into the CredX platform.</p>
+        </div>
+        <div className="hero-stats">
+          <div className="stat-card"><span>Enrollment</span><strong>{education.masterclassEnrolled ? 'Active' : 'Off'}</strong></div>
+          <div className="stat-card"><span>Completed</span><strong>{completed.length}/{days.length}</strong></div>
+          <div className="stat-card"><span>Access Window</span><strong>{education.offerEligibleUntil ? formatDate(education.offerEligibleUntil) : 'Standard'}</strong></div>
+          <div className="stat-card"><span>Support</span><strong>AI + Coach</strong></div>
+        </div>
+      </section>
+
+      <section className="panel two-col">
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Curriculum</p><h2>Day-by-day lessons</h2></div></div>
+          <div className="dispute-list">
+            {days.map((day) => {
+              const done = completed.includes(day.id);
+              return (
+                <div key={day.id} className="dispute-card-live">
+                  <div className="dispute-card-top"><strong>{day.title}</strong><span className={done ? 'status-badge status-active' : 'status-badge status-pending'}>{done ? 'Completed' : 'Open'}</span></div>
+                  <div className="cell-subtext">{day.desc}</div>
+                  <div style={{ marginTop: '12px' }}><button className="ghost-button" onClick={() => markComplete(day.id)} disabled={done}>{done ? 'Completed' : 'Mark complete'}</button></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Affiliate Resources</p><h2>Recommended tools</h2></div></div>
+          <div className="dispute-list">
+            {(education.affiliateLinks || []).length ? education.affiliateLinks!.map((item, index) => (
+              <div key={`${item.url}-${index}`} className="plan-card">
+                <strong>{item.label}</strong>
+                <span>{prettyStatus(item.category || 'resource')}</span>
+                <small><a href={item.url} target="_blank" rel="noreferrer">Open resource</a></small>
+              </div>
+            )) : <div className="empty-state-card">Affiliate links will appear here once assigned.</div>}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { token: string; user: User | null; client: Client | null; refreshAll: () => Promise<void>; onUserUpdated: (next: User) => void; }) {
   const [profile, setProfile] = useState({
     firstName: user?.firstName || '',
@@ -816,6 +891,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const navItems: Array<{ key: PortalTab; label: string }> = [
     { key: 'overview', label: 'Overview' },
     { key: 'monitoring', label: 'Credit Monitoring' },
+    { key: 'education', label: '5-Day Masterclass' },
     { key: 'disputes', label: 'Disputes' },
     { key: 'activity', label: 'Activity' },
     { key: 'profile', label: 'Profile' },
@@ -882,6 +958,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           ) : null}
 
           {activeTab === 'monitoring' ? <CreditMonitoringSection token={token} client={client} progress={progress} refreshAll={refreshAll} /> : null}
+          {activeTab === 'education' ? <EducationSection token={token} progress={progress} refreshAll={refreshAll} /> : null}
           {activeTab === 'disputes' ? <DisputesSection client={client} progress={progress} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}

@@ -22,10 +22,16 @@ leadsRouter.post('/', async (req, res, next) => {
   try {
     const data = createLeadSchema.parse(req.body);
     const offerEligibleUntil = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const affiliateLinks = [
+      { label: 'IdentityIQ Credit Monitoring', url: 'https://www.identityiq.com/', category: 'monitoring' },
+      { label: 'Self Credit Builder', url: 'https://www.self.inc/', category: 'credit_builder' },
+      { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }
+    ];
     const lead = await prisma.lead.create({
       data: {
         ...data,
-        offerEligibleUntil
+        offerEligibleUntil,
+        notes: data.offerInterest === 'masterclass' ? JSON.stringify({ affiliateLinks, masterclassFreeWindow: true }) : undefined
       }
     });
     const contractLink = `${config.appUrl.replace(/\/$/, '')}/contract`;

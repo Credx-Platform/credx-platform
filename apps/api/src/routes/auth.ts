@@ -16,6 +16,12 @@ import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 
 export const authRouter = Router();
 
+const defaultAffiliateLinks = [
+  { label: 'IdentityIQ Credit Monitoring', url: 'https://www.identityiq.com/', category: 'monitoring' },
+  { label: 'Self Credit Builder', url: 'https://www.self.inc/', category: 'credit_builder' },
+  { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }
+];
+
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -49,7 +55,8 @@ authRouter.post('/register', async (req, res, next) => {
                   masterclassEnrolled: data.offerInterest === 'masterclass',
                   masterclassAccess: data.offerInterest === 'masterclass',
                   masterclassProgress: [],
-                  affiliateLinks: [],
+                  affiliateLinks: data.offerInterest === 'masterclass' ? defaultAffiliateLinks : [],
+                  offerEligibleUntil: data.offerInterest === 'masterclass' ? new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() : null,
                   enrolledAt: data.offerInterest === 'masterclass' ? new Date().toISOString() : null
                 }
               }
