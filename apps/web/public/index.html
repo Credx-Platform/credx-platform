@@ -102,8 +102,8 @@ input::placeholder,textarea::placeholder{color:var(--muted2)}
 select{cursor:pointer}
 select option{background:var(--bg)}
 textarea{resize:vertical;min-height:72px}
-.cb-row{display:flex;align-items:flex-start;gap:8px;margin:16px 0 10px}
-.cb-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--cyan);flex-shrink:0;margin-top:2px;padding:0;background:none;border:none}
+.cb-row{display:flex;align-items:flex-start;gap:10px;margin:16px 0 10px}
+.cb-row input[type=checkbox]{display:block !important;visibility:visible !important;opacity:1 !important;appearance:auto !important;-webkit-appearance:checkbox !important;width:18px;height:18px;accent-color:var(--cyan);flex:0 0 18px;margin:2px 0 0;padding:0;background:transparent;border:1px solid var(--border-c);border-radius:4px;box-shadow:none}
 .cb-row label{font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400;cursor:pointer}
 .choice-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}
 .choice-card{position:relative;display:flex;align-items:center;gap:12px;min-height:58px;padding:15px 16px;border:1px solid var(--border);border-radius:14px;background:var(--bg);cursor:pointer;transition:border-color .2s,transform .2s,box-shadow .2s,background .2s;color:var(--white);font-size:14px;text-transform:none;letter-spacing:0;font-weight:700}
