@@ -411,17 +411,27 @@ function ClientDetailRoute({ token }: { token: string }) {
         </div>
       </section>
 
-      <section className="panel">
-        <div className="client-tab-row">
-          {tabs.map((tab) => (
-            <button key={tab.key} className={`tab ${activeTab === tab.key ? 'active' : ''}`} onClick={() => setActiveTab(tab.key)}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      <section className="client-workspace-shell">
+        <aside className="panel client-workspace-nav">
+          <div className="client-mini-profile">
+            <div className="client-avatar">{client.user.firstName?.[0] || 'C'}{client.user.lastName?.[0] || ''}</div>
+            <div>
+              <strong>{fullName}</strong>
+              <div className="cell-subtext">{client.user.email}</div>
+            </div>
+          </div>
+          <div className="client-tab-stack">
+            {tabs.map((tab) => (
+              <button key={tab.key} className={`tab client-side-tab ${activeTab === tab.key ? 'active' : ''}`} onClick={() => setActiveTab(tab.key)}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </aside>
 
+        <div className="panel client-workspace-main">
         {activeTab === 'overview' ? (
-          <div className="two-col">
+          <div className="two-col client-section-grid">
             <div className="preview-card">
               <h3>Account summary</h3>
               <ul className="detail-list">
@@ -440,11 +450,27 @@ function ClientDetailRoute({ token }: { token: string }) {
                 <li><strong>Reports</strong><span>{client.creditReports?.length || 0}</span></li>
               </ul>
             </div>
+            <div className="preview-card">
+              <h3>Dispute progress</h3>
+              <ul className="detail-list">
+                <li><strong>Total items</strong><span>{disputeItems.length}</span></li>
+                <li><strong>Documents</strong><span>{documents.length}</span></li>
+                <li><strong>Last update</strong><span>{formatDate(client.updatedAt)}</span></li>
+                <li><strong>Portal status</strong><span>{client.portalRestricted ? 'Restricted' : 'Open'}</span></li>
+              </ul>
+            </div>
+            <div className="preview-card">
+              <h3>Next actions</h3>
+              <ul className="detail-list">
+                <li><strong>Workflow stage</strong><span>{client.progress?.workflow?.stage || 'Not started'}</span></li>
+                <li><strong>Next queue</strong><span>{client.progress?.workflow?.next?.join(', ') || 'Pending update'}</span></li>
+              </ul>
+            </div>
           </div>
         ) : null}
 
         {activeTab === 'profile' ? (
-          <div className="two-col">
+          <div className="two-col client-section-grid">
             <div className="preview-card">
               <h3>Profile details</h3>
               <ul className="detail-list">
@@ -530,6 +556,7 @@ function ClientDetailRoute({ token }: { token: string }) {
             ) : <p className="helper-text">No activity yet.</p>}
           </div>
         ) : null}
+        </div>
       </section>
     </div>
   );

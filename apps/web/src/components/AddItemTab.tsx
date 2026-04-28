@@ -4,6 +4,8 @@ import type { DisputeItem, Furnisher } from './DisputeManager';
 interface AddItemTabProps {
   token: string;
   items: DisputeItem[];
+  selectedClientId: string;
+  selectedClientLabel?: string;
   onItemCreated: () => void;
   onItemsChange: () => void;
   selectedItemIds: string[];
@@ -32,10 +34,8 @@ const disputeReasons = [
   'Other'
 ];
 
-export function AddItemTab({ token, items, onItemCreated, onItemsChange, selectedItemIds, onSelectionChange, onOpenBureaus }: AddItemTabProps) {
-  const [clients, setClients] = useState<any[]>([]);
+export function AddItemTab({ token, items, selectedClientId, selectedClientLabel, onItemCreated, onItemsChange, selectedItemIds, onSelectionChange, onOpenBureaus }: AddItemTabProps) {
   const [furnishers, setFurnishers] = useState<Furnisher[]>([]);
-  const [selectedClient, setSelectedClient] = useState('');
   const [editingItem, setEditingItem] = useState<DisputeItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(selectedItemIds));
@@ -53,15 +53,8 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange, selecte
     customInstruction: ''
   });
 
-  // Fetch clients and furnishers
+  // Fetch furnishers
   useEffect(() => {
-    fetch(`${API_BASE}/api/clients`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => setClients(data.clients || []))
-      .catch(console.error);
-
     fetch(`${API_BASE}/api/disputes/furnishers`, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -122,7 +115,7 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange, selecte
   };
 
   const handleSave = async () => {
-    if (!selectedClient) {
+    if (!selectedClientId) {
       alert('Please select a client first');
       return;
     }
@@ -147,7 +140,7 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange, selecte
         },
         body: JSON.stringify({
           ...formData,
-          clientId: selectedClient,
+          clientId: selectedClientId,
           balance: formData.balance ? parseFloat(formData.balance) : null
         })
       });
@@ -164,7 +157,7 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange, selecte
   };
 
   const handleSaveAndDispute = async () => {
-    if (!selectedClient) {
+    if (!selectedClientId) {
       alert('Please select a client first');
       return;
     }
@@ -190,7 +183,7 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange, selecte
         },
         body: JSON.stringify({
           ...formData,
-          clientId: selectedClient,
+          clientId: selectedClientId,
           balance: formData.balance ? parseFloat(formData.balance) : null
         })
       });
@@ -209,7 +202,7 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange, selecte
           },
           body: JSON.stringify({
             itemId: itemId,
-            clientId: selectedClient,
+            clientId: selectedClientId,
             bureaus: {
               equifax: formData.disputeEquifax,
               experian: formData.disputeExperian,
@@ -272,7 +265,6 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange, selecte
 
   const startEdit = (item: DisputeItem) => {
     setEditingItem(item);
-    setSelectedClient(item.clientId);
     setFormData({
       furnisher: item.furnisher,
       accountNumber: item.accountNumber || '',
@@ -316,32 +308,14 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange, selecte
           padding: 1.5rem;
         }
 
-        .add-item-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1.5rem;
-          flex-wrap: wrap;
-          gap: 1rem;
-        }
+        .add-item-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; }
 
         .add-item-header h3 {
           font-size: 1.25rem;
           color: #1e293b;
         }
 
-        .client-selector {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-        }
-
-        .client-selector select {
-          padding: 0.5rem 1rem;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          min-width: 250px;
-        }
+        .client-selector { display:flex; align-items:center; gap:.75rem; }
 
         .dispute-form {
           background: #f8fafc;
@@ -564,18 +538,9 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange, selecte
         <h3>Add Dispute Items</h3>
         <div className="client-selector">
           <label>Client:</label>
-          <select 
-            value={selectedClient} 
-            onChange={(e) => setSelectedClient(e.target.value)}
-            disabled={!!editingItem}
-          >
-            <option value="">Select client...</option>
-            {clients.map(client => (
-              <option key={client.id} value={client.id}>
-                {client.user.firstName} {client.user.lastName}
-              </option>
-            ))}
-          </select>
+          <div style={{padding:'0.6rem 0.95rem', border:'1px solid #d1d5db', borderRadius:'6px', minWidth:'250px', background:'#fff', color:'#0f172a'}}>
+            {selectedClientLabel || 'Select a client at the top of the dispute workspace.'}
+          </div>
         </div>
       </div>
 
@@ -704,7 +669,7 @@ export function AddItemTab({ token, items, onItemCreated, onItemsChange, selecte
           <button 
             className="btn btn-success" 
             onClick={handleSaveAndDispute}
-            disabled={saving || !selectedClient}
+            disabled={saving || !selectedClientId}
           >
             {editingItem ? 'Update & Dispute' : 'Save & Dispute'}
           </button>

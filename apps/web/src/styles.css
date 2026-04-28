@@ -355,6 +355,47 @@ button:hover,
   flex-wrap: wrap;
   margin-bottom: 18px;
 }
+.client-workspace-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 18px;
+}
+.client-workspace-nav,
+.client-workspace-main {
+  min-height: 100%;
+}
+.client-workspace-nav {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+.client-mini-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.client-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(0,198,251,.18), rgba(255,255,255,.03));
+  color: var(--white);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+}
+.client-tab-stack {
+  display: grid;
+  gap: 10px;
+}
+.client-side-tab {
+  width: 100%;
+  justify-content: flex-start;
+}
+.client-section-grid {
+  align-items: start;
+}
 .client-workspace-actions {
   display: flex;
   gap: 12px;
@@ -420,6 +461,7 @@ button:hover,
     border-bottom: 1px solid var(--border);
   }
   .hero-card, .two-col, .workflow-grid, .field-grid { grid-template-columns: 1fr; }
+  .client-workspace-shell { grid-template-columns: 1fr; }
   .topbar { flex-direction: column; }
   .topbar-actions { width: 100%; justify-content: space-between; }
 }

@@ -2,34 +2,29 @@ import { useState, useRef, useEffect } from 'react';
 
 interface ImportReportTabProps {
   token: string;
+  selectedClientId: string;
+  selectedClientLabel?: string;
   onImportComplete: () => void;
 }
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
 
-export function ImportReportTab({ token, onImportComplete }: ImportReportTabProps) {
-  const [selectedClient, setSelectedClient] = useState('');
-  const [clients, setClients] = useState<any[]>([]);
+export function ImportReportTab({ token, selectedClientId, selectedClientLabel, onImportComplete }: ImportReportTabProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ success: boolean; count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch clients on mount
   useEffect(() => {
-    fetch(`${API_BASE}/api/clients`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => setClients(data.clients || []))
-      .catch(console.error);
-  }, [token]);
+    setUploadResult(null);
+    setError(null);
+  }, [selectedClientId]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!selectedClient) {
+    if (!selectedClientId) {
       setError('Please select a client first');
       return;
     }
@@ -41,7 +36,7 @@ export function ImportReportTab({ token, onImportComplete }: ImportReportTabProp
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('clientId', selectedClient);
+      formData.append('clientId', selectedClientId);
 
       const response = await fetch(`${API_BASE}/api/disputes/import/csv`, {
         method: 'POST',
@@ -269,20 +264,12 @@ export function ImportReportTab({ token, onImportComplete }: ImportReportTabProp
       </div>
 
       <div className="import-section">
-        <h4>1. Select Client</h4>
+        <h4>1. Active Client</h4>
         <div className="form-group">
           <label>Client</label>
-          <select 
-            value={selectedClient} 
-            onChange={(e) => setSelectedClient(e.target.value)}
-          >
-            <option value="">Select a client...</option>
-            {clients.map(client => (
-              <option key={client.id} value={client.id}>
-                {client.user.firstName} {client.user.lastName} ({client.user.email})
-              </option>
-            ))}
-          </select>
+          <div style={{padding:'0.75rem 1rem', border:'1px solid #d1d5db', borderRadius:'6px', background:'white', color:'#0f172a'}}>
+            {selectedClientLabel || 'Select a client at the top of the dispute workspace.'}
+          </div>
         </div>
 
         <div className="toggle-row">

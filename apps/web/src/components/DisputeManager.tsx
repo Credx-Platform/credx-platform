@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ImportReportTab } from './ImportReportTab';
 import { AddItemTab } from './AddItemTab';
 import { BureausTab } from './BureausTab';
@@ -68,14 +68,42 @@ export function DisputeManager({ token }: DisputeManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>('add');
   const [items, setItems] = useState<DisputeItem[]>([]);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [clients, setClients] = useState<Array<{ id: string; user: { firstName: string; lastName: string; email: string } }>>([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    fetch(`${API_BASE}/api/clients`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const nextClients = data.clients || [];
+        setClients(nextClients);
+        if (!selectedClientId && nextClients[0]?.id) setSelectedClientId(nextClients[0].id);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load clients'));
+  }, [token]);
+
+  const selectedClient = useMemo(
+    () => clients.find((client) => client.id === selectedClientId) || null,
+    [clients, selectedClientId]
+  );
+
+  const selectedClientLabel = selectedClient
+    ? `${selectedClient.user.firstName} ${selectedClient.user.lastName} (${selectedClient.user.email})`
+    : '';
+
   const fetchItems = useCallback(async () => {
+    if (!selectedClientId) {
+      setItems([]);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/api/disputes/items`, {
+      const response = await fetch(`${API_BASE}/api/disputes/items?clientId=${encodeURIComponent(selectedClientId)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Failed to fetch items');
@@ -86,11 +114,15 @@ export function DisputeManager({ token }: DisputeManagerProps) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, selectedClientId]);
 
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  useEffect(() => {
+    setSelectedItemIds([]);
+  }, [selectedClientId]);
 
   const handleItemCreated = () => {
     fetchItems();
@@ -183,7 +215,63 @@ export function DisputeManager({ token }: DisputeManagerProps) {
           border-radius: 6px;
           margin: 1rem;
         }
+
+        .dm-client-shell {
+          display:grid;
+          gap:1rem;
+          margin-bottom:1rem;
+        }
+
+        .dm-client-bar {
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          gap:1rem;
+          padding:1rem 1.1rem;
+          background:linear-gradient(180deg,#ffffff,#f8fafc);
+          border:1px solid #e2e8f0;
+          border-radius:12px;
+          flex-wrap:wrap;
+        }
+
+        .dm-client-copy strong { display:block; color:#0f172a; font-size:1rem; }
+        .dm-client-copy span { color:#64748b; font-size:.875rem; }
+
+        .dm-client-picker {
+          min-width:320px;
+          padding:0.75rem 1rem;
+          border:1px solid #d1d5db;
+          border-radius:10px;
+          background:white;
+          font-size:.95rem;
+        }
+
+        .dm-empty-client {
+          padding:2rem;
+          text-align:center;
+          color:#64748b;
+          background:#fff;
+          border:1px dashed #cbd5e1;
+          border-radius:12px;
+        }
       `}</style>
+
+      <div className="dm-client-shell">
+        <div className="dm-client-bar">
+          <div className="dm-client-copy">
+            <strong>Selected client</strong>
+            <span>This client context stays active across import, add items, bureaus, tracking, and results.</span>
+          </div>
+          <select className="dm-client-picker" value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)}>
+            <option value="">Select a client...</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.user.firstName} {client.user.lastName} ({client.user.email})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       <div className="dm-tabs">
         {tabs.map(tab => (
@@ -198,6 +286,7 @@ export function DisputeManager({ token }: DisputeManagerProps) {
       </div>
 
       <div className="dm-content">
+        {!selectedClientId && !loading && !error && <div className="dm-empty-client">Select a client above to begin dispute operations.</div>}
         {loading && <div className="dm-loading">Loading dispute data...</div>}
         
         {error && (
@@ -207,11 +296,13 @@ export function DisputeManager({ token }: DisputeManagerProps) {
           </div>
         )}
 
-        {!loading && !error && (
+        {!loading && !error && !!selectedClientId && (
           <>
             {activeTab === 'import' && (
               <ImportReportTab 
                 token={token} 
+                selectedClientId={selectedClientId}
+                selectedClientLabel={selectedClientLabel}
                 onImportComplete={handleImportComplete}
               />
             )}
@@ -220,6 +311,8 @@ export function DisputeManager({ token }: DisputeManagerProps) {
               <AddItemTab 
                 token={token} 
                 items={items}
+                selectedClientId={selectedClientId}
+                selectedClientLabel={selectedClientLabel}
                 onItemCreated={handleItemCreated}
                 onItemsChange={fetchItems}
                 selectedItemIds={selectedItemIds}
