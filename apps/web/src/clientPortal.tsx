@@ -5,6 +5,7 @@ type User = {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string | null;
   role: 'CLIENT' | 'STAFF' | 'ADMIN';
 };
 
@@ -16,20 +17,29 @@ type Client = {
   disputePlanSummary?: string | null;
   estimatedTimelineMonths?: number | null;
   portalRestricted?: boolean;
+  ssnLast4?: string | null;
+  currentAddressLine1?: string | null;
+  currentAddressLine2?: string | null;
+  currentCity?: string | null;
+  currentState?: string | null;
+  currentPostalCode?: string | null;
+  dobEncrypted?: string | null;
   tasks?: Array<{ id: string; title: string; description?: string | null; completed: boolean; dueAt?: string | null }>;
   activities?: Array<{ id: string; message: string; createdAt: string; type?: string }>;
-  disputes?: Array<{ id: string; creditorName: string; bureau: string; status: string; round: number; reason?: string | null }>;
+  disputes?: Array<{ id: string; creditorName: string; bureau: string; status: string; round: number; reason?: string | null; accountNumber?: string | null }>;
   documents?: Array<{ id: string; fileName: string; type: string; uploadedAt: string }>;
 };
 
 type Progress = {
-  uploadedDocs?: Array<{ name?: string; type?: string; uploadedAt?: string; fileName?: string }>;
+  uploadedDocs?: Array<{ name?: string; type?: string; uploadedAt?: string; fileName?: string; url?: string | null }>;
   workflow?: { stage?: string; updatedAt?: string; next?: string[] };
-  onboarding?: { status?: string; signupAt?: string | null; completedAt?: string | null };
+  onboarding?: { status?: string; signupAt?: string | null; completedAt?: string | null; portalReadyEmailSentAt?: string | null };
   tasks?: Array<{ id: string; title: string; description?: string | null; completed: boolean; dueAt?: string | null }>;
-  activities?: Array<{ id: string; message: string; createdAt: string }>;
+  activities?: Array<{ id: string; message: string; createdAt: string; type?: string }>;
   disputes?: Array<Record<string, unknown>>;
   scores?: { equifax?: number | null; experian?: number | null; transunion?: number | null };
+  analysis?: { findings?: string[]; [key: string]: unknown } | null;
+  disputeStrategy?: { objective?: string; phases?: string[]; [key: string]: unknown } | null;
 };
 
 type LoginResponse = {
@@ -58,6 +68,8 @@ type WizardState = {
   monitorUsername: string;
   monitorPassword: string;
 };
+
+type PortalTab = 'overview' | 'monitoring' | 'disputes' | 'activity' | 'profile' | 'tasks';
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() ||
   (typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
@@ -106,6 +118,46 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return 'Pending';
+  return new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function maskDob(value?: string | null) {
+  if (!value) return 'Not saved';
+  const [year, month] = value.split('-');
+  return month && year ? `••/${month}/${year}` : 'Saved securely';
+}
+
+function normalizeDisputes(client: Client | null, progress: Progress | null) {
+  const fromClient = (client?.disputes || []).map((item) => ({
+    id: item.id,
+    account: item.creditorName,
+    bureau: item.bureau,
+    status: item.status,
+    round: item.round,
+    reason: item.reason || 'Reason pending',
+    changed: item.status === 'COMPLETED' ? 'Resolved' : item.status === 'REJECTED' ? 'Verified as reported' : 'In progress',
+    accountNumber: item.accountNumber || null
+  }));
+
+  const fromProgress = (progress?.disputes || []).map((item, index) => {
+    const record = item as Record<string, unknown>;
+    return {
+      id: String(record.id || `progress-${index}`),
+      account: String(record.accountName || record.title || 'Reported account'),
+      bureau: String(record.bureau || 'All bureaus'),
+      status: String(record.status || 'drafted').toUpperCase(),
+      round: Number(record.round || 1),
+      reason: String(record.reason || record.request || 'Investigation pending'),
+      changed: String(record.notes || record.type || 'Draft created'),
+      accountNumber: record.accountNumber ? String(record.accountNumber) : null
+    };
+  });
+
+  return [...fromClient, ...fromProgress].filter((item, index, arr) => arr.findIndex((other) => other.id === item.id) === index);
+}
+
 function ClientLogin({
   email,
   password,
@@ -131,7 +183,7 @@ function ClientLogin({
         </div>
         <p className="eyebrow">CredX Client Access</p>
         <h1>Client Portal Login</h1>
-        <p className="helper-text">Sign in to see your workflow stage, tasks, activity, and current dispute progress.</p>
+        <p className="helper-text">Sign in to see your credit monitoring, analysis, account activity, disputes, and profile.</p>
         <label>
           <span>Email</span>
           <input value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="you@example.com" />
@@ -147,17 +199,7 @@ function ClientLogin({
   );
 }
 
-function OnboardingWizard({
-  token,
-  user,
-  progress,
-  onProgressUpdated
-}: {
-  token: string;
-  user: User;
-  progress: Progress | null;
-  onProgressUpdated: (nextProgress: Progress) => void;
-}) {
+function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token: string; user: User; progress: Progress | null; onProgressUpdated: (nextProgress: Progress) => void; }) {
   const [contractText, setContractText] = useState<ContractTextResponse | null>(null);
   const [loadingContract, setLoadingContract] = useState(true);
   const [busyStep, setBusyStep] = useState<string | null>(null);
@@ -166,28 +208,16 @@ function OnboardingWizard({
   const [contractAgreed, setContractAgreed] = useState(false);
   const [docName, setDocName] = useState('');
   const [docType, setDocType] = useState('credit_report');
-  const [wizardState, setWizardState] = useState<WizardState>({
-    ...defaultWizardState,
-    fullName: `${user.firstName} ${user.lastName}`.trim(),
-    email: user.email
-  });
+  const [wizardState, setWizardState] = useState<WizardState>({ ...defaultWizardState, fullName: `${user.firstName} ${user.lastName}`.trim(), email: user.email, phone: user.phone || '' });
 
   useEffect(() => {
     let cancelled = false;
     setLoadingContract(true);
     apiFetch<ContractTextResponse>('/api/contracts/text', token)
-      .then((response) => {
-        if (!cancelled) setContractText(response);
-      })
-      .catch((error) => {
-        if (!cancelled) setWizardError(error.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingContract(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((response) => { if (!cancelled) setContractText(response); })
+      .catch((error) => { if (!cancelled) setWizardError(error.message); })
+      .finally(() => { if (!cancelled) setLoadingContract(false); });
+    return () => { cancelled = true; };
   }, [token]);
 
   const stage = progress?.workflow?.stage || 'signup_received';
@@ -211,10 +241,7 @@ function OnboardingWizard({
     setWizardError(null);
     setBusyStep('contract');
     try {
-      await apiFetch('/api/contracts', token, {
-        method: 'POST',
-        body: JSON.stringify({ signed_name: signatureName, agreed: contractAgreed })
-      });
+      await apiFetch('/api/contracts', token, { method: 'POST', body: JSON.stringify({ signed_name: signatureName, agreed: contractAgreed }) });
       await refreshProgress();
     } catch (error) {
       setWizardError(error instanceof Error ? error.message : 'Unable to sign contract');
@@ -258,11 +285,7 @@ function OnboardingWizard({
     try {
       await apiFetch('/api/monitoring', token, {
         method: 'POST',
-        body: JSON.stringify({
-          provider: wizardState.provider,
-          username: wizardState.monitorUsername,
-          password: wizardState.monitorPassword
-        })
+        body: JSON.stringify({ provider: wizardState.provider, username: wizardState.monitorUsername, password: wizardState.monitorPassword })
       });
       await refreshProgress();
     } catch (error) {
@@ -277,10 +300,7 @@ function OnboardingWizard({
     setWizardError(null);
     setBusyStep('upload');
     try {
-      await apiFetch('/api/progress/me/docs', token, {
-        method: 'POST',
-        body: JSON.stringify({ name: docName, fileName: docName, type: docType })
-      });
+      await apiFetch('/api/progress/me/docs', token, { method: 'POST', body: JSON.stringify({ name: docName, fileName: docName, type: docType }) });
       setDocName('');
       await refreshProgress();
     } catch (error) {
@@ -291,95 +311,283 @@ function OnboardingWizard({
   }
 
   return (
-    <section className="panel" id="onboarding">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Onboarding</p>
-          <h2>Finish your CredX setup</h2>
-        </div>
-      </div>
+    <section className="panel">
+      <div className="panel-header"><div><p className="eyebrow">Onboarding</p><h2>Finish your CredX setup</h2></div></div>
       {wizardError ? <div className="error-banner">{wizardError}</div> : null}
       <div className="dispute-list">
         {loadingContract ? <div className="empty-state-card">Loading your agreement...</div> : null}
-
-        {needsContract && contractText ? (
-          <form className="dispute-card-live" onSubmit={submitContract}>
-            <div className="dispute-card-top"><strong>Step 1, sign your agreement</strong></div>
-            <div className="dispute-meta" style={{ display: 'block' }}>
-              <p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.agreement}</p>
-              <p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.disclosure}</p>
-              <input className="chat-input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your full name" />
-              <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginTop: '1rem' }}>
-                <input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} />
-                <span>I have read and agree to the contract and disclosures.</span>
-              </label>
-              <button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim()} style={{ marginTop: '1rem' }}>
-                {busyStep === 'contract' ? 'Signing...' : 'Sign contract'}
-              </button>
-            </div>
-          </form>
-        ) : null}
-
-        {needsApplication ? (
-          <form className="dispute-card-live" onSubmit={submitApplication}>
-            <div className="dispute-card-top"><strong>Step 2, complete intake</strong></div>
-            <div className="dispute-meta" style={{ display: 'grid', gap: '.75rem' }}>
-              <input className="chat-input" value={wizardState.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Full name" />
-              <input className="chat-input" value={wizardState.email} onChange={(e) => setField('email', e.target.value)} placeholder="Email" />
-              <input className="chat-input" value={wizardState.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="Phone" />
-              <input className="chat-input" value={wizardState.address1} onChange={(e) => setField('address1', e.target.value)} placeholder="Address line 1" />
-              <input className="chat-input" value={wizardState.address2} onChange={(e) => setField('address2', e.target.value)} placeholder="Address line 2" />
-              <input className="chat-input" value={wizardState.city} onChange={(e) => setField('city', e.target.value)} placeholder="City" />
-              <input className="chat-input" value={wizardState.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" />
-              <input className="chat-input" value={wizardState.zip} onChange={(e) => setField('zip', e.target.value)} placeholder="ZIP" />
-              <input className="chat-input" value={wizardState.dob} onChange={(e) => setField('dob', e.target.value)} placeholder="Date of birth (YYYY-MM-DD)" />
-              <input className="chat-input" value={wizardState.ssn} onChange={(e) => setField('ssn', e.target.value)} placeholder="SSN" />
-              <button className="ghost-button" type="submit" disabled={busyStep === 'application'}>
-                {busyStep === 'application' ? 'Saving...' : 'Save intake'}
-              </button>
-            </div>
-          </form>
-        ) : null}
-
-        {needsMonitoring ? (
-          <form className="dispute-card-live" onSubmit={submitMonitoring}>
-            <div className="dispute-card-top"><strong>Step 3, set your monitoring account</strong></div>
-            <div className="dispute-meta" style={{ display: 'grid', gap: '.75rem' }}>
-              <select className="chat-input" value={wizardState.provider} onChange={(e) => setField('provider', e.target.value)}>
-                <option value="">Select provider</option>
-                <option value="IdentityIQ">IdentityIQ</option>
-                <option value="MyFreeScoreNow">MyFreeScoreNow</option>
-              </select>
-              <input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" />
-              <input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" />
-              <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>
-                {busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}
-              </button>
-            </div>
-          </form>
-        ) : null}
-
-        {needsUpload ? (
-          <form className="dispute-card-live" onSubmit={submitDocument}>
-            <div className="dispute-card-top"><strong>Step 4, upload your documents</strong></div>
-            <div className="dispute-meta" style={{ display: 'grid', gap: '.75rem' }}>
-              <input className="chat-input" value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="Document name, for example experian-report.pdf" />
-              <select className="chat-input" value={docType} onChange={(e) => setDocType(e.target.value)}>
-                <option value="credit_report">Credit report</option>
-                <option value="identity">Driver's license or ID</option>
-                <option value="proof_of_address">Proof of address</option>
-                <option value="other">Other</option>
-              </select>
-              <button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docName.trim()}>
-                {busyStep === 'upload' ? 'Uploading...' : 'Save document'}
-              </button>
-            </div>
-          </form>
-        ) : null}
-
+        {needsContract && contractText ? <form className="dispute-card-live" onSubmit={submitContract}><div className="dispute-card-top"><strong>Step 1, sign your agreement</strong></div><div className="dispute-meta" style={{ display: 'block' }}><p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.agreement}</p><p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.disclosure}</p><input className="chat-input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your full name" /><label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginTop: '1rem' }}><input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} /><span>I have read and agree to the contract and disclosures.</span></label><button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim()} style={{ marginTop: '1rem' }}>{busyStep === 'contract' ? 'Signing...' : 'Sign contract'}</button></div></form> : null}
+        {needsApplication ? <form className="dispute-card-live" onSubmit={submitApplication}><div className="dispute-card-top"><strong>Step 2, complete intake</strong></div><div className="field-grid"><input className="chat-input" value={wizardState.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Full name" /><input className="chat-input" value={wizardState.email} onChange={(e) => setField('email', e.target.value)} placeholder="Email" /><input className="chat-input" value={wizardState.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="Phone" /><input className="chat-input" value={wizardState.address1} onChange={(e) => setField('address1', e.target.value)} placeholder="Address line 1" /><input className="chat-input" value={wizardState.address2} onChange={(e) => setField('address2', e.target.value)} placeholder="Address line 2" /><input className="chat-input" value={wizardState.city} onChange={(e) => setField('city', e.target.value)} placeholder="City" /><input className="chat-input" value={wizardState.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" /><input className="chat-input" value={wizardState.zip} onChange={(e) => setField('zip', e.target.value)} placeholder="ZIP" /><input className="chat-input" value={wizardState.dob} onChange={(e) => setField('dob', e.target.value)} placeholder="Date of birth (YYYY-MM-DD)" /><input className="chat-input" value={wizardState.ssn} onChange={(e) => setField('ssn', e.target.value)} placeholder="SSN" /><button className="ghost-button" type="submit" disabled={busyStep === 'application'}>{busyStep === 'application' ? 'Saving...' : 'Save intake'}</button></div></form> : null}
+        {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}><div className="dispute-card-top"><strong>Step 3, set your monitoring account</strong></div><div className="field-grid"><select className="chat-input" value={wizardState.provider} onChange={(e) => setField('provider', e.target.value)}><option value="">Select provider</option><option value="IdentityIQ">IdentityIQ</option><option value="MyFreeScoreNow">MyFreeScoreNow</option></select><input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" /><input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" /><button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}</button></div></form> : null}
+        {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Step 4, upload your credit report</strong></div><div className="field-grid"><input className="chat-input" value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="Document name, for example experian-report.pdf" /><select className="chat-input" value={docType} onChange={(e) => setDocType(e.target.value)}><option value="credit_report">Credit report</option><option value="identity">Driver's license or ID</option><option value="proof_of_address">Proof of address</option><option value="other">Other</option></select><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docName.trim()}>{busyStep === 'upload' ? 'Uploading...' : 'Save document'}</button></div></form> : null}
         {completedAt ? <div className="empty-state-card">Onboarding complete. Your file is now in review.</div> : null}
       </div>
     </section>
+  );
+}
+
+function CreditMonitoringSection({ token, client, progress, refreshAll }: { token: string; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; }) {
+  const [docName, setDocName] = useState('');
+  const [docType, setDocType] = useState('credit_report');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const uploadedDocs = progress?.uploadedDocs || [];
+  const creditDocs = uploadedDocs.filter((doc) => (doc.type || '').toLowerCase().includes('credit'));
+
+  async function submitDocument(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await apiFetch('/api/progress/me/docs', token, { method: 'POST', body: JSON.stringify({ name: docName, fileName: docName, type: docType }) });
+      setDocName('');
+      setMessage('Document saved.');
+      await refreshAll();
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Unable to upload document');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="page-grid">
+      <section className="hero-card">
+        <div>
+          <p className="eyebrow">Credit Monitoring</p>
+          <h1>Report upload & analysis</h1>
+          <p>This area is dedicated to your monitoring connection, credit report uploads, and the analysis CredX prepares from your file.</p>
+        </div>
+        <div className="hero-stats">
+          <div className="stat-card"><span>Workflow Stage</span><strong>{prettyStatus(progress?.workflow?.stage || client?.status)}</strong></div>
+          <div className="stat-card"><span>Reports Uploaded</span><strong>{creditDocs.length}</strong></div>
+          <div className="stat-card"><span>Analysis</span><strong>{client?.analysisSummary ? 'Ready' : 'Pending'}</strong></div>
+          <div className="stat-card"><span>Next Update</span><strong>{progress?.workflow?.updatedAt ? formatDate(progress.workflow.updatedAt) : 'Pending'}</strong></div>
+        </div>
+      </section>
+
+      <section className="panel two-col">
+        <div>
+          <h2>Analysis report</h2>
+          <div className="plan-card">
+            <strong>Summary</strong>
+            <span>{client?.analysisSummary || 'Your analysis report has not been published yet.'}</span>
+            {progress?.analysis?.findings?.length ? <small>{progress.analysis.findings.join(' • ')}</small> : null}
+          </div>
+          <div className="plan-card">
+            <strong>Dispute strategy</strong>
+            <span>{client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Your strategy will appear here after report review.'}</span>
+            {progress?.disputeStrategy?.phases?.length ? <small>{progress.disputeStrategy.phases.join(' → ')}</small> : null}
+          </div>
+        </div>
+        <div>
+          <h2>Upload credit report</h2>
+          <form className="dispute-card-live" onSubmit={submitDocument}>
+            <div className="field-grid">
+              <input className="chat-input" value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="experian-report.pdf" />
+              <select className="chat-input" value={docType} onChange={(e) => setDocType(e.target.value)}>
+                <option value="credit_report">Credit report</option>
+                <option value="other">Monitoring screenshot / other</option>
+              </select>
+              <button className="ghost-button" type="submit" disabled={saving || !docName.trim()}>{saving ? 'Saving...' : 'Save report'}</button>
+            </div>
+          </form>
+          {message ? <div className="helper-text" style={{ marginTop: '10px' }}>{message}</div> : null}
+          {error ? <div className="error-banner" style={{ marginTop: '10px' }}>{error}</div> : null}
+          <div className="dispute-list" style={{ marginTop: '12px' }}>
+            {creditDocs.length ? creditDocs.map((doc, index) => (
+              <div key={`${doc.fileName || doc.name}-${index}`} className="plan-card">
+                <strong>{doc.fileName || doc.name || 'Credit report'}</strong>
+                <span>{prettyStatus(doc.type)}</span>
+                <small>Uploaded {formatDateTime(doc.uploadedAt)}</small>
+              </div>
+            )) : <div className="empty-state-card">No credit report is on file yet.</div>}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ActivitySection({ progress, client }: { progress: Progress | null; client: Client | null; }) {
+  const activities = progress?.activities || client?.activities || [];
+  const nextUpdate = progress?.workflow?.next?.length ? progress.workflow.next.map(prettyStatus).join(', ') : 'CredX will post the next milestone here once your file advances.';
+  return (
+    <section className="panel">
+      <div className="panel-header"><div><p className="eyebrow">Activity</p><h2>What was done and what comes next</h2></div></div>
+      <div className="dispute-list">
+        <div className="plan-card"><strong>Next update</strong><span>{nextUpdate}</span><small>Last workflow change: {formatDateTime(progress?.workflow?.updatedAt)}</small></div>
+        {activities.length ? activities.slice().sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).map((item) => (
+          <div key={item.id} className="dispute-card-live">
+            <div className="dispute-card-top"><strong>{item.message}</strong><span>{formatDateTime(item.createdAt)}</span></div>
+            <div className="dispute-meta"><span>{prettyStatus(item.type || 'activity')}</span></div>
+          </div>
+        )) : <div className="empty-state-card">No client-facing activity has been posted yet.</div>}
+      </div>
+    </section>
+  );
+}
+
+function DisputesSection({ client, progress }: { client: Client | null; progress: Progress | null; }) {
+  const disputes = normalizeDisputes(client, progress);
+  return (
+    <section className="panel">
+      <div className="panel-header"><div><p className="eyebrow">Disputes</p><h2>Accounts, status, and changes</h2></div></div>
+      <div className="dispute-list">
+        {disputes.length ? disputes.map((dispute) => (
+          <div key={dispute.id} className="dispute-card-live">
+            <div className="dispute-card-top"><strong>{dispute.account}</strong><span className={`status-badge status-${String(dispute.status).toLowerCase()}`}>{prettyStatus(dispute.status)}</span></div>
+            <div className="dispute-meta"><span>{dispute.bureau} · Round {dispute.round}</span><span>{dispute.accountNumber ? `Acct ${dispute.accountNumber}` : 'Account number not shown'}</span></div>
+            <div className="dispute-meta"><span><strong>Current status:</strong> {prettyStatus(dispute.status)}</span><span><strong>What changed:</strong> {dispute.changed}</span></div>
+            <div className="cell-subtext">{dispute.reason}</div>
+          </div>
+        )) : <div className="empty-state-card">No dispute accounts have been published to your portal yet.</div>}
+      </div>
+    </section>
+  );
+}
+
+function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { token: string; user: User | null; client: Client | null; refreshAll: () => Promise<void>; onUserUpdated: (next: User) => void; }) {
+  const [profile, setProfile] = useState({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    phone: user?.phone || '',
+    address1: client?.currentAddressLine1 || '',
+    address2: client?.currentAddressLine2 || '',
+    city: client?.currentCity || '',
+    state: client?.currentState || '',
+    zip: client?.currentPostalCode || '',
+    dob: client?.dobEncrypted || '',
+    ssn: ''
+  });
+  const [docName, setDocName] = useState('');
+  const [docType, setDocType] = useState('identity');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setProfile({
+      firstName: user?.firstName || '',
+      lastName: user?.lastName || '',
+      phone: user?.phone || '',
+      address1: client?.currentAddressLine1 || '',
+      address2: client?.currentAddressLine2 || '',
+      city: client?.currentCity || '',
+      state: client?.currentState || '',
+      zip: client?.currentPostalCode || '',
+      dob: client?.dobEncrypted || '',
+      ssn: ''
+    });
+  }, [user, client]);
+
+  const verificationDocs = (client?.documents || []).filter((doc) => ['IDENTITY', 'PROOF_OF_ADDRESS', 'OTHER'].includes(doc.type));
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const nextUser = await apiFetch<User>('/api/users/me/profile', token, { method: 'PUT', body: JSON.stringify({ firstName: profile.firstName, lastName: profile.lastName, phone: profile.phone }) });
+      await apiFetch('/api/clients/me/profile', token, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          currentAddressLine1: profile.address1,
+          currentAddressLine2: profile.address2,
+          currentCity: profile.city,
+          currentState: profile.state,
+          currentPostalCode: profile.zip,
+          dobEncrypted: profile.dob,
+          ssnEncrypted: profile.ssn || undefined
+        })
+      });
+      onUserUpdated(nextUser);
+      await refreshAll();
+      setProfile((current) => ({ ...current, ssn: '' }));
+      setMessage('Profile saved securely.');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save profile');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function uploadVerificationDoc(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await apiFetch('/api/progress/me/docs', token, { method: 'POST', body: JSON.stringify({ name: docName, fileName: docName, type: docType }) });
+      setDocName('');
+      await refreshAll();
+      setMessage('Verification document saved.');
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Unable to save document');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="page-grid">
+      <section className="panel two-col">
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Profile</p><h2>Edit your information</h2></div></div>
+          <form onSubmit={saveProfile} className="dispute-card-live">
+            <div className="field-grid">
+              <input className="chat-input" value={profile.firstName} onChange={(e) => setProfile((c) => ({ ...c, firstName: e.target.value }))} placeholder="First name" />
+              <input className="chat-input" value={profile.lastName} onChange={(e) => setProfile((c) => ({ ...c, lastName: e.target.value }))} placeholder="Last name" />
+              <input className="chat-input" value={profile.phone} onChange={(e) => setProfile((c) => ({ ...c, phone: e.target.value }))} placeholder="Phone" />
+              <input className="chat-input" value={profile.address1} onChange={(e) => setProfile((c) => ({ ...c, address1: e.target.value }))} placeholder="Address line 1" />
+              <input className="chat-input" value={profile.address2} onChange={(e) => setProfile((c) => ({ ...c, address2: e.target.value }))} placeholder="Address line 2" />
+              <input className="chat-input" value={profile.city} onChange={(e) => setProfile((c) => ({ ...c, city: e.target.value }))} placeholder="City" />
+              <input className="chat-input" value={profile.state} onChange={(e) => setProfile((c) => ({ ...c, state: e.target.value }))} placeholder="State" />
+              <input className="chat-input" value={profile.zip} onChange={(e) => setProfile((c) => ({ ...c, zip: e.target.value }))} placeholder="ZIP" />
+              <input className="chat-input" value={profile.dob} onChange={(e) => setProfile((c) => ({ ...c, dob: e.target.value }))} placeholder="Date of birth (YYYY-MM-DD)" />
+              <input className="chat-input" value={profile.ssn} onChange={(e) => setProfile((c) => ({ ...c, ssn: e.target.value }))} placeholder="Full SSN to replace stored value" />
+              <button className="ghost-button" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save profile'}</button>
+            </div>
+          </form>
+          {message ? <div className="helper-text" style={{ marginTop: '10px' }}>{message}</div> : null}
+          {error ? <div className="error-banner" style={{ marginTop: '10px' }}>{error}</div> : null}
+        </div>
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Secure File</p><h2>Verification and stored details</h2></div></div>
+          <div className="plan-card"><strong>Email</strong><span>{user?.email || 'Not available'}</span></div>
+          <div className="plan-card"><strong>Stored SSN</strong><span>{client?.ssnLast4 ? `•••-••-${client.ssnLast4}` : 'Not saved'}</span></div>
+          <div className="plan-card"><strong>Stored DOB</strong><span>{maskDob(client?.dobEncrypted)}</span></div>
+          <div className="plan-card"><strong>Address on file</strong><span>{[client?.currentAddressLine1, client?.currentAddressLine2, client?.currentCity, client?.currentState, client?.currentPostalCode].filter(Boolean).join(', ') || 'Not saved'}</span></div>
+        </div>
+      </section>
+
+      <section className="panel two-col">
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Verification Documents</p><h2>Upload secure documents</h2></div></div>
+          <form className="dispute-card-live" onSubmit={uploadVerificationDoc}>
+            <div className="field-grid">
+              <input className="chat-input" value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="driver-license.pdf" />
+              <select className="chat-input" value={docType} onChange={(e) => setDocType(e.target.value)}>
+                <option value="identity">Identity document</option>
+                <option value="proof_of_address">Proof of address</option>
+                <option value="other">Other verification</option>
+              </select>
+              <button className="ghost-button" type="submit" disabled={saving || !docName.trim()}>{saving ? 'Saving...' : 'Save document'}</button>
+            </div>
+          </form>
+        </div>
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Files on Record</p><h2>Uploaded verification documents</h2></div></div>
+          <div className="dispute-list">
+            {verificationDocs.length ? verificationDocs.map((doc) => <div key={doc.id} className="plan-card"><strong>{doc.fileName}</strong><span>{prettyStatus(doc.type)}</span><small>Uploaded {formatDateTime(doc.uploadedAt)}</small></div>) : <div className="empty-state-card">No verification documents uploaded yet.</div>}
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -402,6 +610,20 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<PortalTab>('overview');
+
+  async function refreshAll() {
+    if (!token) return;
+    const [userResponse, clientResponse, progressResponse] = await Promise.all([
+      apiFetch<User>('/api/users/me', token),
+      apiFetch<{ client: Client | null }>('/api/clients/me', token),
+      apiFetch<Progress>('/api/progress/me', token)
+    ]);
+    setUser(userResponse);
+    localStorage.setItem(USER_KEY, JSON.stringify(userResponse));
+    setClient(clientResponse.client);
+    setProgress(progressResponse);
+  }
 
   useEffect(() => {
     if (!token) return;
@@ -443,9 +665,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         if (!cancelled) setDataLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [token]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -453,13 +673,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     setLoading(true);
     setError(null);
     try {
-      const response = await apiFetch<LoginResponse>('/api/auth/login', undefined, {
-        method: 'POST',
-        body: JSON.stringify({ email, password })
-      });
-      if (response.user.role !== 'CLIENT') {
-        throw new Error('This login is for clients only');
-      }
+      const response = await apiFetch<LoginResponse>('/api/auth/login', undefined, { method: 'POST', body: JSON.stringify({ email, password }) });
+      if (response.user.role !== 'CLIENT') throw new Error('This login is for clients only');
       setToken(response.token);
       setUser(response.user);
       localStorage.setItem(TOKEN_KEY, response.token);
@@ -482,223 +697,110 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
   const workflowStage = useMemo(() => prettyStatus(progress?.workflow?.stage || client?.status), [progress?.workflow?.stage, client?.status]);
   const tasks = progress?.tasks || client?.tasks || [];
-  const activities = progress?.activities || client?.activities || [];
-  const disputes = client?.disputes || [];
-  const uploadedDocs = progress?.uploadedDocs || [];
-  const scoreEntries = progress?.scores || {};
+  const disputes = normalizeDisputes(client, progress);
+  const pendingTasks = tasks.filter((task) => !task.completed).length;
 
   if (!token) {
     if (onboardingOnly) {
-      return (
-        <div className="auth-shell client-auth-shell">
-          <div className="auth-card client-auth-card">
-            <div className="brand-mark brand-mark--centered">
-              <img src={BRAND_LOGO} alt="CredX" className="brand-logo" />
-            </div>
-            <p className="eyebrow">CredX Onboarding</p>
-            <h1>Continue your signup</h1>
-            <p className="helper-text">Use the secure link from your welcome email to review your agreement and finish your intake.</p>
-          </div>
-        </div>
-      );
+      return <div className="auth-shell client-auth-shell"><div className="auth-card client-auth-card"><div className="brand-mark brand-mark--centered"><img src={BRAND_LOGO} alt="CredX" className="brand-logo" /></div><p className="eyebrow">CredX Onboarding</p><h1>Continue your signup</h1><p className="helper-text">Use the secure link from your welcome email to review your agreement and finish your intake.</p></div></div>;
     }
-
-    return (
-      <ClientLogin
-        email={email}
-        password={password}
-        onEmailChange={setEmail}
-        onPasswordChange={setPassword}
-        onSubmit={handleLogin}
-        loading={loading}
-        error={error}
-      />
-    );
+    return <ClientLogin email={email} password={password} onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleLogin} loading={loading} error={error} />;
   }
 
   if (onboardingOnly) {
     return (
       <div className="shell client-shell">
         <main className="main" style={{ marginLeft: 0 }}>
-          <header className="topbar">
-            <div>
-              <div className="brand-row">
-                <img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" />
-                <p className="eyebrow">CredX Onboarding</p>
-              </div>
-              <h1 className="top-title">Complete your signup</h1>
-              <p className="helper-text">Review your agreement, finish your intake, and connect your credit monitoring provider.</p>
-            </div>
-          </header>
+          <header className="topbar"><div><div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">CredX Onboarding</p></div><h1 className="top-title">Complete your signup</h1><p className="helper-text">Review your agreement, finish your intake, and connect your credit monitoring provider.</p></div></header>
           {error ? <div className="error-banner">{error}</div> : null}
-          {!progress?.onboarding?.completedAt && user ? (
-            <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} />
-          ) : null}
-          {progress?.onboarding?.completedAt ? (
-            <section className="panel">
-              <div className="empty-state-card">
-                Signup complete. Check your email for the password setup link to access your client portal.
-              </div>
-            </section>
-          ) : null}
+          {!progress?.onboarding?.completedAt && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
+          {progress?.onboarding?.completedAt ? <section className="panel"><div className="empty-state-card">Signup complete. Check your email for the password setup link to access your client portal.</div></section> : null}
         </main>
       </div>
     );
   }
 
+  const navItems: Array<{ key: PortalTab; label: string }> = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'monitoring', label: 'Credit Monitoring' },
+    { key: 'disputes', label: 'Disputes' },
+    { key: 'activity', label: 'Activity' },
+    { key: 'profile', label: 'Profile' },
+    { key: 'tasks', label: 'Tasks' }
+  ];
+
   return (
     <div className="shell client-shell">
       <aside className="sidebar">
-        <div className="brand-mark">
-          <img src={BRAND_LOGO} alt="CredX" className="brand-logo" />
-        </div>
+        <div className="brand-mark"><img src={BRAND_LOGO} alt="CredX" className="brand-logo" /></div>
         <nav>
-          <a className="active" href="#overview">Overview</a>
-          <a href="#onboarding">Onboarding</a>
-          <a href="#tasks">Tasks</a>
-          <a href="#activity">Activity</a>
-          <a href="#disputes">Disputes</a>
+          {navItems.map((item) => <button key={item.key} type="button" className={`tab ${activeTab === item.key ? 'active' : ''}`} onClick={() => setActiveTab(item.key)}>{item.label}</button>)}
         </nav>
       </aside>
       <main className="main">
         <header className="topbar">
           <div>
-            <div className="brand-row">
-              <img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" />
-              <p className="eyebrow">Client Portal</p>
-            </div>
+            <div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">Client Portal</p></div>
             <h1 className="top-title">Welcome back{user ? `, ${user.firstName}` : ''}</h1>
-            {dataLoading ? <p className="helper-text">Refreshing your latest CredX progress...</p> : null}
+            {dataLoading ? <p className="helper-text">Refreshing your latest CredX progress...</p> : <p className="helper-text">Use the menu to move through your dashboard. Every section is now wired to live portal data.</p>}
           </div>
-          <div className="topbar-actions">
-            <div className="admin-pill">{client?.serviceTier || 'ESSENTIAL'} plan</div>
-            <button className="ghost-button" onClick={handleLogout}>Sign out</button>
-          </div>
+          <div className="topbar-actions"><div className="admin-pill">{client?.serviceTier || 'ESSENTIAL'} plan</div><button className="ghost-button" onClick={handleLogout}>Sign out</button></div>
         </header>
 
         {error ? <div className="error-banner">{error}</div> : null}
         {client?.portalRestricted ? <div className="error-banner">Your portal access is currently restricted. Contact CredX support for help.</div> : null}
 
         <div className="page-grid">
-          <section className="hero-card" id="overview">
+          <section className="hero-card">
             <div>
               <p className="eyebrow">Current Status</p>
               <h1 style={{ fontSize: '2rem' }}>{workflowStage}</h1>
-              <p>
-                {client?.analysisSummary || 'Your account is active in the CredX workflow. Check tasks and recent activity below for the latest updates.'}
-              </p>
+              <p>{client?.analysisSummary || 'Your account is active in the CredX workflow. Open any dashboard section below to review progress, uploads, disputes, and updates.'}</p>
             </div>
             <div className="hero-stats">
               <div className="stat-card"><span>Portal Status</span><strong>{prettyStatus(client?.status)}</strong></div>
               <div className="stat-card"><span>Timeline</span><strong>{client?.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} mo` : 'Pending'}</strong></div>
-              <div className="stat-card"><span>Tasks</span><strong>{tasks.length}</strong></div>
+              <div className="stat-card"><span>Open Tasks</span><strong>{pendingTasks}</strong></div>
               <div className="stat-card"><span>Disputes</span><strong>{disputes.length}</strong></div>
             </div>
           </section>
 
-          {!progress?.onboarding?.completedAt && user ? (
-            <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} />
+          {!progress?.onboarding?.completedAt && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
+
+          {activeTab === 'overview' ? (
+            <section className="panel two-col">
+              <div>
+                <h2>Workflow snapshot</h2>
+                <ul className="activity-list">
+                  <li><strong>Credit monitoring</strong><span>{progress?.workflow?.next?.length ? progress.workflow.next.map(prettyStatus).join(', ') : 'No next step posted yet.'}</span></li>
+                  <li><strong>Analysis report</strong><span>{client?.analysisSummary || 'Pending report review.'}</span></li>
+                  <li><strong>Dispute strategy</strong><span>{client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Pending publication.'}</span></li>
+                </ul>
+              </div>
+              <div>
+                <h2>Score snapshot</h2>
+                <div className="quick-actions quick-actions--plans">
+                  <div className="plan-card"><strong>Equifax</strong><span>{progress?.scores?.equifax ?? 'Pending'}</span></div>
+                  <div className="plan-card"><strong>Experian</strong><span>{progress?.scores?.experian ?? 'Pending'}</span></div>
+                  <div className="plan-card"><strong>TransUnion</strong><span>{progress?.scores?.transunion ?? 'Pending'}</span></div>
+                </div>
+              </div>
+            </section>
           ) : null}
 
-          <section className="panel two-col">
-            <div>
-              <h2>Workflow</h2>
-              <ul className="activity-list">
-                <li>
-                  <strong>Onboarding</strong>
-                  <span>{prettyStatus(progress?.onboarding?.status)} · {formatDate(progress?.onboarding?.completedAt || progress?.onboarding?.signupAt || undefined)}</span>
-                </li>
-                <li>
-                  <strong>Next Steps</strong>
-                  <span>{progress?.workflow?.next?.length ? progress.workflow.next.map(prettyStatus).join(', ') : 'Updates will appear here soon.'}</span>
-                </li>
-                <li>
-                  <strong>Dispute Plan</strong>
-                  <span>{client?.disputePlanSummary || 'Not published yet.'}</span>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h2>Score Snapshot</h2>
-              <div className="quick-actions quick-actions--plans">
-                <div className="plan-card"><strong>Equifax</strong><span>{scoreEntries.equifax ?? 'Pending'}</span></div>
-                <div className="plan-card"><strong>Experian</strong><span>{scoreEntries.experian ?? 'Pending'}</span></div>
-                <div className="plan-card"><strong>TransUnion</strong><span>{scoreEntries.transunion ?? 'Pending'}</span></div>
-              </div>
-            </div>
-          </section>
+          {activeTab === 'monitoring' ? <CreditMonitoringSection token={token} client={client} progress={progress} refreshAll={refreshAll} /> : null}
+          {activeTab === 'disputes' ? <DisputesSection client={client} progress={progress} /> : null}
+          {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
+          {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
 
-          <section className="panel" id="tasks">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Action Items</p>
-                <h2>Your Tasks</h2>
-              </div>
-            </div>
-            <div className="dispute-list">
-              {tasks.length ? tasks.map((task) => (
-                <div key={task.id} className="dispute-card-live">
-                  <div className="dispute-card-top">
-                    <strong>{task.title}</strong>
-                    <span className={task.completed ? 'status-badge status-active' : 'status-badge status-pending'}>{task.completed ? 'Completed' : 'Open'}</span>
-                  </div>
-                  <div className="dispute-meta">
-                    <span>{task.description || 'No extra details yet.'}</span>
-                    <span>{task.dueAt ? `Due ${formatDate(task.dueAt)}` : 'No due date set'}</span>
-                  </div>
-                </div>
-              )) : <div className="empty-state-card">No active tasks right now.</div>}
-            </div>
-          </section>
-
-          <section className="panel two-col">
-            <div id="activity">
-              <h2>Recent Activity</h2>
-              <ul className="activity-list">
-                {activities.length ? activities.slice(0, 8).map((item) => (
-                  <li key={item.id}>
-                    <strong>{formatDate(item.createdAt)}</strong>
-                    <span>{item.message}</span>
-                  </li>
-                )) : <li><strong>No updates yet</strong><span>As your file moves, updates will appear here.</span></li>}
-              </ul>
-            </div>
-            <div id="disputes">
-              <h2>Disputes</h2>
+          {activeTab === 'tasks' ? (
+            <section className="panel">
+              <div className="panel-header"><div><p className="eyebrow">Tasks</p><h2>Your action items</h2></div></div>
               <div className="dispute-list">
-                {disputes.length ? disputes.map((dispute) => (
-                  <div key={dispute.id} className="dispute-card-live">
-                    <div className="dispute-card-top">
-                      <strong>{dispute.creditorName}</strong>
-                      <span className={`status-badge status-${dispute.status.toLowerCase()}`}>{prettyStatus(dispute.status)}</span>
-                    </div>
-                    <div className="dispute-meta">
-                      <span>{dispute.bureau} · Round {dispute.round}</span>
-                      <span>{dispute.reason || 'Reason pending'}</span>
-                    </div>
-                  </div>
-                )) : <div className="empty-state-card">No disputes have been posted to your portal yet.</div>}
+                {tasks.length ? tasks.map((task) => <div key={task.id} className="dispute-card-live"><div className="dispute-card-top"><strong>{task.title}</strong><span className={task.completed ? 'status-badge status-active' : 'status-badge status-pending'}>{task.completed ? 'Completed' : 'Open'}</span></div><div className="dispute-meta"><span>{task.description || 'No extra details yet.'}</span><span>{task.dueAt ? `Due ${formatDate(task.dueAt)}` : 'No due date set'}</span></div></div>) : <div className="empty-state-card">No active tasks right now.</div>}
               </div>
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-header">
-              <div>
-                <p className="eyebrow">Documents</p>
-                <h2>Uploaded Docs</h2>
-              </div>
-            </div>
-            <div className="quick-actions quick-actions--plans">
-              {uploadedDocs.length ? uploadedDocs.map((doc, index) => (
-                <div key={`${doc.name || doc.fileName || 'doc'}-${index}`} className="plan-card">
-                  <strong>{doc.name || doc.fileName || 'Document'}</strong>
-                  <span>{prettyStatus(doc.type)}</span>
-                  <small>{formatDate(doc.uploadedAt)}</small>
-                </div>
-              )) : <div className="empty-state-card">No uploaded documents listed yet.</div>}
-            </div>
-          </section>
+            </section>
+          ) : null}
         </div>
       </main>
     </div>

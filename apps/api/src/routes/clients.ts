@@ -54,6 +54,16 @@ const analysisSchema = z.object({
   serviceTier: z.enum(['ESSENTIAL', 'AGGRESSIVE', 'FAMILY']).optional()
 });
 
+const clientProfileSchema = z.object({
+  currentAddressLine1: z.string().optional(),
+  currentAddressLine2: z.string().optional(),
+  currentCity: z.string().optional(),
+  currentState: z.string().optional(),
+  currentPostalCode: z.string().optional(),
+  dobEncrypted: z.string().optional(),
+  ssnEncrypted: z.string().optional()
+});
+
 const statusUpdateSchema = z.object({
   status: z.enum(['LEAD', 'CONTRACT_SENT', 'INTAKE_RECEIVED', 'ANALYSIS_READY', 'UPGRADE_OFFERED', 'ACTIVE', 'PAST_DUE', 'RESTRICTED', 'CANCELLED'])
 });
@@ -67,6 +77,42 @@ clientsRouter.post('/onboarding', requireAuth, async (req: AuthedRequest, res, n
       create: { userId: req.auth!.sub, status: 'INTAKE_RECEIVED', ...data }
     });
     return res.status(201).json({ client });
+  } catch (error) {
+    next(error);
+  }
+});
+
+clientsRouter.patch('/me/profile', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const data = clientProfileSchema.parse(req.body);
+    const updateData: Record<string, string | null> = {};
+
+    if (data.currentAddressLine1 !== undefined) updateData.currentAddressLine1 = data.currentAddressLine1 || null;
+    if (data.currentAddressLine2 !== undefined) updateData.currentAddressLine2 = data.currentAddressLine2 || null;
+    if (data.currentCity !== undefined) updateData.currentCity = data.currentCity || null;
+    if (data.currentState !== undefined) updateData.currentState = data.currentState || null;
+    if (data.currentPostalCode !== undefined) updateData.currentPostalCode = data.currentPostalCode || null;
+    if (data.dobEncrypted !== undefined) updateData.dobEncrypted = data.dobEncrypted || null;
+    if (data.ssnEncrypted !== undefined) {
+      updateData.ssnEncrypted = data.ssnEncrypted || null;
+      updateData.ssnLast4 = data.ssnEncrypted ? data.ssnEncrypted.replace(/\D/g, '').slice(-4) : null;
+    }
+
+    const client = await prisma.client.update({
+      where: { userId: req.auth!.sub },
+      data: updateData,
+      include: { payments: true, disputes: true, tasks: true, documents: true, activities: true }
+    });
+
+    await prisma.activityEvent.create({
+      data: {
+        clientId: client.id,
+        type: 'profile_updated',
+        message: 'Client profile and verification details were updated.'
+      }
+    });
+
+    return res.json({ client });
   } catch (error) {
     next(error);
   }
