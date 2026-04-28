@@ -332,7 +332,22 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
      </div>
     </div>
     <div class="form-row single">
-     <div class="form-group"><label for="situation">Tell us about your situation</label><textarea id="situation" placeholder="What are you trying to fix or improve?"></textarea></div>
+     <div class="form-group">
+      <label for="heardAbout">How did you hear about us?</label>
+      <select id="heardAbout">
+       <option value="">Select one</option>
+       <option value="YouTube">YouTube</option>
+       <option value="Instagram">Instagram</option>
+       <option value="TikTok">TikTok</option>
+       <option value="Facebook">Facebook</option>
+       <option value="Friend or family">Friend or family</option>
+       <option value="Other">Other</option>
+      </select>
+     </div>
+    </div>
+    <div class="form-row">
+     <div class="form-group"><label for="referralName">Friend or family name</label><input id="referralName" type="text" placeholder="Who referred you?"></div>
+     <div class="form-group"><label for="heardAboutOther">Other</label><input id="heardAboutOther" type="text" placeholder="Tell us where you found us"></div>
     </div>
     <div class="form-row single">
      <div class="form-group">
@@ -444,7 +459,11 @@ async function submitForm(){
   email:document.getElementById('email').value.trim(),
   phone:document.getElementById('phone').value.trim()||undefined,
   creditGoal:document.getElementById('creditGoal').value||undefined,
-  notes:document.getElementById('situation').value.trim()||undefined
+  notes:[
+   document.getElementById('heardAbout').value?`How did you hear about us: ${document.getElementById('heardAbout').value}`:'',
+   document.getElementById('referralName').value.trim()?`Friend or family: ${document.getElementById('referralName').value.trim()}`:'',
+   document.getElementById('heardAboutOther').value.trim()?`Other: ${document.getElementById('heardAboutOther').value.trim()}`:''
+  ].filter(Boolean).join(' | ')||undefined
  };
  if(!payload.firstName||!payload.lastName||!payload.email){showToast('Please complete first name, last name, and email.','error');return;}
  if(!/\S+@\S+\.\S+/.test(payload.email)){showToast('Please enter a valid email.','error');return;}
