@@ -105,6 +105,17 @@ textarea{resize:vertical;min-height:72px}
 .cb-row{display:flex;align-items:flex-start;gap:8px;margin:16px 0}
 .cb-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--cyan);flex-shrink:0;margin-top:2px;padding:0;background:none;border:none}
 .cb-row label{font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400;cursor:pointer}
+.choice-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
+.choice-card{position:relative;display:flex;align-items:center;gap:10px;padding:14px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg);cursor:pointer;transition:border-color .2s,transform .2s,box-shadow .2s;color:var(--white);font-size:14px;text-transform:none;letter-spacing:0;font-weight:600}
+.choice-card:hover{border-color:var(--cyan);transform:translateY(-1px)}
+.choice-card input{position:absolute;opacity:0;pointer-events:none}
+.choice-card.active{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(0,198,251,.2),0 0 24px rgba(0,198,251,.08);background:linear-gradient(180deg,rgba(0,198,251,.08),rgba(255,255,255,.02))}
+.choice-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--muted2);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.choice-card.active .choice-dot{border-color:var(--cyan)}
+.choice-card.active .choice-dot::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--cyan)}
+.conditional-field{display:none;margin-top:12px}
+.conditional-field.show{display:block}
+.submit-wrap{position:sticky;bottom:0;padding-top:10px;background:linear-gradient(180deg,rgba(16,22,34,0),rgba(16,22,34,.92) 30%,rgba(16,22,34,.98))}
 .upload-area{border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:border-color .2s;background:var(--bg);margin-bottom:14px}
 .upload-area:hover{border-color:var(--cyan)}
 .upload-area input{display:none}
@@ -333,27 +344,30 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
     </div>
     <div class="form-row single">
      <div class="form-group">
-      <label for="heardAbout">How did you hear about us?</label>
-      <select id="heardAbout">
-       <option value="">Select one</option>
-       <option value="YouTube">YouTube</option>
-       <option value="Instagram">Instagram</option>
-       <option value="TikTok">TikTok</option>
-       <option value="Facebook">Facebook</option>
-       <option value="Friend or family">Friend or family</option>
-       <option value="Other">Other</option>
-      </select>
+      <label>How did you hear about us?</label>
+      <div class="choice-group" id="heardAboutGroup">
+       <label class="choice-card"><input type="radio" name="heardAbout" value="YouTube"><span class="choice-dot"></span><span>YouTube</span></label>
+       <label class="choice-card"><input type="radio" name="heardAbout" value="Instagram"><span class="choice-dot"></span><span>Instagram</span></label>
+       <label class="choice-card"><input type="radio" name="heardAbout" value="TikTok"><span class="choice-dot"></span><span>TikTok</span></label>
+       <label class="choice-card"><input type="radio" name="heardAbout" value="Facebook"><span class="choice-dot"></span><span>Facebook</span></label>
+       <label class="choice-card"><input type="radio" name="heardAbout" value="Friend or family"><span class="choice-dot"></span><span>Friend or family</span></label>
+       <label class="choice-card"><input type="radio" name="heardAbout" value="Other"><span class="choice-dot"></span><span>Other</span></label>
+      </div>
+      <div class="conditional-field" id="referralNameWrap">
+       <input id="referralName" type="text" placeholder="Who referred you?">
+      </div>
+      <div class="conditional-field" id="heardAboutOtherWrap">
+       <input id="heardAboutOther" type="text" placeholder="Tell us where you found us">
+      </div>
      </div>
-    </div>
-    <div class="form-row">
-     <div class="form-group"><label for="referralName">Friend or family name</label><input id="referralName" type="text" placeholder="Who referred you?"></div>
-     <div class="form-group"><label for="heardAboutOther">Other</label><input id="heardAboutOther" type="text" placeholder="Tell us where you found us"></div>
     </div>
     <div class="cb-row">
      <input id="consent" type="checkbox">
      <label for="consent">I confirm the information submitted is accurate to the best of my knowledge.</label>
     </div>
-    <button class="form-submit" id="submitBtn" type="button">Confirm & Submit</button>
+    <div class="submit-wrap">
+     <button class="form-submit" id="submitBtn" type="button">Confirm & Submit</button>
+    </div>
    </div>
    <div class="success-panel" id="successPanel">
     <div class="success-icon">✅</div>
@@ -438,15 +452,29 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 const API_BASE='https://credxapi-production.up.railway.app';
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>{t.className='toast';},3200);}
 const faqItems=document.querySelectorAll('.faq-item');faqItems.forEach(item=>{item.querySelector('.faq-q').addEventListener('click',()=>item.classList.toggle('open'));});
+const heardAboutInputs=[...document.querySelectorAll('input[name="heardAbout"]')];
+const referralNameWrap=document.getElementById('referralNameWrap');
+const heardAboutOtherWrap=document.getElementById('heardAboutOtherWrap');
+function syncHeardAboutUI(){
+ const selected=heardAboutInputs.find(input=>input.checked)?.value||'';
+ heardAboutInputs.forEach(input=>input.closest('.choice-card').classList.toggle('active',input.checked));
+ referralNameWrap.classList.toggle('show',selected==='Friend or family');
+ heardAboutOtherWrap.classList.toggle('show',selected==='Other');
+ if(selected!=='Friend or family') document.getElementById('referralName').value='';
+ if(selected!=='Other') document.getElementById('heardAboutOther').value='';
+}
+heardAboutInputs.forEach(input=>input.addEventListener('change',syncHeardAboutUI));
+syncHeardAboutUI();
 async function submitForm(){
  const btn=document.getElementById('submitBtn');
+ const heardAbout=heardAboutInputs.find(input=>input.checked)?.value||'';
  const payload={
   firstName:document.getElementById('firstName').value.trim(),
   lastName:document.getElementById('lastName').value.trim(),
   email:document.getElementById('email').value.trim(),
   phone:document.getElementById('phone').value.trim()||undefined,
   creditGoal:document.getElementById('creditGoal').value||undefined,
-  referralSource:document.getElementById('heardAbout').value||undefined,
+  referralSource:heardAbout||undefined,
   referralName:document.getElementById('referralName').value.trim()||undefined,
   referralOther:document.getElementById('heardAboutOther').value.trim()||undefined
  };
@@ -458,12 +486,12 @@ async function submitForm(){
   const res=await fetch(`${API_BASE}/api/leads`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const body=await res.json().catch(()=>null);
   if(!res.ok) throw new Error(body?.error||'Submission failed');
-  document.getElementById('form-panel').style.display='none';
-  document.getElementById('successPanel').style.display='block';
-  showToast('Submitted successfully');
- }catch(err){
-  showToast(err.message||'Submission failed','error');
-  btn.disabled=false;btn.textContent='Submit Application';
+ document.getElementById('form-panel').style.display='none';
+ document.getElementById('successPanel').style.display='block';
+ showToast('Submitted successfully');
+}catch(err){
+ showToast(err.message||'Submission failed','error');
+  btn.disabled=false;btn.textContent='Confirm & Submit';
  }
 }
 document.getElementById('submitBtn').addEventListener('click',submitForm);
