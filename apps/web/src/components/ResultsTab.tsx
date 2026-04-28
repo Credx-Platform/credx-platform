@@ -64,12 +64,82 @@ export function ResultsTab({ token, items, onItemsChange }: ResultsTabProps) {
 
   const handleBulkEmail = () => {
     if (selectedItems.size === 0) return;
-    alert(`Preparing to email deletion results for ${selectedItems.size} items...`);
+    setUpdating(true);
+    fetch(`${API_BASE}/api/disputes/bulk/email-results`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ids: Array.from(selectedItems) })
+    })
+      .then(async (response) => {
+        const body = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(body?.error || 'Failed to send results emails');
+        const count = Array.isArray(body?.deliveries) ? body.deliveries.length : 0;
+        alert(`Results email sent for ${count} client${count === 1 ? '' : 's'}.`);
+      })
+      .catch((err) => {
+        alert(err instanceof Error ? err.message : 'Failed to send results emails');
+      })
+      .finally(() => setUpdating(false));
   };
 
   const handleUpdateScore = () => {
     if (selectedItems.size === 0) return;
-    alert(`Updating score history for ${selectedItems.size} items...`);
+    const selectedResults = resultsItems.filter((item) => selectedItems.has(item.id));
+    const uniqueClientIds = [...new Set(selectedResults.map((item) => item.clientId))];
+    if (uniqueClientIds.length !== 1) {
+      alert('Please select dispute items for one client at a time when updating scores.');
+      return;
+    }
+
+    const equifaxRaw = window.prompt('Enter updated Equifax score (leave blank to skip):', '');
+    if (equifaxRaw === null) return;
+    const experianRaw = window.prompt('Enter updated Experian score (leave blank to skip):', '');
+    if (experianRaw === null) return;
+    const transunionRaw = window.prompt('Enter updated TransUnion score (leave blank to skip):', '');
+    if (transunionRaw === null) return;
+
+    const parseScore = (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const parsed = Number(trimmed);
+      if (!Number.isFinite(parsed)) throw new Error('Scores must be numbers.');
+      return parsed;
+    };
+
+    let scores;
+    try {
+      scores = {
+        equifax: parseScore(equifaxRaw),
+        experian: parseScore(experianRaw),
+        transunion: parseScore(transunionRaw)
+      };
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Invalid score input');
+      return;
+    }
+
+    setUpdating(true);
+    fetch(`${API_BASE}/api/disputes/bulk/update-scores`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ids: Array.from(selectedItems), scores })
+    })
+      .then(async (response) => {
+        const body = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(body?.error || 'Failed to update scores');
+        alert(`Scores updated and emailed to ${body?.email || 'the client'}.`);
+        onItemsChange();
+      })
+      .catch((err) => {
+        alert(err instanceof Error ? err.message : 'Failed to update scores');
+      })
+      .finally(() => setUpdating(false));
   };
 
   const getBureauStatus = (item: DisputeItem, bureau: 'efx' | 'xpn' | 'tu'): string => {

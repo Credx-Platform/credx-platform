@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { sendEmail } from '../lib/email.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 
 export const disputesRouter = Router();
@@ -589,6 +590,171 @@ disputesRouter.post('/initiate', requireAuth, requireRole(['STAFF', 'ADMIN']), a
 const bureauStatusSchema = z.object({
   status: z.enum(['PENDING', 'DELETED', 'UPDATED', 'VERIFIED']),
   bureau: z.enum(['efx', 'xpn', 'tu']).optional()
+});
+
+const bulkIdsSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1)
+});
+
+const scoreUpdateSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1),
+  scores: z.object({
+    equifax: z.number().int().min(300).max(850).nullable().optional(),
+    experian: z.number().int().min(300).max(850).nullable().optional(),
+    transunion: z.number().int().min(300).max(850).nullable().optional()
+  })
+});
+
+function formatItemType(value: string) {
+  return value.toLowerCase().replace(/_/g, ' ').replace(/(^|\s)\S/g, (s) => s.toUpperCase());
+}
+
+function formatResultStatus(value: string) {
+  return value.toLowerCase().replace(/_/g, ' ').replace(/(^|\s)\S/g, (s) => s.toUpperCase());
+}
+
+disputesRouter.post('/bulk/email-results', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const { ids } = bulkIdsSchema.parse(req.body);
+
+    const items = await prisma.disputeItem.findMany({
+      where: { id: { in: ids } },
+      include: {
+        client: {
+          include: { user: true }
+        }
+      }
+    });
+
+    const grouped = new Map<string, typeof items>();
+    for (const item of items) {
+      const key = item.clientId;
+      const existing = grouped.get(key) || [];
+      existing.push(item);
+      grouped.set(key, existing);
+    }
+
+    const deliveries: Array<{ clientId: string; email: string; result: Awaited<ReturnType<typeof sendEmail>> }> = [];
+
+    for (const [clientId, clientItems] of grouped.entries()) {
+      const client = clientItems[0]?.client;
+      if (!client?.user?.email) continue;
+
+      const deletedCount = clientItems.filter((item) => item.status === 'DELETED').length;
+      const updatedCount = clientItems.filter((item) => item.status === 'UPDATED').length;
+      const verifiedCount = clientItems.filter((item) => item.status === 'VERIFIED').length;
+      const inDisputeCount = clientItems.filter((item) => item.status === 'IN_DISPUTE').length;
+
+      const rows = clientItems.map((item) => `<li><strong>${item.furnisher}</strong> ${item.accountNumber ? `(${item.accountNumber})` : ''} — ${formatItemType(item.accountType)} — ${formatResultStatus(item.status)}</li>`).join('');
+      const subject = 'Your CredX dispute results update';
+      const html = `
+        <div style="font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.6;">
+          <h2 style="margin-bottom:12px;">Your dispute results update</h2>
+          <p>Hi ${client.user.firstName || 'there'},</p>
+          <p>Here is your latest results summary from CredX.</p>
+          <ul>
+            <li><strong>Deleted:</strong> ${deletedCount}</li>
+            <li><strong>Updated:</strong> ${updatedCount}</li>
+            <li><strong>Verified:</strong> ${verifiedCount}</li>
+            <li><strong>Still in dispute:</strong> ${inDisputeCount}</li>
+          </ul>
+          <p><strong>Accounts included in this update:</strong></p>
+          <ul>${rows}</ul>
+          <p>Sign in to your CredX portal for the latest activity and next-step notes.</p>
+        </div>
+      `;
+      const text = `Your CredX dispute results update\n\nHi ${client.user.firstName || 'there'},\n\nDeleted: ${deletedCount}\nUpdated: ${updatedCount}\nVerified: ${verifiedCount}\nStill in dispute: ${inDisputeCount}\n\nAccounts included:\n${clientItems.map((item) => `- ${item.furnisher}${item.accountNumber ? ` (${item.accountNumber})` : ''} — ${formatItemType(item.accountType)} — ${formatResultStatus(item.status)}`).join('\n')}\n\nSign in to your CredX portal for the latest activity and next-step notes.`;
+
+      const result = await sendEmail({ to: client.user.email, subject, html, text });
+      deliveries.push({ clientId, email: client.user.email, result });
+
+      await prisma.activityEvent.create({
+        data: {
+          clientId,
+          type: 'RESULTS_EMAIL_SENT',
+          message: `Dispute results email sent to ${client.user.email}`,
+          metadata: { itemIds: clientItems.map((item) => item.id), statuses: clientItems.map((item) => item.status) }
+        }
+      });
+    }
+
+    return res.json({ success: true, deliveries });
+  } catch (error) {
+    next(error);
+  }
+});
+
+disputesRouter.post('/bulk/update-scores', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const { ids, scores } = scoreUpdateSchema.parse(req.body);
+
+    const items = await prisma.disputeItem.findMany({
+      where: { id: { in: ids } },
+      include: {
+        client: {
+          include: { user: true, progress: true }
+        }
+      }
+    });
+
+    if (!items.length) {
+      return res.status(404).json({ error: 'No dispute items found' });
+    }
+
+    const clientIds = [...new Set(items.map((item) => item.clientId))];
+    if (clientIds.length !== 1) {
+      return res.status(400).json({ error: 'Score updates must be sent for one client at a time.' });
+    }
+
+    const client = items[0].client;
+    const existingScores = (client.progress?.scores as any) || { equifax: null, experian: null, transunion: null };
+    const mergedScores = { ...existingScores, ...scores };
+
+    if (client.progress) {
+      await prisma.clientProgress.update({
+        where: { clientId: client.id },
+        data: { scores: mergedScores }
+      });
+    } else {
+      await prisma.clientProgress.create({
+        data: {
+          clientId: client.id,
+          scores: mergedScores
+        }
+      });
+    }
+
+    await prisma.activityEvent.create({
+      data: {
+        clientId: client.id,
+        type: 'SCORES_UPDATED',
+        message: 'Credit score update sent to client',
+        metadata: { scores: mergedScores, itemIds: ids }
+      }
+    });
+
+    const subject = 'Your CredX score update';
+    const html = `
+      <div style="font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.6;">
+        <h2 style="margin-bottom:12px;">Your latest score update</h2>
+        <p>Hi ${client.user.firstName || 'there'},</p>
+        <p>CredX has updated the latest score snapshot on your file.</p>
+        <ul>
+          <li><strong>Equifax:</strong> ${mergedScores.equifax ?? 'Not provided'}</li>
+          <li><strong>Experian:</strong> ${mergedScores.experian ?? 'Not provided'}</li>
+          <li><strong>TransUnion:</strong> ${mergedScores.transunion ?? 'Not provided'}</li>
+        </ul>
+        <p>Sign in to your portal to review dispute progress, account changes, and next steps.</p>
+      </div>
+    `;
+    const text = `Your CredX score update\n\nHi ${client.user.firstName || 'there'},\n\nCredX has updated the latest score snapshot on your file.\n\nEquifax: ${mergedScores.equifax ?? 'Not provided'}\nExperian: ${mergedScores.experian ?? 'Not provided'}\nTransUnion: ${mergedScores.transunion ?? 'Not provided'}\n\nSign in to your portal to review dispute progress, account changes, and next steps.`;
+
+    const delivery = await sendEmail({ to: client.user.email, subject, html, text });
+
+    return res.json({ success: true, clientId: client.id, email: client.user.email, scores: mergedScores, delivery });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Update dispute item with bureau-specific status
