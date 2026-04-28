@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { DisputeManager } from './components/DisputeManager';
 
 type Plan = {
@@ -32,6 +32,26 @@ type ClientRecord = {
   payments: Array<{ id: string; status: string }>;
   documents: Array<{ id: string }>;
   activities: Array<{ id: string; message: string; createdAt: string }>;
+};
+
+type ClientDetail = ClientRecord & {
+  disputeItems?: Array<{
+    id: string;
+    furnisher: string;
+    accountNumber?: string | null;
+    accountType: string;
+    status: string;
+    currentRound: number;
+    reason?: string | null;
+    dueDate?: string | null;
+    createdAt: string;
+  }>;
+  progress?: {
+    scores?: { equifax?: number | null; experian?: number | null; transunion?: number | null };
+    workflow?: { stage?: string; next?: string[] };
+  } | null;
+  creditReports?: Array<{ id: string; bureau: string; pulledAt: string; tradelines: Array<{ id: string }> }>;
+  tasks?: Array<{ id: string; title?: string | null; status?: string | null }>;
 };
 
 type DisputeRecord = {
@@ -239,6 +259,7 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
 }
 
 function Clients({ clients }: { clients: ClientRecord[] }) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   
   const filteredClients = useMemo(() => {
@@ -289,7 +310,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
         </thead>
         <tbody>
           {filteredClients.length ? filteredClients.map((client) => (
-            <tr key={client.id}>
+            <tr key={client.id} className="clickable-row" onClick={() => navigate(`/clients/${client.id}`)}>
               <td>
                 <strong>{client.user.firstName} {client.user.lastName}</strong>
                 <div className="cell-subtext">{client.user.email}</div>
@@ -311,6 +332,206 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
         </tbody>
       </table>
     </section>
+  );
+}
+
+type ClientWorkspaceTab = 'overview' | 'profile' | 'documents' | 'disputes' | 'activity';
+
+function ClientDetailRoute({ token }: { token: string }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [client, setClient] = useState<ClientDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ClientWorkspaceTab>('overview');
+  const [statusValue, setStatusValue] = useState('LEAD');
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    apiFetch<{ client: ClientDetail }>(`/api/clients/${id}`, token)
+      .then((response) => {
+        setClient(response.client);
+        setStatusValue(response.client.status);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [id, token]);
+
+  const saveStatus = async () => {
+    if (!client) return;
+    setSaving(true);
+    try {
+      const response = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}/status`, token, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: statusValue })
+      });
+      setClient(response.client);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save status');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <section className="panel"><p className="helper-text">Loading client workspace...</p></section>;
+  if (error) return <section className="panel"><div className="error-banner">{error}</div></section>;
+  if (!client) return <section className="panel"><p className="helper-text">Client not found.</p></section>;
+
+  const fullName = `${client.user.firstName} ${client.user.lastName}`;
+  const disputeItems = client.disputeItems || [];
+  const documents = client.documents || [];
+  const activities = client.activities || [];
+  const scores = client.progress?.scores || {};
+  const tabs: Array<{ key: ClientWorkspaceTab; label: string }> = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'profile', label: 'Profile' },
+    { key: 'documents', label: 'Documents' },
+    { key: 'disputes', label: 'Disputes' },
+    { key: 'activity', label: 'Activity' }
+  ];
+
+  return (
+    <div className="page-grid">
+      <section className="hero-card hero-card--compact">
+        <div>
+          <p className="eyebrow">Client Workspace</p>
+          <h1>{fullName}</h1>
+          <p>{client.analysisSummary || 'Open each section below to manage profile details, uploads, dispute items, and activity.'}</p>
+          <div className="client-workspace-actions">
+            <button className="ghost-button" onClick={() => navigate('/clients')}>Back to Customers</button>
+          </div>
+        </div>
+        <div className="hero-stats">
+          <div className="stat-card"><span>Status</span><strong>{client.status.replace('_', ' ')}</strong></div>
+          <div className="stat-card"><span>Documents</span><strong>{documents.length}</strong></div>
+          <div className="stat-card"><span>Dispute Items</span><strong>{disputeItems.length}</strong></div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="client-tab-row">
+          {tabs.map((tab) => (
+            <button key={tab.key} className={`tab ${activeTab === tab.key ? 'active' : ''}`} onClick={() => setActiveTab(tab.key)}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'overview' ? (
+          <div className="two-col">
+            <div className="preview-card">
+              <h3>Account summary</h3>
+              <ul className="detail-list">
+                <li><strong>Email</strong><span>{client.user.email}</span></li>
+                <li><strong>Tier</strong><span>{client.serviceTier}</span></li>
+                <li><strong>Timeline</strong><span>{client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} months` : 'Pending'}</span></li>
+                <li><strong>Workflow</strong><span>{client.progress?.workflow?.stage || 'Not started'}</span></li>
+              </ul>
+            </div>
+            <div className="preview-card">
+              <h3>Latest score snapshot</h3>
+              <ul className="detail-list">
+                <li><strong>Equifax</strong><span>{scores.equifax ?? '—'}</span></li>
+                <li><strong>Experian</strong><span>{scores.experian ?? '—'}</span></li>
+                <li><strong>TransUnion</strong><span>{scores.transunion ?? '—'}</span></li>
+                <li><strong>Reports</strong><span>{client.creditReports?.length || 0}</span></li>
+              </ul>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'profile' ? (
+          <div className="two-col">
+            <div className="preview-card">
+              <h3>Profile details</h3>
+              <ul className="detail-list">
+                <li><strong>Name</strong><span>{fullName}</span></li>
+                <li><strong>Email</strong><span>{client.user.email}</span></li>
+                <li><strong>Address</strong><span>{[client.currentAddressLine1, client.currentAddressLine2, client.currentCity, client.currentState, client.currentPostalCode].filter(Boolean).join(', ') || 'Not on file'}</span></li>
+                <li><strong>SSN last 4</strong><span>{client.ssnLast4 || 'Not on file'}</span></li>
+              </ul>
+            </div>
+            <div className="preview-card">
+              <h3>Admin controls</h3>
+              <div className="field-grid">
+                <label>
+                  <span>Status</span>
+                  <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>
+                    {['LEAD','CONTRACT_SENT','INTAKE_RECEIVED','ANALYSIS_READY','UPGRADE_OFFERED','ACTIVE','PAST_DUE','RESTRICTED','CANCELLED'].map((status) => (
+                      <option key={status} value={status}>{status.replace('_', ' ')}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="client-workspace-actions">
+                <button onClick={saveStatus} disabled={saving}>{saving ? 'Saving...' : 'Save Status'}</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'documents' ? (
+          <div className="preview-card">
+            <h3>Documents</h3>
+            {documents.length ? (
+              <table className="data-table">
+                <thead><tr><th>Document</th><th>Type</th><th>Uploaded</th></tr></thead>
+                <tbody>
+                  {documents.map((doc: any) => (
+                    <tr key={doc.id}>
+                      <td>{doc.fileName || doc.id}</td>
+                      <td>{doc.type || 'Unknown'}</td>
+                      <td>{formatDate(doc.createdAt || client.updatedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : <p className="helper-text">No documents uploaded yet.</p>}
+          </div>
+        ) : null}
+
+        {activeTab === 'disputes' ? (
+          <div className="preview-card">
+            <h3>Dispute items</h3>
+            {disputeItems.length ? (
+              <table className="data-table">
+                <thead><tr><th>Furnisher</th><th>Account</th><th>Status</th><th>Round</th><th>Reason</th></tr></thead>
+                <tbody>
+                  {disputeItems.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.furnisher}</td>
+                      <td>{item.accountNumber || '—'}</td>
+                      <td><span className={statusClass(item.status)}>{item.status.replace('_', ' ')}</span></td>
+                      <td>{item.currentRound}</td>
+                      <td>{item.reason || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : <p className="helper-text">No dispute items for this client yet.</p>}
+          </div>
+        ) : null}
+
+        {activeTab === 'activity' ? (
+          <div className="preview-card">
+            <h3>Activity</h3>
+            {activities.length ? (
+              <ul className="activity-list">
+                {activities.map((item) => (
+                  <li key={item.id}>
+                    <strong>{formatDate(item.createdAt)}</strong>
+                    <span>{item.message}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="helper-text">No activity yet.</p>}
+          </div>
+        ) : null}
+      </section>
+    </div>
   );
 }
 
@@ -570,6 +791,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Overview clients={clients} disputes={disputes} plans={plans} />} />
           <Route path="/clients" element={<Clients clients={clients} />} />
+          <Route path="/clients/:id" element={<ClientDetailRoute token={token} />} />
           <Route path="/disputes" element={<DisputesRoute token={token} disputes={disputes} />} />
         </Routes>
       </main>

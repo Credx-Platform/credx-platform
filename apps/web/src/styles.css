@@ -347,6 +347,36 @@ button:hover,
   text-align: left;
   vertical-align: top;
 }
+.clickable-row { cursor: pointer; }
+.clickable-row:hover { background: rgba(255,255,255,.03); }
+.client-tab-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.client-workspace-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.detail-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.detail-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(133,157,186,.12);
+}
+.detail-list li strong { color: var(--white); }
+.detail-list li span { color: var(--muted); text-align: right; }
 .data-table th { color: #c8d7e8; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 .empty-row { text-align: center; color: var(--muted); }
 

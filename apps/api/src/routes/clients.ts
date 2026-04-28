@@ -23,6 +23,43 @@ clientsRouter.get('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (_req
   }
 });
 
+clientsRouter.get('/:id', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const client = await prisma.client.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        payments: true,
+        disputes: true,
+        disputeItems: {
+          include: {
+            rounds: {
+              orderBy: { roundNumber: 'desc' }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        },
+        documents: true,
+        activities: {
+          orderBy: { createdAt: 'desc' }
+        },
+        tasks: true,
+        progress: true,
+        creditReports: {
+          orderBy: { pulledAt: 'desc' },
+          include: { tradelines: true }
+        }
+      }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    return res.json({ client });
+  } catch (error) {
+    next(error);
+  }
+});
+
 clientsRouter.get('/me', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
     const client = await prisma.client.findUnique({
