@@ -44,6 +44,11 @@ const server = createServer(async (req, res) => {
     if (existsSync(startPath)) return serveFile(res, startPath);
   }
 
+  if (requestPath === '/signup' || requestPath === '/signup/') {
+    const signupPath = join(rootDir, 'signup.html');
+    if (existsSync(signupPath)) return serveFile(res, signupPath);
+  }
+
   if (requestPath === '/portal' || requestPath === '/portal/') {
     const portalPath = join(rootDir, 'portal.html');
     if (existsSync(portalPath)) return serveFile(res, portalPath);
@@ -66,6 +71,11 @@ const server = createServer(async (req, res) => {
   if (requestPath.startsWith('/start/')) {
     const startPath = join(rootDir, 'start.html');
     if (existsSync(startPath)) return serveFile(res, startPath);
+  }
+
+  if (requestPath.startsWith('/signup/')) {
+    const signupPath = join(rootDir, 'signup.html');
+    if (existsSync(signupPath)) return serveFile(res, signupPath);
   }
 
   if (requestPath.startsWith('/portal/')) {

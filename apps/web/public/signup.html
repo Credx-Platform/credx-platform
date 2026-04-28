@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CredX Sign Up</title>
+<meta name="description" content="Sign up for CredX directly. Choose the guided program or 5-Day Masterclass and submit your intake.">
+<style>
+:root{--bg:#07111f;--bg2:#0d1b31;--bg3:#112543;--bg4:#173457;--border:rgba(147,197,253,.15);--border-c:rgba(34,211,238,.35);--white:#f8fbff;--text:#dbe8ff;--muted:#9fb5d6;--cyan:#22d3ee;--cyan-dim:rgba(34,211,238,.16);--shadow:0 30px 80px rgba(0,0,0,.35)}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at top,#13335e 0%,#08111d 42%,#050a12 100%);color:var(--text)}
+a{color:inherit}.page{min-height:100vh;padding:32px 18px 48px}.shell{max-width:1120px;margin:0 auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:26px}.brand{display:flex;align-items:center;gap:12px;text-decoration:none}.brand img{width:44px;height:44px;border-radius:12px;object-fit:cover;box-shadow:0 10px 30px rgba(0,0,0,.25)}.brand-copy{display:flex;flex-direction:column}.brand-copy strong{color:var(--white);font-size:16px}.brand-copy span{font-size:12px;color:var(--muted)}.top-actions{display:flex;gap:10px;flex-wrap:wrap}.top-link{padding:10px 14px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.03);text-decoration:none;color:var(--text);font-size:13px}.top-link.primary{background:linear-gradient(135deg,var(--cyan),#2563eb);color:#03111b;border-color:transparent;font-weight:700}.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:start}.panel{background:linear-gradient(180deg,rgba(8,17,31,.86),rgba(8,17,31,.68));border:1px solid var(--border);border-radius:28px;box-shadow:var(--shadow);backdrop-filter:blur(18px)}.intro{padding:34px}.eyebrow{display:inline-flex;padding:8px 12px;border-radius:999px;background:var(--cyan-dim);border:1px solid var(--border-c);color:var(--cyan);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.intro h1{margin:18px 0 14px;font-size:48px;line-height:1.05;color:var(--white)}.intro p{margin:0 0 18px;color:var(--muted);line-height:1.7;font-size:16px}.path-grid{display:grid;gap:14px;margin-top:22px}.path-card{padding:18px;border:1px solid var(--border);border-radius:20px;background:rgba(255,255,255,.03)}.path-card.active{border-color:var(--border-c);background:rgba(34,211,238,.1)}.path-card h3{margin:0 0 8px;color:var(--white);font-size:18px}.path-card p{margin:0;color:var(--muted);font-size:14px;line-height:1.6}.mini-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.mini-btn{padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--border);text-decoration:none;font-size:14px}.mini-btn strong{color:var(--white)}.form-wrap{padding:30px}.form-wrap h2{margin:0 0 8px;color:var(--white);font-size:30px}.form-wrap p{margin:0 0 22px;color:var(--muted);line-height:1.6}.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}.form-row.single{grid-template-columns:1fr}.form-group label{display:block;margin:0 0 8px;font-size:13px;color:#c8daf7;font-weight:600}.form-group input,.form-group select{width:100%;padding:14px 14px;border-radius:14px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--white);font-size:14px;outline:none}.form-group input::placeholder{color:#86a3c8}.choice-group{display:grid;grid-template-columns:1fr 1fr;gap:12px}.choice-card{position:relative;display:flex;align-items:center;gap:10px;padding:14px 15px;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.03);cursor:pointer;min-height:58px}.choice-card.active{border-color:var(--border-c);background:rgba(34,211,238,.11)}.choice-card input{position:absolute;opacity:0;pointer-events:none}.choice-dot{width:14px;height:14px;border-radius:50%;border:2px solid #6f8db2;display:inline-block;flex-shrink:0}.choice-card.active .choice-dot{border-color:var(--cyan);background:var(--cyan);box-shadow:0 0 0 3px rgba(34,211,238,.15)}.conditional-field{display:none;margin-top:12px}.conditional-field.show{display:block}.cb-row{display:flex;gap:12px;align-items:flex-start;margin:18px 0 14px}.cb-row input{margin-top:3px}.cb-row label{font-size:13px;color:var(--muted);line-height:1.5}.action-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}.form-submit,.secondary-btn{appearance:none;border:none;cursor:pointer;padding:14px 18px;border-radius:14px;font-weight:700;font-size:14px}.form-submit{background:linear-gradient(135deg,var(--cyan),#2563eb);color:#03111b;flex:1}.secondary-btn{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);text-decoration:none;text-align:center}.success-panel{display:none;text-align:center;padding:8px 0 4px}.success-icon{font-size:38px}.success-title{margin-top:8px;color:var(--white);font-size:24px;font-weight:800}.success-msg{margin-top:8px;color:var(--muted);line-height:1.6}.success-links{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:18px}.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(24px);background:#07111f;border:1px solid var(--border);color:var(--white);padding:12px 16px;border-radius:14px;opacity:0;pointer-events:none;transition:.25s;z-index:20;box-shadow:var(--shadow)}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}.toast.error{border-color:rgba(248,113,113,.4)}@media (max-width:980px){.hero{grid-template-columns:1fr}.intro h1{font-size:38px}}@media (max-width:640px){.page{padding:18px 14px 40px}.topbar{flex-direction:column;align-items:flex-start}.form-row,.choice-group{grid-template-columns:1fr}.intro,.form-wrap{padding:22px}.intro h1{font-size:32px}}</style>
+</head>
+<body>
+<div class="page">
+ <div class="shell">
+  <div class="topbar">
+   <a class="brand" href="/">
+    <img src="/images/credx-logo-1.jpg" alt="CredX logo">
+    <div class="brand-copy">
+     <strong>CredX</strong>
+     <span>Direct sign-up page</span>
+    </div>
+   </a>
+   <div class="top-actions">
+    <a class="top-link" href="/">Back to landing page</a>
+    <a class="top-link" href="/portal/">Client portal login</a>
+    <a class="top-link primary" href="/signup?offer=program">Program sign up</a>
+   </div>
+  </div>
+
+  <div class="hero">
+   <div class="panel intro">
+    <div class="eyebrow">Direct CredX intake</div>
+    <h1>Choose your path and sign up.</h1>
+    <p>This page is built for fast links, DMs, text messages, ads, and QR codes. Pick the CredX path that fits you, submit your intake, and your lead will go straight into the admin workflow for follow-up.</p>
+    <div class="path-grid">
+     <div class="path-card" id="programCard">
+      <h3>CredX Program + AI + Coaching</h3>
+      <p>Best for people who want guided support, file review, structured next steps, dispute workflow visibility, and portal-based progress tracking.</p>
+     </div>
+     <div class="path-card" id="masterclassCard">
+      <h3>5-Day Masterclass DIY Guide</h3>
+      <p>Best for people who want education first, a structured DIY path, and a lower-friction way to learn credit, disputes, rebuilding, and funding readiness.</p>
+     </div>
+    </div>
+    <div class="mini-actions">
+     <a class="mini-btn" href="/signup?offer=program"><strong>Program:</strong> guided support</a>
+     <a class="mini-btn" href="/signup?offer=masterclass"><strong>Masterclass:</strong> DIY education</a>
+     <a class="mini-btn" href="/portal/"><strong>Already a client?</strong> Open portal</a>
+    </div>
+   </div>
+
+   <div class="panel form-wrap">
+    <h2>Start your CredX sign up</h2>
+    <p>Complete the short intake below. Once submitted, your information goes into the CredX admin pipeline for review and follow-up.</p>
+
+    <div id="form-panel">
+     <div class="form-row">
+      <div class="form-group"><label for="firstName">First Name</label><input id="firstName" type="text" placeholder="First name"></div>
+      <div class="form-group"><label for="lastName">Last Name</label><input id="lastName" type="text" placeholder="Last name"></div>
+     </div>
+     <div class="form-row">
+      <div class="form-group"><label for="email">Email</label><input id="email" type="email" placeholder="Email address"></div>
+      <div class="form-group"><label for="phone">Phone</label><input id="phone" type="tel" placeholder="Phone number"></div>
+     </div>
+     <div class="form-row single">
+      <div class="form-group">
+       <label for="creditGoal">Primary Goal</label>
+       <select id="creditGoal">
+        <option value="">Select one</option>
+        <option value="Remove negative items">Remove negative items</option>
+        <option value="Prepare for financing">Prepare for financing</option>
+        <option value="Rebuild after collections or charge-offs">Rebuild after collections or charge-offs</option>
+        <option value="General credit improvement">General credit improvement</option>
+       </select>
+      </div>
+     </div>
+     <div class="form-row single">
+      <div class="form-group">
+       <label>Which CredX offer are you interested in?</label>
+       <div class="choice-group" id="offerInterestGroup">
+        <label class="choice-card"><input type="radio" name="offerInterest" value="program"><span class="choice-dot"></span><span>CredX Program + AI + Coaching</span></label>
+        <label class="choice-card"><input type="radio" name="offerInterest" value="masterclass"><span class="choice-dot"></span><span>5-Day Masterclass DIY Guide</span></label>
+       </div>
+      </div>
+     </div>
+     <div class="form-row single">
+      <div class="form-group">
+       <label>How did you hear about us?</label>
+       <div class="choice-group" id="heardAboutGroup">
+        <label class="choice-card"><input type="radio" name="heardAbout" value="YouTube"><span class="choice-dot"></span><span>YouTube</span></label>
+        <label class="choice-card"><input type="radio" name="heardAbout" value="Instagram"><span class="choice-dot"></span><span>Instagram</span></label>
+        <label class="choice-card"><input type="radio" name="heardAbout" value="TikTok"><span class="choice-dot"></span><span>TikTok</span></label>
+        <label class="choice-card"><input type="radio" name="heardAbout" value="Facebook"><span class="choice-dot"></span><span>Facebook</span></label>
+        <label class="choice-card"><input type="radio" name="heardAbout" value="Friend or family"><span class="choice-dot"></span><span>Friend or family</span></label>
+        <label class="choice-card"><input type="radio" name="heardAbout" value="Other"><span class="choice-dot"></span><span>Other</span></label>
+       </div>
+       <div class="conditional-field" id="referralNameWrap">
+        <input id="referralName" type="text" placeholder="Who referred you?">
+       </div>
+       <div class="conditional-field" id="heardAboutOtherWrap">
+        <input id="heardAboutOther" type="text" placeholder="Tell us where you found us">
+       </div>
+      </div>
+     </div>
+     <div class="cb-row">
+      <input id="consent" type="checkbox">
+      <label for="consent">I confirm the information submitted is accurate to the best of my knowledge.</label>
+     </div>
+     <div class="action-row">
+      <button class="form-submit" id="submitBtn" type="button">Confirm & Submit</button>
+      <a class="secondary-btn" href="/portal/">Already have a portal account?</a>
+     </div>
+    </div>
+
+    <div class="success-panel" id="successPanel">
+     <div class="success-icon">✅</div>
+     <div class="success-title">Sign-up received</div>
+     <div class="success-msg">Thanks — your intake was submitted successfully. A CredX specialist can follow up after review.</div>
+     <div class="success-links">
+      <a class="secondary-btn" href="/">Back to main site</a>
+      <a class="secondary-btn" href="/portal/">Client portal login</a>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const API_BASE='https://credxapi-production.up.railway.app';
+const params=new URLSearchParams(window.location.search);
+const requestedOffer=params.get('offer');
+const heardAboutInputs=[...document.querySelectorAll('input[name="heardAbout"]')];
+const offerInterestInputs=[...document.querySelectorAll('input[name="offerInterest"]')];
+const referralNameWrap=document.getElementById('referralNameWrap');
+const heardAboutOtherWrap=document.getElementById('heardAboutOtherWrap');
+let selectedOfferInterest='program';
+function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>{t.className='toast';},3200);}
+function syncOfferInterestUI(){
+ offerInterestInputs.forEach(input=>input.closest('.choice-card').classList.toggle('active',input.checked));
+ selectedOfferInterest=offerInterestInputs.find(input=>input.checked)?.value||'program';
+ document.getElementById('programCard').classList.toggle('active',selectedOfferInterest==='program');
+ document.getElementById('masterclassCard').classList.toggle('active',selectedOfferInterest==='masterclass');
+}
+function syncHeardAboutUI(){
+ const selected=heardAboutInputs.find(input=>input.checked)?.value||'';
+ heardAboutInputs.forEach(input=>input.closest('.choice-card').classList.toggle('active',input.checked));
+ referralNameWrap.classList.toggle('show',selected==='Friend or family');
+ heardAboutOtherWrap.classList.toggle('show',selected==='Other');
+ if(selected!=='Friend or family') document.getElementById('referralName').value='';
+ if(selected!=='Other') document.getElementById('heardAboutOther').value='';
+}
+function selectOffer(value){
+ const target=offerInterestInputs.find(input=>input.value===value) || offerInterestInputs[0];
+ if(target){ target.checked=true; syncOfferInterestUI(); }
+}
+heardAboutInputs.forEach(input=>input.addEventListener('change',syncHeardAboutUI));
+offerInterestInputs.forEach(input=>input.addEventListener('change',syncOfferInterestUI));
+syncHeardAboutUI();
+selectOffer(requestedOffer==='masterclass'?'masterclass':'program');
+async function submitForm(){
+ const btn=document.getElementById('submitBtn');
+ const heardAbout=heardAboutInputs.find(input=>input.checked)?.value||'';
+ const payload={
+  firstName:document.getElementById('firstName').value.trim(),
+  lastName:document.getElementById('lastName').value.trim(),
+  email:document.getElementById('email').value.trim(),
+  phone:document.getElementById('phone').value.trim()||undefined,
+  creditGoal:document.getElementById('creditGoal').value||undefined,
+  offerInterest:selectedOfferInterest,
+  referralSource:heardAbout||undefined,
+  referralName:document.getElementById('referralName').value.trim()||undefined,
+  referralOther:document.getElementById('heardAboutOther').value.trim()||undefined
+ };
+ if(!payload.firstName||!payload.lastName||!payload.email){showToast('Please complete first name, last name, and email.','error');return;}
+ if(!/\S+@\S+\.\S+/.test(payload.email)){showToast('Please enter a valid email.','error');return;}
+ if(!document.getElementById('consent').checked){showToast('Please confirm your information is accurate.','error');return;}
+ btn.disabled=true;btn.textContent='Submitting...';
+ try{
+  const res=await fetch(`${API_BASE}/api/leads`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const body=await res.json().catch(()=>null);
+  if(!res.ok) throw new Error(body?.error||'Submission failed');
+  document.getElementById('form-panel').style.display='none';
+  document.getElementById('successPanel').style.display='block';
+  showToast('Submitted successfully');
+ }catch(err){
+  showToast(err.message||'Submission failed','error');
+  btn.disabled=false;btn.textContent='Confirm & Submit';
+ }
+}
+document.getElementById('submitBtn').addEventListener('click',submitForm);
+</script>
+</body>
+</html>

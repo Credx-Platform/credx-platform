@@ -234,7 +234,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
  <li><a href="#chat">Chat</a></li>
  <li><a href="#faq">FAQ</a></li>
  </ul>
- <a href="#analysis" class="nav-cta">Free Analysis</a>
+ <a href="/signup" class="nav-cta">Sign Up</a>
 </nav>
 <section class="hero">
  <div class="hero-bg"></div>
@@ -244,13 +244,18 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   <h1>CredX helps you <span class="accent">repair, rebuild, and rise.</span></h1>
   <p class="hero-sub">Free credit analysis, dispute support, score tracking, and strategy designed to move you toward approvals and stronger financial positioning.</p>
   <div class="hero-btns">
-   <a href="#analysis" class="btn btn-primary">Get Free Analysis</a>
-   <a href="#pricing" class="btn btn-outline">View Plans</a>
+   <a href="/signup?offer=program" class="btn btn-primary">Sign Up for the Program</a>
+   <a href="/signup?offer=masterclass" class="btn btn-outline">Join the Masterclass</a>
   </div>
   <div class="hero-stats">
    <div><div class="hs-num">24/7</div><div class="hs-label">Portal Access</div></div>
    <div><div class="hs-num">1:1</div><div class="hs-label">Strategic Support</div></div>
    <div><div class="hs-num">Custom</div><div class="hs-label">Action Plans</div></div>
+  </div>
+  <div class="chat-quick-actions" style="justify-content:center;padding:18px 0 0;background:transparent">
+   <a href="/signup?offer=program" class="chat-quick" style="text-decoration:none">Program Sign Up</a>
+   <a href="/signup?offer=masterclass" class="chat-quick" style="text-decoration:none">Masterclass Sign Up</a>
+   <a href="/portal/" class="chat-quick" style="text-decoration:none">Portal Login</a>
   </div>
  </div>
 </section>
@@ -297,7 +302,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
      <li>Affiliate tools and recommended resources</li>
      <li>Client portal access for education tracking</li>
     </ul>
-    <a href="#analysis" class="plan-cta" onclick="selectOffer('masterclass')">Join the Masterclass</a>
+    <a href="/signup?offer=masterclass" class="plan-cta">Join the Masterclass</a>
    </div>
    <div class="plan feat">
     <div class="offer-pill">Done With You</div>
@@ -311,7 +316,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
      <li>Dispute workflow visibility</li>
      <li>Monthly progress tracking</li>
     </ul>
-    <a href="#analysis" class="plan-cta" onclick="selectOffer('program')">Start with Essential</a>
+    <a href="/signup?offer=program" class="plan-cta">Start with Essential</a>
    </div>
    <div class="plan">
     <div class="plan-badge">Most Popular</div>
@@ -325,7 +330,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
      <li>Best for complex files or urgent repositioning</li>
      <li class="note">Monthly continuation is discussed after review based on file complexity and service fit.</li>
     </ul>
-    <a href="#analysis" class="plan-cta" onclick="selectOffer('program')">Apply for Aggressive</a>
+    <a href="/signup?offer=program" class="plan-cta">Apply for Aggressive</a>
    </div>
    <div class="plan">
     <div class="plan-name">Family</div>
@@ -337,7 +342,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
      <li>Coordinated rebuild and dispute support</li>
      <li>Ideal for couples or family financial recovery</li>
     </ul>
-    <a href="#analysis" class="plan-cta" onclick="selectOffer('program')">Ask About Family Plan</a>
+    <a href="/signup?offer=program" class="plan-cta">Ask About Family Plan</a>
    </div>
   </div>
  </div>
@@ -492,7 +497,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
    <div class="footer-tagline">CredX is built to help organize practical credit strategy and stronger next steps.</div>
   </div>
   <div class="footer-col"><h5>Platform</h5><a href="#about">About</a><a href="#how">How it Works</a><a href="#pricing">Pricing</a><a href="/portal/">Client Portal</a></div>
-  <div class="footer-col"><h5>Support</h5><a href="#analysis">Free Analysis</a><a href="#chat">Chat</a><a href="#faq">FAQ</a></div>
+  <div class="footer-col"><h5>Support</h5><a href="/signup">Sign Up</a><a href="#chat">Chat</a><a href="#faq">FAQ</a></div>
   <div class="footer-col"><h5>Contact</h5><a href="mailto:info@credxme.com">info@credxme.com</a><a href="https://credx-platform-web.netlify.app">Live Site</a></div>
  </div>
  <div class="footer-bottom">
@@ -572,7 +577,8 @@ function appendChatMessage(role,text){
  row.innerHTML=role==='agent'
   ? `<div class="chat-msg-av">CX</div><div class="chat-bubble"></div>`
   : `<div class="chat-msg-av">You</div><div class="chat-bubble"></div>`;
- row.querySelector('.chat-bubble').textContent=text;
+ if(role==='agent') row.querySelector('.chat-bubble').innerHTML=text;
+ else row.querySelector('.chat-bubble').textContent=text;
  chatMessages.appendChild(row);
  chatMessages.scrollTop=chatMessages.scrollHeight;
 }
@@ -580,13 +586,16 @@ function appendChatMessage(role,text){
 function getCesarReply(message){
  const text=(message||'').toLowerCase();
  if(!text.trim()) return 'Ask me anything about the CredX program, the 5-Day Masterclass, disputes, financing readiness, or rebuilding your credit.';
- if(text.includes('masterclass')||text.includes('diy')) return 'The 5-Day Masterclass is the DIY path inside CredX. It walks you through credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. It is best for people who want education, structure, and affiliate resources they can use on their own.';
- if(text.includes('program')||text.includes('coaching')||text.includes('service')) return 'The CredX Program is the done-with-you path. It includes the software platform, AI guidance, and James\' coaching layer. It is better for clients who want support, tracking, document workflow, and a more guided process.';
- if(text.includes('financing')||text.includes('mortgage')||text.includes('car')||text.includes('approval')) return 'If your goal is financing readiness, CredX helps you identify score blockers, utilization issues, inaccurate reporting, and next actions so you can move toward stronger approval positioning. The best first step is the free analysis so your file can be reviewed in context.';
- if(text.includes('dispute')||text.includes('collection')||text.includes('inquiry')) return 'CredX can help organize dispute workflow, identify what looks challengeable, and map next steps. The strongest dispute strategy depends on the actual reporting, dates, balances, and bureau differences, so the free analysis is where tailored review starts.';
- if(text.includes('price')||text.includes('cost')||text.includes('pricing')) return 'CredX offers both a full program path and a 5-Day Masterclass path. The right option depends on whether you want DIY education or guided support with coaching. If you want, I can help you compare the two before you submit the form.';
- if(text.includes('next step')||text.includes('start')||text.includes('apply')) return 'Your best next step is to choose the offer that fits you, complete the short intake, and let CredX review your file. If you want education first, choose the 5-Day Masterclass. If you want guided support, choose the program path.';
- return 'I can help with the CredX program, the 5-Day Masterclass, disputes, credit rebuilding, and financing readiness. If you want tailored guidance based on your file, the free analysis is still the best next step.';
+ if(text.includes('portal')||text.includes('sign in')||text.includes('login')||text.includes('log in')) return 'If you already have portal access, sign in here: <a href="/portal/">CredX Client Portal</a>.<br><br>If you are new and want to get started first, use the direct sign-up page here: <a href="/signup?offer=program">Program Sign Up</a>.';
+ if(text.includes('how do i get started')||text.includes('get started')||text.includes('how to start')||text.includes('sign up')||text.includes('signup')||text.includes('apply')) return 'Here\'s the fastest path:<br><br>• <a href="/signup?offer=program">Sign up for the CredX Program</a><br>• <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>• <a href="/portal/">Portal login</a> if you already have an account.<br><br>If you want, tell me whether you want DIY education or guided support and I\'ll point you to the best option.';
+ if(text.includes('help me')||text==='help'||text.includes('what can you help')||text.includes('how can you help')) return 'I can help you do one of three things right now:<br><br>1. <a href="/signup?offer=program">Start the guided CredX Program</a><br>2. <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>3. <a href="/portal/">Open your portal login</a><br><br>If you tell me your goal—remove negatives, prepare for financing, or rebuild after collections—I\'ll recommend the best path.';
+ if(text.includes('masterclass')||text.includes('diy')) return 'The 5-Day Masterclass is the DIY path inside CredX. It walks you through credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. If that sounds right, start here: <a href="/signup?offer=masterclass">Masterclass Sign Up</a>.';
+ if(text.includes('program')||text.includes('coaching')||text.includes('service')) return 'The CredX Program is the guided path with software, AI support, and coaching. If you want hands-on structure and follow-through, start here: <a href="/signup?offer=program">Program Sign Up</a>.';
+ if(text.includes('financing')||text.includes('mortgage')||text.includes('car')||text.includes('approval')) return 'If your goal is financing readiness, the best move is the guided program so your file can be reviewed in context. You can start here: <a href="/signup?offer=program">Program Sign Up</a>.';
+ if(text.includes('dispute')||text.includes('collection')||text.includes('inquiry')) return 'CredX can help organize dispute workflow and identify what looks challengeable, but the strongest next step is still getting your file into review. Start here: <a href="/signup?offer=program">Free Analysis / Program Sign Up</a>.';
+ if(text.includes('price')||text.includes('cost')||text.includes('pricing')) return 'CredX has two main paths right now: the guided Program and the 5-Day Masterclass. If you want support, choose the Program. If you want DIY education, choose the Masterclass.<br><br>• <a href="/signup?offer=program">Program Sign Up</a><br>• <a href="/signup?offer=masterclass">Masterclass Sign Up</a>';
+ if(text.includes('next step')) return 'Your next step is to choose your path and submit the short sign-up form:<br><br>• <a href="/signup?offer=program">CredX Program</a><br>• <a href="/signup?offer=masterclass">5-Day Masterclass</a>';
+ return 'I can help you choose the fastest path:<br><br>• <a href="/signup?offer=program">Sign up for the Program</a><br>• <a href="/signup?offer=masterclass">Join the Masterclass</a><br>• <a href="/portal/">Portal Login</a><br><br>If you tell me your goal, I\'ll point you to the best one.';
 }
 
 function sendChat(){
