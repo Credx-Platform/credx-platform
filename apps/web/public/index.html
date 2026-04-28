@@ -452,14 +452,14 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
    <div class="chat-header">
     <div class="chat-agent-av">CX</div>
     <div>
-     <div class="chat-agent-name">CredX Guidance Assistant</div>
+     <div class="chat-agent-name">Cesar · CredX Guidance Assistant</div>
      <div class="chat-agent-status">Online now</div>
     </div>
     <div class="chat-powered">Powered by <span>CredX</span></div>
    </div>
    <div class="chat-messages" id="chatMessages">
-    <div class="chat-msg agent"><div class="chat-msg-av">CX</div><div class="chat-bubble">Hi, how can I help you today?</div></div>
-    <div class="chat-msg agent"><div class="chat-msg-av">CX</div><div class="chat-bubble">I can help you better understand your credit profile, financing readiness, and the best next steps based on your goals.</div></div>
+    <div class="chat-msg agent"><div class="chat-msg-av">CX</div><div class="chat-bubble">Hi, I'm Cesar. How can I help you today?</div></div>
+    <div class="chat-msg agent"><div class="chat-msg-av">CX</div><div class="chat-bubble">I can help you understand the CredX program, the 5-Day Masterclass, financing readiness, dispute workflow, and the best next step based on your goals.</div></div>
    </div>
    <div class="chat-input-wrap">
     <input class="chat-input" id="chatInput" placeholder="Ask about your next step">
@@ -562,8 +562,48 @@ async function submitForm(){
  }
 }
 document.getElementById('submitBtn').addEventListener('click',submitForm);
-document.getElementById('chatSend').addEventListener('click',()=>showToast('Guidance chat is in demo mode for now. Start with the free analysis to get a tailored next-step review.'));
-document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('click',()=>showToast('Use the free analysis to get a tailored review and next-step guidance.')));
+
+const chatMessages=document.getElementById('chatMessages');
+const chatInput=document.getElementById('chatInput');
+
+function appendChatMessage(role,text){
+ const row=document.createElement('div');
+ row.className=`chat-msg ${role}`;
+ row.innerHTML=role==='agent'
+  ? `<div class="chat-msg-av">CX</div><div class="chat-bubble"></div>`
+  : `<div class="chat-msg-av">You</div><div class="chat-bubble"></div>`;
+ row.querySelector('.chat-bubble').textContent=text;
+ chatMessages.appendChild(row);
+ chatMessages.scrollTop=chatMessages.scrollHeight;
+}
+
+function getCesarReply(message){
+ const text=(message||'').toLowerCase();
+ if(!text.trim()) return 'Ask me anything about the CredX program, the 5-Day Masterclass, disputes, financing readiness, or rebuilding your credit.';
+ if(text.includes('masterclass')||text.includes('diy')) return 'The 5-Day Masterclass is the DIY path inside CredX. It walks you through credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. It is best for people who want education, structure, and affiliate resources they can use on their own.';
+ if(text.includes('program')||text.includes('coaching')||text.includes('service')) return 'The CredX Program is the done-with-you path. It includes the software platform, AI guidance, and James\' coaching layer. It is better for clients who want support, tracking, document workflow, and a more guided process.';
+ if(text.includes('financing')||text.includes('mortgage')||text.includes('car')||text.includes('approval')) return 'If your goal is financing readiness, CredX helps you identify score blockers, utilization issues, inaccurate reporting, and next actions so you can move toward stronger approval positioning. The best first step is the free analysis so your file can be reviewed in context.';
+ if(text.includes('dispute')||text.includes('collection')||text.includes('inquiry')) return 'CredX can help organize dispute workflow, identify what looks challengeable, and map next steps. The strongest dispute strategy depends on the actual reporting, dates, balances, and bureau differences, so the free analysis is where tailored review starts.';
+ if(text.includes('price')||text.includes('cost')||text.includes('pricing')) return 'CredX offers both a full program path and a 5-Day Masterclass path. The right option depends on whether you want DIY education or guided support with coaching. If you want, I can help you compare the two before you submit the form.';
+ if(text.includes('next step')||text.includes('start')||text.includes('apply')) return 'Your best next step is to choose the offer that fits you, complete the short intake, and let CredX review your file. If you want education first, choose the 5-Day Masterclass. If you want guided support, choose the program path.';
+ return 'I can help with the CredX program, the 5-Day Masterclass, disputes, credit rebuilding, and financing readiness. If you want tailored guidance based on your file, the free analysis is still the best next step.';
+}
+
+function sendChat(){
+ const value=chatInput.value.trim();
+ if(!value) return;
+ appendChatMessage('user',value);
+ chatInput.value='';
+ window.setTimeout(()=>appendChatMessage('agent',getCesarReply(value)),250);
+}
+
+document.getElementById('chatSend').addEventListener('click',sendChat);
+chatInput.addEventListener('keydown',(event)=>{ if(event.key==='Enter'){ event.preventDefault(); sendChat(); }});
+document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('click',()=>{
+ const prompt=btn.textContent.trim();
+ appendChatMessage('user',prompt);
+ window.setTimeout(()=>appendChatMessage('agent',getCesarReply(prompt)),250);
+}));
 </script>
 </body>
 </html>
