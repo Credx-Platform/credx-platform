@@ -349,21 +349,11 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
      <div class="form-group"><label for="referralName">Friend or family name</label><input id="referralName" type="text" placeholder="Who referred you?"></div>
      <div class="form-group"><label for="heardAboutOther">Other</label><input id="heardAboutOther" type="text" placeholder="Tell us where you found us"></div>
     </div>
-    <div class="form-row single">
-     <div class="form-group">
-      <label>Optional credit report upload</label>
-      <label class="upload-area" for="reportFile">
-       <input id="reportFile" type="file">
-       <div class="upload-title">Choose a file</div>
-       <div class="upload-sub" id="fileName">No file selected</div>
-      </label>
-     </div>
-    </div>
     <div class="cb-row">
      <input id="consent" type="checkbox">
      <label for="consent">I confirm the information submitted is accurate to the best of my knowledge.</label>
     </div>
-    <button class="form-submit" id="submitBtn" type="button">Submit Application</button>
+    <button class="form-submit" id="submitBtn" type="button">Confirm & Submit</button>
    </div>
    <div class="success-panel" id="successPanel">
     <div class="success-icon">✅</div>
@@ -446,9 +436,6 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 <div class="toast" id="toast"></div>
 <script>
 const API_BASE='https://credxapi-production.up.railway.app';
-const fileInput=document.getElementById('reportFile');
-const fileName=document.getElementById('fileName');
-if(fileInput){fileInput.addEventListener('change',()=>{fileName.textContent=fileInput.files&&fileInput.files[0]?fileInput.files[0].name:'No file selected';});}
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>{t.className='toast';},3200);}
 const faqItems=document.querySelectorAll('.faq-item');faqItems.forEach(item=>{item.querySelector('.faq-q').addEventListener('click',()=>item.classList.toggle('open'));});
 async function submitForm(){
@@ -459,11 +446,9 @@ async function submitForm(){
   email:document.getElementById('email').value.trim(),
   phone:document.getElementById('phone').value.trim()||undefined,
   creditGoal:document.getElementById('creditGoal').value||undefined,
-  notes:[
-   document.getElementById('heardAbout').value?`How did you hear about us: ${document.getElementById('heardAbout').value}`:'',
-   document.getElementById('referralName').value.trim()?`Friend or family: ${document.getElementById('referralName').value.trim()}`:'',
-   document.getElementById('heardAboutOther').value.trim()?`Other: ${document.getElementById('heardAboutOther').value.trim()}`:''
-  ].filter(Boolean).join(' | ')||undefined
+  referralSource:document.getElementById('heardAbout').value||undefined,
+  referralName:document.getElementById('referralName').value.trim()||undefined,
+  referralOther:document.getElementById('heardAboutOther').value.trim()||undefined
  };
  if(!payload.firstName||!payload.lastName||!payload.email){showToast('Please complete first name, last name, and email.','error');return;}
  if(!/\S+@\S+\.\S+/.test(payload.email)){showToast('Please enter a valid email.','error');return;}

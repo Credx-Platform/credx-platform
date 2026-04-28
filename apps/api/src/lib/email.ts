@@ -355,7 +355,7 @@ export async function sendPortalReadyEmail(params: {
   return { ...email, delivery: result };
 }
 
-export async function notifyNewLead(params: { firstName: string; lastName: string; email: string; phone?: string }) {
+export async function notifyNewLead(params: { firstName: string; lastName: string; email: string; phone?: string; source?: string }) {
   const subject = `New CredX lead: ${params.firstName} ${params.lastName}`;
   const html = `
     <div style="font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.6;">
@@ -363,9 +363,10 @@ export async function notifyNewLead(params: { firstName: string; lastName: strin
       <p><strong>Name:</strong> ${params.firstName} ${params.lastName}</p>
       <p><strong>Email:</strong> ${params.email}</p>
       <p><strong>Phone:</strong> ${params.phone || 'Not provided'}</p>
+      <p><strong>Referral source:</strong> ${params.source || 'Not provided'}</p>
     </div>
   `;
-  const text = `New CredX lead received\n\nName: ${params.firstName} ${params.lastName}\nEmail: ${params.email}\nPhone: ${params.phone || 'Not provided'}`;
+  const text = `New CredX lead received\n\nName: ${params.firstName} ${params.lastName}\nEmail: ${params.email}\nPhone: ${params.phone || 'Not provided'}\nReferral source: ${params.source || 'Not provided'}`;
 
   const result = await sendEmail({
     to: 'jmalloy@credxme.com',

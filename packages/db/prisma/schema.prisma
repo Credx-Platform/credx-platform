@@ -109,6 +109,9 @@ model Lead {
   email      String
   phone      String?
   creditGoal String?
+  referralSource String?
+  referralName String?
+  referralOther String?
   createdAt  DateTime @default(now())
   notes      String?
 }

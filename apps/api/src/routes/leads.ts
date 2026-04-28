@@ -11,7 +11,10 @@ const createLeadSchema = z.object({
   lastName: z.string().min(1),
   email: z.string().email(),
   phone: z.string().optional(),
-  creditGoal: z.string().optional()
+  creditGoal: z.string().optional(),
+  referralSource: z.string().optional(),
+  referralName: z.string().optional(),
+  referralOther: z.string().optional()
 });
 
 leadsRouter.post('/', async (req, res, next) => {
@@ -30,7 +33,12 @@ leadsRouter.post('/', async (req, res, next) => {
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email,
-      phone: data.phone
+      phone: data.phone,
+      source: [
+        data.referralSource ? `Heard about us: ${data.referralSource}` : '',
+        data.referralName ? `Friend/family: ${data.referralName}` : '',
+        data.referralOther ? `Other: ${data.referralOther}` : ''
+      ].filter(Boolean).join(' | ') || undefined
     });
 
     return res.status(201).json({
