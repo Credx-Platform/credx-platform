@@ -55,6 +55,13 @@ type LoginResponse = {
   token: string;
 };
 
+type SessionResponse = User & {
+  client: Client | null;
+  progress?: Progress | null;
+  leadId?: string | null;
+  portalUnlocked?: boolean;
+};
+
 type ContractTextResponse = {
   agreement: string;
   disclosure: string;
@@ -77,7 +84,7 @@ type WizardState = {
   monitorPassword: string;
 };
 
-type PortalTab = 'overview' | 'monitoring' | 'education' | 'disputes' | 'activity' | 'profile' | 'tasks';
+type PortalTab = 'overview' | 'profile' | 'monitoring' | 'education' | 'disputes' | 'activity' | 'resources' | 'tasks';
 
 type SecureUploadState = {
   file: File | null;
@@ -91,6 +98,13 @@ const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() ||
 const TOKEN_KEY = 'credx-client-token';
 const USER_KEY = 'credx-client-user';
 const BRAND_LOGO = '/images/credx-logo-1.jpg';
+const DEFAULT_AFFILIATE_LINKS = [
+  { label: 'IdentityIQ Credit Monitoring', url: 'https://www.identityiq.com/', category: 'monitoring' },
+  { label: 'MyFreeScoreNow Credit Monitoring', url: 'https://www.myfreescorenow.com/', category: 'monitoring' },
+  { label: 'Self Credit Builder', url: 'https://www.self.inc/', category: 'credit_builder' },
+  { label: 'Kikoff Credit Builder', url: 'https://kikoff.com/', category: 'credit_builder' },
+  { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }
+] as const;
 
 const defaultWizardState: WizardState = {
   fullName: '',
@@ -198,6 +212,73 @@ function normalizeDisputes(client: Client | null, progress: Progress | null) {
   return [...fromClient, ...fromProgress].filter((item, index, arr) => arr.findIndex((other) => other.id === item.id) === index);
 }
 
+type ScoreBand = { label: string; color: string; range: string };
+
+function scoreBand(score: number): ScoreBand {
+  if (score >= 800) return { label: 'Excellent', color: '#2dd4bf', range: '800–850' };
+  if (score >= 740) return { label: 'Very Good', color: '#00c6fb', range: '740–799' };
+  if (score >= 670) return { label: 'Good', color: '#a3e635', range: '670–739' };
+  if (score >= 580) return { label: 'Fair', color: '#facc15', range: '580–669' };
+  return { label: 'Poor', color: '#f87171', range: '300–579' };
+}
+
+function CreditScoreGauge({ bureau, score }: { bureau: string; score: number | null }) {
+  const hasScore = typeof score === 'number' && Number.isFinite(score);
+  const pct = hasScore ? Math.max(0, Math.min(1, ((score as number) - 300) / 550)) : 0;
+  const band = hasScore ? scoreBand(score as number) : { label: 'Pending', color: '#8ea4bb', range: '300–850' };
+
+  return (
+    <div
+      className="score-gauge"
+      style={{
+        ['--score-color' as any]: band.color,
+        ['--score-pct' as any]: pct.toFixed(4)
+      }}
+    >
+      <div className="score-gauge-bureau">{bureau}</div>
+      <div className="score-gauge-ring">
+        <div className="score-gauge-center">
+          <div className="score-gauge-value">{hasScore ? score : '—'}</div>
+          <div className="score-gauge-band">{band.label}</div>
+        </div>
+      </div>
+      <div className="score-gauge-foot">
+        <span>VantageScore</span>
+        <span>{band.range}</span>
+      </div>
+    </div>
+  );
+}
+
+function CreditScoreCards({ scores }: { scores?: Progress['scores'] }) {
+  const bureaus: Array<{ key: 'experian' | 'equifax' | 'transunion'; label: string }> = [
+    { key: 'experian', label: 'Experian' },
+    { key: 'equifax', label: 'Equifax' },
+    { key: 'transunion', label: 'TransUnion' }
+  ];
+  const values = scores || {};
+  return (
+    <section className="panel score-panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Your Credit Scores</p>
+          <h2>Three-bureau VantageScore</h2>
+        </div>
+      </div>
+      <div className="score-grid">
+        {bureaus.map((b) => {
+          const raw = values[b.key];
+          const score = typeof raw === 'number' ? raw : null;
+          return <CreditScoreGauge key={b.key} bureau={b.label} score={score} />;
+        })}
+      </div>
+      <p className="helper-text" style={{ marginTop: 14 }}>
+        Scores update after each credit monitoring sync. Range from 300 (Poor) to 850 (Excellent).
+      </p>
+    </section>
+  );
+}
+
 function ClientLogin({
   email,
   password,
@@ -219,23 +300,31 @@ function ClientLogin({
   loading: boolean;
   resetMessage: string | null;
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <div className="auth-shell client-auth-shell">
-      <form className="auth-card client-auth-card" onSubmit={onSubmit}>
+      <form className="auth-card client-auth-card" onSubmit={onSubmit} method="post" autoComplete="on" noValidate>
         <div className="brand-mark brand-mark--centered">
           <img src={BRAND_LOGO} alt="CredX" className="brand-logo" />
         </div>
         <p className="eyebrow">CredX Client Access</p>
         <h1>Client Portal Login</h1>
         <p className="helper-text">Sign in to see your credit monitoring, analysis, account activity, disputes, and profile.</p>
-        <label>
+        <p className="helper-text">If this is your first time signing in, enter your email and tap <strong>Reset password</strong> to get your secure setup link.</p>
+        <label htmlFor="client-login-email">
           <span>Email</span>
-          <input value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="you@example.com" />
+          <input id="client-login-email" name="email" type="email" autoComplete="username email" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email" enterKeyHint="next" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="you@example.com" />
         </label>
-        <label>
+        <label htmlFor="client-login-password">
           <span>Password</span>
-          <input type="password" value={password} onChange={(event) => onPasswordChange(event.target.value)} placeholder="Password" />
         </label>
+        <div className="password-field-row">
+          <input id="client-login-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go" value={password} onChange={(event) => onPasswordChange(event.target.value)} placeholder="Password" />
+          <button type="button" className="ghost-button password-toggle" onClick={() => setShowPassword((current) => !current)} aria-controls="client-login-password" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+            {showPassword ? 'Hide' : 'View'}
+          </button>
+        </div>
         {error ? <div className="error-banner">{error}</div> : null}
         {resetMessage ? <div className="helper-text">{resetMessage}</div> : null}
         <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</button>
@@ -252,9 +341,9 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
   const [wizardError, setWizardError] = useState<string | null>(null);
   const [signatureName, setSignatureName] = useState(`${user.firstName} ${user.lastName}`.trim());
   const [contractAgreed, setContractAgreed] = useState(false);
-  const [docName, setDocName] = useState('');
-  const [docType, setDocType] = useState('credit_report');
+  const [docUpload, setDocUpload] = useState<SecureUploadState>({ file: null, type: 'credit_report' });
   const [wizardState, setWizardState] = useState<WizardState>({ ...defaultWizardState, fullName: `${user.firstName} ${user.lastName}`.trim(), email: user.email, phone: user.phone || '' });
+  const affiliateLinks = (progress?.education?.affiliateLinks?.length ? progress.education.affiliateLinks : DEFAULT_AFFILIATE_LINKS).filter((item) => ['monitoring', 'credit_builder'].includes(String(item.category || '').toLowerCase()));
 
   useEffect(() => {
     let cancelled = false;
@@ -343,11 +432,18 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
 
   async function submitDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!docUpload.file) {
+      setWizardError('Choose a file first.');
+      return;
+    }
     setWizardError(null);
     setBusyStep('upload');
     try {
-      await apiFetch('/api/progress/me/docs', token, { method: 'POST', body: JSON.stringify({ name: docName, fileName: docName, type: docType }) });
-      setDocName('');
+      const formData = new FormData();
+      formData.append('file', docUpload.file);
+      formData.append('type', docUpload.type);
+      await apiUpload('/api/progress/me/docs/upload', token, formData);
+      setDocUpload({ file: null, type: 'credit_report' });
       await refreshProgress();
     } catch (error) {
       setWizardError(error instanceof Error ? error.message : 'Unable to save document');
@@ -364,8 +460,8 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
         {loadingContract ? <div className="empty-state-card">Loading your agreement...</div> : null}
         {needsContract && contractText ? <form className="dispute-card-live" onSubmit={submitContract}><div className="dispute-card-top"><strong>Step 1, sign your agreement</strong></div><div className="dispute-meta" style={{ display: 'block' }}><p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.agreement}</p><p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.disclosure}</p><input className="chat-input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your full name" /><label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginTop: '1rem' }}><input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} /><span>I have read and agree to the contract and disclosures.</span></label><button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim()} style={{ marginTop: '1rem' }}>{busyStep === 'contract' ? 'Signing...' : 'Sign contract'}</button></div></form> : null}
         {needsApplication ? <form className="dispute-card-live" onSubmit={submitApplication}><div className="dispute-card-top"><strong>Step 2, complete intake</strong></div><div className="field-grid"><input className="chat-input" value={wizardState.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Full name" /><input className="chat-input" value={wizardState.email} onChange={(e) => setField('email', e.target.value)} placeholder="Email" /><input className="chat-input" value={wizardState.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="Phone" /><input className="chat-input" value={wizardState.address1} onChange={(e) => setField('address1', e.target.value)} placeholder="Address line 1" /><input className="chat-input" value={wizardState.address2} onChange={(e) => setField('address2', e.target.value)} placeholder="Address line 2" /><input className="chat-input" value={wizardState.city} onChange={(e) => setField('city', e.target.value)} placeholder="City" /><input className="chat-input" value={wizardState.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" /><input className="chat-input" value={wizardState.zip} onChange={(e) => setField('zip', e.target.value)} placeholder="ZIP" /><input className="chat-input" value={wizardState.dob} onChange={(e) => setField('dob', e.target.value)} placeholder="Date of birth (YYYY-MM-DD)" /><input className="chat-input" value={wizardState.ssn} onChange={(e) => setField('ssn', e.target.value)} placeholder="SSN" /><button className="ghost-button" type="submit" disabled={busyStep === 'application'}>{busyStep === 'application' ? 'Saving...' : 'Save intake'}</button></div></form> : null}
-        {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}><div className="dispute-card-top"><strong>Step 3, set your monitoring account</strong></div><div className="field-grid"><select className="chat-input" value={wizardState.provider} onChange={(e) => setField('provider', e.target.value)}><option value="">Select provider</option><option value="IdentityIQ">IdentityIQ</option><option value="MyFreeScoreNow">MyFreeScoreNow</option></select><input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" /><input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" /><button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}</button></div></form> : null}
-        {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Step 4, upload your credit report</strong></div><div className="field-grid"><input className="chat-input" value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="Document name, for example experian-report.pdf" /><select className="chat-input" value={docType} onChange={(e) => setDocType(e.target.value)}><option value="credit_report">Credit report</option><option value="identity">Driver's license or ID</option><option value="proof_of_address">Proof of address</option><option value="other">Other</option></select><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docName.trim()}>{busyStep === 'upload' ? 'Uploading...' : 'Save document'}</button></div></form> : null}
+        {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}><div className="dispute-card-top"><strong>Step 3, set your monitoring account</strong></div><div className="field-grid"><select className="chat-input" value={wizardState.provider} onChange={(e) => setField('provider', e.target.value)}><option value="">Select provider</option><option value="IdentityIQ">IdentityIQ</option><option value="MyFreeScoreNow">MyFreeScoreNow</option></select><input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" /><input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" /><button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}</button></div><div className="helper-link-grid">{affiliateLinks.map((item, index) => <a key={`${item.url}-${index}`} className="resource-link-card" href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>{String(item.category || '').replace(/_/g, ' ')}</span></a>)}</div><p className="helper-text">Choose IdentityIQ or MyFreeScoreNow, open your preferred provider link, then come back and submit the credentials you want on file. Password setup is emailed only after this step is completed.</p></form> : null}
+        {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Step 4, upload your credit report</strong></div><div className="field-grid"><input className="chat-input" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => setDocUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} /><select className="chat-input" value={docUpload.type} onChange={(e) => setDocUpload((current) => ({ ...current, type: e.target.value }))}><option value="credit_report">Credit report</option><option value="identity">Driver's license or ID</option><option value="proof_of_address">Proof of address</option><option value="other">Other</option></select><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docUpload.file}>{busyStep === 'upload' ? 'Uploading...' : 'Upload securely'}</button></div><p className="helper-text">Upload credit reports as PDF or HTML files. JPG, PNG, and WEBP are also accepted for screenshots and supporting images.</p></form> : null}
         {completedAt ? <div className="empty-state-card">Onboarding complete. Your file is now in review.</div> : null}
       </div>
     </section>
@@ -439,7 +535,7 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
           <h2>Upload credit report</h2>
           <form className="dispute-card-live" onSubmit={submitDocument}>
             <div className="field-grid">
-              <input className="chat-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => setUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} />
+              <input className="chat-input" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => setUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} />
               <select className="chat-input" value={upload.type} onChange={(e) => setUpload((current) => ({ ...current, type: e.target.value }))}>
                 <option value="credit_report">Credit report</option>
                 <option value="other">Monitoring screenshot / other</option>
@@ -447,7 +543,7 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
               <button className="ghost-button" type="submit" disabled={saving || !upload.file}>{saving ? 'Saving...' : 'Upload securely'}</button>
             </div>
           </form>
-          <p className="helper-text">Files are submitted through the secured client portal flow and recorded as protected documents.</p>
+          <p className="helper-text">Upload credit reports as PDF or HTML files. JPG, PNG, and WEBP are also accepted for screenshots and supporting images.</p>
           {message ? <div className="helper-text" style={{ marginTop: '10px' }}>{message}</div> : null}
           {error ? <div className="error-banner" style={{ marginTop: '10px' }}>{error}</div> : null}
           <div className="dispute-list" style={{ marginTop: '12px' }}>
@@ -507,9 +603,67 @@ function DisputesSection({ client, progress }: { client: Client | null; progress
   );
 }
 
+function ResourcesSection({ progress }: { progress: Progress | null; }) {
+  const affiliateLinks = (progress?.education?.affiliateLinks?.length ? progress.education.affiliateLinks : DEFAULT_AFFILIATE_LINKS);
+  const monitoringLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'monitoring');
+  const creditBuilderLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'credit_builder');
+  const reportLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'reports');
+
+  return (
+    <div className="page-grid">
+      <section className="hero-card hero-card--compact">
+        <div>
+          <p className="eyebrow">Resources</p>
+          <h1>Affiliate tools & credit builders</h1>
+          <p>These are the partner tools currently attached to the CredX experience for onboarding, monitoring, and post-dispute rebuilding.</p>
+        </div>
+        <div className="hero-stats">
+          <div className="stat-card"><span>Monitoring Options</span><strong>{monitoringLinks.length}</strong></div>
+          <div className="stat-card"><span>Credit Builders</span><strong>{creditBuilderLinks.length}</strong></div>
+          <div className="stat-card"><span>Report Sources</span><strong>{reportLinks.length}</strong></div>
+          <div className="stat-card"><span>Masterclass</span><strong>{progress?.education?.masterclassEnrolled ? 'Active' : 'Available'}</strong></div>
+        </div>
+      </section>
+
+      <section className="panel two-col">
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Monitoring</p><h2>Credit monitoring signup links</h2></div></div>
+          <div className="dispute-list">
+            {monitoringLinks.map((item, index) => <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>Use this during onboarding when choosing your provider.</span><small>Open partner link</small></a>)}
+          </div>
+        </div>
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Credit Building</p><h2>Recommended builder accounts</h2></div></div>
+          <div className="dispute-list">
+            {creditBuilderLinks.map((item, index) => <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>Helpful for rebuilding after cleanup and utilization work.</span><small>Open partner link</small></a>)}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel two-col">
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Masterclass</p><h2>5-Day Masterclass offer</h2></div></div>
+          <div className="dispute-card-live">
+            <div className="dispute-card-top"><strong>DIY education + affiliate stack</strong><span className={progress?.education?.masterclassEnrolled ? 'status-badge status-active' : 'status-badge status-pending'}>{progress?.education?.masterclassEnrolled ? 'Enrolled' : 'Available'}</span></div>
+            <div className="cell-subtext">Position the masterclass as the self-serve path: five days of guided education, bonus content, and recommended partner tools inside the same CredX ecosystem.</div>
+            <div style={{ marginTop: '12px' }}><a className="ghost-button" href="/signup?offer=masterclass">Open masterclass offer</a></div>
+          </div>
+        </div>
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Reports</p><h2>Report access</h2></div></div>
+          <div className="dispute-list">
+            {reportLinks.map((item, index) => <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>Use this when you need a fresh bureau copy for review or upload.</span><small>Open report source</small></a>)}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function EducationSection({ token, progress, refreshAll }: { token: string; progress: Progress | null; refreshAll: () => Promise<void>; }) {
   const education = progress?.education || {};
   const completed = education.masterclassProgress || [];
+  const affiliateLinks = (education.affiliateLinks || []).length ? education.affiliateLinks! : [...DEFAULT_AFFILIATE_LINKS];
   const days = [
     { id: 'day1', title: 'Day 1 · Credit Fundamentals', desc: 'How scores work, what factors matter, and how to read your reports.' },
     { id: 'day2', title: 'Day 2 · Disputes & Removals', desc: 'Learn dispute workflow, 609 concepts, and lawful strategy basics.' },
@@ -560,7 +714,7 @@ function EducationSection({ token, progress, refreshAll }: { token: string; prog
         <div>
           <div className="panel-header"><div><p className="eyebrow">Affiliate Resources</p><h2>Recommended tools</h2></div></div>
           <div className="dispute-list">
-            {(education.affiliateLinks || []).length ? education.affiliateLinks!.map((item, index) => (
+            {affiliateLinks.length ? affiliateLinks.map((item, index) => (
               <div key={`${item.url}-${index}`} className="plan-card">
                 <strong>{item.label}</strong>
                 <span>{prettyStatus(item.category || 'resource')}</span>
@@ -752,15 +906,15 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
   async function refreshAll() {
     if (!token) return;
-    const [userResponse, clientResponse, progressResponse] = await Promise.all([
-      apiFetch<User>('/api/users/me', token),
-      apiFetch<{ client: Client | null }>('/api/clients/me', token),
+    const [sessionResponse, progressResponse] = await Promise.all([
+      apiFetch<SessionResponse>('/api/auth/me', token),
       apiFetch<Progress>('/api/progress/me', token)
     ]);
+    const { client: clientResponse, progress: authProgress, ...userResponse } = sessionResponse;
     setUser(userResponse);
     localStorage.setItem(USER_KEY, JSON.stringify(userResponse));
-    setClient(clientResponse.client);
-    setProgress(progressResponse);
+    setClient(clientResponse);
+    setProgress(progressResponse ?? authProgress ?? null);
   }
 
   useEffect(() => {
@@ -785,16 +939,16 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     setError(null);
 
     Promise.all([
-      apiFetch<User>('/api/users/me', token),
-      apiFetch<{ client: Client | null }>('/api/clients/me', token),
+      apiFetch<SessionResponse>('/api/auth/me', token),
       apiFetch<Progress>('/api/progress/me', token)
     ])
-      .then(([userResponse, clientResponse, progressResponse]) => {
+      .then(([sessionResponse, progressResponse]) => {
         if (cancelled) return;
+        const { client: clientResponse, progress: authProgress, ...userResponse } = sessionResponse;
         setUser(userResponse);
         localStorage.setItem(USER_KEY, JSON.stringify(userResponse));
-        setClient(clientResponse.client);
-        setProgress(progressResponse);
+        setClient(clientResponse);
+        setProgress(progressResponse ?? authProgress ?? null);
       })
       .catch((fetchError) => {
         if (cancelled) return;
@@ -890,11 +1044,12 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
   const navItems: Array<{ key: PortalTab; label: string }> = [
     { key: 'overview', label: 'Overview' },
+    { key: 'profile', label: 'Profile' },
     { key: 'monitoring', label: 'Credit Monitoring' },
     { key: 'education', label: '5-Day Masterclass' },
     { key: 'disputes', label: 'Disputes' },
     { key: 'activity', label: 'Activity' },
-    { key: 'profile', label: 'Profile' },
+    { key: 'resources', label: 'Credit Builders' },
     { key: 'tasks', label: 'Tasks' }
   ];
 
@@ -937,31 +1092,25 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           {!progress?.onboarding?.completedAt && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
 
           {activeTab === 'overview' ? (
-            <section className="panel two-col">
-              <div>
-                <h2>Workflow snapshot</h2>
+            <>
+              <CreditScoreCards scores={progress?.scores} />
+              <section className="panel">
+                <div className="panel-header"><div><p className="eyebrow">Workflow</p><h2>Workflow snapshot</h2></div></div>
                 <ul className="activity-list">
                   <li><strong>Credit monitoring</strong><span>{progress?.workflow?.next?.length ? progress.workflow.next.map(prettyStatus).join(', ') : 'No next step posted yet.'}</span></li>
                   <li><strong>Analysis report</strong><span>{client?.analysisSummary || 'Pending report review.'}</span></li>
                   <li><strong>Dispute strategy</strong><span>{client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Pending publication.'}</span></li>
                 </ul>
-              </div>
-              <div>
-                <h2>Score snapshot</h2>
-                <div className="quick-actions quick-actions--plans">
-                  <div className="plan-card"><strong>Equifax</strong><span>{progress?.scores?.equifax ?? 'Pending'}</span></div>
-                  <div className="plan-card"><strong>Experian</strong><span>{progress?.scores?.experian ?? 'Pending'}</span></div>
-                  <div className="plan-card"><strong>TransUnion</strong><span>{progress?.scores?.transunion ?? 'Pending'}</span></div>
-                </div>
-              </div>
-            </section>
+              </section>
+            </>
           ) : null}
 
+          {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
           {activeTab === 'monitoring' ? <CreditMonitoringSection token={token} client={client} progress={progress} refreshAll={refreshAll} /> : null}
           {activeTab === 'education' ? <EducationSection token={token} progress={progress} refreshAll={refreshAll} /> : null}
           {activeTab === 'disputes' ? <DisputesSection client={client} progress={progress} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
-          {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
+          {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
 
           {activeTab === 'tasks' ? (
             <section className="panel">
