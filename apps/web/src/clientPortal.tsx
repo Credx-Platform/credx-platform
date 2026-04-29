@@ -84,7 +84,7 @@ type WizardState = {
   monitorPassword: string;
 };
 
-type PortalTab = 'overview' | 'profile' | 'monitoring' | 'education' | 'disputes' | 'activity' | 'resources' | 'tasks';
+type PortalTab = 'overview' | 'profile' | 'monitoring' | 'disputes' | 'activity' | 'resources' | 'tasks';
 
 type SecureUploadState = {
   file: File | null;
@@ -101,7 +101,13 @@ const BRAND_LOGO = '/images/credx-logo-1.jpg';
 const DEFAULT_AFFILIATE_LINKS = [
   { label: 'IdentityIQ Credit Monitoring', url: 'https://www.identityiq.com/', category: 'monitoring' },
   { label: 'MyFreeScoreNow Credit Monitoring', url: 'https://www.myfreescorenow.com/', category: 'monitoring' },
-  { label: 'Self Credit Builder', url: 'https://www.self.inc/', category: 'credit_builder' },
+  { label: 'Self — Credit Builder Account', url: 'https://self.inc/refer/16452347', category: 'credit_builder' },
+  { label: 'Credit Strong', url: 'https://tracking.creditstrong.com/aff_c?aff_id=1491&offer_id=2&source=MGFinstagram', category: 'credit_builder' },
+  { label: 'Rent Reporters', url: 'https://prf.hn/click/camref:1101l52pUS', category: 'credit_builder' },
+  { label: 'Credit Builder Card', url: 'https://www.creditbuildercard.com/mgf.html', category: 'credit_builder' },
+  { label: 'Grow Credit', url: 'https://growcredit.com/?kid=12BYTD', category: 'credit_builder' },
+  { label: 'Kovo', url: 'https://kovocredit.com/r/O6LDVXN7', category: 'credit_builder' },
+  { label: 'Ava', url: 'https://meetava.app.link/tdMaQUdV7Rb', category: 'credit_builder' },
   { label: 'Kikoff Credit Builder', url: 'https://kikoff.com/', category: 'credit_builder' },
   { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }
 ] as const;
@@ -660,74 +666,6 @@ function ResourcesSection({ progress }: { progress: Progress | null; }) {
   );
 }
 
-function EducationSection({ token, progress, refreshAll }: { token: string; progress: Progress | null; refreshAll: () => Promise<void>; }) {
-  const education = progress?.education || {};
-  const completed = education.masterclassProgress || [];
-  const affiliateLinks = (education.affiliateLinks || []).length ? education.affiliateLinks! : [...DEFAULT_AFFILIATE_LINKS];
-  const days = [
-    { id: 'day1', title: 'Day 1 · Credit Fundamentals', desc: 'How scores work, what factors matter, and how to read your reports.' },
-    { id: 'day2', title: 'Day 2 · Disputes & Removals', desc: 'Learn dispute workflow, 609 concepts, and lawful strategy basics.' },
-    { id: 'day3', title: 'Day 3 · Advanced Strategies', desc: 'Goodwill, sequencing, and leverage points that matter most.' },
-    { id: 'day4', title: 'Day 4 · Credit Building', desc: 'Secured cards, utilization, and sustainable rebuild tactics.' },
-    { id: 'day5', title: 'Day 5 · Business Credit', desc: 'Business setup, vendor accounts, and funding-readiness basics.' },
-    { id: 'bonus', title: 'Bonus Day · Generational Wealth', desc: 'Long-term asset and legacy thinking beyond score recovery.' }
-  ];
-
-  async function markComplete(dayId: string) {
-    const next = Array.from(new Set([...(education.masterclassProgress || []), dayId]));
-    await apiFetch('/api/progress/me', token, { method: 'PATCH', body: JSON.stringify({ education: { ...education, masterclassProgress: next } }) });
-    await refreshAll();
-  }
-
-  return (
-    <div className="page-grid">
-      <section className="hero-card">
-        <div>
-          <p className="eyebrow">Education</p>
-          <h1>5-Day Masterclass</h1>
-          <p>Your DIY roadmap to credit improvement, business credit, and financial freedom — now built directly into the CredX platform.</p>
-        </div>
-        <div className="hero-stats">
-          <div className="stat-card"><span>Enrollment</span><strong>{education.masterclassEnrolled ? 'Active' : 'Off'}</strong></div>
-          <div className="stat-card"><span>Completed</span><strong>{completed.length}/{days.length}</strong></div>
-          <div className="stat-card"><span>Access Window</span><strong>{education.offerEligibleUntil ? formatDate(education.offerEligibleUntil) : 'Standard'}</strong></div>
-          <div className="stat-card"><span>Support</span><strong>AI + Coach</strong></div>
-        </div>
-      </section>
-
-      <section className="panel two-col">
-        <div>
-          <div className="panel-header"><div><p className="eyebrow">Curriculum</p><h2>Day-by-day lessons</h2></div></div>
-          <div className="dispute-list">
-            {days.map((day) => {
-              const done = completed.includes(day.id);
-              return (
-                <div key={day.id} className="dispute-card-live">
-                  <div className="dispute-card-top"><strong>{day.title}</strong><span className={done ? 'status-badge status-active' : 'status-badge status-pending'}>{done ? 'Completed' : 'Open'}</span></div>
-                  <div className="cell-subtext">{day.desc}</div>
-                  <div style={{ marginTop: '12px' }}><button className="ghost-button" onClick={() => markComplete(day.id)} disabled={done}>{done ? 'Completed' : 'Mark complete'}</button></div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        <div>
-          <div className="panel-header"><div><p className="eyebrow">Affiliate Resources</p><h2>Recommended tools</h2></div></div>
-          <div className="dispute-list">
-            {affiliateLinks.length ? affiliateLinks.map((item, index) => (
-              <div key={`${item.url}-${index}`} className="plan-card">
-                <strong>{item.label}</strong>
-                <span>{prettyStatus(item.category || 'resource')}</span>
-                <small><a href={item.url} target="_blank" rel="noreferrer">Open resource</a></small>
-              </div>
-            )) : <div className="empty-state-card">Affiliate links will appear here once assigned.</div>}
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
 function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { token: string; user: User | null; client: Client | null; refreshAll: () => Promise<void>; onUserUpdated: (next: User) => void; }) {
   const [profile, setProfile] = useState({
     firstName: user?.firstName || '',
@@ -1046,7 +984,6 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     { key: 'overview', label: 'Overview' },
     { key: 'profile', label: 'Profile' },
     { key: 'monitoring', label: 'Credit Monitoring' },
-    { key: 'education', label: '5-Day Masterclass' },
     { key: 'disputes', label: 'Disputes' },
     { key: 'activity', label: 'Activity' },
     { key: 'resources', label: 'Credit Builders' },
@@ -1105,7 +1042,6 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
           {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
           {activeTab === 'monitoring' ? <CreditMonitoringSection token={token} client={client} progress={progress} refreshAll={refreshAll} /> : null}
-          {activeTab === 'education' ? <EducationSection token={token} progress={progress} refreshAll={refreshAll} /> : null}
           {activeTab === 'disputes' ? <DisputesSection client={client} progress={progress} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
