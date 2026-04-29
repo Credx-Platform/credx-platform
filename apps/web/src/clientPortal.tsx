@@ -1089,8 +1089,6 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             </div>
           </section>
 
-          {!progress?.onboarding?.completedAt && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
-
           {activeTab === 'overview' ? (
             <>
               <CreditScoreCards scores={progress?.scores} />
