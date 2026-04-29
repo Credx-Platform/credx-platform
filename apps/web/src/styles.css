@@ -499,14 +499,59 @@ button:hover,
 .client-auth-shell { padding-inline: 16px; }
 .client-shell .main { width: 100%; }
 
-.score-panel {
-  background: linear-gradient(180deg, rgba(11,18,32,.94), rgba(8,14,24,.94));
+.hero-card--dispute {
+  grid-template-columns: 1fr;
+  min-height: 420px;
+  background:
+    linear-gradient(110deg, rgba(6,10,18,.92) 0%, rgba(11,18,32,.78) 45%, rgba(11,18,32,.18) 70%, rgba(11,18,32,0) 100%),
+    url('/images/credx-hero-bg.jpg') center/cover no-repeat;
 }
-.score-grid {
+.hero-dispute-content {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 14px;
+  max-width: 70%;
 }
+.hero-dispute-title {
+  font-size: clamp(1.6rem, 2.6vw, 2.2rem);
+  margin: 0;
+  color: var(--white);
+}
+.hero-scores {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 170px));
+  gap: 14px;
+  margin-top: 12px;
+}
+.hero-scores .score-gauge {
+  background: linear-gradient(180deg, rgba(11,18,32,.62), rgba(6,10,18,.55));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 16px 12px;
+  gap: 10px;
+}
+.hero-scores .score-gauge-ring {
+  width: 140px;
+  height: 140px;
+}
+.hero-scores .score-gauge-value {
+  font-size: 36px;
+}
+.hero-scores .score-gauge-bureau {
+  font-size: 13px;
+}
+.hero-scores .score-gauge-foot {
+  font-size: 10px;
+}
+
+@media (max-width: 980px) {
+  .hero-card--dispute { background-position: top right; }
+  .hero-dispute-content { max-width: 100%; }
+  .hero-scores { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 640px) {
+  .hero-scores { grid-template-columns: 1fr; max-width: 280px; }
+}
+
 .score-gauge {
   background: linear-gradient(180deg, rgba(16,26,43,.96), rgba(11,18,32,.96));
   border: 1px solid var(--border);
@@ -582,10 +627,6 @@ button:hover,
   color: var(--muted);
   letter-spacing: .08em;
   text-transform: uppercase;
-}
-
-@media (max-width: 720px) {
-  .score-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 980px) {

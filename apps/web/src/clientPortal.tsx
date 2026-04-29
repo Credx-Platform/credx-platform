@@ -256,35 +256,6 @@ function CreditScoreGauge({ bureau, score }: { bureau: string; score: number | n
   );
 }
 
-function CreditScoreCards({ scores }: { scores?: Progress['scores'] }) {
-  const bureaus: Array<{ key: 'experian' | 'equifax' | 'transunion'; label: string }> = [
-    { key: 'experian', label: 'Experian' },
-    { key: 'equifax', label: 'Equifax' },
-    { key: 'transunion', label: 'TransUnion' }
-  ];
-  const values = scores || {};
-  return (
-    <section className="panel score-panel">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Your Credit Scores</p>
-          <h2>Three-bureau VantageScore</h2>
-        </div>
-      </div>
-      <div className="score-grid">
-        {bureaus.map((b) => {
-          const raw = values[b.key];
-          const score = typeof raw === 'number' ? raw : null;
-          return <CreditScoreGauge key={b.key} bureau={b.label} score={score} />;
-        })}
-      </div>
-      <p className="helper-text" style={{ marginTop: 14 }}>
-        Scores update after each credit monitoring sync. Range from 300 (Poor) to 850 (Excellent).
-      </p>
-    </section>
-  );
-}
-
 function ClientLogin({
   email,
   password,
@@ -959,6 +930,13 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const tasks = progress?.tasks || client?.tasks || [];
   const disputes = normalizeDisputes(client, progress);
   const pendingTasks = tasks.filter((task) => !task.completed).length;
+  const activeDisputes = disputes.filter((d) => !['COMPLETED', 'REJECTED'].includes(String(d.status).toUpperCase()));
+  const disputeHeadline = activeDisputes.length > 0
+    ? `${activeDisputes.length} active dispute${activeDisputes.length === 1 ? '' : 's'}`
+    : disputes.length > 0
+      ? 'All disputes resolved'
+      : 'Awaiting dispute strategy';
+  const disputeSummary = client?.disputePlanSummary || progress?.disputeStrategy?.objective || client?.analysisSummary || 'Your dispute plan and bureau-by-bureau progress will appear here once your CredX team finalizes strategy.';
 
   if (!token) {
     if (onboardingOnly) {
@@ -1012,32 +990,29 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         {client?.portalRestricted ? <div className="error-banner">Your portal access is currently restricted. Contact CredX support for help.</div> : null}
 
         <div className="page-grid">
-          <section className="hero-card">
-            <div>
-              <p className="eyebrow">Current Status</p>
-              <h1 style={{ fontSize: '2rem' }}>{workflowStage}</h1>
-              <p>{client?.analysisSummary || 'Your account is active in the CredX workflow. Open any dashboard section below to review progress, uploads, disputes, and updates.'}</p>
-            </div>
-            <div className="hero-stats">
-              <div className="stat-card"><span>Portal Status</span><strong>{prettyStatus(client?.status)}</strong></div>
-              <div className="stat-card"><span>Timeline</span><strong>{client?.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} mo` : 'Pending'}</strong></div>
-              <div className="stat-card"><span>Open Tasks</span><strong>{pendingTasks}</strong></div>
-              <div className="stat-card"><span>Disputes</span><strong>{disputes.length}</strong></div>
+          <section className="hero-card hero-card--dispute">
+            <div className="hero-dispute-content">
+              <p className="eyebrow">Dispute Status</p>
+              <h1 className="hero-dispute-title">{disputeHeadline}</h1>
+              <p>{disputeSummary}</p>
+              <div className="hero-scores">
+                <CreditScoreGauge bureau="Experian" score={typeof progress?.scores?.experian === 'number' ? progress.scores.experian : null} />
+                <CreditScoreGauge bureau="Equifax" score={typeof progress?.scores?.equifax === 'number' ? progress.scores.equifax : null} />
+                <CreditScoreGauge bureau="TransUnion" score={typeof progress?.scores?.transunion === 'number' ? progress.scores.transunion : null} />
+              </div>
             </div>
           </section>
 
           {activeTab === 'overview' ? (
-            <>
-              <CreditScoreCards scores={progress?.scores} />
-              <section className="panel">
-                <div className="panel-header"><div><p className="eyebrow">Workflow</p><h2>Workflow snapshot</h2></div></div>
-                <ul className="activity-list">
-                  <li><strong>Credit monitoring</strong><span>{progress?.workflow?.next?.length ? progress.workflow.next.map(prettyStatus).join(', ') : 'No next step posted yet.'}</span></li>
-                  <li><strong>Analysis report</strong><span>{client?.analysisSummary || 'Pending report review.'}</span></li>
-                  <li><strong>Dispute strategy</strong><span>{client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Pending publication.'}</span></li>
-                </ul>
-              </section>
-            </>
+            <section className="panel">
+              <div className="panel-header"><div><p className="eyebrow">Workflow</p><h2>Workflow snapshot</h2></div></div>
+              <ul className="activity-list">
+                <li><strong>Credit monitoring</strong><span>{progress?.workflow?.next?.length ? progress.workflow.next.map(prettyStatus).join(', ') : 'No next step posted yet.'}</span></li>
+                <li><strong>Analysis report</strong><span>{client?.analysisSummary || 'Pending report review.'}</span></li>
+                <li><strong>Dispute strategy</strong><span>{client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Pending publication.'}</span></li>
+                <li><strong>Open tasks</strong><span>{pendingTasks} pending · {disputes.length} dispute{disputes.length === 1 ? '' : 's'} on file</span></li>
+              </ul>
+            </section>
           ) : null}
 
           {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
