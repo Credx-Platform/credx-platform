@@ -856,12 +856,17 @@ export default function App() {
         <select
           className="mobile-nav-select"
           value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/clients') ? '/clients' : '/'}
-          onChange={(e) => navigate(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === '__signup') { window.location.href = '/signup'; return; }
+            navigate(value);
+          }}
           aria-label="Admin section"
         >
           <option value="/">Overview</option>
           <option value="/clients">Clients</option>
           <option value="/disputes">Disputes</option>
+          <option value="__signup">Sign up</option>
         </select>
 
         {error ? <div className="error-banner">{error}</div> : null}

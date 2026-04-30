@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 
 type User = {
   id: string;
@@ -981,6 +981,9 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PortalTab>('overview');
   const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [welcomeLeaving, setWelcomeLeaving] = useState(false);
+  const welcomeShownRef = useRef(false);
 
   async function refreshAll() {
     if (!token) return;
@@ -1093,6 +1096,27 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     setProgress(null);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    welcomeShownRef.current = false;
+    setShowWelcome(false);
+    setWelcomeLeaving(false);
+  };
+
+  useEffect(() => {
+    if (!token || !user || welcomeShownRef.current) return;
+    welcomeShownRef.current = true;
+    setShowWelcome(true);
+    setWelcomeLeaving(false);
+    const leaveTimer = setTimeout(() => setWelcomeLeaving(true), 5000);
+    const removeTimer = setTimeout(() => setShowWelcome(false), 5400);
+    return () => {
+      clearTimeout(leaveTimer);
+      clearTimeout(removeTimer);
+    };
+  }, [token, user]);
+
+  const dismissWelcome = () => {
+    setWelcomeLeaving(true);
+    setTimeout(() => setShowWelcome(false), 350);
   };
 
   const workflowStage = useMemo(() => prettyStatus(progress?.workflow?.stage || client?.status), [progress?.workflow?.stage, client?.status]);
@@ -1147,24 +1171,40 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         </nav>
       </aside>
       <main className="main">
+        {showWelcome && user ? (
+          <div className={`welcome-toast${welcomeLeaving ? ' welcome-toast--leaving' : ''}`} role="status">
+            <div className="welcome-toast-content">
+              <p className="eyebrow">CredX Portal</p>
+              <strong>Welcome back, {user.firstName}</strong>
+              <span className="welcome-toast-tier">{client?.serviceTier || 'ESSENTIAL'} plan</span>
+            </div>
+            <button className="welcome-toast-close" onClick={dismissWelcome} aria-label="Dismiss welcome">×</button>
+          </div>
+        ) : null}
+
         <header className="topbar">
           <div>
             <div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">Client Portal</p></div>
-            <h1 className="top-title">Welcome back{user ? `, ${user.firstName}` : ''}</h1>
-            {dataLoading ? <p className="helper-text">Refreshing your latest CredX progress...</p> : <p className="helper-text">Use the menu to move through your dashboard. Every section is now wired to live portal data.</p>}
+            <h1 className="top-title">{navItems.find((item) => item.key === activeTab)?.label || 'Dashboard'}</h1>
+            {dataLoading ? <p className="helper-text">Refreshing your latest CredX progress...</p> : null}
           </div>
-          <div className="topbar-actions"><div className="admin-pill">{client?.serviceTier || 'ESSENTIAL'} plan</div><button className="ghost-button" onClick={handleLogout}>Sign out</button></div>
+          <div className="topbar-actions"><button className="ghost-button" onClick={handleLogout}>Sign out</button></div>
         </header>
 
         <select
           className="mobile-nav-select"
           value={activeTab}
-          onChange={(e) => setActiveTab(e.target.value as PortalTab)}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === '__signup') { window.location.href = '/signup'; return; }
+            setActiveTab(value as PortalTab);
+          }}
           aria-label="Portal section"
         >
           {navItems.map((item) => (
             <option key={item.key} value={item.key}>{item.label}</option>
           ))}
+          <option value="__signup">Sign up</option>
         </select>
 
         {error ? <div className="error-banner">{error}</div> : null}
