@@ -1,11 +1,24 @@
 {
-  "version": 2,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": false,
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/signup(?:/(.*))?", "dest": "/signup.html" },
-    { "src": "/start(?:/(.*))?", "dest": "/start.html" },
-    { "src": "/portal(?:/(.*))?", "dest": "/portal.html" },
-    { "src": "/adminportal(?:/(.*))?", "dest": "/adminportal.html" }
+  "redirects": [
+    { "source": "/signup/", "destination": "/signup", "permanent": true },
+    { "source": "/contract/", "destination": "/contract", "permanent": true },
+    { "source": "/start/", "destination": "/start", "permanent": true },
+    { "source": "/portal/", "destination": "/portal", "permanent": true },
+    { "source": "/portal/set-password/", "destination": "/portal/set-password", "permanent": true },
+    { "source": "/adminportal/", "destination": "/adminportal", "permanent": true }
+  ],
+  "rewrites": [
+    { "source": "/signup", "destination": "/signup.html" },
+    { "source": "/signup/:path*", "destination": "/signup.html" },
+    { "source": "/contract", "destination": "/signup.html" },
+    { "source": "/contract/:path*", "destination": "/signup.html" },
+    { "source": "/start", "destination": "/start.html" },
+    { "source": "/start/:path*", "destination": "/start.html" },
+    { "source": "/portal", "destination": "/portal.html" },
+    { "source": "/portal/:path*", "destination": "/portal.html" },
+    { "source": "/adminportal", "destination": "/adminportal.html" },
+    { "source": "/adminportal/:path*", "destination": "/adminportal.html" }
   ]
 }

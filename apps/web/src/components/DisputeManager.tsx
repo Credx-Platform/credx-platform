@@ -327,6 +327,7 @@ export function DisputeManager({ token }: DisputeManagerProps) {
                 selectedItemIds={selectedItemIds}
                 onBackToItems={() => setActiveTab('add')}
                 onOpenTracking={() => setActiveTab('tracking')}
+                clientName={selectedClient ? `${selectedClient.user.firstName} ${selectedClient.user.lastName}` : undefined}
               />
             )}
             

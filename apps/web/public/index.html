@@ -19,6 +19,7 @@ html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
 body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--white);line-height:1.65;overflow-x:hidden}
 h1,h2,h3,h4,.hd{font-family:'Outfit',sans-serif}
 a{text-decoration:none;color:inherit}
+.motion-lift{transition:transform .35s ease,box-shadow .35s ease,border-color .35s ease,background-color .35s ease,color .35s ease}
 .nav{position:fixed;top:0;left:0;right:0;z-index:100;height:60px;padding:0 clamp(16px,4vw,48px);display:flex;align-items:center;justify-content:space-between;background:rgba(6,10,18,.85);backdrop-filter:blur(24px);border-bottom:1px solid var(--border)}
 .nav-logo{height:32px;border-radius:4px}
 .nav-links{display:flex;gap:24px;list-style:none}
@@ -54,13 +55,15 @@ h1 .accent{color:var(--cyan);position:relative}
 .about-name{font-family:'Outfit';font-size:18px;font-weight:700;margin-top:20px}
 .about-role{font-size:13px;color:var(--cyan)}
 section{padding:100px clamp(16px,4vw,48px)}
+.container,.about-inner,.hero-inner,.footer-inner{position:relative;z-index:1}
 .container{max-width:1000px;margin:0 auto}
 .stag{font-size:11px;font-weight:600;color:var(--cyan);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px}
 .stitle{font-size:clamp(28px,3.5vw,44px);font-weight:800;letter-spacing:-.8px;line-height:1.12;margin-bottom:14px}
 .ssub{font-size:16px;color:var(--muted);max-width:520px;line-height:1.7}
 .how{background:var(--bg)}
 .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:2px;margin-top:52px;background:var(--border);border-radius:16px;overflow:hidden}
-.step{background:var(--bg3);padding:36px 28px}
+.step{background:var(--bg3);padding:36px 28px;transition:transform .35s ease,box-shadow .35s ease,background-color .35s ease}
+.step:hover{transform:translateY(-6px);box-shadow:0 22px 44px rgba(0,0,0,.18);background:#121d30}
 .step-num{font-family:'Outfit';font-size:44px;font-weight:900;color:rgba(0,198,251,.1);line-height:1;margin-bottom:16px}
 .step-title{font-family:'Outfit';font-size:16px;font-weight:700;margin-bottom:8px}
 .step-desc{font-size:13px;color:var(--muted);line-height:1.7}
@@ -88,7 +91,8 @@ section{padding:100px clamp(16px,4vw,48px)}
 .plan-guarantee{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:11px;color:var(--muted)}
 .offer-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:rgba(0,198,251,.08);border:1px solid var(--border-c);font-size:11px;color:var(--cyan);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:16px}
 .cur-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:36px}
-.cur-card{background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:22px;position:relative;overflow:hidden}
+.cur-card{background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:22px;position:relative;overflow:hidden;transition:transform .35s ease,box-shadow .35s ease,border-color .35s ease}
+.cur-card:hover{transform:translateY(-6px);box-shadow:0 24px 48px rgba(0,0,0,.18);border-color:var(--border-c)}
 .cur-n{position:absolute;top:12px;right:14px;font-family:'Outfit';font-size:40px;font-weight:900;color:rgba(255,255,255,.04)}
 .cur-badge{display:inline-flex;padding:5px 10px;border-radius:999px;background:rgba(0,198,251,.12);color:var(--cyan);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px}
 .cur-title{font-family:'Outfit';font-size:20px;font-weight:800;margin:12px 0 8px}
@@ -97,7 +101,8 @@ section{padding:100px clamp(16px,4vw,48px)}
 .masterclass-note{margin-top:14px;font-size:12px;color:var(--muted)}
 .form-section{background:var(--bg);position:relative;overflow:hidden}
 .form-section::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(0,198,251,.05) 0%,transparent 70%);pointer-events:none}
-.form-wrap{max-width:640px;margin:48px auto 0;background:var(--bg3);border:1px solid var(--border-c);border-radius:20px;padding:40px 40px 28px;position:relative;z-index:2;overflow:visible}
+.form-wrap{max-width:640px;margin:48px auto 0;background:var(--bg3);border:1px solid var(--border-c);border-radius:20px;padding:40px 40px 28px;position:relative;z-index:2;overflow:visible;transition:transform .4s ease,box-shadow .4s ease}
+.form-wrap:hover{transform:translateY(-4px);box-shadow:0 28px 60px rgba(0,0,0,.2)}
 .form-head{text-align:center;margin-bottom:32px}
 .form-head h2{font-size:26px;font-weight:800;margin-bottom:6px}
 .form-head p{font-size:14px;color:var(--muted)}
@@ -142,8 +147,8 @@ textarea{resize:vertical;min-height:72px}
 .success-link{display:inline-block;margin-top:20px;padding:12px 28px;background:var(--cyan);color:var(--bg);font-family:'Outfit';font-weight:700;font-size:14px;border-radius:8px}
 .test-section{background:var(--bg2)}
 .test-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:48px}
-.test-card{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;transition:border-color .3s}
-.test-card:hover{border-color:var(--border-c)}
+.test-card{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;transition:transform .35s ease,border-color .35s ease,box-shadow .35s ease}
+.test-card:hover{transform:translateY(-6px);border-color:var(--border-c);box-shadow:0 24px 46px rgba(0,0,0,.18)}
 .test-stars{color:var(--gold);font-size:13px;letter-spacing:2px;margin-bottom:12px}
 .test-quote{font-size:14px;line-height:1.7;color:var(--white);margin-bottom:16px;font-style:italic}
 .test-author{display:flex;align-items:center;gap:10px}
@@ -153,7 +158,8 @@ textarea{resize:vertical;min-height:72px}
 .test-lift{display:inline-block;margin-top:4px;padding:2px 8px;background:var(--cyan-dim);border-radius:4px;font-size:10px;color:var(--cyan);font-weight:700}
 .faq-section{background:var(--bg)}
 .faq-list{max-width:680px;margin:48px auto 0;display:flex;flex-direction:column;gap:10px}
-.faq-item{background:var(--bg3);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.faq-item{background:var(--bg3);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:transform .35s ease,border-color .35s ease,box-shadow .35s ease}
+.faq-item:hover{transform:translateY(-3px);border-color:var(--border-c);box-shadow:0 16px 32px rgba(0,0,0,.14)}
 .faq-q{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;cursor:pointer;font-family:'Outfit';font-size:14px;font-weight:700;transition:color .2s}
 .faq-q:hover{color:var(--cyan)}
 .faq-q::after{content:'+';font-size:18px;color:var(--cyan);transition:transform .3s}
@@ -175,7 +181,8 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 .chat-section{background:var(--bg2);position:relative;overflow:hidden}
 .chat-section::before{content:'';position:absolute;bottom:-200px;right:0;width:500px;height:500px;background:radial-gradient(circle,rgba(0,198,251,.04) 0%,transparent 70%);pointer-events:none}
 .chat-container{max-width:800px;margin:48px auto 0}
-.chat-window{background:var(--bg3);border:1px solid var(--border-c);border-radius:16px;overflow:hidden;position:relative;z-index:2}
+.chat-window{background:var(--bg3);border:1px solid var(--border-c);border-radius:16px;overflow:hidden;position:relative;z-index:2;transition:transform .4s ease,box-shadow .4s ease}
+.chat-window:hover{transform:translateY(-4px);box-shadow:0 28px 60px rgba(0,0,0,.22)}
 .chat-header{display:flex;align-items:center;gap:12px;padding:16px 20px;background:var(--bg);border-bottom:1px solid var(--border)}
 .chat-agent-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),#0055cc);display:flex;align-items:center;justify-content:center;font-family:'Outfit';font-weight:800;font-size:14px;color:var(--white);flex-shrink:0;position:relative}
 .chat-agent-av::after{content:'';position:absolute;bottom:1px;right:1px;width:10px;height:10px;background:var(--green);border-radius:50%;border:2px solid var(--bg)}
@@ -208,8 +215,19 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 .chat-quick-actions{display:flex;gap:6px;flex-wrap:wrap;padding:0 20px 14px;background:var(--bg)}
 .chat-quick{padding:6px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:100px;font-size:11px;color:var(--muted);cursor:pointer;transition:all .2s;font-family:'Plus Jakarta Sans'}
 .chat-quick:hover{border-color:var(--cyan);color:var(--cyan)}
-.reveal{opacity:0;transform:translateY(24px);transition:all .7s ease}
-.reveal.visible{opacity:1;transform:none}
+.reveal{opacity:0;transform:translate3d(0,28px,0) scale(.985);transition:opacity .72s cubic-bezier(.22,1,.36,1),transform .72s cubic-bezier(.22,1,.36,1),filter .72s ease;transition-delay:var(--reveal-delay,0ms);filter:blur(4px)}
+.reveal.visible{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}
+.reveal[data-reveal="left"]{transform:translate3d(-28px,22px,0) scale(.985)}
+.reveal[data-reveal="right"]{transform:translate3d(28px,22px,0) scale(.985)}
+.reveal.visible[data-reveal="left"],.reveal.visible[data-reveal="right"]{transform:translate3d(0,0,0) scale(1)}
+.section-fade{position:relative}
+.section-fade::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:120px;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.012),rgba(255,255,255,0));pointer-events:none;opacity:.8}
+@media (prefers-reduced-motion: reduce){
+ html{scroll-behavior:auto}
+ *,*::before,*::after{animation:none !important;transition:none !important}
+ .reveal,.reveal.visible,.reveal[data-reveal="left"],.reveal[data-reveal="right"]{opacity:1 !important;transform:none !important;filter:none !important}
+ .step:hover,.cur-card:hover,.test-card:hover,.faq-item:hover,.form-wrap:hover,.chat-window:hover,.btn-primary:hover,.plan:hover,.choice-card:hover{transform:none;box-shadow:none}
+}
 @media(max-width:768px){
  .nav-links{display:none}
  .hero-stats{flex-wrap:wrap;gap:24px}
@@ -236,7 +254,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
  </ul>
  <a href="/signup" class="nav-cta">Sign Up</a>
 </nav>
-<section class="hero">
+<section class="hero section-fade">
  <div class="hero-bg"></div>
  <div class="hero-overlay"></div>
  <div class="hero-inner">
@@ -255,11 +273,11 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   <div class="chat-quick-actions" style="justify-content:center;padding:18px 0 0;background:transparent">
    <a href="/signup?offer=program" class="chat-quick" style="text-decoration:none">Program Sign Up</a>
    <a href="/signup?offer=masterclass" class="chat-quick" style="text-decoration:none">Masterclass Sign Up</a>
-   <a href="/portal/" class="chat-quick" style="text-decoration:none">Portal Login</a>
+   <a href="/portal" class="chat-quick" style="text-decoration:none">Portal Login</a>
   </div>
  </div>
 </section>
-<section class="about" id="about">
+<section class="about section-fade" id="about">
  <div class="about-inner">
   <img class="about-photo" src="/images/cesar-profile.jpg" alt="J. Malloy leadership profile for CredX">
   <div>
@@ -273,7 +291,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   </div>
  </div>
 </section>
-<section class="how" id="how">
+<section class="how section-fade" id="how">
  <div class="container">
   <div class="stag">How it works</div>
   <h2 class="stitle">A straightforward process from intake to action</h2>
@@ -285,7 +303,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   </div>
  </div>
 </section>
-<section class="pricing" id="pricing">
+<section class="pricing section-fade" id="pricing">
  <div class="container">
   <div class="stag">Pricing</div>
   <h2 class="stitle">Choose the level of support that fits your goals</h2>
@@ -347,7 +365,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   </div>
  </div>
 </section>
-<section class="pricing" id="masterclass-curriculum">
+<section class="pricing section-fade" id="masterclass-curriculum">
  <div class="container">
   <div class="stag">The System</div>
   <h2 class="stitle">5-Day Masterclass + Bonus Day</h2>
@@ -363,7 +381,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   <p class="masterclass-note">New clients who come in through ads or referrals can unlock the masterclass free when they subscribe within 48 hours of first touch.</p>
  </div>
 </section>
-<section class="form-section" id="analysis">
+<section class="form-section section-fade" id="analysis">
  <div class="container">
   <div class="form-wrap">
    <div class="form-head">
@@ -431,12 +449,12 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
     <div class="success-icon">✅</div>
     <div class="success-title">Application Received</div>
     <div class="success-msg">Thanks, your intake was submitted successfully. A CredX specialist can follow up after review.</div>
-    <a class="success-link" href="/portal/">Go to Client Portal</a>
+    <a class="success-link" href="/portal">Go to Client Portal</a>
    </div>
   </div>
  </div>
 </section>
-<section class="test-section" id="testimonials">
+<section class="test-section section-fade" id="testimonials">
  <div class="container">
   <div class="stag">Results</div>
   <h2 class="stitle">Clients come for clarity, structure, and momentum</h2>
@@ -448,7 +466,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   </div>
  </div>
 </section>
-<section class="chat-section" id="chat">
+<section class="chat-section section-fade" id="chat">
  <div class="container chat-container">
   <div class="stag">Chat</div>
   <h2 class="stitle">Talk with CredX before you get started</h2>
@@ -479,7 +497,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   </div>
  </div>
 </section>
-<section class="faq-section" id="faq">
+<section class="faq-section section-fade" id="faq">
  <div class="container">
   <div class="stag">FAQ</div>
   <h2 class="stitle">Common questions</h2>
@@ -496,7 +514,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
    <img class="f-logo" src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5OjcBCgoKDQ0NDg0NDisZFRkrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrK//AABEIAEAAQAMBIgACEQEDEQH/xAAbAAABBQEBAAAAAAAAAAAAAAADAAECBAYFB//EADUQAAIBAgQDBgQEBQUAAAAAAAECAwQRAAUSITFBBhMiUWFxgZEUMqGxQlKx0fAjM1NicoL/xAAZAQADAQEBAAAAAAAAAAAAAAABAgMABAX/xAAkEQEBAAICAgICAgMAAAAAAAAAAQIRAyESMUEEEyJRYXGBoP/aAAwDAQACEQMRAD8A9zREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREB//Z" alt="CredX">
    <div class="footer-tagline">CredX is built to help organize practical credit strategy and stronger next steps.</div>
   </div>
-  <div class="footer-col"><h5>Platform</h5><a href="#about">About</a><a href="#how">How it Works</a><a href="#pricing">Pricing</a><a href="/portal/">Client Portal</a></div>
+  <div class="footer-col"><h5>Platform</h5><a href="#about">About</a><a href="#how">How it Works</a><a href="#pricing">Pricing</a><a href="/portal">Client Portal</a></div>
   <div class="footer-col"><h5>Support</h5><a href="/signup">Sign Up</a><a href="#chat">Chat</a><a href="#faq">FAQ</a></div>
   <div class="footer-col"><h5>Contact</h5><a href="mailto:info@credxme.com">info@credxme.com</a><a href="https://credx-platform-web.netlify.app">Live Site</a></div>
  </div>
@@ -509,6 +527,9 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 <script>
 const API_BASE='https://credxapi-production.up.railway.app';
 let selectedOfferInterest='program';
+function generateTempPassword(){
+ return 'Credx!' + Math.random().toString(36).slice(2,10) + '9A';
+}
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>{t.className='toast';},3200);}
 const faqItems=document.querySelectorAll('.faq-item');faqItems.forEach(item=>{item.querySelector('.faq-q').addEventListener('click',()=>item.classList.toggle('open'));});
 const heardAboutInputs=[...document.querySelectorAll('input[name="heardAbout"]')];
@@ -542,10 +563,11 @@ async function submitForm(){
  const payload={
   firstName:document.getElementById('firstName').value.trim(),
   lastName:document.getElementById('lastName').value.trim(),
-  email:document.getElementById('email').value.trim(),
+  email:document.getElementById('email').value.trim().toLowerCase(),
   phone:document.getElementById('phone').value.trim()||undefined,
-  creditGoal:document.getElementById('creditGoal').value||undefined,
   offerInterest:selectedOfferInterest,
+  password:generateTempPassword(),
+  creditGoal:document.getElementById('creditGoal').value||undefined,
   referralSource:heardAbout||undefined,
   referralName:document.getElementById('referralName').value.trim()||undefined,
   referralOther:document.getElementById('heardAboutOther').value.trim()||undefined
@@ -555,12 +577,19 @@ async function submitForm(){
  if(!document.getElementById('consent').checked){showToast('Please confirm your information is accurate.','error');return;}
  btn.disabled=true;btn.textContent='Submitting...';
  try{
-  const res=await fetch(`${API_BASE}/api/leads`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const res=await fetch(`${API_BASE}/api/auth/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const body=await res.json().catch(()=>null);
+  if(res.status===409){
+   showToast('This email is already in the system. Use portal reset password or contact support to continue onboarding.','error');
+   btn.disabled=false;btn.textContent='Confirm & Submit';
+   return;
+  }
   if(!res.ok) throw new Error(body?.error||'Submission failed');
  document.getElementById('form-panel').style.display='none';
  document.getElementById('successPanel').style.display='block';
- showToast('Submitted successfully');
+ showToast('Signup created. Opening onboarding...');
+ const nextUrl=`/start?token=${encodeURIComponent(body.token)}#onboarding`;
+ setTimeout(()=>{ window.location.assign(nextUrl); }, 600);
 }catch(err){
  showToast(err.message||'Submission failed','error');
   btn.disabled=false;btn.textContent='Confirm & Submit';
@@ -586,16 +615,16 @@ function appendChatMessage(role,text){
 function getCesarReply(message){
  const text=(message||'').toLowerCase();
  if(!text.trim()) return 'Ask me anything about the CredX program, the 5-Day Masterclass, disputes, financing readiness, or rebuilding your credit.';
- if(text.includes('portal')||text.includes('sign in')||text.includes('login')||text.includes('log in')) return 'If you already have portal access, sign in here: <a href="/portal/">CredX Client Portal</a>.<br><br>If you are new and want to get started first, use the direct sign-up page here: <a href="/signup?offer=program">Program Sign Up</a>.';
- if(text.includes('how do i get started')||text.includes('get started')||text.includes('how to start')||text.includes('sign up')||text.includes('signup')||text.includes('apply')) return 'Here\'s the fastest path:<br><br>• <a href="/signup?offer=program">Sign up for the CredX Program</a><br>• <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>• <a href="/portal/">Portal login</a> if you already have an account.<br><br>If you want, tell me whether you want DIY education or guided support and I\'ll point you to the best option.';
- if(text.includes('help me')||text==='help'||text.includes('what can you help')||text.includes('how can you help')) return 'I can help you do one of three things right now:<br><br>1. <a href="/signup?offer=program">Start the guided CredX Program</a><br>2. <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>3. <a href="/portal/">Open your portal login</a><br><br>If you tell me your goal—remove negatives, prepare for financing, or rebuild after collections—I\'ll recommend the best path.';
+ if(text.includes('portal')||text.includes('sign in')||text.includes('login')||text.includes('log in')) return 'If you already have portal access, sign in here: <a href="/portal">CredX Client Portal</a>.<br><br>If you are new and want to get started first, use the direct sign-up page here: <a href="/signup?offer=program">Program Sign Up</a>.';
+ if(text.includes('how do i get started')||text.includes('get started')||text.includes('how to start')||text.includes('sign up')||text.includes('signup')||text.includes('apply')) return 'Here\'s the fastest path:<br><br>• <a href="/signup?offer=program">Sign up for the CredX Program</a><br>• <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>• <a href="/portal">Portal login</a> if you already have an account.<br><br>If you want, tell me whether you want DIY education or guided support and I\'ll point you to the best option.';
+ if(text.includes('help me')||text==='help'||text.includes('what can you help')||text.includes('how can you help')) return 'I can help you do one of three things right now:<br><br>1. <a href="/signup?offer=program">Start the guided CredX Program</a><br>2. <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>3. <a href="/portal">Open your portal login</a><br><br>If you tell me your goal—remove negatives, prepare for financing, or rebuild after collections—I\'ll recommend the best path.';
  if(text.includes('masterclass')||text.includes('diy')) return 'The 5-Day Masterclass is the DIY path inside CredX. It walks you through credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. If that sounds right, start here: <a href="/signup?offer=masterclass">Masterclass Sign Up</a>.';
  if(text.includes('program')||text.includes('coaching')||text.includes('service')) return 'The CredX Program is the guided path with software, AI support, and coaching. If you want hands-on structure and follow-through, start here: <a href="/signup?offer=program">Program Sign Up</a>.';
  if(text.includes('financing')||text.includes('mortgage')||text.includes('car')||text.includes('approval')) return 'If your goal is financing readiness, the best move is the guided program so your file can be reviewed in context. You can start here: <a href="/signup?offer=program">Program Sign Up</a>.';
  if(text.includes('dispute')||text.includes('collection')||text.includes('inquiry')) return 'CredX can help organize dispute workflow and identify what looks challengeable, but the strongest next step is still getting your file into review. Start here: <a href="/signup?offer=program">Free Analysis / Program Sign Up</a>.';
  if(text.includes('price')||text.includes('cost')||text.includes('pricing')) return 'CredX has two main paths right now: the guided Program and the 5-Day Masterclass. If you want support, choose the Program. If you want DIY education, choose the Masterclass.<br><br>• <a href="/signup?offer=program">Program Sign Up</a><br>• <a href="/signup?offer=masterclass">Masterclass Sign Up</a>';
  if(text.includes('next step')) return 'Your next step is to choose your path and submit the short sign-up form:<br><br>• <a href="/signup?offer=program">CredX Program</a><br>• <a href="/signup?offer=masterclass">5-Day Masterclass</a>';
- return 'I can help you choose the fastest path:<br><br>• <a href="/signup?offer=program">Sign up for the Program</a><br>• <a href="/signup?offer=masterclass">Join the Masterclass</a><br>• <a href="/portal/">Portal Login</a><br><br>If you tell me your goal, I\'ll point you to the best one.';
+ return 'I can help you choose the fastest path:<br><br>• <a href="/signup?offer=program">Sign up for the Program</a><br>• <a href="/signup?offer=masterclass">Join the Masterclass</a><br>• <a href="/portal">Portal Login</a><br><br>If you tell me your goal, I\'ll point you to the best one.';
 }
 
 function sendChat(){
@@ -613,6 +642,49 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
  appendChatMessage('user',prompt);
  window.setTimeout(()=>appendChatMessage('agent',getCesarReply(prompt)),250);
 }));
+
+const prefersReducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function initScrollMotion(){
+ if(prefersReducedMotion) return;
+
+ const revealGroups=[
+  ['.hero-tag, .hero h1, .hero-sub, .hero-btns, .hero-stats > div, .hero .chat-quick', 'up'],
+  ['.about-photo', 'left'],
+  ['.about-tag, .about h2, .about p, .about-name, .about-role', 'right'],
+  ['.stag, .stitle, .ssub', 'up'],
+  ['.step, .plan, .cur-card, .test-card, .faq-item', 'up'],
+  ['.form-wrap, .chat-window', 'up'],
+  ['.footer-brand, .footer-col, .footer-bottom > span', 'up']
+ ];
+
+ revealGroups.forEach(([selector,direction])=>{
+  document.querySelectorAll(selector).forEach((el,index)=>{
+   if(el.classList.contains('reveal')) return;
+   el.classList.add('reveal');
+   if(direction!=='up') el.dataset.reveal=direction;
+   const delay=Math.min(index * 70, 420);
+   el.style.setProperty('--reveal-delay', `${delay}ms`);
+  });
+ });
+
+ document.querySelectorAll('.btn, .nav-cta, .plan-cta, .chat-quick, .success-link, .step, .plan, .cur-card, .test-card, .faq-item, .chat-window, .form-wrap').forEach(el=>{
+  el.classList.add('motion-lift');
+ });
+
+ const observer=new IntersectionObserver((entries)=>{
+  entries.forEach(entry=>{
+   if(entry.isIntersecting){
+    entry.target.classList.add('visible');
+    observer.unobserve(entry.target);
+   }
+  });
+ },{threshold:0.16, rootMargin:'0px 0px -8% 0px'});
+
+ document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+}
+
+initScrollMotion();
 </script>
 </body>
 </html>

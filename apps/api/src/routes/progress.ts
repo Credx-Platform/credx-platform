@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { config } from '../config.js';
+import { CreditAnalysisService } from '../lib/creditAnalysis.js';
 import type { DocumentType } from '@prisma/client';
 
 export const progressRouter = Router();
@@ -13,6 +14,9 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }
 });
+
+const ALLOWED_UPLOAD_EXTENSIONS = new Set(['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.html', '.htm']);
+const ALLOWED_UPLOAD_MIME_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'text/html']);
 
 function inferDocumentType(input = ''): string {
   const value = String(input || '').toLowerCase();
@@ -39,6 +43,17 @@ function toPrismaDocumentType(docType: string): DocumentType {
 function formatField(value: string | null | undefined, fallback = 'Not provided'): string {
   const trimmed = value?.trim();
   return trimmed ? trimmed : fallback;
+}
+
+function getFileExtension(fileName = ''): string {
+  const normalized = String(fileName || '').toLowerCase();
+  const dotIndex = normalized.lastIndexOf('.');
+  return dotIndex >= 0 ? normalized.slice(dotIndex) : '';
+}
+
+function isAllowedUpload(file: Express.Multer.File): boolean {
+  const extension = getFileExtension(file.originalname || '');
+  return ALLOWED_UPLOAD_EXTENSIONS.has(extension) || ALLOWED_UPLOAD_MIME_TYPES.has(String(file.mimetype || '').toLowerCase());
 }
 
 function buildOwnerOnboardingEmail(payload: {
@@ -308,6 +323,67 @@ async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
     let workflowResult = null;
     if (docType === 'credit_report') {
       workflowResult = await completeOnboardingWorkflow(client.id, doc);
+
+      // Auto-generate credit analysis if credit report data exists
+      try {
+        const clientWithReports = await prisma.client.findUnique({
+          where: { id: client.id },
+          include: {
+            user: true,
+            creditReports: { orderBy: { pulledAt: 'desc' }, include: { tradelines: true } }
+          }
+        });
+
+        if (clientWithReports && clientWithReports.creditReports.length > 0) {
+          const existingAnalysis = await prisma.clientProgress.findUnique({
+            where: { clientId: client.id },
+            select: { analysis: true }
+          });
+
+          if (!existingAnalysis?.analysis) {
+            const analysis = CreditAnalysisService.generate({
+              client: clientWithReports as any,
+              creditReports: clientWithReports.creditReports as any
+            });
+
+            await prisma.clientProgress.update({
+              where: { clientId: client.id },
+              data: {
+                analysis: analysis as any,
+                workflow: {
+                  ...(workflow as any || {}),
+                  stage: 'analysis_ready',
+                  updatedAt: new Date().toISOString(),
+                  next: ['review_analysis', 'begin_disputes']
+                }
+              }
+            });
+
+            await prisma.client.update({
+              where: { id: client.id },
+              data: {
+                status: 'ANALYSIS_READY',
+                analysisSummary: analysis.clientFacingSummary.slice(0, 500) + '...'
+              }
+            });
+
+            await prisma.activityEvent.create({
+              data: {
+                clientId: client.id,
+                type: 'ANALYSIS_AUTO_GENERATED',
+                message: `Credit analysis auto-generated after report upload: ${analysis.keyFindings.length} findings identified.`,
+                metadata: { findingCount: analysis.keyFindings.length, disputeCount: analysis.disputeOpportunities.length }
+              }
+            });
+
+            (workflowResult as any).analysisGenerated = true;
+            (workflowResult as any).analysisFindings = analysis.keyFindings.length;
+          }
+        }
+      } catch (analysisErr) {
+        console.error('Auto-analysis generation failed:', analysisErr);
+        // Non-fatal: don't block the upload if analysis fails
+      }
     }
 
     return res.json({ uploadedDocs, workflow: workflowResult });
@@ -322,6 +398,9 @@ progressRouter.post('/docs', requireAuth, handleDocUpload);
 progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async (req: AuthedRequest, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (!isAllowedUpload(req.file)) {
+      return res.status(400).json({ error: 'Unsupported file type. Upload PDF, HTML, JPG, PNG, or WEBP files.' });
+    }
 
     const client = await prisma.client.findUnique({ where: { userId: req.auth!.sub }, include: { progress: true } });
     if (!client || !client.progress) return res.status(404).json({ error: 'Client progress not found' });
@@ -377,6 +456,66 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
     let workflowResult = null;
     if (docType === 'credit_report') {
       workflowResult = await completeOnboardingWorkflow(client.id, secureDoc);
+
+      // Auto-generate credit analysis if credit report data exists
+      try {
+        const clientWithReports = await prisma.client.findUnique({
+          where: { id: client.id },
+          include: {
+            user: true,
+            creditReports: { orderBy: { pulledAt: 'desc' }, include: { tradelines: true } }
+          }
+        });
+
+        if (clientWithReports && clientWithReports.creditReports.length > 0) {
+          const existingAnalysis = await prisma.clientProgress.findUnique({
+            where: { clientId: client.id },
+            select: { analysis: true }
+          });
+
+          if (!existingAnalysis?.analysis) {
+            const analysis = CreditAnalysisService.generate({
+              client: clientWithReports as any,
+              creditReports: clientWithReports.creditReports as any
+            });
+
+            await prisma.clientProgress.update({
+              where: { clientId: client.id },
+              data: {
+                analysis: analysis as any,
+                workflow: {
+                  ...(workflow as any || {}),
+                  stage: 'analysis_ready',
+                  updatedAt: uploadedAt,
+                  next: ['review_analysis', 'begin_disputes']
+                }
+              }
+            });
+
+            await prisma.client.update({
+              where: { id: client.id },
+              data: {
+                status: 'ANALYSIS_READY',
+                analysisSummary: analysis.clientFacingSummary.slice(0, 500) + '...'
+              }
+            });
+
+            await prisma.activityEvent.create({
+              data: {
+                clientId: client.id,
+                type: 'ANALYSIS_AUTO_GENERATED',
+                message: `Credit analysis auto-generated after report upload: ${analysis.keyFindings.length} findings identified.`,
+                metadata: { findingCount: analysis.keyFindings.length, disputeCount: analysis.disputeOpportunities.length }
+              }
+            });
+
+            (workflowResult as any).analysisGenerated = true;
+            (workflowResult as any).analysisFindings = analysis.keyFindings.length;
+          }
+        }
+      } catch (analysisErr) {
+        console.error('Auto-analysis generation failed:', analysisErr);
+      }
     }
 
     return res.json({

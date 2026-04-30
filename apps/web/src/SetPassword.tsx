@@ -37,6 +37,8 @@ export default function SetPassword() {
   const [status, setStatus] = useState<Status>({ kind: 'verifying' });
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -158,34 +160,54 @@ export default function SetPassword() {
 
   return (
     <div className="auth-shell">
-      <form className="auth-card" onSubmit={handleSubmit}>
+      <form className="auth-card" onSubmit={handleSubmit} method="post" autoComplete="on" noValidate>
         <p className="eyebrow">CredX Portal</p>
         <h1>{headline}</h1>
         <p className="helper-text">
           Hi {verify.firstName || 'there'} — choose a password for <strong>{verify.email}</strong>. You'll use it to sign in to your portal at credxme.com/portal.
         </p>
-        <label>
+        <label htmlFor="setup-password">
           <span>New password</span>
+        </label>
+        <div className="password-field-row">
           <input
-            type="password"
+            id="setup-password"
+            name="new-password"
+            type={showPassword ? 'text' : 'password'}
             autoComplete="new-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="At least 8 characters"
             disabled={submitting}
           />
-        </label>
-        <label>
+          <button type="button" className="ghost-button password-toggle" onClick={() => setShowPassword((current) => !current)} aria-controls="setup-password" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+            {showPassword ? 'Hide' : 'View'}
+          </button>
+        </div>
+        <label htmlFor="setup-password-confirm">
           <span>Confirm password</span>
+        </label>
+        <div className="password-field-row">
           <input
-            type="password"
+            id="setup-password-confirm"
+            name="confirm-password"
+            type={showConfirm ? 'text' : 'password'}
             autoComplete="new-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             value={confirm}
             onChange={(event) => setConfirm(event.target.value)}
             placeholder="Re-enter password"
             disabled={submitting}
           />
-        </label>
+          <button type="button" className="ghost-button password-toggle" onClick={() => setShowConfirm((current) => !current)} aria-controls="setup-password-confirm" aria-label={showConfirm ? 'Hide password' : 'Show password'}>
+            {showConfirm ? 'Hide' : 'View'}
+          </button>
+        </div>
         {formError ? <div className="error-banner">{formError}</div> : null}
         <button type="submit" disabled={submitting}>{submitting ? 'Saving…' : isReset ? 'Reset password' : 'Set password & continue'}</button>
         <p className="helper-text">Link expires {new Date(verify.expiresAt).toLocaleString()}.</p>

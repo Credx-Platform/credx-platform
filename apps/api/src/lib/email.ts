@@ -1,83 +1,101 @@
 import { Resend } from 'resend';
 
-function renderWelcomeLeadEmail(params: { firstName: string; contractLink: string }) {
+function renderWelcomeLeadEmail(params: { firstName: string; contractLink: string; offerType?: 'program' | 'masterclass' }) {
+  const isMasterclass = params.offerType === 'masterclass';
+  const subject = isMasterclass ? 'Welcome to the CredX 5-Day Masterclass' : 'Welcome to CredX — Here’s Your Next Step';
+  const headline = isMasterclass ? 'Welcome to the CredX 5-Day Masterclass' : 'Welcome to CredX';
+  const intro = isMasterclass
+    ? 'You’re in. Your next step is to open your secure onboarding link so you can review the agreement, complete your intake, and unlock the masterclass inside CredX.'
+    : 'Your inquiry has been received, and the next step is to open your secure onboarding link so you can review the agreement and complete your intake properly.';
+  const steps = isMasterclass
+    ? [
+        'Open your secure CredX onboarding link.',
+        'Review and sign your CredX agreement.',
+        'Complete your intake and choose your monitoring provider.',
+        'Unlock your masterclass lessons and affiliate tools inside the platform.'
+      ]
+    : [
+        'Open your secure CredX onboarding link.',
+        'Review and sign your CredX agreement.',
+        'Complete your intake and connect your monitoring provider.',
+        'Watch for your portal-ready email once onboarding is complete.'
+      ];
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Welcome to CredX</title>
+  <title>${headline}</title>
 </head>
 <body style="margin:0;padding:0;background:#0d1420;font-family:Arial,Helvetica,sans-serif;color:#e9eef6;">
-  <div style="width:100%;background:#0d1420;padding:32px 16px;">
-    <div style="max-width:640px;margin:0 auto;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
-      <div style="height:6px;background:#c9a227;"></div>
-      <div style="background:linear-gradient(135deg,#111a28,#1b2739);padding:34px 32px 26px;text-align:center;border-bottom:1px solid #243247;">
-        <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
-        <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">Credit Repair & Financial Strategy Support</div>
-      </div>
-      <div style="padding:32px;">
-        <h1 style="margin:0 0 12px;font-size:28px;color:#ffffff;">Welcome to CredX</h1>
-        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Hi ${params.firstName},</p>
-        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Welcome to CredX. We’re excited to support you on your credit repair and financial rebuilding journey.</p>
-        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Your inquiry has been received, and the next step is to complete your CredX service agreement so we can begin your onboarding process properly.</p>
-        <div style="margin:24px 0;display:grid;gap:14px;">
-          <div style="padding:14px 16px;background:#162132;border:1px solid #243247;border-radius:12px;color:#e9eef6;"><strong>1.</strong> Review and sign your CredX contract.</div>
-          <div style="padding:14px 16px;background:#162132;border:1px solid #243247;border-radius:12px;color:#e9eef6;"><strong>2.</strong> Prepare your most recent credit report.</div>
-          <div style="padding:14px 16px;background:#162132;border:1px solid #243247;border-radius:12px;color:#e9eef6;"><strong>3.</strong> Complete any requested intake details.</div>
-          <div style="padding:14px 16px;background:#162132;border:1px solid #243247;border-radius:12px;color:#e9eef6;"><strong>4.</strong> Watch for your next CredX update.</div>
-        </div>
-        <div style="text-align:center;padding:10px 0 4px;">
-          <a href="${params.contractLink}" style="display:inline-block;background:#6b7280;color:#ffffff;text-decoration:none;padding:15px 28px;border-radius:12px;font-weight:800;font-size:16px;border:1px solid #7a8290;">Complete Your Signup</a>
-        </div>
-        <div style="margin-top:22px;padding:16px 18px;background:#0f1826;border:1px solid #243247;border-radius:12px;color:#c8d3e1;font-size:14px;">
-          If you have any questions, simply reply to this email and the CredX team will help you.
-        </div>
-      </div>
-      <div style="padding:24px 32px 32px;color:#9fb0c5;font-size:13px;line-height:1.6;border-top:1px solid #243247;">
-        <strong style="color:#ffffff;">CredX</strong><br />
-        Credit Repair & Financial Strategy Support<br />
-        Sent from hello@credxme.com
-      </div>
-    </div>
-  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0d1420;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
+          <tr><td style="height:6px;background:#c9a227;font-size:0;line-height:0;">&nbsp;</td></tr>
+          <tr>
+            <td style="background:#111a28;padding:32px 28px 24px;text-align:center;border-bottom:1px solid #243247;">
+              <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
+              <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">${isMasterclass ? '5-Day Masterclass + onboarding access' : 'Credit Repair & Financial Strategy Support'}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 28px;">
+              <h1 style="margin:0 0 12px;font-size:28px;line-height:1.2;color:#ffffff;">${headline}</h1>
+              <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Hi ${params.firstName || 'there'},</p>
+              <p style="margin:0 0 16px;color:#d5dfeb;font-size:16px;line-height:1.65;">${intro}</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
+                ${steps.map((step, index) => `<tr><td style="padding:0 0 12px;"><div style="padding:14px 16px;background:#162132;border:1px solid #243247;border-radius:12px;color:#e9eef6;"><strong>${index + 1}.</strong> ${step}</div></td></tr>`).join('')}
+              </table>
+              <div style="text-align:center;padding:10px 0 4px;">
+                <a href="${params.contractLink}" style="display:inline-block;background:#c9a227;color:#111a28;text-decoration:none;padding:15px 28px;border-radius:12px;font-weight:800;font-size:16px;">Open Secure Onboarding</a>
+              </div>
+              <p style="margin:18px 0 0;color:#9fb0c5;font-size:13px;line-height:1.6;">If the button doesn’t open, copy and paste this link into your browser:<br /><span style="color:#ffffff;word-break:break-all;">${params.contractLink}</span></p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 28px 30px;color:#9fb0c5;font-size:13px;line-height:1.6;border-top:1px solid #243247;">
+              <strong style="color:#ffffff;">CredX</strong><br />
+              Credit Repair & Financial Strategy Support<br />
+              Sent from hello@credxme.com
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 
-  const text = `Subject: Welcome to CredX — Here’s Your Next Step
+  const text = `${headline}
 
-Hi ${params.firstName},
+Hi ${params.firstName || 'there'},
 
-Welcome to CredX.
+${intro}
 
-We’re excited to support you on your credit repair and financial rebuilding journey. Your inquiry has been received, and the next step is to complete your CredX service agreement so we can begin your onboarding process properly.
+Next steps:
+1. ${steps[0]}
+2. ${steps[1]}
+3. ${steps[2]}
+4. ${steps[3]}
 
-Next Steps:
-1. Review and sign your CredX contract.
-2. Prepare your most recent credit report.
-3. Complete any requested intake details.
-4. Watch for your next CredX update.
-
-Complete Your Signup:
+Open secure onboarding:
 ${params.contractLink}
 
-If you have any questions, simply reply to this email and the CredX team will help you.
+If the button doesn’t open, copy and paste the link into your browser.
 
 CredX
-Credit Repair & Financial Strategy Support
-Sent from hello@credxme.com`;
+Credit Repair & Financial Strategy Support`;
 
-  return {
-    subject: 'Welcome to CredX — Here’s Your Next Step',
-    html,
-    text
-  };
+  return { subject, html, text };
 }
 
-export async function sendWelcomeLeadEmail(params: { firstName: string; email: string; contractLink: string }) {
+export async function sendWelcomeLeadEmail(params: { firstName: string; email: string; contractLink: string; offerType?: 'program' | 'masterclass' }) {
   const email = renderWelcomeLeadEmail({
     firstName: params.firstName,
-    contractLink: params.contractLink
+    contractLink: params.contractLink,
+    offerType: params.offerType
   });
 
   const result = await sendEmail({
@@ -109,6 +127,8 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
     return { email, name: name || 'CredX' };
   };
 
+  let resendFailure: string | null = null;
+
   if (resendApiKey) {
     try {
       const resend = new Resend(resendApiKey);
@@ -121,21 +141,22 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
         ...(params.text ? { text: params.text } : { text: '' })
       });
 
-      if (result.error) {
-        console.warn('RESEND_SEND_FAILED', result.error);
-        return { skipped: true, reason: `RESEND_SEND_FAILED:${JSON.stringify(result.error)}` };
+      if (!result.error) {
+        return { id: result.data?.id, provider: 'resend' };
       }
 
-      return { id: result.data?.id, provider: 'resend' };
+      resendFailure = `RESEND_SEND_FAILED:${JSON.stringify(result.error)}`;
+      console.warn('RESEND_SEND_FAILED', result.error);
     } catch (error) {
-      console.warn('RESEND_EXCEPTION', error instanceof Error ? error.message : String(error));
-      return { skipped: true, reason: error instanceof Error ? error.message : String(error) };
+      resendFailure = error instanceof Error ? error.message : String(error);
+      console.warn('RESEND_EXCEPTION', resendFailure);
     }
   }
 
   if (!sendgridApiKey) {
-    console.log('EMAIL_PREVIEW', { to: params.to, subject: params.subject, reason: 'No email provider configured' });
-    return { skipped: true, reason: 'No email provider configured' };
+    const reason = resendFailure ? `Resend failed and no SendGrid fallback is configured: ${resendFailure}` : 'No email provider configured';
+    console.log('EMAIL_PREVIEW', { to: params.to, subject: params.subject, reason });
+    return { skipped: true, reason };
   }
 
   const from = parseFrom(sendgridFrom);
@@ -160,14 +181,16 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
 
     if (!response.ok) {
       const body = await response.text().catch(() => '');
+      const reason = `SENDGRID_SEND_FAILED:${response.status}:${body}`;
       console.warn('SENDGRID_SEND_FAILED', response.status, body);
-      return { skipped: true, reason: `SENDGRID_SEND_FAILED:${response.status}:${body}` };
+      return { skipped: true, reason: resendFailure ? `${resendFailure} | ${reason}` : reason };
     }
 
     return { id: response.headers.get('x-message-id') || 'sendgrid-accepted', provider: 'sendgrid' };
   } catch (error) {
-    console.warn('SENDGRID_EXCEPTION', error instanceof Error ? error.message : String(error));
-    return { skipped: true, reason: error instanceof Error ? error.message : String(error) };
+    const reason = error instanceof Error ? error.message : String(error);
+    console.warn('SENDGRID_EXCEPTION', reason);
+    return { skipped: true, reason: resendFailure ? `${resendFailure} | ${reason}` : reason };
   }
 }
 

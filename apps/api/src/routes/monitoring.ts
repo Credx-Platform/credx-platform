@@ -65,6 +65,16 @@ monitoringRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) =>
       hasCredentials;
     const alreadySent = Boolean((progress.onboarding || {})[PORTAL_READY_GUARD_KEY]);
 
+    console.log('PORTAL_EMAIL_GATE_CHECK', {
+      gatesPassed,
+      alreadySent,
+      stage: progress?.workflow?.stage,
+      hasSSN: Boolean(client.ssnLast4),
+      hasAddress: Boolean(client.currentAddressLine1),
+      hasDOB: Boolean(client.dobEncrypted),
+      hasCredentials
+    });
+
     let emailNotification: { status: string; reason?: string; deliveryId?: string } = {
       status: 'skipped',
       reason: !gatesPassed
@@ -75,6 +85,7 @@ monitoringRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) =>
     };
 
     if (gatesPassed && !alreadySent) {
+      console.log('PORTAL_EMAIL_SENDING', { to: client.user.email, firstName: client.user.firstName });
       try {
         const { rawToken } = await issuePasswordSetupToken({
           userId: client.user.id,
@@ -88,19 +99,28 @@ monitoringRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) =>
           loginLink,
           setupLink
         });
-        await prisma.clientProgress.update({
-          where: { clientId: client.id },
-          data: {
-            onboarding: {
-              ...(updated.onboarding as any),
-              [PORTAL_READY_GUARD_KEY]: submittedAt
+        if (result.delivery?.skipped) {
+          console.log('PORTAL_EMAIL_DELIVERY_SKIPPED', { reason: result.delivery.reason });
+          emailNotification = {
+            status: 'failed',
+            reason: result.delivery.reason || 'delivery_skipped'
+          };
+        } else {
+          console.log('PORTAL_EMAIL_SENT', { deliveryId: (result.delivery as any)?.id });
+          await prisma.clientProgress.update({
+            where: { clientId: client.id },
+            data: {
+              onboarding: {
+                ...(updated.onboarding as any),
+                [PORTAL_READY_GUARD_KEY]: submittedAt
+              }
             }
-          }
-        });
-        emailNotification = {
-          status: 'sent',
-          deliveryId: (result.delivery as any)?.id
-        };
+          });
+          emailNotification = {
+            status: 'sent',
+            deliveryId: (result.delivery as any)?.id
+          };
+        }
       } catch (emailError) {
         console.warn('PORTAL_READY_EMAIL_FAILED', emailError instanceof Error ? emailError.message : emailError);
         emailNotification = { status: 'failed', reason: emailError instanceof Error ? emailError.message : String(emailError) };

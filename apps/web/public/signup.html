@@ -23,7 +23,7 @@ a{color:inherit}.page{min-height:100vh;padding:32px 18px 48px}.shell{max-width:1
    </a>
    <div class="top-actions">
     <a class="top-link" href="/">Back to landing page</a>
-    <a class="top-link" href="/portal/">Client portal login</a>
+    <a class="top-link" href="/portal">Client portal login</a>
     <a class="top-link primary" href="/signup?offer=program">Program sign up</a>
    </div>
   </div>
@@ -46,7 +46,7 @@ a{color:inherit}.page{min-height:100vh;padding:32px 18px 48px}.shell{max-width:1
     <div class="mini-actions">
      <a class="mini-btn" href="/signup?offer=program"><strong>Program:</strong> guided support</a>
      <a class="mini-btn" href="/signup?offer=masterclass"><strong>Masterclass:</strong> DIY education</a>
-     <a class="mini-btn" href="/portal/"><strong>Already a client?</strong> Open portal</a>
+     <a class="mini-btn" href="/portal"><strong>Already a client?</strong> Open portal</a>
     </div>
    </div>
 
@@ -109,7 +109,7 @@ a{color:inherit}.page{min-height:100vh;padding:32px 18px 48px}.shell{max-width:1
      </div>
      <div class="action-row">
       <button class="form-submit" id="submitBtn" type="button">Confirm & Submit</button>
-      <a class="secondary-btn" href="/portal/">Already have a portal account?</a>
+      <a class="secondary-btn" href="/portal">Already have a portal account?</a>
      </div>
     </div>
 
@@ -119,7 +119,7 @@ a{color:inherit}.page{min-height:100vh;padding:32px 18px 48px}.shell{max-width:1
      <div class="success-msg">Thanks — your intake was submitted successfully. A CredX specialist can follow up after review.</div>
      <div class="success-links">
       <a class="secondary-btn" href="/">Back to main site</a>
-      <a class="secondary-btn" href="/portal/">Client portal login</a>
+      <a class="secondary-btn" href="/portal">Client portal login</a>
      </div>
     </div>
    </div>
@@ -131,6 +131,9 @@ a{color:inherit}.page{min-height:100vh;padding:32px 18px 48px}.shell{max-width:1
 const API_BASE='https://credxapi-production.up.railway.app';
 const params=new URLSearchParams(window.location.search);
 const requestedOffer=params.get('offer');
+function generateTempPassword(){
+ return 'Credx!' + Math.random().toString(36).slice(2,10) + '9A';
+}
 const heardAboutInputs=[...document.querySelectorAll('input[name="heardAbout"]')];
 const offerInterestInputs=[...document.querySelectorAll('input[name="offerInterest"]')];
 const referralNameWrap=document.getElementById('referralNameWrap');
@@ -161,29 +164,32 @@ syncHeardAboutUI();
 selectOffer(requestedOffer==='masterclass'?'masterclass':'program');
 async function submitForm(){
  const btn=document.getElementById('submitBtn');
- const heardAbout=heardAboutInputs.find(input=>input.checked)?.value||'';
  const payload={
   firstName:document.getElementById('firstName').value.trim(),
   lastName:document.getElementById('lastName').value.trim(),
-  email:document.getElementById('email').value.trim(),
+  email:document.getElementById('email').value.trim().toLowerCase(),
   phone:document.getElementById('phone').value.trim()||undefined,
-  creditGoal:document.getElementById('creditGoal').value||undefined,
   offerInterest:selectedOfferInterest,
-  referralSource:heardAbout||undefined,
-  referralName:document.getElementById('referralName').value.trim()||undefined,
-  referralOther:document.getElementById('heardAboutOther').value.trim()||undefined
+  password:generateTempPassword()
  };
  if(!payload.firstName||!payload.lastName||!payload.email){showToast('Please complete first name, last name, and email.','error');return;}
  if(!/\S+@\S+\.\S+/.test(payload.email)){showToast('Please enter a valid email.','error');return;}
  if(!document.getElementById('consent').checked){showToast('Please confirm your information is accurate.','error');return;}
  btn.disabled=true;btn.textContent='Submitting...';
  try{
-  const res=await fetch(`${API_BASE}/api/leads`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const res=await fetch(`${API_BASE}/api/auth/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const body=await res.json().catch(()=>null);
+  if(res.status===409){
+   showToast('This email is already in the system. Use portal reset password or contact support to continue onboarding.','error');
+   btn.disabled=false;btn.textContent='Confirm & Submit';
+   return;
+  }
   if(!res.ok) throw new Error(body?.error||'Submission failed');
   document.getElementById('form-panel').style.display='none';
   document.getElementById('successPanel').style.display='block';
-  showToast('Submitted successfully');
+  showToast('Signup created. Opening your contract...');
+  const nextUrl=`/start?token=${encodeURIComponent(body.token)}#onboarding`;
+  setTimeout(()=>{ window.location.assign(nextUrl); }, 600);
  }catch(err){
   showToast(err.message||'Submission failed','error');
   btn.disabled=false;btn.textContent='Confirm & Submit';

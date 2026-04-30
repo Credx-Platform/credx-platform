@@ -5,14 +5,16 @@ interface BureausTabProps {
   selectedItemIds: string[];
   onBackToItems: () => void;
   onOpenTracking: () => void;
+  clientName?: string;
+  clientAddress?: string;
 }
 
 type BureauKey = 'equifax' | 'experian' | 'transunion';
 
 const bureauMeta: Array<{ key: BureauKey; short: string; label: string; address: string }> = [
-  { key: 'equifax', short: 'EFX', label: 'Equifax', address: '[EFXAddress]' },
-  { key: 'experian', short: 'XPN', label: 'Experian', address: '[XPNAddress]' },
-  { key: 'transunion', short: 'TU', label: 'TransUnion', address: '[TUAddress]' }
+  { key: 'equifax', short: 'EFX', label: 'Equifax', address: 'P.O. Box 740256, Atlanta, GA 30374-0256' },
+  { key: 'experian', short: 'XPN', label: 'Experian', address: 'P.O. Box 4500, Allen, TX 75013' },
+  { key: 'transunion', short: 'TU', label: 'TransUnion', address: 'P.O. Box 2000, Chester, PA 19016' }
 ];
 
 function itemMatchesBureau(item: DisputeItem, bureau: BureauKey) {
@@ -21,19 +23,21 @@ function itemMatchesBureau(item: DisputeItem, bureau: BureauKey) {
   return item.disputeTransunion;
 }
 
-function buildLetter(label: string, address: string, bureauItems: DisputeItem[]) {
+function buildLetter(label: string, address: string, bureauItems: DisputeItem[], clientName?: string, clientAddress?: string) {
   const lines = bureauItems.map((item, index) => (
     `${index + 1}. ${item.furnisher} | ${item.accountNumber || 'Account number pending'} | ${item.accountType.replace(/_/g, ' ')} | Reason: ${item.reason || 'Reason pending'}${item.customInstruction ? ` | Instruction: ${item.customInstruction}` : ''}`
   ));
 
-  return `${label}\n${address}\n\nDate: __________________\n\nDear ${label},\n\nI am writing to dispute the following accounts on my credit report. Please investigate each item and correct or delete any inaccurate, incomplete, or unverifiable reporting.\n\n${lines.join('\n')}\n\nPlease send the investigation results and updated report to the mailing address on file.\n\nSincerely,\n[Client Name]`;
+  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  return `${label}\n${address}\n\nDate: ${today}\n\n${clientName ? `Re: ${clientName}\n` : ''}${clientAddress ? `${clientAddress}\n\n` : ''}Dear ${label},\n\nI am writing to dispute the following accounts on my credit report. Please investigate each item and correct or delete any inaccurate, incomplete, or unverifiable reporting.\n\n${lines.join('\n')}\n\nPlease send the investigation results and updated report to the mailing address on file.\n\nSincerely,\n${clientName || '[Client Name]'}`;
 }
 
-export function BureausTab({ items, selectedItemIds, onBackToItems, onOpenTracking }: BureausTabProps) {
+export function BureausTab({ items, selectedItemIds, onBackToItems, onOpenTracking, clientName, clientAddress }: BureausTabProps) {
   const selectedItems = items.filter((item) => selectedItemIds.includes(item.id));
 
   const handlePrint = (bureauLabel: string, address: string, bureauItems: DisputeItem[]) => {
-    const letter = buildLetter(bureauLabel, address, bureauItems);
+    const letter = buildLetter(bureauLabel, address, bureauItems, clientName, clientAddress);
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) return;
     printWindow.document.write(`<!DOCTYPE html><html><head><title>${bureauLabel} Dispute Letter</title><style>body{font-family:Arial,sans-serif;padding:32px;line-height:1.6;color:#111}h1{font-size:20px;margin-bottom:18px}pre{white-space:pre-wrap;font-family:Arial,sans-serif;font-size:14px}</style></head><body><h1>${bureauLabel} Dispute Letter</h1><pre>${letter.replace(/</g, '&lt;')}</pre></body></html>`);
@@ -43,7 +47,7 @@ export function BureausTab({ items, selectedItemIds, onBackToItems, onOpenTracki
   };
 
   const handleSave = (bureauLabel: string, address: string, bureauItems: DisputeItem[]) => {
-    const letter = buildLetter(bureauLabel, address, bureauItems);
+    const letter = buildLetter(bureauLabel, address, bureauItems, clientName, clientAddress);
     const blob = new Blob([letter], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');

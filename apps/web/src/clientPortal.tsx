@@ -235,7 +235,8 @@ const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
   disputes: { title: 'Disputes', desc: 'Track active dispute items, bureau status, and round progression.', accent: '#f59e0b' },
   activity: { title: 'Activity', desc: 'Timeline of what just happened on your file and what comes next.', accent: '#2dd4bf' },
   resources: { title: 'Credit Builders', desc: 'Partner tools and accounts to rebuild your credit profile.', accent: '#84cc16' },
-  tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' }
+  tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' },
+  analysis: { title: 'Credit Analysis', desc: 'Your professional credit analysis report and dispute strategy.', accent: '#2563eb' }
 };
 
 function SectionHeader({ section }: { section: Exclude<PortalTab, 'overview'> }) {
@@ -471,13 +472,18 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
 }
 
 function CreditMonitoringSection({ token, client, progress, refreshAll }: { token: string; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; }) {
+  const uploadedDocs = progress?.uploadedDocs || [];
+  const creditDocs = uploadedDocs.filter((doc) => (doc.type || '').toLowerCase().includes('credit'));
+  const hasCreditReport = creditDocs.length > 0;
+  const hasAnalysis = client?.analysisSummary || progress?.analysis;
+  const needsUpload = !hasCreditReport;
+  const needsAnalysis = hasCreditReport && !hasAnalysis;
+  const analysisReady = hasCreditReport && hasAnalysis;
+
   const [upload, setUpload] = useState<SecureUploadState>({ file: null, type: 'credit_report' });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const uploadedDocs = progress?.uploadedDocs || [];
-  const creditDocs = uploadedDocs.filter((doc) => (doc.type || '').toLowerCase().includes('credit'));
 
   async function submitDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -522,19 +528,74 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
       <section className="panel two-col">
         <div>
           <h2>Analysis report</h2>
-          <div className="plan-card">
-            <strong>Summary</strong>
-            <span>{client?.analysisSummary || 'Your analysis report has not been published yet.'}</span>
-            {progress?.analysis?.findings?.length ? <small>{progress.analysis.findings.join(' • ')}</small> : null}
-          </div>
-          <div className="plan-card">
-            <strong>Dispute strategy</strong>
-            <span>{client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Your strategy will appear here after report review.'}</span>
-            {progress?.disputeStrategy?.phases?.length ? <small>{progress.disputeStrategy.phases.join(' → ')}</small> : null}
-          </div>
+          {needsUpload && (
+            <div className="plan-card" style={{ border: '2px dashed #00c6fb', background: 'rgba(0,198,251,0.05)', padding: '1.5rem', textAlign: 'center' }}>
+              <strong style={{ color: '#00c6fb', fontSize: '1.1rem' }}>📋 Upload Your Credit Report</strong>
+              <p style={{ margin: '0.75rem 0', color: '#64748b' }}>
+                To generate your professional credit analysis, upload your credit report below.
+                We accept PDF, HTML, and screenshots.
+              </p>
+              <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                Your analysis will appear here within minutes of upload.
+              </p>
+            </div>
+          )}
+          {needsAnalysis && (
+            <div className="plan-card" style={{ border: '2px dashed #f59e0b', background: 'rgba(245,158,11,0.05)', padding: '1.5rem', textAlign: 'center' }}>
+              <strong style={{ color: '#f59e0b', fontSize: '1.1rem' }}>⏳ Analysis In Progress</strong>
+              <p style={{ margin: '0.75rem 0', color: '#64748b' }}>
+                Your credit report has been received. The CredX team is preparing your analysis.
+              </p>
+              <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                Check back shortly or refresh this page.
+              </p>
+            </div>
+          )}
+          {analysisReady && (
+            <>
+              <div className="plan-card">
+                <strong>Summary</strong>
+                <span>{client?.analysisSummary || 'Your analysis report has been published.'}</span>
+                {progress?.analysis?.findings?.length ? <small>{progress.analysis.findings.join(' • ')}</small> : null}
+              </div>
+              <div className="plan-card">
+                <strong>Dispute strategy</strong>
+                <span>{client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Your strategy will appear here after report review.'}</span>
+                {progress?.disputeStrategy?.phases?.length ? <small>{progress.disputeStrategy.phases.join(' → ')}</small> : null}
+              </div>
+              <div style={{ marginTop: '12px', textAlign: 'center' }}>
+                <button
+                  className="ghost-button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      const event = new CustomEvent('portal-navigate', { detail: { tab: 'analysis' } });
+                      window.dispatchEvent(event);
+                    }
+                  }}
+                  style={{ background: '#2563eb', color: '#fff', border: 'none', fontWeight: 600 }}
+                >
+                  📊 View Full Analysis Report
+                </button>
+              </div>
+            </>
+          )}
         </div>
         <div>
           <h2>Upload credit report</h2>
+          {needsUpload && (
+            <div className="plan-card" style={{ border: '2px dashed #00c6fb', background: 'rgba(0,198,251,0.05)', padding: '1.5rem', marginBottom: '1rem' }}>
+              <strong style={{ color: '#00c6fb', fontSize: '1.1rem' }}>📥 Step 1: Download Your Report</strong>
+              <p style={{ margin: '0.75rem 0', color: '#64748b' }}>
+                Before uploading, download your credit report from your monitoring provider.
+                Most providers allow you to save as PDF or print to PDF.
+              </p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                <a href="https://www.identityiq.com" target="_blank" rel="noopener noreferrer" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>IdentityIQ ↗</a>
+                <a href="https://www.smartcredit.com" target="_blank" rel="noopener noreferrer" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>SmartCredit ↗</a>
+                <a href="https://www.privacyguard.com" target="_blank" rel="noopener noreferrer" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>PrivacyGuard ↗</a>
+              </div>
+            </div>
+          )}
           <form className="dispute-card-live" onSubmit={submitDocument}>
             <div className="field-grid">
               <input className="chat-input" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => setUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} />
@@ -1156,6 +1217,13 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
       : 'Awaiting dispute strategy';
   const disputeSummary = client?.disputePlanSummary || progress?.disputeStrategy?.objective || client?.analysisSummary || 'Your dispute plan and bureau-by-bureau progress will appear here once your CredX team finalizes strategy.';
 
+  const uploadedDocs = progress?.uploadedDocs || [];
+  const creditDocs = uploadedDocs.filter((doc) => (doc.type || '').toLowerCase().includes('credit'));
+  const hasCreditReport = creditDocs.length > 0;
+  const hasAnalysis = !!(client?.analysisSummary || progress?.analysis);
+  const needsAnalysis = hasCreditReport && !hasAnalysis;
+  const analysisReady = hasCreditReport && hasAnalysis;
+
   if (!token) {
     if (onboardingOnly) {
       return <div className="auth-shell client-auth-shell"><div className="auth-card client-auth-card"><div className="brand-mark brand-mark--centered"><img src={BRAND_LOGO} alt="CredX" className="brand-logo" /></div><p className="eyebrow">CredX Onboarding</p><h1>Continue your signup</h1><p className="helper-text">Use the secure link from your welcome email to review your agreement and finish your intake.</p></div></div>;
@@ -1251,6 +1319,82 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                 </div>
               </section>
 
+              {!hasCreditReport && (
+                <section className="panel" style={{ border: '2px dashed #00c6fb', background: 'rgba(0,198,251,0.03)' }}>
+                  <div className="panel-header">
+                    <div>
+                      <p className="eyebrow" style={{ color: '#00c6fb' }}>Next Step</p>
+                      <h2>Upload Your Credit Report</h2>
+                    </div>
+                  </div>
+                  <div style={{ padding: '1rem 0' }}>
+                    <p style={{ marginBottom: '1rem' }}>
+                      Your CredX analysis and dispute strategy are waiting on your credit report.
+                      First, download your report from your monitoring provider, then upload it here.
+                    </p>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                      <button
+                        className="ghost-button"
+                        onClick={() => setActiveTab('monitoring')}
+                        style={{ background: '#00c6fb', color: '#060a12', border: 'none', fontWeight: 700 }}
+                      >
+                        📤 Go to Upload
+                      </button>
+                      <a href="/signup?offer=masterclass" className="ghost-button" style={{ textDecoration: 'none' }}>
+                        📚 Learn More
+                      </a>
+                    </div>
+                    <p className="helper-text">
+                      Accepted formats: PDF, HTML, HTM, PNG, JPG, JPEG, WEBP
+                    </p>
+                  </div>
+                </section>
+              )}
+
+              {needsAnalysis && (
+                <section className="panel" style={{ border: '2px dashed #f59e0b', background: 'rgba(245,158,11,0.03)' }}>
+                  <div className="panel-header">
+                    <div>
+                      <p className="eyebrow" style={{ color: '#f59e0b' }}>In Progress</p>
+                      <h2>Analysis Being Prepared</h2>
+                    </div>
+                  </div>
+                  <div style={{ padding: '1rem 0' }}>
+                    <p>
+                      Your credit report was uploaded successfully. The CredX team is reviewing your file
+                      and preparing your professional analysis. Check back shortly.
+                    </p>
+                    <p className="helper-text" style={{ marginTop: '0.75rem' }}>
+                      Reports uploaded: {creditDocs.length}
+                    </p>
+                  </div>
+                </section>
+              )}
+
+              {analysisReady && (
+                <section className="panel" style={{ border: '2px solid #22c55e', background: 'rgba(34,197,94,0.03)' }}>
+                  <div className="panel-header">
+                    <div>
+                      <p className="eyebrow" style={{ color: '#22c55e' }}>Ready</p>
+                      <h2>Your Analysis Is Complete</h2>
+                    </div>
+                  </div>
+                  <div style={{ padding: '1rem 0' }}>
+                    <p style={{ marginBottom: '1rem' }}>
+                      Your professional credit analysis is ready. View your findings, dispute opportunities,
+                      and recommended action plan.
+                    </p>
+                    <button
+                      className="ghost-button"
+                      onClick={() => setActiveTab('analysis')}
+                      style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}
+                    >
+                      📊 View Analysis Report
+                    </button>
+                  </div>
+                </section>
+              )}
+
               <section className="panel">
                 <div className="panel-header"><div><p className="eyebrow">Workflow</p><h2>Workflow snapshot</h2></div></div>
                 <ul className="activity-list">
@@ -1268,11 +1412,21 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           ) : null}
 
           {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
-          {activeTab === 'monitoring' ? <CreditMonitoringSection token={token} client={client} progress={progress} refreshAll={refreshAll} /> : null}
+          {activeTab === 'monitoring' ? (
+            <>
+              <SectionHeader section="monitoring" />
+              <CreditMonitoringSection token={token} client={client} progress={progress} refreshAll={refreshAll} />
+            </>
+          ) : null}
           {activeTab === 'disputes' ? <DisputesSection client={client} progress={progress} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
-          {activeTab === 'analysis' ? <AnalysisSection client={client} progress={progress} /> : null}
+          {activeTab === 'analysis' ? (
+            <>
+              <SectionHeader section="analysis" />
+              <AnalysisSection client={client} progress={progress} />
+            </>
+          ) : null}
 
           {activeTab === 'tasks' ? (
             <section className="panel">

@@ -28,6 +28,7 @@ The Letter Generation system provides credit repair letter templates with auto-p
 3. **Goodwill Adjustment Request** - Request removal of late payments as goodwill
 4. **Pay-for-Delete Offer** - Negotiate payment for account deletion
 5. **Cease & Desist** - Stop collection harassment
+6. **Custom Bureau Dispute Template** - Saved draft at `/packages/shared/src/letters/custom-bureau-dispute-template.md` for the new CredX dispute style the user requested
 
 ## Usage
 

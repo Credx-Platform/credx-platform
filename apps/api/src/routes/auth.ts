@@ -18,7 +18,9 @@ export const authRouter = Router();
 
 const defaultAffiliateLinks = [
   { label: 'IdentityIQ Credit Monitoring', url: 'https://www.identityiq.com/', category: 'monitoring' },
+  { label: 'MyFreeScoreNow Credit Monitoring', url: 'https://www.myfreescorenow.com/', category: 'monitoring' },
   { label: 'Self Credit Builder', url: 'https://www.self.inc/', category: 'credit_builder' },
+  { label: 'Kikoff Credit Builder', url: 'https://kikoff.com/', category: 'credit_builder' },
   { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }
 ];
 
@@ -55,7 +57,7 @@ authRouter.post('/register', async (req, res, next) => {
                   masterclassEnrolled: data.offerInterest === 'masterclass',
                   masterclassAccess: data.offerInterest === 'masterclass',
                   masterclassProgress: [],
-                  affiliateLinks: data.offerInterest === 'masterclass' ? defaultAffiliateLinks : [],
+                  affiliateLinks: defaultAffiliateLinks,
                   offerEligibleUntil: data.offerInterest === 'masterclass' ? new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() : null,
                   enrolledAt: data.offerInterest === 'masterclass' ? new Date().toISOString() : null
                 }
@@ -80,10 +82,12 @@ authRouter.post('/register', async (req, res, next) => {
     const welcomeEmail = await sendWelcomeLeadEmail({
       firstName: user.firstName || '',
       email: user.email,
-      contractLink
+      contractLink,
+      offerType: data.offerInterest
     });
+    const { passwordHash: _omitPasswordHash, ...safeUser } = user;
 
-    return res.status(201).json({ user, token, welcomeEmail: welcomeEmail.delivery });
+    return res.status(201).json({ user: safeUser, token, welcomeEmail: welcomeEmail.delivery });
   } catch (error) {
     next(error);
   }
@@ -104,7 +108,8 @@ authRouter.post('/login', async (req, res, next) => {
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
     const token = signToken({ sub: user.id, role: user.role });
-    return res.json({ user, token });
+    const { passwordHash: _omitPasswordHash, ...safeUser } = user;
+    return res.json({ user: safeUser, token });
   } catch (error) {
     next(error);
   }
@@ -126,13 +131,17 @@ authRouter.post('/password-setup/request', async (req, res, next) => {
         purpose: data.purpose ?? 'setup'
       });
       const link = buildPasswordSetupLink(config.appUrl, rawToken);
-      await sendPasswordSetupEmail({
+      const delivery = await sendPasswordSetupEmail({
         to: user.email,
         firstName: user.firstName,
         setupLink: link,
         purpose: data.purpose ?? 'setup',
         expiresAt
       });
+
+      if (delivery.delivery?.skipped) {
+        return res.status(503).json({ error: 'We could not send the reset email right now. Please try again in a few minutes or contact support.' });
+      }
     }
 
     return res.json({ success: true, message: 'If an account exists for that email, a setup link has been sent.' });

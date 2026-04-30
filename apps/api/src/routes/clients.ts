@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
+import { CreditAnalysisService } from '../lib/creditAnalysis.js';
 
 export const clientsRouter = Router();
 
@@ -18,6 +19,18 @@ clientsRouter.get('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (_req
       orderBy: { createdAt: 'desc' }
     });
     return res.json({ clients });
+  } catch (error) {
+    next(error);
+  }
+});
+
+clientsRouter.get('/me', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const client = await prisma.client.findUnique({
+      where: { userId: req.auth!.sub },
+      include: { payments: true, disputes: true, tasks: true, documents: true, activities: true }
+    });
+    return res.json({ client });
   } catch (error) {
     next(error);
   }
@@ -54,18 +67,6 @@ clientsRouter.get('/:id', requireAuth, requireRole(['STAFF', 'ADMIN']), async (r
     });
 
     if (!client) return res.status(404).json({ error: 'Client not found' });
-    return res.json({ client });
-  } catch (error) {
-    next(error);
-  }
-});
-
-clientsRouter.get('/me', requireAuth, async (req: AuthedRequest, res, next) => {
-  try {
-    const client = await prisma.client.findUnique({
-      where: { userId: req.auth!.sub },
-      include: { payments: true, disputes: true, tasks: true, documents: true, activities: true }
-    });
     return res.json({ client });
   } catch (error) {
     next(error);
@@ -195,6 +196,219 @@ clientsRouter.patch('/:id/status', requireAuth, requireRole(['STAFF', 'ADMIN']),
       include: { user: true, payments: true, disputes: true, documents: true, activities: true }
     });
     return res.json({ client });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== CREDIT ANALYSIS ENDPOINTS ==========
+
+clientsRouter.post('/:id/analysis/generate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const client = await prisma.client.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        creditReports: {
+          orderBy: { pulledAt: 'desc' },
+          include: { tradelines: true }
+        }
+      }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const analysis = CreditAnalysisService.generate({
+      client: client as any,
+      creditReports: client.creditReports as any
+    });
+
+    // Store analysis in ClientProgress.analysis JSON field
+    const progress = await prisma.clientProgress.findUnique({
+      where: { clientId: id }
+    });
+
+    if (progress) {
+      await prisma.clientProgress.update({
+        where: { clientId: id },
+        data: {
+          analysis: analysis as any,
+          workflow: {
+            ...(progress.workflow as any || {}),
+            stage: 'analysis_ready',
+            updatedAt: new Date().toISOString(),
+            next: ['review_analysis', 'begin_disputes']
+          }
+        }
+      });
+    } else {
+      await prisma.clientProgress.create({
+        data: {
+          clientId: id,
+          analysis: analysis as any,
+          workflow: {
+            stage: 'analysis_ready',
+            updatedAt: new Date().toISOString(),
+            next: ['review_analysis', 'begin_disputes']
+          }
+        }
+      });
+    }
+
+    // Also update client status
+    await prisma.client.update({
+      where: { id },
+      data: {
+        status: 'ANALYSIS_READY',
+        analysisSummary: analysis.clientFacingSummary.slice(0, 500) + '...'
+      }
+    });
+
+    await prisma.activityEvent.create({
+      data: {
+        clientId: id,
+        type: 'ANALYSIS_GENERATED',
+        message: `Credit analysis generated: ${analysis.keyFindings.length} findings, ${analysis.disputeOpportunities.length} dispute opportunities identified.`,
+        metadata: {
+          findingCount: analysis.keyFindings.length,
+          disputeCount: analysis.disputeOpportunities.length,
+          totalAccounts: analysis.overallStats.totalAccounts
+        }
+      }
+    });
+
+    return res.status(201).json({ analysis });
+  } catch (error) {
+    next(error);
+  }
+});
+
+clientsRouter.get('/:id/analysis', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const id = String(req.params.id);
+
+    // Clients can only view their own analysis
+    if (req.auth?.role === 'CLIENT') {
+      const client = await prisma.client.findUnique({
+        where: { userId: req.auth.sub },
+        include: { progress: true }
+      });
+      if (!client || client.id !== id) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+
+    const progress = await prisma.clientProgress.findUnique({
+      where: { clientId: id }
+    });
+
+    if (!progress?.analysis) {
+      return res.status(404).json({ error: 'Analysis not found. Generate one first.' });
+    }
+
+    return res.json({ analysis: progress.analysis });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Auto-generate analysis endpoint (called after document upload)
+clientsRouter.post('/:id/analysis/auto', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const id = String(req.params.id);
+
+    // Clients can only auto-generate for themselves
+    if (req.auth?.role === 'CLIENT') {
+      const client = await prisma.client.findUnique({
+        where: { userId: req.auth.sub }
+      });
+      if (!client || client.id !== id) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    } else if (!['STAFF', 'ADMIN'].includes(req.auth?.role || '')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Check if analysis already exists
+    const existing = await prisma.clientProgress.findUnique({
+      where: { clientId: id }
+    });
+
+    if (existing?.analysis) {
+      return res.json({ analysis: existing.analysis, cached: true });
+    }
+
+    const client = await prisma.client.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        creditReports: {
+          orderBy: { pulledAt: 'desc' },
+          include: { tradelines: true }
+        }
+      }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    // Need at least some credit report data
+    if (client.creditReports.length === 0) {
+      return res.status(400).json({ error: 'No credit reports found. Upload a report first.' });
+    }
+
+    const analysis = CreditAnalysisService.generate({
+      client: client as any,
+      creditReports: client.creditReports as any
+    });
+
+    if (existing) {
+      await prisma.clientProgress.update({
+        where: { clientId: id },
+        data: {
+          analysis: analysis as any,
+          workflow: {
+            ...(existing.workflow as any || {}),
+            stage: 'analysis_ready',
+            updatedAt: new Date().toISOString()
+          }
+        }
+      });
+    } else {
+      await prisma.clientProgress.create({
+        data: {
+          clientId: id,
+          analysis: analysis as any,
+          workflow: {
+            stage: 'analysis_ready',
+            updatedAt: new Date().toISOString(),
+            next: ['review_analysis', 'begin_disputes']
+          }
+        }
+      });
+    }
+
+    await prisma.client.update({
+      where: { id },
+      data: {
+        status: 'ANALYSIS_READY',
+        analysisSummary: analysis.clientFacingSummary.slice(0, 500) + '...'
+      }
+    });
+
+    await prisma.activityEvent.create({
+      data: {
+        clientId: id,
+        type: 'ANALYSIS_AUTO_GENERATED',
+        message: `Credit analysis auto-generated after report upload: ${analysis.keyFindings.length} findings identified.`,
+        metadata: {
+          findingCount: analysis.keyFindings.length,
+          disputeCount: analysis.disputeOpportunities.length
+        }
+      }
+    });
+
+    return res.status(201).json({ analysis });
   } catch (error) {
     next(error);
   }
