@@ -216,11 +216,15 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
       <section className="hero-card">
         <div>
           <p className="eyebrow">CredX Admin Portal</p>
-          <h1>Client Dashboard & Dispute Operations</h1>
+          <h1>Client Dashboard &amp; Dispute Operations</h1>
           <p>
             Centralize onboarding, disputes, client tracking, and staff workflow in one live CredX workspace.
           </p>
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Quick Stats</p><h2>At a glance</h2></div></div>
         <div className="hero-stats">
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=LEAD')}><span>New Leads</span><strong>{newLeads}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ANALYSIS_READY')}><span>Analysis Ready</span><strong>{analysisReady}</strong></button>
@@ -297,13 +301,6 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
             placeholder="Search clients..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              padding: '0.5rem 1rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              minWidth: '250px'
-            }}
           />
         </div>
       </div>
