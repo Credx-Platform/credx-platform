@@ -7,6 +7,7 @@ import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { config } from '../config.js';
 import { CreditAnalysisService } from '../lib/creditAnalysis.js';
+import { extractReport } from '../lib/reportExtractor.js';
 import type { DocumentType } from '@prisma/client';
 
 export const progressRouter = Router();
@@ -456,6 +457,56 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
     let workflowResult = null;
     if (docType === 'credit_report') {
       workflowResult = await completeOnboardingWorkflow(client.id, secureDoc);
+
+      // Parse uploaded PDF/HTML into CreditReport + Tradeline rows via AI Gateway.
+      // Fail-soft: if the gateway is unconfigured or the call errors, the upload still
+      // succeeds and the rule-based analyzer simply produces nothing this round.
+      try {
+        const extracted = await extractReport({
+          buffer: req.file.buffer,
+          mimeType: req.file.mimetype,
+          filename: safeName
+        });
+
+        if (extracted) {
+          for (const bureauReport of extracted.bureauReports) {
+            const pulledAt = bureauReport.pulledAt ? new Date(bureauReport.pulledAt) : new Date(uploadedAt);
+            await prisma.creditReport.create({
+              data: {
+                clientId: client.id,
+                bureau: bureauReport.bureau,
+                source: extracted.source,
+                pulledAt: Number.isFinite(pulledAt.getTime()) ? pulledAt : new Date(uploadedAt),
+                rawPayload: extracted.rawPayload as any,
+                tradelines: {
+                  create: bureauReport.tradelines.map(t => ({
+                    creditorName: t.creditorName,
+                    accountNumber: t.accountNumber,
+                    accountType: t.accountType,
+                    status: t.status,
+                    balance: t.balance,
+                    isNegative: t.isNegative
+                  }))
+                }
+              }
+            });
+          }
+          await prisma.activityEvent.create({
+            data: {
+              clientId: client.id,
+              type: 'CREDIT_REPORT_PARSED',
+              message: `Parsed ${extracted.bureauReports.length} bureau report(s) from uploaded file.`,
+              metadata: {
+                bureaus: extracted.bureauReports.map(b => b.bureau),
+                tradelineCount: extracted.bureauReports.reduce((sum, b) => sum + b.tradelines.length, 0),
+                source: extracted.source
+              }
+            }
+          });
+        }
+      } catch (parseErr) {
+        console.error('Credit-report extraction failed:', (parseErr as Error).message);
+      }
 
       // Auto-generate credit analysis if credit report data exists
       try {

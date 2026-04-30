@@ -421,41 +421,97 @@ export class CreditAnalysisService {
       }
     ];
 
-    // Client-facing summary
+    // Client-facing summary — Sharon-style structured narrative
     const totalDisputes = disputeOps.length;
-    const criticalFindings = findings.filter(f => f.severity === 'critical').length;
-    const highFindings = findings.filter(f => f.severity === 'high').length;
+    const inconsistencyFindings = findings.filter(f => f.category === 'inconsistency');
+    const duplicateFindings = findings.filter(f => f.category === 'duplicate');
+    const challengeable = findings.filter(f => f.category === 'challengeable');
+    const utilizationFinding = findings.find(f => f.category === 'utilization');
+
+    const profileLines: string[] = [
+      `- **Name:** ${client.user.firstName} ${client.user.lastName}`,
+      `- **Report date:** ${new Date().toLocaleDateString()}`,
+      `- **Bureaus reviewed:** ${bureauSummaries.filter(b => b.totalAccounts > 0).map(b => b.label).join(', ') || 'Pending bureau data'}`
+    ];
+    const profileAddress = [client.currentAddressLine1, client.currentCity, client.currentState, client.currentPostalCode]
+      .filter(Boolean).join(', ');
+    if (profileAddress) profileLines.push(`- **Current address on file:** ${profileAddress}`);
+    if (client.ssnLast4) profileLines.push(`- **SSN ending:** ${client.ssnLast4}`);
+
+    const bureauCountLines = bureauSummaries
+      .map(b => `- **${b.label}:** ${b.totalAccounts} total / ${b.negativeAccounts} derogatory`)
+      .join('\n');
+    const bureauBalanceLines = bureauSummaries
+      .map(b => `- **${b.label}:** $${Number(b.totalBalance).toLocaleString()}`)
+      .join('\n');
+
+    const balanceVals = bureauSummaries.map(b => Number(b.totalBalance));
+    const balanceSpread = balanceVals.length ? Math.max(...balanceVals) - Math.min(...balanceVals) : 0;
+
+    const negativeCodingLines: string[] = [];
+    for (const summary of bureauSummaries) {
+      if (summary.negativeAccounts > 0) {
+        const types = new Set(summary.accounts.filter(a => a.isNegative).map(a => a.status || a.accountType || 'unspecified'));
+        negativeCodingLines.push(`- **${summary.label}:** ${Array.from(types).slice(0, 6).join(', ')}`);
+      }
+    }
+
+    const reviewPoints: string[] = [];
+    if (utilizationFinding) {
+      reviewPoints.push(`### Utilization\n${utilizationFinding.description}\n\n_${utilizationFinding.recommendation}_`);
+    }
+    if (balanceSpread > 1000) {
+      reviewPoints.push(`### Balance inconsistencies\nReported balances differ by **$${balanceSpread.toLocaleString()}** across bureaus. Reconcile account by account.`);
+    }
+    if (inconsistencyFindings.length) {
+      reviewPoints.push(`### Bureau-to-bureau inconsistencies\n${inconsistencyFindings.slice(0, 3).map(f => `- ${f.title}: ${f.description}`).join('\n')}`);
+    }
+    if (duplicateFindings.length) {
+      reviewPoints.push(`### Duplicate reporting\n${duplicateFindings.slice(0, 3).map(f => `- ${f.title}`).join('\n')}`);
+    }
+    reviewPoints.push(`### Address / personal info audit\nVerify that name spelling, current and prior addresses, and employer history are correct and match across all three bureaus. Stale or mismatched personal info can cause mixed-file issues.`);
+
+    const timeline = totalNegativeAccounts > 10 ? '6–12 month' : totalNegativeAccounts > 5 ? '4–8 month' : '3–6 month';
 
     const clientFacingSummary = `
-## Your CredX Credit Analysis
+## Quick profile snapshot
 
-**Prepared for:** ${client.user.firstName} ${client.user.lastName}
-**Date:** ${new Date().toLocaleDateString()}
+${profileLines.join('\n')}
 
-### Executive Summary
+## Bureau summary differences that matter
 
-Your credit file contains **${totalAccounts} accounts** across the three major bureaus, with **${totalNegativeAccounts} negative items** currently reporting. Our analysis identified **${findings.length} key findings** and **${totalDisputes} dispute opportunities**.
+### Account counts
+${bureauCountLines || '- No bureau data parsed yet'}
 
-${criticalFindings > 0 ? `⚠️ **${criticalFindings} critical issue(s)** require immediate attention.` : ''}
-${highFindings > 0 ? `🔍 **${highFindings} high-priority finding(s)** identified for dispute.` : ''}
+### Balances
+${bureauBalanceLines || '- No balance data parsed yet'}
 
-### What's Hurting Your Score
+${negativeCodingLines.length ? `### Negative account coding\n${negativeCodingLines.join('\n')}\n` : ''}
+## Other obvious review points
 
-${findings.slice(0, 5).map(f => `- **${f.title}** (${f.severity.toUpperCase()}): ${f.description}`).join('\n\n')}
+${reviewPoints.join('\n\n')}
 
-### Recommended Timeline
+## Best next-step strategy
 
-Based on your file complexity, we estimate a **${totalNegativeAccounts > 10 ? '6-12 month' : totalNegativeAccounts > 5 ? '4-8 month' : '3-6 month'}** dispute and rebuild timeline.
+1. **Personal info audit first.** Confirm correct current address; identify wrong/obsolete addresses; flag any name or employer variants that should be removed or corrected.
+2. **Build a bureau-by-bureau negative account grid.** For each negative account, list furnisher, account number fragment, status, balance, payment status, date opened, date of first delinquency, and which bureau(s) report it.
+3. **Flag inconsistency targets.** Look for accounts where one bureau reports charge-off and another does not; balances differ; open/closed status differs; account history/dates differ; an item appears on one bureau but not the others.
+4. **Separate factual disputes from score concerns.**
+   - Utilization → rebuild issue
+   - Inconsistent derogatory reporting → dispute review issue
+   - Stale personal identifiers → cleanup issue
 
-### Next Steps
+## Bottom line
 
-1. Review this analysis with your CredX specialist
-2. Confirm dispute strategy and priority accounts
-3. Begin Round-One bureau disputes
-4. Monitor responses and escalate as needed
+Across the three bureaus we see **${totalAccounts} unique accounts**, **${totalNegativeAccounts} reporting negatively**, and **${totalDisputes} dispute opportunities** identified. Estimated working timeline: **${timeline}**.
+
+If you want, the next deliverables are:
+1. A **negative account comparison table** across bureaus
+2. A **personal info deletion/correction list**
+3. A **draft dispute strategy by bureau** based only on factual inconsistencies
 
 ---
-*This analysis is for educational and strategic planning purposes. Results vary by individual file and bureau response.*
+*Educational and strategic planning purposes. Results vary by individual file and bureau response.*
 `.trim();
 
     const educationSection = `
