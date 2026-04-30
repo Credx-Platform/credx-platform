@@ -581,24 +581,73 @@ button:hover,
   margin-top: 12px;
 }
 .hero-scores .score-gauge {
-  background: linear-gradient(180deg, rgba(11,18,32,.62), rgba(6,10,18,.55));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  padding: 16px 12px;
-  gap: 10px;
-}
-.hero-scores .score-gauge-ring {
-  width: 140px;
-  height: 140px;
+  background: linear-gradient(180deg, rgba(11,18,32,.32), rgba(6,10,18,.26));
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  padding: 16px 14px;
+  gap: 8px;
 }
 .hero-scores .score-gauge-value {
-  font-size: 36px;
+  font-size: 38px;
 }
 .hero-scores .score-gauge-bureau {
   font-size: 13px;
 }
-.hero-scores .score-gauge-foot {
+
+.score-bar {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ef4444 0%, #f59e0b 30%, #facc15 50%, #84cc16 72%, #22c55e 100%);
+  margin-top: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12);
+}
+.score-bar-marker {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--score-pct, 0) * 100%);
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--white);
+  border: 2px solid #0f1929;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.45), 0 0 0 2px var(--score-color, var(--cyan));
+}
+.score-bar-range {
+  display: flex;
+  justify-content: space-between;
   font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .08em;
+  margin-top: 2px;
+}
+
+.hero-card--section {
+  grid-template-columns: 1fr;
+  background: linear-gradient(135deg, rgba(8,14,24,.94), rgba(16,26,43,.88));
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--section-accent, var(--cyan));
+  padding: 22px 26px;
+  min-height: auto;
+  box-shadow: var(--shadow), inset 24px 0 36px -28px var(--section-accent, var(--cyan));
+}
+.hero-card--section .eyebrow {
+  color: var(--section-accent, var(--cyan));
+}
+.hero-card--section h1 {
+  font-size: clamp(1.4rem, 2.4vw, 1.95rem);
+  margin: 6px 0 8px;
+}
+.hero-card--section p {
+  color: var(--muted);
+  margin: 0;
+  max-width: 620px;
+  line-height: 1.6;
+}
+@media (max-width: 720px) {
+  .hero-card--section { padding: 18px 18px 18px 22px; }
 }
 
 @media (max-width: 980px) {
@@ -608,17 +657,19 @@ button:hover,
 }
 @media (max-width: 720px) {
   .hero-scores { gap: 8px; }
-  .hero-scores .score-gauge { padding: 12px 6px; gap: 8px; }
-  .hero-scores .score-gauge-ring { width: 96px; height: 96px; }
-  .hero-scores .score-gauge-value { font-size: 22px; }
+  .hero-scores .score-gauge { padding: 12px 8px; gap: 6px; }
+  .hero-scores .score-gauge-value { font-size: 26px; }
   .hero-scores .score-gauge-bureau { font-size: 11px; }
   .hero-scores .score-gauge-band { font-size: 10px; }
-  .hero-scores .score-gauge-foot { display: none; }
+  .hero-scores .score-bar { height: 6px; }
+  .hero-scores .score-bar-marker { width: 12px; height: 12px; }
+  .hero-scores .score-bar-range { font-size: 9px; }
 }
 @media (max-width: 420px) {
-  .hero-scores .score-gauge-ring { width: 78px; height: 78px; }
-  .hero-scores .score-gauge-value { font-size: 18px; }
-  .hero-scores .score-gauge { padding: 10px 4px; }
+  .hero-scores .score-gauge-value { font-size: 20px; }
+  .hero-scores .score-gauge { padding: 10px 6px; }
+  .hero-scores .score-bar { height: 5px; }
+  .hero-scores .score-bar-marker { width: 10px; height: 10px; }
 }
 
 .score-gauge {

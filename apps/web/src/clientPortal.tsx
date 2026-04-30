@@ -228,6 +228,32 @@ function scoreBand(score: number): ScoreBand {
   return { label: 'Poor', color: '#f87171', range: '300–579' };
 }
 
+type SectionTheme = { title: string; desc: string; accent: string };
+const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
+  profile: { title: 'Your Profile', desc: 'Personal info, secure documents, and identity verification details.', accent: '#a855f7' },
+  monitoring: { title: 'Credit Monitoring', desc: 'Connect your monitoring provider, upload reports, and review CredX analysis.', accent: '#00c6fb' },
+  disputes: { title: 'Disputes', desc: 'Track active dispute items, bureau status, and round progression.', accent: '#f59e0b' },
+  activity: { title: 'Activity', desc: 'Timeline of what just happened on your file and what comes next.', accent: '#2dd4bf' },
+  resources: { title: 'Credit Builders', desc: 'Partner tools and accounts to rebuild your credit profile.', accent: '#84cc16' },
+  tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' }
+};
+
+function SectionHeader({ section }: { section: Exclude<PortalTab, 'overview'> }) {
+  const theme = SECTION_THEMES[section];
+  return (
+    <section
+      className="hero-card hero-card--section"
+      style={{ ['--section-accent' as any]: theme.accent }}
+    >
+      <div>
+        <p className="eyebrow">{theme.title}</p>
+        <h1>{theme.title}</h1>
+        <p>{theme.desc}</p>
+      </div>
+    </section>
+  );
+}
+
 function CreditScoreGauge({ bureau, score }: { bureau: string; score: number | null }) {
   const hasScore = typeof score === 'number' && Number.isFinite(score);
   const pct = hasScore ? Math.max(0, Math.min(1, ((score as number) - 300) / 550)) : 0;
@@ -242,15 +268,14 @@ function CreditScoreGauge({ bureau, score }: { bureau: string; score: number | n
       }}
     >
       <div className="score-gauge-bureau">{bureau}</div>
-      <div className="score-gauge-ring">
-        <div className="score-gauge-center">
-          <div className="score-gauge-value">{hasScore ? score : '—'}</div>
-          <div className="score-gauge-band">{band.label}</div>
-        </div>
+      <div className="score-gauge-value">{hasScore ? score : '—'}</div>
+      <div className="score-gauge-band">{band.label}</div>
+      <div className="score-bar" aria-hidden="true">
+        {hasScore ? <div className="score-bar-marker" /> : null}
       </div>
-      <div className="score-gauge-foot">
-        <span>VantageScore</span>
-        <span>{band.range}</span>
+      <div className="score-bar-range">
+        <span>300</span>
+        <span>850</span>
       </div>
     </div>
   );
@@ -1211,29 +1236,35 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         {client?.portalRestricted ? <div className="error-banner">Your portal access is currently restricted. Contact CredX support for help.</div> : null}
 
         <div className="page-grid">
-          <section className="hero-card hero-card--dispute">
-            <div className="hero-dispute-content">
-              <p className="eyebrow">Dispute Status</p>
-              <h1 className="hero-dispute-title">{disputeHeadline}</h1>
-              <p>{disputeSummary}</p>
-              <div className="hero-scores">
-                <CreditScoreGauge bureau="Experian" score={typeof progress?.scores?.experian === 'number' ? progress.scores.experian : null} />
-                <CreditScoreGauge bureau="Equifax" score={typeof progress?.scores?.equifax === 'number' ? progress.scores.equifax : null} />
-                <CreditScoreGauge bureau="TransUnion" score={typeof progress?.scores?.transunion === 'number' ? progress.scores.transunion : null} />
-              </div>
-            </div>
-          </section>
-
           {activeTab === 'overview' ? (
-            <section className="panel">
-              <div className="panel-header"><div><p className="eyebrow">Workflow</p><h2>Workflow snapshot</h2></div></div>
-              <ul className="activity-list">
-                <li><strong>Credit monitoring</strong><span>{progress?.workflow?.next?.length ? progress.workflow.next.map(prettyStatus).join(', ') : 'No next step posted yet.'}</span></li>
-                <li><strong>Analysis report</strong><span>{client?.analysisSummary || 'Pending report review.'}</span></li>
-                <li><strong>Dispute strategy</strong><span>{client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Pending publication.'}</span></li>
-                <li><strong>Open tasks</strong><span>{pendingTasks} pending · {disputes.length} dispute{disputes.length === 1 ? '' : 's'} on file</span></li>
-              </ul>
-            </section>
+            <>
+              <section className="hero-card hero-card--dispute">
+                <div className="hero-dispute-content">
+                  <p className="eyebrow">Dispute Status</p>
+                  <h1 className="hero-dispute-title">{disputeHeadline}</h1>
+                  <p>{disputeSummary}</p>
+                  <div className="hero-scores">
+                    <CreditScoreGauge bureau="Experian" score={typeof progress?.scores?.experian === 'number' ? progress.scores.experian : null} />
+                    <CreditScoreGauge bureau="Equifax" score={typeof progress?.scores?.equifax === 'number' ? progress.scores.equifax : null} />
+                    <CreditScoreGauge bureau="TransUnion" score={typeof progress?.scores?.transunion === 'number' ? progress.scores.transunion : null} />
+                  </div>
+                </div>
+              </section>
+
+              <section className="panel">
+                <div className="panel-header"><div><p className="eyebrow">Workflow</p><h2>Workflow snapshot</h2></div></div>
+                <ul className="activity-list">
+                  <li><strong>Credit monitoring</strong><span>{progress?.workflow?.next?.length ? progress.workflow.next.map(prettyStatus).join(', ') : 'No next step posted yet.'}</span></li>
+                  <li><strong>Analysis report</strong><span>{client?.analysisSummary || 'Pending report review.'}</span></li>
+                  <li><strong>Dispute strategy</strong><span>{client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Pending publication.'}</span></li>
+                  <li><strong>Open tasks</strong><span>{pendingTasks} pending · {disputes.length} dispute{disputes.length === 1 ? '' : 's'} on file</span></li>
+                </ul>
+              </section>
+            </>
+          ) : null}
+
+          {activeTab !== 'overview' && (activeTab in SECTION_THEMES) ? (
+            <SectionHeader section={activeTab as Exclude<PortalTab, 'overview'>} />
           ) : null}
 
           {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
