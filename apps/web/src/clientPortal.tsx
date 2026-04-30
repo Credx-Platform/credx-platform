@@ -269,12 +269,13 @@ function CreditScoreGauge({ bureau, score }: { bureau: string; score: number | n
       }}
     >
       <div className="score-gauge-bureau">{bureau}</div>
-      <div className="score-gauge-value">{hasScore ? score : '—'}</div>
-      <div className="score-gauge-band">{band.label}</div>
-      <div className="score-bar" aria-hidden="true">
-        {hasScore ? <div className="score-bar-marker" /> : null}
+      <div className="score-gauge-ring" aria-hidden="true">
+        <div className="score-gauge-center">
+          <div className="score-gauge-value">{hasScore ? score : '—'}</div>
+          <div className="score-gauge-band">{band.label}</div>
+        </div>
       </div>
-      <div className="score-bar-range">
+      <div className="score-gauge-foot">
         <span>300</span>
         <span>850</span>
       </div>
