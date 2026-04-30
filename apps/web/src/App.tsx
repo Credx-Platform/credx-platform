@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DisputeManager } from './components/DisputeManager';
+import { AnalysisTab } from './components/AnalysisTab';
 
 type Plan = {
   code: string;
@@ -25,6 +26,12 @@ type ClientRecord = {
   disputePlanSummary?: string | null;
   estimatedTimelineMonths?: number | null;
   portalRestricted?: boolean;
+  ssnLast4?: string | null;
+  currentAddressLine1?: string | null;
+  currentAddressLine2?: string | null;
+  currentCity?: string | null;
+  currentState?: string | null;
+  currentPostalCode?: string | null;
   createdAt: string;
   updatedAt: string;
   user: User;
@@ -343,7 +350,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
   );
 }
 
-type ClientWorkspaceTab = 'overview' | 'profile' | 'documents' | 'disputes' | 'activity';
+type ClientWorkspaceTab = 'overview' | 'profile' | 'documents' | 'disputes' | 'activity' | 'analysis';
 
 function ClientDetailRoute({ token }: { token: string }) {
   const { id } = useParams();
@@ -404,6 +411,7 @@ function ClientDetailRoute({ token }: { token: string }) {
     { key: 'profile', label: 'Profile' },
     { key: 'documents', label: 'Documents' },
     { key: 'disputes', label: 'Disputes' },
+    { key: 'analysis', label: 'Analysis' },
     { key: 'activity', label: 'Activity' }
   ];
 
@@ -570,6 +578,20 @@ function ClientDetailRoute({ token }: { token: string }) {
             ) : <p className="helper-text">No activity yet.</p>}
           </div>
         ) : null}
+
+        {activeTab === 'analysis' ? (
+          <AnalysisTab
+            token={token}
+            clientId={client.id}
+            clientName={fullName}
+            clientAddress={[
+              client.currentAddressLine1,
+              client.currentCity,
+              client.currentState,
+              client.currentPostalCode
+            ].filter(Boolean).join(', ') || undefined}
+          />
+        ) : null}
         </div>
       </section>
     </div>
@@ -702,6 +724,8 @@ function LoginScreen({
 }
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [user, setUser] = useState<User | null>(() => {
     const raw = localStorage.getItem(USER_KEY);
@@ -828,6 +852,18 @@ export default function App() {
             <button className="ghost-button" onClick={handleLogout}>Sign out</button>
           </div>
         </header>
+
+        <select
+          className="mobile-nav-select"
+          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/clients') ? '/clients' : '/'}
+          onChange={(e) => navigate(e.target.value)}
+          aria-label="Admin section"
+        >
+          <option value="/">Overview</option>
+          <option value="/clients">Clients</option>
+          <option value="/disputes">Disputes</option>
+        </select>
+
         {error ? <div className="error-banner">{error}</div> : null}
         <Routes>
           <Route path="/" element={<Overview clients={clients} disputes={disputes} plans={plans} />} />

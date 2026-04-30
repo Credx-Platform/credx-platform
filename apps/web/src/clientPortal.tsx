@@ -84,7 +84,7 @@ type WizardState = {
   monitorPassword: string;
 };
 
-type PortalTab = 'overview' | 'profile' | 'monitoring' | 'disputes' | 'activity' | 'resources' | 'tasks';
+type PortalTab = 'overview' | 'profile' | 'monitoring' | 'disputes' | 'activity' | 'resources' | 'tasks' | 'analysis';
 
 type SecureUploadState = {
   file: File | null;
@@ -789,6 +789,175 @@ function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { to
   );
 }
 
+function AnalysisSection({ client, progress }: { client: Client | null; progress: Progress | null; }) {
+  const analysis = progress?.analysis as any;
+  const hasAnalysis = analysis && typeof analysis === 'object' && analysis.keyFindings;
+
+  const findings = hasAnalysis ? (analysis.keyFindings || []) : [];
+  const disputeOps = hasAnalysis ? (analysis.disputeOpportunities || []) : [];
+  const actionPlan = hasAnalysis ? (analysis.actionPlan || []) : [];
+  const bureauSummaries = hasAnalysis ? (analysis.bureauSummaries || []) : [];
+  const overallStats = hasAnalysis ? (analysis.overallStats || {}) : {};
+  const clientFacingSummary = hasAnalysis ? (analysis.clientFacingSummary || '') : '';
+  const educationSection = hasAnalysis ? (analysis.educationSection || '') : '';
+
+  function severityColor(severity: string): string {
+    switch (severity) {
+      case 'critical': return '#dc2626';
+      case 'high': return '#ea580c';
+      case 'medium': return '#ca8a04';
+      case 'low': return '#16a34a';
+      default: return '#6b7280';
+    }
+  }
+
+  function bureauLabel(b: string): string {
+    return b === 'equifax' ? 'Equifax' : b === 'experian' ? 'Experian' : 'TransUnion';
+  }
+
+  if (!hasAnalysis) {
+    return (
+      <div className="page-grid">
+        <section className="panel">
+          <div className="panel-header"><div><p className="eyebrow">Credit Analysis</p><h2>Your analysis report</h2></div></div>
+          <div className="empty-state-card">
+            <strong>Analysis not ready yet</strong>
+            <p>Your CredX team is reviewing your credit reports. The analysis will appear here once it's complete.</p>
+            <p style={{ marginTop: '12px', fontSize: '0.85rem', color: '#64748b' }}>
+              Status: {client?.status || 'Pending'} · Reports uploaded: {client?.documents?.filter(d => d.type === 'CREDIT_REPORT').length || 0}
+            </p>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="page-grid">
+      <section className="hero-card hero-card--compact">
+        <div>
+          <p className="eyebrow">Credit Analysis</p>
+          <h1>Your Professional Credit Report Analysis</h1>
+          <p>A detailed breakdown of your credit file, findings, and recommended dispute strategy.</p>
+        </div>
+        <div className="hero-stats">
+          <div className="stat-card"><span>Total Accounts</span><strong>{overallStats.totalAccounts || 0}</strong></div>
+          <div className="stat-card"><span>Negatives</span><strong style={{ color: '#dc2626' }}>{overallStats.totalNegativeAccounts || 0}</strong></div>
+          <div className="stat-card"><span>Total Balance</span><strong>${(overallStats.totalBalance || 0).toLocaleString()}</strong></div>
+          <div className="stat-card"><span>Dispute Ops</span><strong>{disputeOps.length}</strong></div>
+        </div>
+      </section>
+
+      <section className="panel two-col">
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Key Findings</p><h2>What we found</h2></div></div>
+          <div className="dispute-list">
+            {findings.slice(0, 5).map((finding: any, idx: number) => (
+              <div key={finding.id || idx} className="dispute-card-live" style={{ borderLeft: `3px solid ${severityColor(finding.severity)}` }}>
+                <div className="dispute-card-top">
+                  <strong>{finding.title}</strong>
+                  <span className="status-badge" style={{ background: severityColor(finding.severity), color: '#fff', textTransform: 'uppercase', fontSize: '0.7rem' }}>
+                    {finding.severity}
+                  </span>
+                </div>
+                <div className="dispute-meta"><span>{finding.description}</span></div>
+                <div className="dispute-meta" style={{ marginTop: '4px' }}>
+                  <span style={{ color: '#2563eb', fontWeight: 600 }}>→ {finding.recommendation}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Bureau Comparison</p><h2>Your 3-bureau snapshot</h2></div></div>
+          <div className="dispute-list">
+            {bureauSummaries.map((b: any) => (
+              <div key={b.bureau} className="plan-card">
+                <strong>{b.label}</strong>
+                <span>{b.totalAccounts} accounts · {b.negativeAccounts} negative · ${b.totalBalance.toLocaleString()} balance</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Dispute Opportunities</p><h2>Accounts ready for dispute</h2></div></div>
+        <div className="dispute-list">
+          {disputeOps.length ? disputeOps.map((op: any, idx: number) => (
+            <div key={idx} className="dispute-card-live">
+              <div className="dispute-card-top">
+                <strong>{op.accountName}</strong>
+                <span className="status-badge" style={{
+                  background: op.priority === 'high' ? '#fef2f2' : op.priority === 'medium' ? '#fefce8' : '#f0fdf4',
+                  color: op.priority === 'high' ? '#dc2626' : op.priority === 'medium' ? '#ca8a04' : '#16a34a'
+                }}>
+                  {op.priority} priority
+                </span>
+              </div>
+              <div className="dispute-meta"><span>{op.issue}</span></div>
+              <div className="dispute-meta" style={{ marginTop: '4px' }}>
+                <span style={{ fontWeight: 600 }}>Reason:</span> {op.reason}
+              </div>
+              <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                {op.bureaus.map((b: string) => (
+                  <span key={b} style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, background: '#eff6ff', color: '#2563eb' }}>
+                    {bureauLabel(b)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )) : <div className="empty-state-card">No dispute opportunities identified yet.</div>}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Action Plan</p><h2>Your 5-phase dispute strategy</h2></div></div>
+        <div className="dispute-list">
+          {actionPlan.map((phase: any) => (
+            <div key={phase.phase} className="dispute-card-live" style={{ paddingLeft: '2.5rem', position: 'relative' }}>
+              <span style={{
+                position: 'absolute', left: '0.75rem', top: '1rem',
+                width: '1.5rem', height: '1.5rem', borderRadius: '50%',
+                background: '#2563eb', color: '#fff', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.75rem', fontWeight: 700
+              }}>
+                {phase.phase}
+              </span>
+              <div className="dispute-card-top"><strong>{phase.title}</strong><span style={{ color: '#2563eb', fontWeight: 600, fontSize: '0.8rem' }}>~{phase.estimatedWeeks} weeks</span></div>
+              <div className="dispute-meta"><span>{phase.description}</span></div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0 0' }}>
+                {phase.tasks.map((task: string, i: number) => (
+                  <li key={i} style={{ fontSize: '0.82rem', color: '#475569', padding: '2px 0', paddingLeft: '1rem', position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 0, color: '#2563eb', fontSize: '0.7rem' }}>→</span>
+                    {task}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel two-col">
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Education</p><h2>Understanding your credit</h2></div></div>
+          <div className="plan-card" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: '0.85rem', color: '#374151' }}>
+            {educationSection}
+          </div>
+        </div>
+        <div>
+          <div className="panel-header"><div><p className="eyebrow">Summary</p><h2>Your executive summary</h2></div></div>
+          <div className="plan-card" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: '0.85rem', color: '#374151' }}>
+            {clientFacingSummary}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function ClientPortalApp({ onboardingOnly = false }: { onboardingOnly?: boolean }) {
   const [token, setToken] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -960,6 +1129,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
   const navItems: Array<{ key: PortalTab; label: string }> = [
     { key: 'overview', label: 'Overview' },
+    { key: 'analysis', label: 'Analysis' },
     { key: 'profile', label: 'Profile' },
     { key: 'monitoring', label: 'Credit Monitoring' },
     { key: 'disputes', label: 'Disputes' },
@@ -985,6 +1155,17 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           </div>
           <div className="topbar-actions"><div className="admin-pill">{client?.serviceTier || 'ESSENTIAL'} plan</div><button className="ghost-button" onClick={handleLogout}>Sign out</button></div>
         </header>
+
+        <select
+          className="mobile-nav-select"
+          value={activeTab}
+          onChange={(e) => setActiveTab(e.target.value as PortalTab)}
+          aria-label="Portal section"
+        >
+          {navItems.map((item) => (
+            <option key={item.key} value={item.key}>{item.label}</option>
+          ))}
+        </select>
 
         {error ? <div className="error-banner">{error}</div> : null}
         {client?.portalRestricted ? <div className="error-banner">Your portal access is currently restricted. Contact CredX support for help.</div> : null}
@@ -1020,6 +1201,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           {activeTab === 'disputes' ? <DisputesSection client={client} progress={progress} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
+          {activeTab === 'analysis' ? <AnalysisSection client={client} progress={progress} /> : null}
 
           {activeTab === 'tasks' ? (
             <section className="panel">
