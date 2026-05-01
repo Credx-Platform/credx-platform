@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import MasterclassDashboard from './components/MasterclassDashboard';
 
 type User = {
   id: string;
@@ -84,7 +85,7 @@ type WizardState = {
   monitorPassword: string;
 };
 
-type PortalTab = 'overview' | 'profile' | 'monitoring' | 'disputes' | 'activity' | 'resources' | 'tasks' | 'analysis';
+type PortalTab = 'overview' | 'profile' | 'monitoring' | 'disputes' | 'activity' | 'resources' | 'tasks' | 'analysis' | 'masterclass';
 
 type SecureUploadState = {
   file: File | null;
@@ -236,7 +237,8 @@ const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
   activity: { title: 'Activity', desc: 'Timeline of what just happened on your file and what comes next.', accent: '#2dd4bf' },
   resources: { title: 'Credit Builders', desc: 'Partner tools and accounts to rebuild your credit profile.', accent: '#84cc16' },
   tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' },
-  analysis: { title: 'Credit Analysis', desc: 'Your professional credit analysis report and dispute strategy.', accent: '#2563eb' }
+  analysis: { title: 'Credit Analysis', desc: 'Your professional credit analysis report and dispute strategy.', accent: '#2563eb' },
+  masterclass: { title: '5-Day Masterclass', desc: 'Your complete credit repair curriculum — videos, slides, key terms, and action steps.', accent: '#00c6fb' }
 };
 
 function SectionHeader({ section }: { section: Exclude<PortalTab, 'overview'> }) {
@@ -1244,16 +1246,59 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     );
   }
 
-  const navItems: Array<{ key: PortalTab; label: string }> = [
-    { key: 'overview', label: 'Overview' },
-    { key: 'analysis', label: 'Analysis' },
-    { key: 'profile', label: 'Profile' },
-    { key: 'monitoring', label: 'Credit Monitoring' },
-    { key: 'disputes', label: 'Disputes' },
-    { key: 'activity', label: 'Activity' },
-    { key: 'resources', label: 'Credit Builders' },
-    { key: 'tasks', label: 'Tasks' }
-  ];
+  const masterclassEnrolled = !!progress?.education?.masterclassEnrolled;
+  const masterclassOnly = masterclassEnrolled && (client?.status || '').toUpperCase() === 'LEAD';
+  const completedMasterclassDays = useMemo(
+    () => (progress?.education?.masterclassProgress || []).filter((s): s is string => typeof s === 'string'),
+    [progress?.education?.masterclassProgress]
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user) return;
+    const url = new URL(window.location.href);
+    const welcome = url.searchParams.get('welcome');
+    if (welcome === 'masterclass' && masterclassEnrolled) {
+      setActiveTab('masterclass');
+      url.searchParams.delete('welcome');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
+    if (masterclassOnly) {
+      setActiveTab('masterclass');
+    }
+  }, [user?.id, masterclassEnrolled, masterclassOnly]);
+
+  const handleMarkMasterclassDay = async (slug: string) => {
+    if (!token) return;
+    if (completedMasterclassDays.includes(slug)) return;
+    try {
+      await apiFetch('/api/masterclass/progress', token, {
+        method: 'POST',
+        body: JSON.stringify({ daySlug: slug })
+      });
+      await refreshAll();
+    } catch (err) {
+      console.warn('Failed to mark masterclass day complete', err);
+    }
+  };
+
+  const navItems: Array<{ key: PortalTab; label: string }> = masterclassOnly
+    ? [
+        { key: 'masterclass', label: '5-Day Masterclass' },
+        { key: 'profile', label: 'Profile' },
+        { key: 'resources', label: 'Credit Builders' }
+      ]
+    : [
+        { key: 'overview', label: 'Overview' },
+        ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
+        { key: 'analysis', label: 'Analysis' },
+        { key: 'profile', label: 'Profile' },
+        { key: 'monitoring', label: 'Credit Monitoring' },
+        { key: 'disputes', label: 'Disputes' },
+        { key: 'activity', label: 'Activity' },
+        { key: 'resources', label: 'Credit Builders' },
+        { key: 'tasks', label: 'Tasks' }
+      ];
 
   return (
     <div className="shell client-shell">
@@ -1426,6 +1471,14 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
               <SectionHeader section="analysis" />
               <AnalysisSection client={client} progress={progress} />
             </>
+          ) : null}
+
+          {activeTab === 'masterclass' ? (
+            <MasterclassDashboard
+              firstName={user?.firstName || ''}
+              completedDays={completedMasterclassDays}
+              onMarkComplete={handleMarkMasterclassDay}
+            />
           ) : null}
 
           {activeTab === 'tasks' ? (

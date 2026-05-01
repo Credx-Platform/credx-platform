@@ -36,7 +36,7 @@ export default function SetPassword() {
   const nextDestination = useMemo(() => {
     if (typeof window === 'undefined') return '/portal';
     const next = new URLSearchParams(window.location.search).get('next');
-    return next === 'masterclass' ? '/masterclass#day1' : '/portal';
+    return next === 'masterclass' ? '/portal?welcome=masterclass' : '/portal';
   }, []);
 
   const [status, setStatus] = useState<Status>({ kind: 'verifying' });

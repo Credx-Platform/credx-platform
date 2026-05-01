@@ -157,6 +157,87 @@ CredX`;
   return { subject, html, text };
 }
 
+type MasterclassDayContent = {
+  day: number;
+  title: string;
+  tagline: string;
+  summary: string;
+  objectives: string[];
+  isBonus?: boolean;
+};
+
+export const MASTERCLASS_EMAIL_DAYS: MasterclassDayContent[] = [
+  { day: 1, title: 'Day 1 — Credit Fundamentals', tagline: 'Understand how credit really works', summary: 'The foundation: how FICO is calculated, how to read a tri-merge report, and how to spot the items actually moving your score.', objectives: ['Break down the five FICO factors.', 'Pull and read all three bureau reports.', 'Build your dispute target list.'] },
+  { day: 2, title: 'Day 2 — The Dispute Process Decoded', tagline: 'Your legal rights and the dispute workflow', summary: 'The Fair Credit Reporting Act gives you a real toolkit. Today you learn the laws and the workflow that forces investigations.', objectives: ['Know your FCRA and FDCPA rights.', 'Draft a dispute letter that cannot be ignored.', 'Track the 30-day reinvestigation window.'] },
+  { day: 3, title: 'Day 3 — Advanced Dispute Tactics', tagline: 'Escalation when bureaus stall', summary: 'Standard disputes get most things removed; the rest need pressure. Today: 609 letters, validation, and CFPB escalation.', objectives: ['Use Section 609 to demand verifiable proof.', 'Force collectors to validate before settling.', 'Escalate to the CFPB or state AG when needed.'] },
+  { day: 4, title: 'Day 4 — Building Positive Credit', tagline: 'Add strong tradelines to push the score up', summary: 'Removing negatives is half the work; the other half is replacing them with consistent positive history.', objectives: ['Use authorized-user tradelines to import history.', 'Choose a secured card that graduates.', 'Stack builder loans, rent and utility reporting.'] },
+  { day: 5, title: 'Day 5 — Business Credit & Funding', tagline: 'Separate personal and business credit for growth', summary: 'Business credit is its own profile. Build the foundation correctly so you can qualify for funding without leaning on personal credit.', objectives: ['Stand up a credible business profile.', 'Open Net-30 vendor accounts that report.', 'Move from vendor credit to business funding.'] },
+  { day: 6, title: 'Bonus Day — Generational Wealth', tagline: 'Build something that outlasts you', summary: 'Credit is a tool. Wealth is the goal. Connect everything to investing, real estate, and structures that protect what you build.', objectives: ['Use strong credit for better real-estate financing.', 'Set up a consistent investing routine.', 'Use trust structures to protect and transfer.'], isBonus: true }
+];
+
+function renderMasterclassDayEmail(params: { firstName: string; portalLink: string; day: MasterclassDayContent }) {
+  const accent = params.day.isBonus ? '#f59e0b' : '#00c6fb';
+  const subject = `${params.day.title} — ${params.day.tagline} | CredX Masterclass`;
+  const objectivesHtml = params.day.objectives.map((o) => `<li style="margin:0 0 8px;color:#d5dfeb;">${o}</li>`).join('');
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>${subject}</title></head>
+<body style="margin:0;padding:0;background:#0d1420;font-family:Arial,Helvetica,sans-serif;color:#e9eef6;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0d1420;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
+        <tr><td style="height:6px;background:${accent};font-size:0;line-height:0;">&nbsp;</td></tr>
+        <tr><td style="padding:32px 28px 22px;text-align:center;border-bottom:1px solid #243247;">
+          <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
+          <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">5-Day Masterclass${params.day.isBonus ? ' · Bonus' : ''}</div>
+        </td></tr>
+        <tr><td style="padding:30px 28px 8px;">
+          <p style="margin:0 0 6px;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:${accent};font-weight:700;">${params.day.title}</p>
+          <h1 style="margin:0 0 12px;font-size:26px;line-height:1.25;color:#ffffff;">${params.day.tagline}</h1>
+          <p style="margin:0 0 18px;color:#d5dfeb;font-size:16px;line-height:1.65;">Hi ${params.firstName || 'there'} — ${params.day.summary}</p>
+          <p style="margin:18px 0 8px;color:#ffffff;font-weight:700;">What you'll learn today</p>
+          <ul style="margin:0 0 18px;padding-left:20px;color:#d5dfeb;font-size:15px;line-height:1.65;">${objectivesHtml}</ul>
+          <div style="text-align:center;padding:14px 0 6px;">
+            <a href="${params.portalLink}" style="display:inline-block;background:${accent};color:#0d1420;text-decoration:none;padding:15px 30px;border-radius:12px;font-weight:800;font-size:16px;">Open Day ${params.day.day} in your portal</a>
+          </div>
+          <p style="margin:18px 0 0;color:#9fb0c5;font-size:13px;line-height:1.6;">Each day has two short lessons, the slide follow-along, key terms, and concrete action steps.</p>
+        </td></tr>
+        <tr><td style="padding:22px 28px 28px;color:#9fb0c5;font-size:12px;line-height:1.6;border-top:1px solid #243247;">
+          Questions? Reply to this email or write to <a href="mailto:contact@credxme.com" style="color:${accent};">contact@credxme.com</a>.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const text = `${params.day.title} — ${params.day.tagline}
+
+Hi ${params.firstName || 'there'},
+
+${params.day.summary}
+
+What you'll learn today:
+${params.day.objectives.map((o) => `- ${o}`).join('\n')}
+
+Open Day ${params.day.day}: ${params.portalLink}
+
+— CredX`;
+
+  return { subject, html, text };
+}
+
+export async function sendMasterclassDayEmail(params: { to: string; firstName: string; portalLink: string; day: number }) {
+  const dayContent = MASTERCLASS_EMAIL_DAYS.find((d) => d.day === params.day);
+  if (!dayContent) {
+    throw new Error(`No masterclass content defined for day ${params.day}`);
+  }
+  const email = renderMasterclassDayEmail({ firstName: params.firstName, portalLink: params.portalLink, day: dayContent });
+  const result = await sendEmail({ to: params.to, subject: email.subject, html: email.html, text: email.text });
+  console.log('MASTERCLASS_DAY_EMAIL_SEND_RESULT', { to: params.to, day: params.day, result });
+  return { ...email, delivery: result };
+}
+
 export async function sendMasterclassWelcomeEmail(params: { to: string; firstName: string; setupLink: string; expiresAt: Date }) {
   const email = renderMasterclassWelcomeEmail({
     firstName: params.firstName,
