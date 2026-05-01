@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>5-Day Masterclass | CredX</title>
+<meta name="description" content="The CredX 5-Day Credit Repair Masterclass plus Bonus Day. Credit fundamentals, disputes, advanced tactics, credit building, business credit, and generational wealth.">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#060a12;--bg2:#0b1120;--bg3:#101828;--bg4:#182035;
+  --cyan:#00c6fb;--cyan2:#00e5ff;--cyan-dim:rgba(0,198,251,.08);--cyan-glow:rgba(0,198,251,.3);
+  --white:#edf2f7;--muted:#64748b;--muted2:#475569;
+  --border:rgba(255,255,255,.06);--border-c:rgba(0,198,251,.15);
+  --gold:#f59e0b;--gold-dim:rgba(245,158,11,.08);--gold-c:rgba(245,158,11,.25);
+}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--white);line-height:1.65;overflow-x:hidden}
+h1,h2,h3,h4,.hd{font-family:'Outfit',sans-serif}
+a{text-decoration:none;color:inherit}
+
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;height:60px;padding:0 clamp(16px,4vw,48px);display:flex;align-items:center;justify-content:space-between;background:rgba(6,10,18,.85);backdrop-filter:blur(24px);border-bottom:1px solid var(--border)}
+.nav-brand{font-family:'Outfit';font-weight:800;font-size:18px;letter-spacing:.4px;color:var(--white);display:inline-flex;align-items:center;gap:10px}
+.nav-brand .x{color:var(--cyan)}
+.nav-links{display:flex;gap:24px;list-style:none}
+.nav-links a{font-size:13px;font-weight:500;color:var(--muted);transition:color .2s}
+.nav-links a:hover{color:var(--white)}
+.nav-cta{height:34px;padding:0 18px;display:inline-flex;align-items:center;background:var(--cyan);color:var(--bg);font-family:'Outfit';font-weight:700;font-size:12px;letter-spacing:.4px;border-radius:6px;border:none;cursor:pointer;transition:all .2s}
+.nav-cta:hover{box-shadow:0 0 20px var(--cyan-glow);background:var(--cyan2)}
+
+.hero{position:relative;min-height:74vh;display:flex;align-items:center;padding:120px clamp(16px,4vw,48px) 80px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background-image:url('/masterclass/cover_image.jpg');background-size:cover;background-position:center 30%;opacity:.45;filter:saturate(1.05) brightness(.85)}
+.hero-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(6,10,18,.95) 35%,rgba(6,10,18,.55) 100%)}
+.hero-inner{position:relative;z-index:2;max-width:780px;margin:0 auto;text-align:center}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;background:var(--cyan-dim);border:1px solid var(--border-c);border-radius:100px;font-size:11px;font-weight:600;color:var(--cyan);letter-spacing:.6px;text-transform:uppercase;margin-bottom:24px}
+.hero-tag::before{content:'';width:6px;height:6px;background:var(--cyan);border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+h1.hero-h{font-size:clamp(36px,5vw,64px);font-weight:900;line-height:1.05;letter-spacing:-1.5px;margin-bottom:18px}
+h1.hero-h .accent{color:var(--cyan)}
+.hero-sub{font-size:17px;color:var(--muted);max-width:580px;margin:0 auto 32px;line-height:1.7}
+.hero-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.btn{height:48px;padding:0 28px;display:inline-flex;align-items:center;font-family:'Outfit';font-weight:700;font-size:14px;border-radius:8px;border:none;cursor:pointer;transition:all .25s}
+.btn-primary{background:var(--cyan);color:var(--bg);box-shadow:0 0 24px rgba(0,198,251,.2)}
+.btn-primary:hover{background:var(--cyan2);box-shadow:0 0 36px var(--cyan-glow);transform:translateY(-1px)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--white)}
+.btn-outline:hover{border-color:var(--cyan);color:var(--cyan)}
+
+section{padding:84px clamp(16px,4vw,48px)}
+.container{max-width:1080px;margin:0 auto}
+.stag{font-size:11px;font-weight:600;color:var(--cyan);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px;text-align:center}
+.stitle{font-size:clamp(28px,3.5vw,42px);font-weight:800;letter-spacing:-.6px;line-height:1.15;margin-bottom:14px;text-align:center}
+.ssub{font-size:16px;color:var(--muted);max-width:620px;margin:0 auto 56px;line-height:1.7;text-align:center}
+
+.overview{background:var(--bg2)}
+.cur-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.cur-card{background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:22px;position:relative;overflow:hidden;transition:transform .35s ease,box-shadow .35s ease,border-color .35s ease}
+.cur-card:hover{transform:translateY(-4px);border-color:var(--border-c);box-shadow:0 24px 48px rgba(0,0,0,.18)}
+.cur-card.bonus{border-color:var(--gold-c);background:linear-gradient(180deg,var(--gold-dim),var(--bg3))}
+.cur-n{position:absolute;top:12px;right:14px;font-family:'Outfit';font-size:40px;font-weight:900;color:rgba(255,255,255,.04)}
+.cur-card.bonus .cur-n{color:rgba(245,158,11,.12)}
+.cur-badge{display:inline-flex;padding:5px 10px;border-radius:999px;background:rgba(0,198,251,.12);color:var(--cyan);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px}
+.cur-card.bonus .cur-badge{background:rgba(245,158,11,.12);color:var(--gold)}
+.cur-title{font-family:'Outfit';font-size:18px;font-weight:800;margin:12px 0 8px}
+.cur-desc{font-size:13px;color:var(--muted);line-height:1.65}
+.cur-card a.cur-link{display:inline-block;margin-top:14px;font-size:12px;font-weight:700;color:var(--cyan);letter-spacing:.4px;text-transform:uppercase}
+.cur-card a.cur-link:hover{color:var(--cyan2)}
+
+.day{background:var(--bg)}
+.day:nth-of-type(even){background:var(--bg2)}
+.day-inner{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:48px;align-items:center;max-width:1080px;margin:0 auto}
+.day-img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:16px;border:1px solid var(--border-c);box-shadow:0 22px 44px rgba(0,0,0,.35)}
+.day-eyebrow{font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:1.4px;text-transform:uppercase;margin-bottom:10px}
+.day-h{font-family:'Outfit';font-size:clamp(26px,3vw,36px);font-weight:800;letter-spacing:-.5px;line-height:1.15;margin-bottom:14px}
+.day-lead{font-size:15px;color:var(--muted);line-height:1.75;margin-bottom:22px}
+.day-list{list-style:none;display:flex;flex-direction:column;gap:14px;margin-bottom:22px}
+.day-list li{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:flex-start;line-height:1.55}
+.day-list li::before{content:'';width:18px;height:18px;border-radius:50%;background:var(--cyan-dim);border:1px solid var(--border-c);position:relative;flex-shrink:0;margin-top:3px}
+.day-list strong{display:block;font-family:'Outfit';font-size:14px;font-weight:700;color:var(--white);margin-bottom:2px}
+.day-list span{font-size:13px;color:var(--muted)}
+.day-tags{display:flex;gap:8px;flex-wrap:wrap}
+.tag{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg);font-size:11px;color:var(--muted)}
+
+.day.bonus .day-eyebrow{color:var(--gold)}
+.day.bonus .day-list li::before{background:var(--gold-dim);border-color:var(--gold-c)}
+.day.bonus .tag{border-color:var(--gold-c);color:var(--gold);background:rgba(245,158,11,.05)}
+
+.cta-section{background:var(--bg2);position:relative;overflow:hidden}
+.cta-section::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(0,198,251,.06) 0%,transparent 70%);pointer-events:none}
+.cta-card{position:relative;z-index:2;max-width:720px;margin:0 auto;background:var(--bg3);border:1px solid var(--border-c);border-radius:20px;padding:48px 32px;text-align:center}
+.cta-card h2{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.4px;margin-bottom:14px}
+.cta-card p{font-size:15px;color:var(--muted);max-width:520px;margin:0 auto 28px;line-height:1.7}
+.cta-card .hero-btns{justify-content:center}
+
+footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clamp(16px,4vw,48px) 32px}
+.footer-inner{max-width:1080px;margin:0 auto;display:flex;justify-content:space-between;gap:40px;flex-wrap:wrap}
+.footer-brand .footer-tagline{font-size:12px;color:var(--muted);max-width:240px;line-height:1.5;margin-top:8px}
+.footer-col h5{font-family:'Outfit';font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--white);margin-bottom:10px}
+.footer-col a{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;transition:color .2s}
+.footer-col a:hover{color:var(--cyan)}
+.footer-bottom{max-width:1080px;margin:28px auto 0;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--muted2)}
+
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none !important;transition:none !important}
+  .cur-card:hover,.btn-primary:hover{transform:none;box-shadow:none}
+}
+@media(max-width:900px){
+  .day-inner{grid-template-columns:1fr;gap:28px}
+  .day-img{max-width:520px;margin:0 auto}
+}
+@media(max-width:768px){
+  .nav-links{display:none}
+  section{padding:64px clamp(16px,4vw,48px)}
+  .hero{padding:104px 16px 64px;min-height:auto}
+  .hero-btns{gap:10px}
+  .hero-btns .btn{width:100%;justify-content:center}
+  .cta-card{padding:36px 22px;border-radius:16px}
+  .footer-inner{flex-direction:column;gap:24px}
+  .footer-bottom{flex-direction:column;align-items:flex-start;gap:6px}
+}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a class="nav-brand" href="/">Cred<span class="x">X</span></a>
+  <ul class="nav-links">
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#day1">Day 1</a></li>
+    <li><a href="#day2">Day 2</a></li>
+    <li><a href="#day3">Day 3</a></li>
+    <li><a href="#day4">Day 4</a></li>
+    <li><a href="#day5">Day 5</a></li>
+    <li><a href="#bonus">Bonus</a></li>
+  </ul>
+  <a href="/signup?offer=masterclass" class="nav-cta">Enroll</a>
+</nav>
+
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-inner">
+    <div class="hero-tag">CredX Masterclass</div>
+    <h1 class="hero-h">5-Day Credit Repair <span class="accent">Masterclass</span></h1>
+    <p class="hero-sub">The complete DIY system for understanding your credit, removing inaccurate negatives, building positive history, and unlocking business funding. Plus a bonus day on generational wealth.</p>
+    <div class="hero-btns">
+      <a href="/signup?offer=masterclass" class="btn btn-primary">Enroll in the Masterclass</a>
+      <a href="/portal" class="btn btn-outline">Already enrolled? Sign in</a>
+    </div>
+  </div>
+</section>
+
+<section class="overview" id="overview">
+  <div class="container">
+    <div class="stag">The System</div>
+    <h2 class="stitle">Your 5-Day Journey + Bonus Day</h2>
+    <p class="ssub">Each day builds on the last. By the end you have a complete credit repair, business credit, and wealth strategy.</p>
+    <div class="cur-grid">
+      <div class="cur-card"><div class="cur-n">01</div><div class="cur-badge">Day 1</div><h3 class="cur-title">Credit Fundamentals</h3><p class="cur-desc">How scores work, what factors matter, and how to read reports correctly.</p><a class="cur-link" href="#day1">Read Day 1 →</a></div>
+      <div class="cur-card"><div class="cur-n">02</div><div class="cur-badge">Day 2</div><h3 class="cur-title">Disputes &amp; Removals</h3><p class="cur-desc">FCRA rights, FDCPA protections, and the full dispute workflow.</p><a class="cur-link" href="#day2">Read Day 2 →</a></div>
+      <div class="cur-card"><div class="cur-n">03</div><div class="cur-badge">Day 3</div><h3 class="cur-title">Advanced Tactics</h3><p class="cur-desc">609 letters, debt validation, and escalation when bureaus stall.</p><a class="cur-link" href="#day3">Read Day 3 →</a></div>
+      <div class="cur-card"><div class="cur-n">04</div><div class="cur-badge">Day 4</div><h3 class="cur-title">Credit Building</h3><p class="cur-desc">Authorized users, secured cards, builder loans, utilization habits.</p><a class="cur-link" href="#day4">Read Day 4 →</a></div>
+      <div class="cur-card"><div class="cur-n">05</div><div class="cur-badge">Day 5</div><h3 class="cur-title">Business Credit</h3><p class="cur-desc">LLC, EIN, DUNS, Net-30 vendors, and business funding readiness.</p><a class="cur-link" href="#day5">Read Day 5 →</a></div>
+      <div class="cur-card bonus"><div class="cur-n">★</div><div class="cur-badge">Bonus</div><h3 class="cur-title">Generational Wealth</h3><p class="cur-desc">Investing, real estate, and structure to protect what you build.</p><a class="cur-link" href="#bonus" style="color:var(--gold)">Read Bonus →</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="day" id="day1">
+  <div class="day-inner">
+    <img class="day-img" src="/masterclass/day1_image.jpg" alt="Day 1 - Credit Fundamentals" loading="lazy">
+    <div>
+      <div class="day-eyebrow">Day 1 · Credit Fundamentals</div>
+      <h2 class="day-h">Understand how credit really works</h2>
+      <p class="day-lead">Before you fix anything, you need to know what you're looking at. Day 1 is the foundation: how FICO is calculated, how to read a tri-merge report, and how to spot the items that are actually moving your score.</p>
+      <ul class="day-list">
+        <li><div><strong>The FICO breakdown</strong><span>Payment history 35%, utilization 30%, length 15%, new credit 10%, mix 10%. Where your effort gets the most return.</span></div></li>
+        <li><div><strong>Reading your report like a pro</strong><span>How to pull all three bureaus, what each section means, and what should never be there.</span></div></li>
+        <li><div><strong>Errors that quietly hurt your score</strong><span>Wrong addresses, duplicate accounts, mis-coded statuses, outdated negatives. A systematic line-by-line review.</span></div></li>
+      </ul>
+      <div class="day-tags"><span class="tag">FICO</span><span class="tag">Reports</span><span class="tag">Bureaus</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="day" id="day2">
+  <div class="day-inner">
+    <img class="day-img" src="/masterclass/day2_image.jpg" alt="Day 2 - Disputes" loading="lazy">
+    <div>
+      <div class="day-eyebrow">Day 2 · Disputes &amp; Removals</div>
+      <h2 class="day-h">Your legal rights and the dispute workflow</h2>
+      <p class="day-lead">The Fair Credit Reporting Act gives you a real toolkit — most people just don't know how to use it. Day 2 walks through the laws that protect you and the exact dispute workflow that forces investigations.</p>
+      <ul class="day-list">
+        <li><div><strong>Your rights under the FCRA</strong><span>Access, dispute, 30-day investigation windows, and remedies when those rights are violated.</span></div></li>
+        <li><div><strong>FDCPA protection from collectors</strong><span>What collectors can and can't do, validation requirements, and how to stop harassment.</span></div></li>
+        <li><div><strong>The complete dispute process</strong><span>Drafting the letter, what evidence to attach, where to send it, and how to track responses.</span></div></li>
+      </ul>
+      <div class="day-tags"><span class="tag">FCRA</span><span class="tag">FDCPA</span><span class="tag">Disputes</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="day" id="day3">
+  <div class="day-inner">
+    <img class="day-img" src="/masterclass/day3_image.jpg" alt="Day 3 - Advanced Tactics" loading="lazy">
+    <div>
+      <div class="day-eyebrow">Day 3 · Advanced Tactics</div>
+      <h2 class="day-h">Escalation when bureaus stall</h2>
+      <p class="day-lead">Standard disputes get most things removed, but some negatives need extra pressure. Day 3 is the escalation playbook — 609 letters, validation requests, and the regulatory levers that get bureaus and collectors to comply.</p>
+      <ul class="day-list">
+        <li><div><strong>609 letters: the verification duty</strong><span>How to demand verifiable proof under Section 609, when it works, and how to use it without overplaying it.</span></div></li>
+        <li><div><strong>Validation requests for collectors</strong><span>Make collectors prove the debt is theirs to collect. What "proper validation" really means.</span></div></li>
+        <li><div><strong>Escalation when nobody complies</strong><span>CFPB complaints, state AG, small claims — how to hold bureaus and collectors accountable.</span></div></li>
+      </ul>
+      <div class="day-tags"><span class="tag">609</span><span class="tag">Validation</span><span class="tag">CFPB</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="day" id="day4">
+  <div class="day-inner">
+    <img class="day-img" src="/masterclass/day4_image.jpg" alt="Day 4 - Credit Building" loading="lazy">
+    <div>
+      <div class="day-eyebrow">Day 4 · Building Positive Credit</div>
+      <h2 class="day-h">Add strong tradelines to push the score up</h2>
+      <p class="day-lead">Removing negatives is half the work. The other half is replacing them with strong, consistent positive history. Day 4 covers the building blocks that move scores fastest without taking on real risk.</p>
+      <ul class="day-list">
+        <li><div><strong>Authorized user strategy</strong><span>How to find the right primary, what makes a tradeline strong, and how to use this to add years of history quickly.</span></div></li>
+        <li><div><strong>Secured cards that actually build credit</strong><span>How to choose, how to use, when to graduate, and the small habits that compound into score gains.</span></div></li>
+        <li><div><strong>Credit builder loans and alternatives</strong><span>Builder loans, rent reporting, utility reporting — how to combine multiple low-risk tools.</span></div></li>
+      </ul>
+      <div class="day-tags"><span class="tag">Authorized User</span><span class="tag">Secured Cards</span><span class="tag">Builder Loans</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="day" id="day5">
+  <div class="day-inner">
+    <img class="day-img" src="/masterclass/day5_image.jpg" alt="Day 5 - Business Credit" loading="lazy">
+    <div>
+      <div class="day-eyebrow">Day 5 · Business Credit &amp; Funding</div>
+      <h2 class="day-h">Separate personal and business credit for growth</h2>
+      <p class="day-lead">Business credit is its own profile and it scales differently than personal. Day 5 builds the foundation correctly — entity, EIN, banking, vendor lines — so you can qualify for funding without leaning on personal credit.</p>
+      <ul class="day-list">
+        <li><div><strong>Entity formation that builds credit</strong><span>LLC vs corp, EIN, business bank account, business licenses, and a credible profile lenders will trust.</span></div></li>
+        <li><div><strong>Net-30 accounts: the foundation</strong><span>Vendor lines that report to business bureaus. Which to start with and how to qualify with limited history.</span></div></li>
+        <li><div><strong>Qualifying for credit lines and loans</strong><span>How to leverage business credit into real funding — cards, lines, and term loans.</span></div></li>
+      </ul>
+      <div class="day-tags"><span class="tag">LLC/EIN</span><span class="tag">Net-30</span><span class="tag">DUNS</span><span class="tag">Funding</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="day bonus" id="bonus">
+  <div class="day-inner">
+    <img class="day-img" src="/masterclass/final_image.jpg" alt="Bonus Day - Generational Wealth" loading="lazy">
+    <div>
+      <div class="day-eyebrow">Bonus Day · Generational Wealth</div>
+      <h2 class="day-h">Build something that outlasts you</h2>
+      <p class="day-lead">Credit is a tool. Wealth is the goal. The bonus day connects everything you've learned to the longer game — investing, real estate, passive income, and the structures that protect what you build for the next generation.</p>
+      <ul class="day-list">
+        <li><div><strong>Real estate as a leveraged asset</strong><span>How strong credit unlocks better terms, and how to use property as a long-horizon wealth tool.</span></div></li>
+        <li><div><strong>Investing and passive income</strong><span>The basics of putting capital to work without speculation. What "boring and consistent" looks like.</span></div></li>
+        <li><div><strong>Trust structures and legacy</strong><span>How to title and protect assets so what you build actually transfers to family.</span></div></li>
+      </ul>
+      <div class="day-tags"><span class="tag">Real Estate</span><span class="tag">Investing</span><span class="tag">Trusts</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section">
+  <div class="cta-card">
+    <div class="stag" style="text-align:center">Your turn</div>
+    <h2>Ready to start the masterclass?</h2>
+    <p>Enroll today, work through the system at your own pace, and use the CredX portal to track your dispute progress, monitoring connections, and credit-builder steps as you go.</p>
+    <div class="hero-btns">
+      <a href="/signup?offer=masterclass" class="btn btn-primary">Enroll in the Masterclass</a>
+      <a href="/" class="btn btn-outline">Back to CredX</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="nav-brand" style="font-size:20px">Cred<span class="x">X</span></div>
+      <div class="footer-tagline">CredX is built to help organize practical credit strategy and stronger next steps.</div>
+    </div>
+    <div class="footer-col"><h5>Platform</h5><a href="/#about">About</a><a href="/#how">How it Works</a><a href="/#pricing">Pricing</a><a href="/portal">Client Portal</a></div>
+    <div class="footer-col"><h5>Masterclass</h5><a href="#overview">Overview</a><a href="#day1">Day 1</a><a href="#day5">Day 5</a><a href="#bonus">Bonus Day</a></div>
+    <div class="footer-col"><h5>Contact</h5><a href="tel:+18662733963">866-CREDX-ME</a><a href="mailto:contact@credxme.com">contact@credxme.com</a><a href="https://credxme.com">credxme.com</a></div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 CredX</span>
+    <span>Credit strategy and education, no guaranteed outcomes.</span>
+  </div>
+</footer>
+</body>
+</html>

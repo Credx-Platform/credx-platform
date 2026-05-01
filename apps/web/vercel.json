@@ -7,7 +7,8 @@
     { "source": "/start/", "destination": "/start", "permanent": true },
     { "source": "/portal/", "destination": "/portal", "permanent": true },
     { "source": "/portal/set-password/", "destination": "/portal/set-password", "permanent": true },
-    { "source": "/adminportal/", "destination": "/adminportal", "permanent": true }
+    { "source": "/adminportal/", "destination": "/adminportal", "permanent": true },
+    { "source": "/masterclass/", "destination": "/masterclass", "permanent": true }
   ],
   "rewrites": [
     { "source": "/signup", "destination": "/signup.html" },
@@ -19,6 +20,7 @@
     { "source": "/portal", "destination": "/portal.html" },
     { "source": "/portal/:path*", "destination": "/portal.html" },
     { "source": "/adminportal", "destination": "/adminportal.html" },
-    { "source": "/adminportal/:path*", "destination": "/adminportal.html" }
+    { "source": "/adminportal/:path*", "destination": "/adminportal.html" },
+    { "source": "/masterclass", "destination": "/masterclass.html" }
   ]
 }
