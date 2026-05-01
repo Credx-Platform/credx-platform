@@ -91,6 +91,96 @@ Credit Repair & Financial Strategy Support`;
   return { subject, html, text };
 }
 
+function renderMasterclassWelcomeEmail(params: { firstName: string; setupLink: string; expiresAt: Date }) {
+  const subject = 'Welcome to the CredX 5-Day Masterclass — Set Your Password';
+  const expiresHours = Math.max(1, Math.round((params.expiresAt.getTime() - Date.now()) / 3_600_000));
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${subject}</title>
+</head>
+<body style="margin:0;padding:0;background:#0d1420;font-family:Arial,Helvetica,sans-serif;color:#e9eef6;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0d1420;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
+        <tr><td style="height:6px;background:#00c6fb;font-size:0;line-height:0;">&nbsp;</td></tr>
+        <tr><td style="padding:32px 28px 22px;text-align:center;border-bottom:1px solid #243247;">
+          <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
+          <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">5-Day Masterclass</div>
+        </td></tr>
+        <tr><td style="padding:30px 28px 8px;">
+          <h1 style="margin:0 0 12px;font-size:26px;line-height:1.25;color:#ffffff;">You're enrolled, ${params.firstName || 'there'}.</h1>
+          <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Welcome to the CredX 5-Day Credit Repair Masterclass. No contracts, no intake forms — just set your password and you're in.</p>
+          <p style="margin:0 0 18px;color:#d5dfeb;font-size:16px;line-height:1.65;"><strong style="color:#ffffff;">Day 1: Credit Fundamentals</strong> is waiting for you the moment you log in.</p>
+          <div style="text-align:center;padding:14px 0 6px;">
+            <a href="${params.setupLink}" style="display:inline-block;background:#00c6fb;color:#0d1420;text-decoration:none;padding:15px 30px;border-radius:12px;font-weight:800;font-size:16px;">Set my password</a>
+          </div>
+          <p style="margin:18px 0 6px;color:#9fb0c5;font-size:13px;line-height:1.6;">This link expires in about ${expiresHours} hours and can only be used once.</p>
+          <p style="margin:6px 0 0;color:#9fb0c5;font-size:13px;line-height:1.6;">If the button doesn't open, copy this link into your browser:<br /><span style="color:#ffffff;word-break:break-all;">${params.setupLink}</span></p>
+        </td></tr>
+        <tr><td style="padding:22px 28px 28px;color:#9fb0c5;font-size:13px;line-height:1.6;border-top:1px solid #243247;">
+          <strong style="color:#ffffff;">What's next:</strong>
+          <ol style="margin:8px 0 0 18px;padding:0;color:#d5dfeb;">
+            <li>Click the button above and set your password.</li>
+            <li>You'll land on Day 1 automatically.</li>
+            <li>Work through one day at a time at your own pace.</li>
+          </ol>
+          <p style="margin:18px 0 0;color:#9fb0c5;font-size:12px;">Questions? Reply to this email or write to <a href="mailto:contact@credxme.com" style="color:#00c6fb;">contact@credxme.com</a>.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const text = `Welcome to the CredX 5-Day Masterclass
+
+Hi ${params.firstName || 'there'},
+
+You're enrolled. No contract, no intake — just set your password and Day 1 is ready.
+
+Set your password: ${params.setupLink}
+
+This link expires in about ${expiresHours} hours and can only be used once.
+
+What's next:
+1. Click the link and set your password.
+2. You'll land on Day 1 automatically.
+3. Work through one day at a time at your own pace.
+
+Questions? Reply to this email or write to contact@credxme.com.
+
+CredX`;
+
+  return { subject, html, text };
+}
+
+export async function sendMasterclassWelcomeEmail(params: { to: string; firstName: string; setupLink: string; expiresAt: Date }) {
+  const email = renderMasterclassWelcomeEmail({
+    firstName: params.firstName,
+    setupLink: params.setupLink,
+    expiresAt: params.expiresAt
+  });
+
+  const result = await sendEmail({
+    to: params.to,
+    subject: email.subject,
+    html: email.html,
+    text: email.text
+  });
+
+  console.log('MASTERCLASS_WELCOME_EMAIL_SEND_RESULT', {
+    to: params.to,
+    setupLink: params.setupLink,
+    expiresAt: params.expiresAt.toISOString(),
+    result
+  });
+
+  return { ...email, delivery: result };
+}
+
 export async function sendWelcomeLeadEmail(params: { firstName: string; email: string; contractLink: string; offerType?: 'program' | 'masterclass' }) {
   const email = renderWelcomeLeadEmail({
     firstName: params.firstName,

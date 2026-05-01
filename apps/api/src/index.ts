@@ -14,6 +14,7 @@ import { clientsRouter } from './routes/clients.js';
 import { disputesRouter } from './routes/disputes.js';
 import { billingRouter } from './routes/billing.js';
 import { progressRouter } from './routes/progress.js';
+import { masterclassRouter } from './routes/masterclass.js';
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use('/api/clients', clientsRouter);
 app.use('/api/disputes', disputesRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/progress', progressRouter);
+app.use('/api/masterclass', masterclassRouter);
 
 app.use(errorHandler);
 

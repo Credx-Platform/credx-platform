@@ -33,6 +33,11 @@ export default function SetPassword() {
     if (typeof window === 'undefined') return '';
     return new URLSearchParams(window.location.search).get('token') ?? '';
   }, []);
+  const nextDestination = useMemo(() => {
+    if (typeof window === 'undefined') return '/portal';
+    const next = new URLSearchParams(window.location.search).get('next');
+    return next === 'masterclass' ? '/masterclass#day1' : '/portal';
+  }, []);
 
   const [status, setStatus] = useState<Status>({ kind: 'verifying' });
   const [password, setPassword] = useState('');
@@ -107,7 +112,7 @@ export default function SetPassword() {
       localStorage.setItem(TOKEN_KEY, complete.token);
       localStorage.setItem(USER_KEY, JSON.stringify(complete.user));
       setStatus({ kind: 'success' });
-      window.location.assign('/portal');
+      window.location.assign(nextDestination);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Could not set password.');
       setStatus({ kind: 'ready', verify: status.verify });
@@ -134,7 +139,7 @@ export default function SetPassword() {
           <h1>This link can't be used</h1>
           <div className="error-banner">{status.message}</div>
           <p className="helper-text">
-            For security, setup links expire after 72 hours and can only be used once. Email <a href="mailto:hello@credxme.com">hello@credxme.com</a> and we'll send a fresh link.
+            For security, setup links expire after 72 hours and can only be used once. Email <a href="mailto:contact@credxme.com">contact@credxme.com</a> and we'll send a fresh link.
           </p>
         </div>
       </div>

@@ -135,7 +135,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
     <li><a href="#day5">Day 5</a></li>
     <li><a href="#bonus">Bonus</a></li>
   </ul>
-  <a href="/signup?offer=masterclass" class="nav-cta">Enroll</a>
+  <a href="#enroll" class="nav-cta">Enroll</a>
 </nav>
 
 <section class="hero">
@@ -146,7 +146,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
     <h1 class="hero-h">5-Day Credit Repair <span class="accent">Masterclass</span></h1>
     <p class="hero-sub">The complete DIY system for understanding your credit, removing inaccurate negatives, building positive history, and unlocking business funding. Plus a bonus day on generational wealth.</p>
     <div class="hero-btns">
-      <a href="/signup?offer=masterclass" class="btn btn-primary">Enroll in the Masterclass</a>
+      <a href="#enroll" class="btn btn-primary">Enroll in the Masterclass</a>
       <a href="/portal" class="btn btn-outline">Already enrolled? Sign in</a>
     </div>
   </div>
@@ -270,17 +270,106 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   </div>
 </section>
 
-<section class="cta-section">
+<section class="cta-section" id="enroll">
   <div class="cta-card">
     <div class="stag" style="text-align:center">Your turn</div>
-    <h2>Ready to start the masterclass?</h2>
-    <p>Enroll today, work through the system at your own pace, and use the CredX portal to track your dispute progress, monitoring connections, and credit-builder steps as you go.</p>
-    <div class="hero-btns">
-      <a href="/signup?offer=masterclass" class="btn btn-primary">Enroll in the Masterclass</a>
-      <a href="/" class="btn btn-outline">Back to CredX</a>
+    <h2>Enroll in the Masterclass</h2>
+    <p>Just your name and email. We'll send you a link to set your password, and you'll land on Day 1 the moment you log in. No contracts, no intake forms.</p>
+    <form id="enrollForm" class="enroll-form" novalidate>
+      <div class="enroll-row">
+        <label class="enroll-field"><span>First name</span><input type="text" name="firstName" required autocomplete="given-name"></label>
+        <label class="enroll-field"><span>Last name</span><input type="text" name="lastName" required autocomplete="family-name"></label>
+      </div>
+      <label class="enroll-field"><span>Email</span><input type="email" name="email" required autocomplete="email"></label>
+      <button type="submit" class="btn btn-primary enroll-submit">Send my access link</button>
+      <p class="enroll-fineprint">We'll email you a one-time setup link. By enrolling you agree to receive course-related email from CredX. You can unsubscribe anytime.</p>
+    </form>
+    <div id="enrollSuccess" class="enroll-success">
+      <div class="enroll-check">✓</div>
+      <h3>Check your email.</h3>
+      <p>We just sent your password-setup link to <strong id="enrollSuccessEmail"></strong>. Click the button in the email, set your password, and you'll go straight to Day 1.</p>
+      <p class="enroll-fineprint">Don't see it in 2 minutes? Check spam, or write to <a href="mailto:contact@credxme.com">contact@credxme.com</a>.</p>
     </div>
+    <div id="enrollError" class="enroll-error" hidden></div>
   </div>
 </section>
+
+<style>
+  .enroll-form{display:flex;flex-direction:column;gap:14px;max-width:520px;margin:0 auto;text-align:left}
+  .enroll-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .enroll-field{display:flex;flex-direction:column;gap:6px}
+  .enroll-field span{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+  .enroll-field input{padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--white);font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;transition:border-color .2s}
+  .enroll-field input:focus{border-color:var(--cyan)}
+  .enroll-submit{width:100%;justify-content:center;margin-top:6px}
+  .enroll-fineprint{margin:6px 0 0;font-size:11px;color:var(--muted2);line-height:1.5;text-align:center}
+  .enroll-success{display:none;max-width:520px;margin:0 auto;text-align:center;padding:8px 0 0}
+  .enroll-success.show{display:block}
+  .enroll-form.hidden{display:none}
+  .enroll-check{width:54px;height:54px;border-radius:50%;background:var(--cyan-dim);border:1px solid var(--border-c);color:var(--cyan);font-size:26px;display:inline-flex;align-items:center;justify-content:center;margin:0 auto 14px}
+  .enroll-success h3{font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;margin-bottom:8px}
+  .enroll-success p{font-size:14px;color:var(--muted);max-width:440px;margin:0 auto 10px}
+  .enroll-error{margin:14px auto 0;max-width:520px;padding:12px 14px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.24);border-radius:10px;color:#f87171;font-size:13px;text-align:center}
+  @media(max-width:520px){
+    .enroll-row{grid-template-columns:1fr}
+  }
+</style>
+
+<script>
+(function(){
+  var form = document.getElementById('enrollForm');
+  var success = document.getElementById('enrollSuccess');
+  var successEmail = document.getElementById('enrollSuccessEmail');
+  var errorBox = document.getElementById('enrollError');
+  var submit = form.querySelector('.enroll-submit');
+  var apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:3000'
+    : 'https://credxapi-production.up.railway.app';
+
+  function showError(msg){
+    errorBox.textContent = msg;
+    errorBox.hidden = false;
+  }
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    errorBox.hidden = true;
+    var fd = new FormData(form);
+    var payload = {
+      firstName: String(fd.get('firstName') || '').trim(),
+      lastName: String(fd.get('lastName') || '').trim(),
+      email: String(fd.get('email') || '').trim()
+    };
+    if(!payload.firstName || !payload.lastName || !payload.email){
+      showError('Please fill in all three fields.');
+      return;
+    }
+    submit.disabled = true;
+    submit.textContent = 'Sending...';
+    try {
+      var res = await fetch(apiBase + '/api/masterclass/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json().catch(function(){ return {}; });
+      if(!res.ok){
+        showError(data.error || 'Enrollment failed. Try again or email contact@credxme.com.');
+        submit.disabled = false;
+        submit.textContent = 'Send my access link';
+        return;
+      }
+      successEmail.textContent = payload.email;
+      form.classList.add('hidden');
+      success.classList.add('show');
+    } catch(err){
+      showError('Network error. Check your connection and try again.');
+      submit.disabled = false;
+      submit.textContent = 'Send my access link';
+    }
+  });
+})();
+</script>
 
 <footer>
   <div class="footer-inner">
