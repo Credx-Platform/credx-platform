@@ -247,7 +247,6 @@ function SectionHeader({ section }: { section: Exclude<PortalTab, 'overview'> })
       style={{ ['--section-accent' as any]: theme.accent }}
     >
       <div>
-        <p className="eyebrow">{theme.title}</p>
         <h1>{theme.title}</h1>
         <p>{theme.desc}</p>
       </div>
