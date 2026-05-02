@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DisputeManager } from './components/DisputeManager';
 import { AnalysisTab } from './components/AnalysisTab';
@@ -718,6 +718,13 @@ function LoginScreen({
         </label>
         {error ? <div className="error-banner">{error}</div> : null}
         <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</button>
+        <div className="security-note" role="note" aria-label="Security details">
+          <span aria-hidden="true" className="security-note-icon">🔒</span>
+          <div>
+            <strong>Staff-only · Encrypted in transit</strong>
+            <span>Admin sessions run over HTTPS and are tied to your role. Failed sign-ins are logged. Sign out when you finish.</span>
+          </div>
+        </div>
       </form>
     </div>
   );
@@ -838,20 +845,42 @@ export default function App() {
         </nav>
       </aside>
       <main className="main">
-        <header className="topbar">
-          <div>
-            <div className="brand-row">
-              <img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" />
-              <p className="eyebrow">Admin Portal</p>
-            </div>
-            <h1 className="top-title">Operations Dashboard</h1>
-            {dataLoading ? <p className="helper-text">Refreshing live CredX data...</p> : null}
-          </div>
-          <div className="topbar-actions">
-            <div className="admin-pill">{statsTitle}</div>
-            <button className="ghost-button" onClick={handleLogout}>Sign out</button>
-          </div>
-        </header>
+        {(() => {
+          const path = location.pathname;
+          const accent = path.startsWith('/disputes')
+            ? '#f59e0b'
+            : path.startsWith('/clients')
+              ? '#a855f7'
+              : '#00c6fb';
+          const sectionLabel = path.startsWith('/disputes')
+            ? 'Disputes operations'
+            : path.startsWith('/clients')
+              ? 'Client management'
+              : 'Operations dashboard';
+          const subtitle = path.startsWith('/disputes')
+            ? 'Track every dispute round, bureau status, and outcome across the book.'
+            : path.startsWith('/clients')
+              ? 'Search, open, and update client files. Identity data is encrypted at rest.'
+              : 'Live snapshot of leads, active programs, dispute throughput, and revenue.';
+          return (
+            <header className="topbar topbar--themed" style={{ ['--section-accent' as string]: accent } as React.CSSProperties}>
+              <div>
+                <div className="brand-row">
+                  <img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" />
+                  <p className="eyebrow" style={{ color: accent }}>Admin · {user?.role || 'STAFF'}</p>
+                </div>
+                <h1 className="top-title">{sectionLabel}</h1>
+                <p className="top-subtitle">{subtitle}</p>
+                {dataLoading ? <p className="helper-text">Refreshing live CredX data...</p> : null}
+              </div>
+              <div className="topbar-actions">
+                <div className="admin-pill">{statsTitle}</div>
+                <span className="security-note-inline" aria-label="Encrypted">🔒 Staff-only · Encrypted</span>
+                <button className="ghost-button" onClick={handleLogout}>Sign out</button>
+              </div>
+            </header>
+          );
+        })()}
 
         <select
           className="mobile-nav-select"
