@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import MasterclassDashboard from './components/MasterclassDashboard';
+import type { LessonDay } from './masterclassCurriculum';
 
 type User = {
   id: string;
@@ -1246,6 +1247,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     );
   }
 
+  const [activeMcDay, setActiveMcDay] = useState<LessonDay | null>(null);
   const masterclassEnrolled = !!progress?.education?.masterclassEnrolled;
   const masterclassOnly = masterclassEnrolled && (client?.status || '').toUpperCase() === 'LEAD';
   const completedMasterclassDays = useMemo(
@@ -1320,14 +1322,27 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           </div>
         ) : null}
 
-        <header className="topbar">
-          <div>
-            <div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">Client Portal</p></div>
-            <h1 className="top-title">{navItems.find((item) => item.key === activeTab)?.label || 'Dashboard'}</h1>
-            {dataLoading ? <p className="helper-text">Refreshing your latest CredX progress...</p> : null}
-          </div>
-          <div className="topbar-actions"><button className="ghost-button" onClick={handleLogout}>Sign out</button></div>
-        </header>
+        {(() => {
+          const tabLabel = navItems.find((item) => item.key === activeTab)?.label || 'Dashboard';
+          const sectionTheme = activeTab !== 'overview' && (activeTab in SECTION_THEMES) ? SECTION_THEMES[activeTab as Exclude<PortalTab, 'overview'>] : null;
+          const isMc = activeTab === 'masterclass';
+          const accent = isMc && activeMcDay ? activeMcDay.accent : (sectionTheme?.accent || '#00c6fb');
+          const subtitle = isMc && activeMcDay
+            ? `${activeMcDay.eyebrow} — ${activeMcDay.tagline}`
+            : (sectionTheme?.desc || null);
+          const topbarStyle = { ['--section-accent' as string]: accent } as CSSProperties;
+          return (
+            <header className="topbar topbar--themed" style={topbarStyle}>
+              <div>
+                <div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow" style={{ color: accent }}>Client Portal</p></div>
+                <h1 className="top-title">{tabLabel}</h1>
+                {subtitle ? <p className="top-subtitle">{subtitle}</p> : null}
+                {dataLoading ? <p className="helper-text">Refreshing your latest CredX progress...</p> : null}
+              </div>
+              <div className="topbar-actions"><button className="ghost-button" onClick={handleLogout}>Sign out</button></div>
+            </header>
+          );
+        })()}
 
         <select
           className="mobile-nav-select"
@@ -1452,32 +1467,19 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             </>
           ) : null}
 
-          {activeTab !== 'overview' && (activeTab in SECTION_THEMES) ? (
-            <SectionHeader section={activeTab as Exclude<PortalTab, 'overview'>} />
-          ) : null}
-
           {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
-          {activeTab === 'monitoring' ? (
-            <>
-              <SectionHeader section="monitoring" />
-              <CreditMonitoringSection token={token} client={client} progress={progress} refreshAll={refreshAll} />
-            </>
-          ) : null}
+          {activeTab === 'monitoring' ? <CreditMonitoringSection token={token} client={client} progress={progress} refreshAll={refreshAll} /> : null}
           {activeTab === 'disputes' ? <DisputesSection client={client} progress={progress} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
-          {activeTab === 'analysis' ? (
-            <>
-              <SectionHeader section="analysis" />
-              <AnalysisSection client={client} progress={progress} />
-            </>
-          ) : null}
+          {activeTab === 'analysis' ? <AnalysisSection client={client} progress={progress} /> : null}
 
           {activeTab === 'masterclass' ? (
             <MasterclassDashboard
               firstName={user?.firstName || ''}
               completedDays={completedMasterclassDays}
               onMarkComplete={handleMarkMasterclassDay}
+              onActiveDayChange={setActiveMcDay}
             />
           ) : null}
 

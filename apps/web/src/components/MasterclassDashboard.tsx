@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { MASTERCLASS_DAYS, type LessonDay } from '../masterclassCurriculum';
 
 type Props = {
   firstName?: string;
   completedDays: string[];
   onMarkComplete?: (slug: string) => void;
+  onActiveDayChange?: (day: LessonDay) => void;
 };
 
-export default function MasterclassDashboard({ firstName, completedDays, onMarkComplete }: Props) {
+export default function MasterclassDashboard({ firstName, completedDays, onMarkComplete, onActiveDayChange }: Props) {
   const [activeDay, setActiveDay] = useState<number>(() => {
     if (typeof window === 'undefined') return 1;
     const stored = sessionStorage.getItem('credx-masterclass-day');
@@ -28,22 +29,26 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
     return MASTERCLASS_DAYS.find((d) => d.day === activeDay) || MASTERCLASS_DAYS[0];
   }, [activeDay]);
 
+  useEffect(() => {
+    onActiveDayChange?.(day);
+  }, [day, onActiveDayChange]);
+
   const slidesSrc = `/masterclass/slides/index.html?day=${day.day}#slide-${day.slidesRange.from}`;
   const isCompleted = completedDays.includes(day.slug);
   const isBonus = !!day.isBonus;
+  const accent = day.accent;
 
   return (
-    <div className="mc-shell">
+    <div className="mc-shell" style={{ ['--day-accent' as string]: accent } as CSSProperties}>
       <section className="mc-hero">
         <div>
-          <p className="eyebrow" style={{ color: '#00c6fb' }}>CredX Masterclass</p>
-          <h1 className="mc-hero-title">Welcome{firstName ? `, ${firstName}` : ''}</h1>
-          <p className="mc-hero-sub">Your 5-day credit repair masterclass plus bonus day. Each day pairs short videos, glossary terms, and the slide follow-along.</p>
+          <p className="eyebrow" style={{ color: accent }}>{firstName ? `Welcome, ${firstName}` : 'Welcome'}</p>
+          <p className="mc-hero-sub">Your 5-day credit repair masterclass plus bonus day. Each day pairs short videos, glossary terms, the slide follow-along, and real-life Q&amp;A.</p>
         </div>
         <div className="mc-progress">
-          <div className="mc-progress-label">Progress</div>
+          <div className="mc-progress-label" style={{ color: accent }}>Progress</div>
           <div className="mc-progress-num">{completedDays.length}<span>/{MASTERCLASS_DAYS.length}</span></div>
-          <div className="mc-progress-bar"><div className="mc-progress-fill" style={{ width: `${(completedDays.length / MASTERCLASS_DAYS.length) * 100}%` }} /></div>
+          <div className="mc-progress-bar"><div className="mc-progress-fill" style={{ width: `${(completedDays.length / MASTERCLASS_DAYS.length) * 100}%`, background: accent }} /></div>
         </div>
       </section>
 
@@ -57,6 +62,7 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
               type="button"
               onClick={() => setActiveDay(d.day)}
               className={`mc-day-card${isActive ? ' is-active' : ''}${d.isBonus ? ' is-bonus' : ''}${done ? ' is-done' : ''}`}
+              style={{ ['--card-accent' as string]: d.accent } as CSSProperties}
             >
               <div className="mc-day-card-num">{d.isBonus ? '★' : `0${d.day}`}</div>
               <div className="mc-day-card-badge">{d.eyebrow.split('·')[0].trim()}</div>
@@ -70,10 +76,10 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
       <section className={`panel mc-day-panel${isBonus ? ' is-bonus' : ''}`}>
         <header className="mc-day-panel-head">
           <div>
-            <p className="eyebrow" style={{ color: isBonus ? '#f59e0b' : '#00c6fb' }}>{day.eyebrow}</p>
+            <p className="eyebrow" style={{ color: accent }}>{day.eyebrow}</p>
             <h2 className="mc-day-panel-title">{day.tagline}</h2>
           </div>
-          <img src={day.image} alt={day.title} className="mc-day-panel-img" />
+          <img src={day.image} alt={day.title} className="mc-day-panel-img" style={{ borderColor: accent }} />
         </header>
         <p className="mc-day-panel-summary">{day.summary}</p>
 

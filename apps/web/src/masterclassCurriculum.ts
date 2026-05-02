@@ -9,6 +9,7 @@ export type LessonDay = {
   tagline: string;
   summary: string;
   image: string;
+  accent: string;
   slidesRange: { from: number; to: number };
   objectives: string[];
   videos: [LessonVideo, LessonVideo];
@@ -18,6 +19,15 @@ export type LessonDay = {
   isBonus?: boolean;
 };
 
+export const DAY_ACCENTS: Record<number, string> = {
+  1: '#00c6fb', // cyan — fundamentals
+  2: '#a855f7', // violet — disputes / legal
+  3: '#22d3ee', // teal — escalation
+  4: '#22c55e', // green — building positive
+  5: '#3b82f6', // royal blue — business
+  6: '#f59e0b'  // gold — bonus / wealth
+};
+
 export const MASTERCLASS_DAYS: LessonDay[] = [
   {
     day: 1,
@@ -25,6 +35,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     title: 'Credit Fundamentals & Report Analysis',
     eyebrow: 'Day 1 · Credit Fundamentals',
     tagline: 'Learn how credit really works',
+    accent: '#00c6fb',
     summary:
       'Today you find out what a credit score actually is, what makes it go up or down, and how to read your own credit report. Think of this as the rulebook everyone needs before they start playing the credit game.',
     image: '/masterclass/day1_image.jpg',
@@ -93,6 +104,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     title: 'The Dispute Process Decoded',
     eyebrow: 'Day 2 · Disputes & Removals',
     tagline: 'Use your legal rights to fix mistakes',
+    accent: '#a855f7',
     summary:
       'There are real laws that protect you and force credit bureaus to fix mistakes. Most people do not know about them. Today you learn the laws, how to write a dispute letter that actually works, and what happens after you send it.',
     image: '/masterclass/day2_image.jpg',
@@ -159,6 +171,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     title: 'Advanced Dispute Tactics',
     eyebrow: 'Day 3 · Advanced Tactics',
     tagline: 'What to do when the easy disputes do not work',
+    accent: '#22d3ee',
     summary:
       'Most disputes get fixed in Round 1. The stubborn ones need extra pressure. Today you learn 3 advanced tools: 609 letters, debt validation, and how to use government agencies to make bureaus and collectors comply.',
     image: '/masterclass/day3_image.jpg',
@@ -225,6 +238,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     title: 'Building Positive Credit',
     eyebrow: 'Day 4 · Building Positive Credit',
     tagline: 'Add good accounts to push your score up',
+    accent: '#22c55e',
     summary:
       'Removing bad stuff is half the job. The other half is adding good payment history that says "I am responsible." Today you learn the safest, fastest ways to build positive credit without taking on real risk.',
     image: '/masterclass/day4_image.jpg',
@@ -291,6 +305,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     title: 'Business Credit & Funding',
     eyebrow: 'Day 5 · Business Credit & Funding',
     tagline: 'Build credit for your business, not just yourself',
+    accent: '#3b82f6',
     summary:
       'Business credit is its own separate score for your company. Done right, your business can qualify for cards, lines, and loans without using your personal credit. Today you learn how to set the foundation and open your first business tradelines.',
     image: '/masterclass/day5_image.jpg',
@@ -358,6 +373,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     title: 'Generational Wealth',
     eyebrow: 'Bonus Day · Generational Wealth',
     tagline: 'Use credit to build something that lasts',
+    accent: '#f59e0b',
     summary:
       'Credit is a tool. The goal is wealth — money and assets that outlive you and help your family. Today connects everything you have learned to the bigger picture: investing, real estate, and the structures that protect what you build.',
     image: '/masterclass/final_image.jpg',

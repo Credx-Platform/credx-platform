@@ -30,6 +30,17 @@
         .font-body {
             font-family: 'Inter', sans-serif;
         }
+        /* White-tint info panels on slides: force readable contrast.
+           These boxes were 20% white over a dark slide with white text on top,
+           which rendered as low-contrast grey-on-grey. */
+        .ppt-slide .bg-white\/20 {
+            background: rgba(255,255,255,0.96) !important;
+            color: #0d1420 !important;
+        }
+        .ppt-slide .bg-white\/20 *,
+        .ppt-slide .bg-white\/20 .text-white\/80 {
+            color: #0d1420 !important;
+        }
     </style>
 </head>
 <body class="bg-gray-900 py-8">
