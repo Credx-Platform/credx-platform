@@ -40,7 +40,41 @@ body {
     url('/images/credx-hero-bg.jpg') center/cover fixed no-repeat;
 }
 
-a { color: inherit; }
+/* Default: inline links read in brand cyan with subtle underline so clients
+   notice them. Surface-styled anchors (.ghost-button, .resource-link-card,
+   .nav-brand, .tab, .btn, navigation links) opt out by re-asserting color. */
+a { color: var(--cyan, #00c6fb); text-decoration: none; transition: color 0.15s; border-bottom: 1px dashed transparent; }
+a:hover { color: var(--cyan2, #00e5ff); border-bottom-color: currentColor; }
+a:focus-visible { outline: 2px solid var(--cyan, #00c6fb); outline-offset: 2px; border-radius: 2px; }
+.ghost-button, .nav-brand, .tab, .btn, .resource-link-card,
+.brand-row, .footer-col a, .nav-links a, .nav-cta, .cur-link {
+  color: inherit; border-bottom: 0;
+}
+.ghost-button:hover, .resource-link-card:hover { border-bottom: 0; }
+
+/* Inline message links: shown when system messages mention masterclass /
+   portal / share a URL. Stand out hard so clients know they're clickable. */
+.msg-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  margin: 0 1px;
+  background: color-mix(in srgb, var(--cyan, #00c6fb) 18%, transparent);
+  color: var(--cyan, #00c6fb) !important;
+  border: 1px solid color-mix(in srgb, var(--cyan, #00c6fb) 35%, transparent);
+  border-radius: 6px;
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.msg-link::after { content: '↗'; font-size: 0.85em; opacity: 0.7; }
+.msg-link:hover {
+  background: color-mix(in srgb, var(--cyan, #00c6fb) 28%, transparent);
+  color: var(--cyan2, #00e5ff) !important;
+  border-color: var(--cyan, #00c6fb);
+}
 h1, h2, h3, .eyebrow, .top-title, button { font-family: 'Outfit', sans-serif; }
 
 .shell {

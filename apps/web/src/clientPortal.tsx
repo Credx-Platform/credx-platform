@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import MasterclassDashboard from './components/MasterclassDashboard';
 import type { LessonDay } from './masterclassCurriculum';
 
@@ -627,6 +627,40 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
   );
 }
 
+function linkifyMessage(text: string): React.ReactNode[] {
+  if (!text) return [];
+  // Pattern: real URLs OR the bare keywords "masterclass" / "portal" (case-insensitive).
+  const pattern = /(https?:\/\/[^\s)]+|\b(?:masterclass|portal access|portal|client portal)\b)/gi;
+  const out: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) out.push(text.slice(lastIndex, match.index));
+    const token = match[0];
+    const isUrl = /^https?:\/\//i.test(token);
+    const lower = token.toLowerCase();
+    let href = '#';
+    if (isUrl) href = token;
+    else if (lower.includes('masterclass')) href = '/portal?welcome=masterclass';
+    else href = '/portal';
+    out.push(
+      <a
+        key={`lnk-${key++}`}
+        href={href}
+        className="msg-link"
+        target={isUrl ? '_blank' : undefined}
+        rel={isUrl ? 'noopener noreferrer' : undefined}
+      >
+        {token}
+      </a>
+    );
+    lastIndex = match.index + token.length;
+  }
+  if (lastIndex < text.length) out.push(text.slice(lastIndex));
+  return out;
+}
+
 function ActivitySection({ progress, client }: { progress: Progress | null; client: Client | null; }) {
   const activities = progress?.activities || client?.activities || [];
   const nextUpdate = progress?.workflow?.next?.length ? progress.workflow.next.map(prettyStatus).join(', ') : 'CredX will post the next milestone here once your file advances.';
@@ -634,10 +668,10 @@ function ActivitySection({ progress, client }: { progress: Progress | null; clie
     <section className="panel">
       <div className="panel-header"><div><p className="eyebrow">Activity</p><h2>What was done and what comes next</h2></div></div>
       <div className="dispute-list">
-        <div className="plan-card"><strong>Next update</strong><span>{nextUpdate}</span><small>Last workflow change: {formatDateTime(progress?.workflow?.updatedAt)}</small></div>
+        <div className="plan-card"><strong>Next update</strong><span>{linkifyMessage(nextUpdate)}</span><small>Last workflow change: {formatDateTime(progress?.workflow?.updatedAt)}</small></div>
         {activities.length ? activities.slice().sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).map((item) => (
           <div key={item.id} className="dispute-card-live">
-            <div className="dispute-card-top"><strong>{item.message}</strong><span>{formatDateTime(item.createdAt)}</span></div>
+            <div className="dispute-card-top"><strong>{linkifyMessage(item.message)}</strong><span>{formatDateTime(item.createdAt)}</span></div>
             <div className="dispute-meta"><span>{prettyStatus(item.type || 'activity')}</span></div>
           </div>
         )) : <div className="empty-state-card">No client-facing activity has been posted yet.</div>}
