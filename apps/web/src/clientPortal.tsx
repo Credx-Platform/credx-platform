@@ -233,12 +233,12 @@ function scoreBand(score: number): ScoreBand {
 type SectionTheme = { title: string; desc: string; accent: string };
 const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
   profile: { title: 'Your Profile', desc: 'Personal info, secure documents, and identity verification details.', accent: '#a855f7' },
-  monitoring: { title: 'Credit Monitoring', desc: 'Connect your monitoring provider, upload reports, and review CredX analysis.', accent: '#00c6fb' },
+  monitoring: { title: 'Credit Monitoring', desc: 'Now lives inside Analysis & Reports — upload, review, and connect monitoring in one place.', accent: '#00c6fb' },
   disputes: { title: 'Disputes', desc: 'Track active dispute items, bureau status, and round progression.', accent: '#f59e0b' },
   activity: { title: 'Activity', desc: 'Timeline of what just happened on your file and what comes next.', accent: '#2dd4bf' },
   resources: { title: 'Credit Builders', desc: 'Partner tools and accounts to rebuild your credit profile.', accent: '#84cc16' },
   tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' },
-  analysis: { title: 'Credit Analysis', desc: 'Your professional credit analysis report and dispute strategy.', accent: '#2563eb' },
+  analysis: { title: 'Analysis & Reports', desc: 'Upload your credit report, run analysis, and connect monitoring — all in one place.', accent: '#2563eb' },
   masterclass: { title: '5-Day Masterclass', desc: 'Your complete credit repair curriculum — videos, slides, key terms, and action steps.', accent: '#00c6fb' }
 };
 
@@ -436,6 +436,19 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
     }
   }
 
+  async function skipMonitoring() {
+    setWizardError(null);
+    setBusyStep('monitoring');
+    try {
+      await apiFetch('/api/monitoring/skip', token, { method: 'POST', body: '{}' });
+      await refreshProgress();
+    } catch (error) {
+      setWizardError(error instanceof Error ? error.message : 'Unable to skip monitoring step');
+    } finally {
+      setBusyStep(null);
+    }
+  }
+
   async function submitDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!docUpload.file) {
@@ -466,7 +479,24 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
         {loadingContract ? <div className="empty-state-card">Loading your agreement...</div> : null}
         {needsContract && contractText ? <form className="dispute-card-live" onSubmit={submitContract}><div className="dispute-card-top"><strong>Step 1, sign your agreement</strong></div><div className="dispute-meta" style={{ display: 'block' }}><p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.agreement}</p><p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.disclosure}</p><input className="chat-input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your full name" /><label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginTop: '1rem' }}><input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} /><span>I have read and agree to the contract and disclosures.</span></label><button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim()} style={{ marginTop: '1rem' }}>{busyStep === 'contract' ? 'Signing...' : 'Sign contract'}</button></div></form> : null}
         {needsApplication ? <form className="dispute-card-live" onSubmit={submitApplication}><div className="dispute-card-top"><strong>Step 2, complete intake</strong><span className="security-note-inline" aria-label="Encrypted">🔒 Encrypted</span></div><div className="field-grid"><input className="chat-input" value={wizardState.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Full name" /><input className="chat-input" value={wizardState.email} onChange={(e) => setField('email', e.target.value)} placeholder="Email" /><input className="chat-input" value={wizardState.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="Phone" /><input className="chat-input" value={wizardState.address1} onChange={(e) => setField('address1', e.target.value)} placeholder="Address line 1" /><input className="chat-input" value={wizardState.address2} onChange={(e) => setField('address2', e.target.value)} placeholder="Address line 2" /><input className="chat-input" value={wizardState.city} onChange={(e) => setField('city', e.target.value)} placeholder="City" /><input className="chat-input" value={wizardState.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" /><input className="chat-input" value={wizardState.zip} onChange={(e) => setField('zip', e.target.value)} placeholder="ZIP" /><input className="chat-input" value={wizardState.dob} onChange={(e) => setField('dob', e.target.value)} placeholder="Date of birth (YYYY-MM-DD)" /><input className="chat-input" type="password" value={wizardState.ssn} onChange={(e) => setField('ssn', e.target.value)} placeholder="SSN" autoComplete="off" /><button className="ghost-button" type="submit" disabled={busyStep === 'application'}>{busyStep === 'application' ? 'Saving...' : 'Save intake'}</button></div><p className="helper-text" style={{ marginTop: '0.5rem' }}>SSN and date of birth are encrypted before they're saved. Only the last 4 digits of your SSN are ever shown back to you.</p></form> : null}
-        {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}><div className="dispute-card-top"><strong>Step 3, set your monitoring account</strong></div><div className="field-grid"><select className="chat-input" value={wizardState.provider} onChange={(e) => setField('provider', e.target.value)}><option value="">Select provider</option><option value="IdentityIQ">IdentityIQ</option><option value="MyFreeScoreNow">MyFreeScoreNow</option></select><input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" /><input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" /><button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}</button></div><div className="helper-link-grid">{affiliateLinks.map((item, index) => <a key={`${item.url}-${index}`} className="resource-link-card" href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>{String(item.category || '').replace(/_/g, ' ')}</span></a>)}</div><p className="helper-text">Choose IdentityIQ or MyFreeScoreNow, open your preferred provider link, then come back and submit the credentials you want on file. Password setup is emailed only after this step is completed.</p></form> : null}
+        {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}>
+          <div className="dispute-card-top">
+            <strong>Step 3, connect credit monitoring (optional)</strong>
+            <span className="security-note-inline" aria-label="Optional">Optional</span>
+          </div>
+          <p className="helper-text" style={{ marginBottom: '0.75rem' }}>
+            You can connect now or do it later from inside your portal. Your password setup link will be emailed as soon as this step is either submitted or skipped.
+          </p>
+          <div className="field-grid">
+            <select className="chat-input" value={wizardState.provider} onChange={(e) => setField('provider', e.target.value)}><option value="">Select provider</option><option value="IdentityIQ">IdentityIQ</option><option value="MyFreeScoreNow">MyFreeScoreNow</option></select>
+            <input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" />
+            <input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" />
+            <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}</button>
+            <button className="ghost-button" type="button" onClick={skipMonitoring} disabled={busyStep === 'monitoring'} style={{ background: 'transparent' }}>{busyStep === 'monitoring' ? 'Saving...' : 'Skip for now'}</button>
+          </div>
+          <div className="helper-link-grid">{affiliateLinks.map((item, index) => <a key={`${item.url}-${index}`} className="resource-link-card" href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>{String(item.category || '').replace(/_/g, ' ')}</span></a>)}</div>
+          <p className="helper-text">Pick a provider and submit credentials, or skip for now and add them later. Either way, your portal is unlocked once this step is acknowledged.</p>
+        </form> : null}
         {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Step 4, upload your credit report</strong></div><div className="field-grid"><input className="chat-input" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => setDocUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} /><select className="chat-input" value={docUpload.type} onChange={(e) => setDocUpload((current) => ({ ...current, type: e.target.value }))}><option value="credit_report">Credit report</option><option value="identity">Driver's license or ID</option><option value="proof_of_address">Proof of address</option><option value="other">Other</option></select><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docUpload.file}>{busyStep === 'upload' ? 'Uploading...' : 'Upload securely'}</button></div><p className="helper-text">Upload credit reports as PDF or HTML files. JPG, PNG, and WEBP are also accepted for screenshots and supporting images.</p></form> : null}
         {completedAt ? <div className="empty-state-card">Onboarding complete. Your file is now in review.</div> : null}
       </div>
@@ -912,7 +942,127 @@ function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { to
   );
 }
 
-function AnalysisSection({ client, progress }: { client: Client | null; progress: Progress | null; }) {
+function AnalysisUploadCard({ token, progress, refreshAll }: { token: string; progress: Progress | null; refreshAll: () => Promise<void>; }) {
+  const uploadedDocs = progress?.uploadedDocs || [];
+  const creditDocs = uploadedDocs.filter((d) => (d.type || '').toLowerCase().includes('credit'));
+  const hasReport = creditDocs.length > 0;
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!file) {
+      setError('Choose a file first.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('type', 'credit_report');
+      await apiUpload('/api/progress/me/docs/upload', token, fd);
+      setFile(null);
+      setMessage('Uploaded — generating your analysis now. This page will refresh shortly.');
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel" style={{ borderColor: hasReport ? 'var(--cx-success)' : 'var(--cx-cyan)' }}>
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow" style={{ color: hasReport ? '#22c55e' : '#00c6fb' }}>{hasReport ? 'Report on file' : 'Upload your credit report'}</p>
+          <h2>{hasReport ? `${creditDocs.length} report${creditDocs.length === 1 ? '' : 's'} uploaded` : 'Drop your report to generate analysis'}</h2>
+        </div>
+        <span className="security-note-inline" aria-label="Encrypted">🔒 Encrypted upload</span>
+      </div>
+      <p className="helper-text" style={{ marginTop: 0 }}>
+        Upload the PDF or HTML file you saved from IdentityIQ, MyFreeScoreNow, or any other tri-merge source.
+        Your CredX analysis is generated automatically the moment your report lands.
+      </p>
+      <form onSubmit={submit} className="field-grid" style={{ marginTop: '0.75rem' }}>
+        <input
+          className="chat-input"
+          type="file"
+          accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp"
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setFile(e.target.files?.[0] || null)}
+        />
+        <button className="ghost-button" type="submit" disabled={busy || !file} style={{ background: '#00c6fb', color: '#060a12', border: 'none', fontWeight: 700 }}>
+          {busy ? 'Uploading…' : hasReport ? 'Upload another' : 'Upload report'}
+        </button>
+      </form>
+      {message ? <p className="helper-text" style={{ color: '#22c55e', marginTop: '0.5rem' }}>{message}</p> : null}
+      {error ? <div className="error-banner" style={{ marginTop: '0.5rem' }}>{error}</div> : null}
+      <p className="helper-text">Accepted formats: PDF, HTML, HTM, PNG, JPG, JPEG, WEBP.</p>
+    </section>
+  );
+}
+
+function MonitoringConnectCard({ token, progress, refreshAll }: { token: string; progress: Progress | null; refreshAll: () => Promise<void>; }) {
+  const onboarding = (progress?.onboarding || {}) as Record<string, unknown>;
+  const provider = String(onboarding.monitoringProvider || '');
+  const hasCredentials = Boolean(onboarding.monitoringHasCredentials);
+  const [form, setForm] = useState({ provider: provider || '', username: '', password: '' });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await apiFetch('/api/monitoring', token, {
+        method: 'POST',
+        body: JSON.stringify({ provider: form.provider, username: form.username, password: form.password })
+      });
+      setForm({ provider: form.provider, username: '', password: '' });
+      setMessage('Monitoring credentials saved.');
+      await refreshAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save credentials.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow" style={{ color: hasCredentials ? '#22c55e' : '#94a3b8' }}>Credit Monitoring (optional)</p>
+          <h2>{hasCredentials ? `Connected · ${provider}` : 'Connect a provider to let CredX pull on your behalf'}</h2>
+        </div>
+      </div>
+      <p className="helper-text" style={{ marginTop: 0 }}>
+        Optional. Without this, you upload reports manually. With this, your CredX team can pull a fresh report and post the analysis without bothering you.
+      </p>
+      <form onSubmit={submit} className="field-grid" style={{ marginTop: '0.75rem' }}>
+        <select className="chat-input" value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })}>
+          <option value="">Select provider</option>
+          <option value="IdentityIQ">IdentityIQ</option>
+          <option value="MyFreeScoreNow">MyFreeScoreNow</option>
+        </select>
+        <input className="chat-input" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="Monitoring username" autoComplete="off" />
+        <input className="chat-input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Monitoring password" autoComplete="new-password" />
+        <button className="ghost-button" type="submit" disabled={busy || !form.provider}>{busy ? 'Saving…' : hasCredentials ? 'Update credentials' : 'Save credentials'}</button>
+      </form>
+      {message ? <p className="helper-text" style={{ color: '#22c55e', marginTop: '0.5rem' }}>{message}</p> : null}
+      {error ? <div className="error-banner" style={{ marginTop: '0.5rem' }}>{error}</div> : null}
+    </section>
+  );
+}
+
+function AnalysisSection({ token, client, progress, refreshAll }: { token: string; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; }) {
   const analysis = progress?.analysis as any;
   const hasAnalysis = analysis && typeof analysis === 'object' && analysis.keyFindings;
 
@@ -941,22 +1091,25 @@ function AnalysisSection({ client, progress }: { client: Client | null; progress
   if (!hasAnalysis) {
     return (
       <div className="page-grid">
+        <AnalysisUploadCard token={token} progress={progress} refreshAll={refreshAll} />
         <section className="panel">
           <div className="panel-header"><div><p className="eyebrow">Credit Analysis</p><h2>Your analysis report</h2></div></div>
           <div className="empty-state-card">
-            <strong>Analysis not ready yet</strong>
-            <p>Your CredX team is reviewing your credit reports. The analysis will appear here once it's complete.</p>
-            <p style={{ marginTop: '12px', fontSize: '0.85rem', color: '#64748b' }}>
+            <strong>Analysis appears here automatically</strong>
+            <p>Once your credit report uploads above, CredX runs your analysis within seconds. If your file is being reviewed manually, the analysis will show up here when ready.</p>
+            <p style={{ marginTop: '12px', fontSize: '0.85rem', color: '#94a3b8' }}>
               Status: {client?.status || 'Pending'} · Reports uploaded: {client?.documents?.filter(d => d.type === 'CREDIT_REPORT').length || 0}
             </p>
           </div>
         </section>
+        <MonitoringConnectCard token={token} progress={progress} refreshAll={refreshAll} />
       </div>
     );
   }
 
   return (
     <div className="page-grid">
+      <AnalysisUploadCard token={token} progress={progress} refreshAll={refreshAll} />
       <section className="hero-card hero-card--compact">
         <div>
           <p className="eyebrow">Credit Analysis</p>
@@ -1327,9 +1480,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     : [
         { key: 'overview', label: 'Overview' },
         ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
-        { key: 'analysis', label: 'Analysis' },
+        { key: 'analysis', label: 'Analysis & Reports' },
         { key: 'profile', label: 'Profile' },
-        { key: 'monitoring', label: 'Credit Monitoring' },
         { key: 'disputes', label: 'Disputes' },
         { key: 'activity', label: 'Activity' },
         { key: 'resources', label: 'Credit Builders' },
@@ -1418,28 +1570,52 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                   <div className="panel-header">
                     <div>
                       <p className="eyebrow" style={{ color: '#00c6fb' }}>Next Step</p>
-                      <h2>Upload Your Credit Report</h2>
+                      <h2>Pull your credit report, then upload it</h2>
                     </div>
                   </div>
-                  <div style={{ padding: '1rem 0' }}>
+                  <div style={{ padding: '0.5rem 0 0' }}>
                     <p style={{ marginBottom: '1rem' }}>
                       Your CredX analysis and dispute strategy are waiting on your credit report.
-                      First, download your report from your monitoring provider, then upload it here.
+                      Use one of the providers below to pull a fresh tri-merge report (Experian + Equifax + TransUnion),
+                      download the PDF or HTML, then drop it into the Analysis tab.
                     </p>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                      <button
+                    <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1.25rem' }}>
+                      <strong style={{ color: '#cbd5e1' }}>How to do it</strong> —
+                      1) Open one of the affiliate links below in a new tab.
+                      2) Sign up (most providers offer a $1 trial).
+                      3) Download or save the report as PDF / HTML.
+                      4) Come back to the Analysis tab and upload it. Your analysis is generated automatically the moment it lands.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '1rem' }}>
+                      <a
+                        href="https://www.identityiq.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="ghost-button"
-                        onClick={() => setActiveTab('monitoring')}
-                        style={{ background: '#00c6fb', color: '#060a12', border: 'none', fontWeight: 700 }}
+                        style={{ background: '#00c6fb', color: '#060a12', border: 'none', fontWeight: 700, justifyContent: 'center', textDecoration: 'none' }}
                       >
-                        📤 Go to Upload
-                      </button>
-                      <a href="/signup?offer=masterclass" className="ghost-button" style={{ textDecoration: 'none' }}>
-                        📚 Learn More
+                        Pull report at IdentityIQ ↗
                       </a>
+                      <a
+                        href="https://www.myfreescorenow.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ghost-button"
+                        style={{ background: '#22c55e', color: '#060a12', border: 'none', fontWeight: 700, justifyContent: 'center', textDecoration: 'none' }}
+                      >
+                        Pull report at MyFreeScoreNow ↗
+                      </a>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => setActiveTab('analysis')}
+                        style={{ justifyContent: 'center' }}
+                      >
+                        I already have it — go to Analysis →
+                      </button>
                     </div>
                     <p className="helper-text">
-                      Accepted formats: PDF, HTML, HTM, PNG, JPG, JPEG, WEBP
+                      Accepted formats: PDF, HTML, HTM, PNG, JPG, JPEG, WEBP. We use these provider links to keep CredX running — there's no extra cost to you.
                     </p>
                   </div>
                 </section>
@@ -1502,11 +1678,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           ) : null}
 
           {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
-          {activeTab === 'monitoring' ? <CreditMonitoringSection token={token} client={client} progress={progress} refreshAll={refreshAll} /> : null}
           {activeTab === 'disputes' ? <DisputesSection client={client} progress={progress} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
-          {activeTab === 'analysis' ? <AnalysisSection client={client} progress={progress} /> : null}
+          {activeTab === 'analysis' ? <AnalysisSection token={token} client={client} progress={progress} refreshAll={refreshAll} /> : null}
 
           {activeTab === 'masterclass' ? (
             <MasterclassDashboard

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { maybeSendPortalReadyEmail } from '../lib/portalReady.js';
 
 export const applicationsRouter = Router();
 
@@ -70,6 +71,11 @@ applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) 
       }
     });
 
+    // Monitoring is now optional — fire the portal-ready email as soon as
+    // contract + profile are both complete. Idempotent guard prevents
+    // duplicate sends if the user later submits or skips the monitoring step.
+    const portalEmail = await maybeSendPortalReadyEmail(user.client.id);
+
     return res.json({
       success: true,
       application_id: applicationId,
@@ -84,7 +90,8 @@ applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) 
         submittedAt
       },
       progress: updatedProgress,
-      next_step: 'monitoring'
+      next_step: 'monitoring_optional',
+      portalEmail
     });
   } catch (error) {
     next(error);
