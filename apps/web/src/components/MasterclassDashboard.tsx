@@ -28,7 +28,7 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
     return MASTERCLASS_DAYS.find((d) => d.day === activeDay) || MASTERCLASS_DAYS[0];
   }, [activeDay]);
 
-  const slidesSrc = `/masterclass/slides/index.html#slide-${day.slidesRange.from}`;
+  const slidesSrc = `/masterclass/slides/index.html?day=${day.day}#slide-${day.slidesRange.from}`;
   const isCompleted = completedDays.includes(day.slug);
   const isBonus = !!day.isBonus;
 
@@ -100,8 +100,11 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
                   )}
                 </div>
                 <div className="mc-video-meta">
-                  <strong>{v.title}</strong>
-                  {v.duration ? <span>{v.duration}</span> : null}
+                  <div className="mc-video-meta-head">
+                    <strong>{v.title}</strong>
+                    {v.duration ? <span className="mc-video-duration">{v.duration}</span> : null}
+                  </div>
+                  <p className="mc-video-desc">{v.description}</p>
                 </div>
               </div>
             ))}
@@ -137,6 +140,20 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
             {day.actionSteps.map((step, i) => <li key={i}>{step}</li>)}
           </ol>
         </div>
+
+        {day.qa && day.qa.length > 0 ? (
+          <div className="mc-section">
+            <h3 className="mc-section-h">Real questions, real answers</h3>
+            <div className="mc-qa-list">
+              {day.qa.map((item, i) => (
+                <details key={i} className="mc-qa-item" open={i === 0}>
+                  <summary>{item.question}</summary>
+                  <p>{item.answer}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="mc-day-footer">
           {!isCompleted && onMarkComplete ? (

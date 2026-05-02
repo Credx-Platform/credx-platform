@@ -1194,8 +1194,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     welcomeShownRef.current = true;
     setShowWelcome(true);
     setWelcomeLeaving(false);
-    const leaveTimer = setTimeout(() => setWelcomeLeaving(true), 5000);
-    const removeTimer = setTimeout(() => setShowWelcome(false), 5400);
+    const leaveTimer = setTimeout(() => setWelcomeLeaving(true), 3000);
+    const removeTimer = setTimeout(() => setShowWelcome(false), 3400);
     return () => {
       clearTimeout(leaveTimer);
       clearTimeout(removeTimer);

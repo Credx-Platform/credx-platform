@@ -33,6 +33,26 @@
     </style>
 </head>
 <body class="bg-gray-900 py-8">
+<script>
+(function(){
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var day = parseInt(params.get('day') || '0', 10);
+    if (!day) return;
+    var ranges = { 1:[3,6], 2:[7,10], 3:[11,14], 4:[15,18], 5:[19,22], 6:[23,23] };
+    var range = ranges[day];
+    if (!range) return;
+    document.addEventListener('DOMContentLoaded', function(){
+      var slides = document.querySelectorAll('.ppt-slide');
+      slides.forEach(function(el){
+        var idAttr = el.getAttribute('id') || '';
+        var n = parseInt(idAttr.replace('slide-', ''), 10);
+        if (!Number.isFinite(n) || n < range[0] || n > range[1]) el.style.display = 'none';
+      });
+    });
+  } catch (e) {}
+})();
+</script>
 <!-- Slide 1: Cover -->
 <div id="slide-1" class="ppt-slide !bg-[#1a1f2e]" type="cover">
 <img alt="Cover" class="absolute inset-0 w-full h-full object-cover opacity-20" src="cover_image.jpg"/>
