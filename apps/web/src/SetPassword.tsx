@@ -215,6 +215,13 @@ export default function SetPassword() {
         </div>
         {formError ? <div className="error-banner">{formError}</div> : null}
         <button type="submit" disabled={submitting}>{submitting ? 'Saving…' : isReset ? 'Reset password' : 'Set password & continue'}</button>
+        <div className="security-note" role="note" aria-label="Security details">
+          <span aria-hidden="true" className="security-note-icon">🔒</span>
+          <div>
+            <strong>Encrypted in transit · Stored as a one-way hash</strong>
+            <span>This page runs over HTTPS. Your password is hashed (bcrypt) before it ever touches our database — even CredX staff can't read it.</span>
+          </div>
+        </div>
         <p className="helper-text">Link expires {new Date(verify.expiresAt).toLocaleString()}.</p>
       </form>
     </div>

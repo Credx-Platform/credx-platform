@@ -1,23 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('./design-tokens.css');
 
 :root {
-  --bg: #060a12;
-  --bg2: #0b1220;
-  --bg3: #101a2b;
-  --panel: rgba(11, 18, 32, 0.88);
-  --panel-strong: rgba(15, 24, 39, 0.96);
-  --panel-soft: rgba(16, 26, 43, 0.82);
-  --white: #f3f7fb;
-  --text: #d7e2ef;
-  --muted: #8ea4bb;
-  --cyan: #00c6fb;
-  --cyan-soft: rgba(0, 198, 251, 0.14);
-  --gold: #d6b04a;
-  --border: rgba(133, 157, 186, 0.18);
-  --border-strong: rgba(0, 198, 251, 0.22);
-  --success: #2dd4bf;
-  --danger: #f87171;
-  --shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+  /* Page-specific surface aliases used by the on-light surface bits below.
+     Brand and dark-mode tokens come from design-tokens.css. */
   --surface: #eef1f6;
   --surface-2: #ffffff;
   --surface-text: #0f1929;
@@ -27,13 +12,11 @@
   --surface-border-strong: rgba(0, 100, 180, 0.30);
 }
 
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
 body {
   margin: 0;
   min-height: 100vh;
-  color: var(--text);
-  font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+  color: var(--cx-text-soft);
+  font-family: var(--cx-font-body);
   background:
     linear-gradient(180deg, rgba(6,10,18,.82), rgba(6,10,18,.96)),
     radial-gradient(circle at top right, rgba(0,198,251,.14), transparent 28%),
@@ -75,7 +58,26 @@ a:focus-visible { outline: 2px solid var(--cyan, #00c6fb); outline-offset: 2px; 
   color: var(--cyan2, #00e5ff) !important;
   border-color: var(--cyan, #00c6fb);
 }
-h1, h2, h3, .eyebrow, .top-title, button { font-family: 'Outfit', sans-serif; }
+
+/* Security indicator: shown on auth/profile/SSN-bearing forms so clients
+   see that the page is protecting their info. Subtle, not alarming. */
+.security-note {
+  margin-top: 14px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  background: color-mix(in srgb, var(--cx-success, #22c55e) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cx-success, #22c55e) 22%, transparent);
+  border-radius: var(--cx-r-md, 10px);
+  color: var(--cx-text-soft, #e2e8f0);
+  font-family: var(--cx-font-body);
+}
+.security-note-icon { font-size: 18px; line-height: 1.2; padding-top: 2px; }
+.security-note strong { display: block; color: var(--cx-success, #22c55e); font-size: 12px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 4px; }
+.security-note span { display: block; font-size: 13px; line-height: 1.55; color: var(--cx-text-muted, #cbd5e1); }
+.security-note-inline { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--cx-r-pill, 999px); background: color-mix(in srgb, var(--cx-success, #22c55e) 12%, transparent); border: 1px solid color-mix(in srgb, var(--cx-success, #22c55e) 28%, transparent); color: var(--cx-success, #22c55e); font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
+h1, h2, h3, .eyebrow, .top-title, button { font-family: var(--cx-font-display); }
 
 .shell {
   display: grid;
@@ -170,7 +172,7 @@ h1, h2, h3, .eyebrow, .top-title, button { font-family: 'Outfit', sans-serif; }
   font-weight: 700;
 }
 .top-title { margin: 4px 0 0; font-size: clamp(1.8rem, 3vw, 2.5rem); color: var(--white); }
-.top-subtitle { margin: 8px 0 0; color: #cbd5e1; font-size: 14px; line-height: 1.6; max-width: 720px; font-family: 'Plus Jakarta Sans', sans-serif; }
+.top-subtitle { margin: 8px 0 0; color: #cbd5e1; font-size: 14px; line-height: 1.6; max-width: 720px; font-family: var(--cx-font-body); }
 .topbar--themed { border-color: color-mix(in srgb, var(--section-accent, #00c6fb) 35%, var(--border)); transition: border-color 0.3s; }
 .topbar--themed::before { content: ''; display: block; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 24px 0 0 24px; background: var(--section-accent, #00c6fb); transition: background 0.3s; }
 .topbar--themed { position: relative; overflow: hidden; }
@@ -525,7 +527,7 @@ button:hover,
   place-items: center;
   background: linear-gradient(135deg, rgba(0,198,251,.18), rgba(255,255,255,.03));
   color: var(--white);
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--cx-font-display);
   font-weight: 800;
 }
 .client-tab-stack {
@@ -704,7 +706,7 @@ button:hover,
   transform: translateY(-2px);
 }
 .score-gauge-bureau {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--cx-font-display);
   font-weight: 700;
   color: var(--white);
   font-size: 15px;
@@ -741,7 +743,7 @@ button:hover,
   gap: 4px;
 }
 .score-gauge-value {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--cx-font-display);
   font-size: 46px;
   font-weight: 800;
   color: var(--white);
@@ -800,7 +802,7 @@ button:hover,
   color: var(--cyan);
 }
 .welcome-toast-content strong {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--cx-font-display);
   font-size: 16px;
   font-weight: 700;
   color: var(--white);
@@ -869,7 +871,7 @@ button:hover,
     border: 1px solid var(--border-strong);
     border-radius: 14px;
     color: var(--white);
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--cx-font-display);
     font-weight: 700;
     font-size: 14px;
     letter-spacing: .04em;
@@ -928,11 +930,11 @@ button:hover,
 .mc-day-card.is-bonus { border-color: color-mix(in srgb, var(--card-accent, #f59e0b) 40%, transparent); }
 .mc-day-card.is-bonus.is-active { border-color: var(--card-accent, #f59e0b); box-shadow: 0 0 24px color-mix(in srgb, var(--card-accent, #f59e0b) 35%, transparent); }
 .mc-day-card.is-done::after { content: ''; position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 10px #22c55e; }
-.mc-day-card-num { font-family: 'Outfit', sans-serif; font-size: 28px; font-weight: 900; color: rgba(255,255,255,0.10); margin-bottom: 4px; line-height: 1; }
+.mc-day-card-num { font-family: var(--cx-font-display); font-size: 28px; font-weight: 900; color: rgba(255,255,255,0.10); margin-bottom: 4px; line-height: 1; }
 .mc-day-card.is-bonus .mc-day-card-num { color: rgba(245,158,11,0.22); }
 .mc-day-card-badge { display: inline-block; padding: 3px 8px; border-radius: 999px; background: rgba(0,198,251,0.18); color: #00c6fb; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
 .mc-day-card.is-bonus .mc-day-card-badge { background: rgba(245,158,11,0.18); color: #f59e0b; }
-.mc-day-card-title { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; line-height: 1.4; color: #f1f5f9; word-break: break-word; }
+.mc-day-card-title { font-family: var(--cx-font-display); font-size: 13px; font-weight: 700; line-height: 1.4; color: #f1f5f9; word-break: break-word; }
 .mc-day-card-done { font-size: 11px; color: #22c55e; font-weight: 700; margin-top: 8px; }
 
 .mc-day-panel.is-bonus { border-color: rgba(245,158,11,0.22); }
@@ -943,7 +945,7 @@ button:hover,
 
 .mc-section { margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); }
 .mc-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
-.mc-section-h { font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: var(--day-accent, #00c6fb); margin-bottom: 14px; transition: color 0.3s; }
+.mc-section-h { font-family: var(--cx-font-display); font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: var(--day-accent, #00c6fb); margin-bottom: 14px; transition: color 0.3s; }
 .mc-day-panel.is-bonus .mc-section-h { color: var(--day-accent, #f59e0b); }
 
 .mc-objective-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }

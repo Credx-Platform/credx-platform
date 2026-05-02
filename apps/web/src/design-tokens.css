@@ -1,0 +1,134 @@
+/* CredX Design Tokens — single source of truth for the entire site.
+ * Validated by the ui-ux-pro-max design intelligence pass for "credit
+ * repair fintech SaaS dashboard" — Dark Mode (OLED) + IBM Plex Sans.
+ *
+ * Any page (portal, landing, admin, set-password, masterclass) reads
+ * from these variables. Changing a value here updates the whole brand.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Surfaces (deepest → highest) */
+  --cx-bg: #060a12;
+  --cx-bg-2: #0b1220;
+  --cx-bg-3: #101a2b;
+  --cx-bg-4: #182035;
+  --cx-panel: rgba(11, 18, 32, 0.88);
+  --cx-panel-strong: rgba(15, 24, 39, 0.96);
+  --cx-panel-soft: rgba(16, 26, 43, 0.82);
+
+  /* Brand colors */
+  --cx-cyan: #00c6fb;
+  --cx-cyan-2: #00e5ff;
+  --cx-cyan-soft: rgba(0, 198, 251, 0.14);
+  --cx-cyan-glow: rgba(0, 198, 251, 0.30);
+  --cx-gold: #f59e0b;
+  --cx-gold-soft: rgba(245, 158, 11, 0.10);
+
+  /* Semantic */
+  --cx-success: #22c55e;
+  --cx-success-soft: rgba(34, 197, 94, 0.12);
+  --cx-warning: #f59e0b;
+  --cx-danger: #f87171;
+  --cx-danger-soft: rgba(248, 113, 113, 0.12);
+
+  /* Text */
+  --cx-text: #f8fafc;
+  --cx-text-soft: #e2e8f0;
+  --cx-text-muted: #cbd5e1;
+  --cx-text-dim: #94a3b8;
+
+  /* Borders */
+  --cx-border: rgba(133, 157, 186, 0.18);
+  --cx-border-strong: rgba(0, 198, 251, 0.28);
+  --cx-border-subtle: rgba(255, 255, 255, 0.08);
+
+  /* Day-specific accents (masterclass) */
+  --cx-day-1: #00c6fb;
+  --cx-day-2: #a855f7;
+  --cx-day-3: #22d3ee;
+  --cx-day-4: #22c55e;
+  --cx-day-5: #3b82f6;
+  --cx-day-6: #f59e0b;
+
+  /* Typography */
+  --cx-font-display: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --cx-font-body: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --cx-font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* Spacing scale */
+  --cx-s-1: 4px;
+  --cx-s-2: 8px;
+  --cx-s-3: 12px;
+  --cx-s-4: 16px;
+  --cx-s-5: 24px;
+  --cx-s-6: 32px;
+  --cx-s-7: 48px;
+  --cx-s-8: 64px;
+
+  /* Radii */
+  --cx-r-sm: 6px;
+  --cx-r-md: 10px;
+  --cx-r-lg: 14px;
+  --cx-r-xl: 20px;
+  --cx-r-pill: 999px;
+
+  /* Motion */
+  --cx-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --cx-dur-fast: 0.15s;
+  --cx-dur-base: 0.25s;
+  --cx-dur-slow: 0.4s;
+
+  /* Elevation */
+  --cx-shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.18);
+  --cx-shadow-md: 0 18px 36px rgba(0, 0, 0, 0.28);
+  --cx-shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.34);
+  --cx-glow: 0 0 24px var(--cx-cyan-glow);
+
+  /* Brand assets */
+  --cx-logo: url('/images/credx-logo-1.jpg');
+
+  /* Layout */
+  --cx-container: 1080px;
+  --cx-container-wide: 1200px;
+}
+
+/* Backwards-compat aliases — the old token names still work so we can
+   migrate gradually instead of touching every selector. */
+:root {
+  --bg: var(--cx-bg);
+  --bg2: var(--cx-bg-2);
+  --bg3: var(--cx-bg-3);
+  --bg4: var(--cx-bg-4);
+  --panel: var(--cx-panel);
+  --panel-strong: var(--cx-panel-strong);
+  --panel-soft: var(--cx-panel-soft);
+  --white: var(--cx-text);
+  --text: var(--cx-text-soft);
+  --muted: var(--cx-text-dim);
+  --cyan: var(--cx-cyan);
+  --cyan2: var(--cx-cyan-2);
+  --cyan-soft: var(--cx-cyan-soft);
+  --gold: var(--cx-gold);
+  --border: var(--cx-border);
+  --border-strong: var(--cx-border-strong);
+  --success: var(--cx-success);
+  --danger: var(--cx-danger);
+  --shadow: var(--cx-shadow-lg);
+}
+
+/* Global a11y baselines from the ui-ux-pro-max pre-delivery checklist. */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; scroll-behavior: smooth; }
+button, [role='button'], a[href], summary, label[for] { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--cx-cyan); outline-offset: 2px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
