@@ -1,12 +1,92 @@
 import { Resend } from 'resend';
 
+/* ============================================================
+   Shared email design system — synced with apps/web/src/design-tokens.css
+   Every transactional email below renders through renderEmailShell()
+   so the CredX header, accent bar, footer, contact info, and brand
+   colors stay identical across the entire chain.
+   ============================================================ */
+const EMAIL_BG = '#060a12';
+const EMAIL_CARD = '#0b1220';
+const EMAIL_CARD_INNER = '#101a2b';
+const EMAIL_BORDER = 'rgba(133,157,186,0.18)';
+const EMAIL_TEXT = '#f8fafc';
+const EMAIL_TEXT_SOFT = '#e2e8f0';
+const EMAIL_TEXT_MUTED = '#cbd5e1';
+const EMAIL_TEXT_DIM = '#94a3b8';
+const EMAIL_CYAN = '#00c6fb';
+const EMAIL_SUCCESS = '#22c55e';
+const EMAIL_FONT = "'IBM Plex Sans',Helvetica,Arial,sans-serif";
+
+function emailButton(href: string, label: string, accent: string = EMAIL_CYAN): string {
+  return `<div style="text-align:center;padding:18px 0 6px;">
+    <a href="${href}" style="display:inline-block;background:${accent};color:#0d1420;text-decoration:none;padding:15px 32px;border-radius:12px;font-weight:700;font-size:16px;font-family:${EMAIL_FONT};letter-spacing:0.2px;">${label}</a>
+  </div>`;
+}
+
+function emailNumberedSteps(steps: string[]): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:18px 0;">
+    ${steps.map((step, i) => `<tr><td style="padding:0 0 10px;">
+      <div style="padding:13px 16px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;color:${EMAIL_TEXT_SOFT};font-family:${EMAIL_FONT};font-size:14px;line-height:1.6;">
+        <strong style="color:${EMAIL_CYAN};margin-right:8px;">${i + 1}.</strong>${step}
+      </div>
+    </td></tr>`).join('')}
+  </table>`;
+}
+
+function renderEmailShell(opts: {
+  preheader: string;
+  eyebrow: string;
+  accent?: string;
+  bodyHtml: string;
+}): string {
+  const accent = opts.accent || EMAIL_CYAN;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="supported-color-schemes" content="dark" />
+  <title>CredX</title>
+</head>
+<body style="margin:0;padding:0;background:${EMAIL_BG};font-family:${EMAIL_FONT};color:${EMAIL_TEXT_SOFT};">
+  <div style="display:none;font-size:1px;color:${EMAIL_BG};line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${opts.preheader}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${EMAIL_BG};padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;background:${EMAIL_CARD};border:1px solid ${EMAIL_BORDER};border-radius:18px;overflow:hidden;">
+        <tr><td style="height:5px;background:${accent};font-size:0;line-height:0;">&nbsp;</td></tr>
+        <tr><td style="padding:30px 32px 22px;text-align:center;border-bottom:1px solid ${EMAIL_BORDER};">
+          <div style="font-family:${EMAIL_FONT};font-size:30px;font-weight:700;color:${EMAIL_TEXT};letter-spacing:0.04em;">CredX</div>
+          <div style="margin-top:6px;color:${accent};font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;">${opts.eyebrow}</div>
+        </td></tr>
+        <tr><td style="padding:30px 32px 24px;color:${EMAIL_TEXT_SOFT};font-size:15px;line-height:1.65;">
+          ${opts.bodyHtml}
+        </td></tr>
+        <tr><td style="padding:22px 32px 30px;color:${EMAIL_TEXT_DIM};font-size:12px;line-height:1.6;border-top:1px solid ${EMAIL_BORDER};">
+          <strong style="color:${EMAIL_TEXT};font-size:14px;">CredX</strong><br />
+          Credit Repair &amp; Financial Strategy Support<br />
+          <a href="https://credxme.com" style="color:${accent};text-decoration:none;">credxme.com</a> ·
+          <a href="mailto:contact@credxme.com" style="color:${accent};text-decoration:none;">contact@credxme.com</a> ·
+          <a href="tel:+18662733963" style="color:${accent};text-decoration:none;">866-CREDX-ME</a>
+          <div style="margin-top:14px;color:${EMAIL_TEXT_DIM};font-size:11px;">
+            You're receiving this because you started with CredX. If this wasn't you, ignore this email — no account changes are made until you act.
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 function renderWelcomeLeadEmail(params: { firstName: string; contractLink: string; offerType?: 'program' | 'masterclass' }) {
   const isMasterclass = params.offerType === 'masterclass';
-  const subject = isMasterclass ? 'Welcome to the CredX 5-Day Masterclass' : 'Welcome to CredX — Here’s Your Next Step';
+  const subject = isMasterclass ? 'Welcome to the CredX 5-Day Masterclass' : "Welcome to CredX — Here's Your Next Step";
   const headline = isMasterclass ? 'Welcome to the CredX 5-Day Masterclass' : 'Welcome to CredX';
   const intro = isMasterclass
-    ? 'You’re in. Your next step is to open your secure onboarding link so you can review the agreement, complete your intake, and unlock the masterclass inside CredX.'
-    : 'Your inquiry has been received, and the next step is to open your secure onboarding link so you can review the agreement and complete your intake properly.';
+    ? "You're in. Your next step is to open your secure onboarding link so you can review the agreement, complete your intake, and unlock the masterclass inside CredX."
+    : 'Your inquiry has been received. Your next step is to open your secure onboarding link so you can review the agreement and complete your intake.';
   const steps = isMasterclass
     ? [
         'Open your secure CredX onboarding link.',
@@ -21,52 +101,19 @@ function renderWelcomeLeadEmail(params: { firstName: string; contractLink: strin
         'Watch for your portal-ready email once onboarding is complete.'
       ];
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${headline}</title>
-</head>
-<body style="margin:0;padding:0;background:#0d1420;font-family:Arial,Helvetica,sans-serif;color:#e9eef6;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0d1420;padding:24px 12px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
-          <tr><td style="height:6px;background:#c9a227;font-size:0;line-height:0;">&nbsp;</td></tr>
-          <tr>
-            <td style="background:#111a28;padding:32px 28px 24px;text-align:center;border-bottom:1px solid #243247;">
-              <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
-              <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">${isMasterclass ? '5-Day Masterclass + onboarding access' : 'Credit Repair & Financial Strategy Support'}</div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px 28px;">
-              <h1 style="margin:0 0 12px;font-size:28px;line-height:1.2;color:#ffffff;">${headline}</h1>
-              <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Hi ${params.firstName || 'there'},</p>
-              <p style="margin:0 0 16px;color:#d5dfeb;font-size:16px;line-height:1.65;">${intro}</p>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
-                ${steps.map((step, index) => `<tr><td style="padding:0 0 12px;"><div style="padding:14px 16px;background:#162132;border:1px solid #243247;border-radius:12px;color:#e9eef6;"><strong>${index + 1}.</strong> ${step}</div></td></tr>`).join('')}
-              </table>
-              <div style="text-align:center;padding:10px 0 4px;">
-                <a href="${params.contractLink}" style="display:inline-block;background:#c9a227;color:#111a28;text-decoration:none;padding:15px 28px;border-radius:12px;font-weight:800;font-size:16px;">Open Secure Onboarding</a>
-              </div>
-              <p style="margin:18px 0 0;color:#9fb0c5;font-size:13px;line-height:1.6;">If the button doesn’t open, copy and paste this link into your browser:<br /><span style="color:#ffffff;word-break:break-all;">${params.contractLink}</span></p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 28px 30px;color:#9fb0c5;font-size:13px;line-height:1.6;border-top:1px solid #243247;">
-              <strong style="color:#ffffff;">CredX</strong><br />
-              Credit Repair & Financial Strategy Support<br />
-              Sent from hello@credxme.com
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+  const bodyHtml = `
+    <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">${headline}</h1>
+    <p style="margin:0 0 12px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Hi ${params.firstName || 'there'},</p>
+    <p style="margin:0 0 4px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">${intro}</p>
+    ${emailNumberedSteps(steps)}
+    ${emailButton(params.contractLink, 'Open Secure Onboarding')}
+    <p style="margin:18px 0 0;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">If the button doesn't open, copy and paste this link into your browser:<br /><span style="color:${EMAIL_TEXT};word-break:break-all;">${params.contractLink}</span></p>
+  `;
+  const html = renderEmailShell({
+    preheader: isMasterclass ? 'Open your secure onboarding to unlock the 5-Day Masterclass.' : 'Open your secure onboarding to begin your CredX journey.',
+    eyebrow: isMasterclass ? '5-Day Masterclass · Onboarding' : 'Welcome · Onboarding',
+    bodyHtml
+  });
 
   const text = `${headline}
 
@@ -94,46 +141,27 @@ Credit Repair & Financial Strategy Support`;
 function renderMasterclassWelcomeEmail(params: { firstName: string; setupLink: string; expiresAt: Date }) {
   const subject = 'Welcome to the CredX 5-Day Masterclass — Set Your Password';
   const expiresHours = Math.max(1, Math.round((params.expiresAt.getTime() - Date.now()) / 3_600_000));
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${subject}</title>
-</head>
-<body style="margin:0;padding:0;background:#0d1420;font-family:Arial,Helvetica,sans-serif;color:#e9eef6;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0d1420;padding:24px 12px;">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
-        <tr><td style="height:6px;background:#00c6fb;font-size:0;line-height:0;">&nbsp;</td></tr>
-        <tr><td style="padding:32px 28px 22px;text-align:center;border-bottom:1px solid #243247;">
-          <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
-          <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">5-Day Masterclass</div>
-        </td></tr>
-        <tr><td style="padding:30px 28px 8px;">
-          <h1 style="margin:0 0 12px;font-size:26px;line-height:1.25;color:#ffffff;">You're enrolled, ${params.firstName || 'there'}.</h1>
-          <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Welcome to the CredX 5-Day Credit Repair Masterclass. No contracts, no intake forms — just set your password and you're in.</p>
-          <p style="margin:0 0 18px;color:#d5dfeb;font-size:16px;line-height:1.65;"><strong style="color:#ffffff;">Day 1: Credit Fundamentals</strong> is waiting for you the moment you log in.</p>
-          <div style="text-align:center;padding:14px 0 6px;">
-            <a href="${params.setupLink}" style="display:inline-block;background:#00c6fb;color:#0d1420;text-decoration:none;padding:15px 30px;border-radius:12px;font-weight:800;font-size:16px;">Set my password</a>
-          </div>
-          <p style="margin:18px 0 6px;color:#9fb0c5;font-size:13px;line-height:1.6;">This link expires in about ${expiresHours} hours and can only be used once.</p>
-          <p style="margin:6px 0 0;color:#9fb0c5;font-size:13px;line-height:1.6;">If the button doesn't open, copy this link into your browser:<br /><span style="color:#ffffff;word-break:break-all;">${params.setupLink}</span></p>
-        </td></tr>
-        <tr><td style="padding:22px 28px 28px;color:#9fb0c5;font-size:13px;line-height:1.6;border-top:1px solid #243247;">
-          <strong style="color:#ffffff;">What's next:</strong>
-          <ol style="margin:8px 0 0 18px;padding:0;color:#d5dfeb;">
-            <li>Click the button above and set your password.</li>
-            <li>You'll land on Day 1 automatically.</li>
-            <li>Work through one day at a time at your own pace.</li>
-          </ol>
-          <p style="margin:18px 0 0;color:#9fb0c5;font-size:12px;">Questions? Reply to this email or write to <a href="mailto:contact@credxme.com" style="color:#00c6fb;">contact@credxme.com</a>.</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  const bodyHtml = `
+    <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">You're enrolled, ${params.firstName || 'there'}.</h1>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Welcome to the CredX 5-Day Credit Repair Masterclass. No contracts, no intake forms — just set your password and you're in.</p>
+    <p style="margin:0 0 4px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;"><strong style="color:${EMAIL_TEXT};">Day 1: Credit Fundamentals</strong> is waiting for you the moment you log in.</p>
+    ${emailButton(params.setupLink, 'Set my password')}
+    <p style="margin:18px 0 6px;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">This link expires in about ${expiresHours} hours and can only be used once.</p>
+    <p style="margin:6px 0 0;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">If the button doesn't open, copy this link into your browser:<br /><span style="color:${EMAIL_TEXT};word-break:break-all;">${params.setupLink}</span></p>
+    <div style="margin-top:22px;padding:14px 16px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;">
+      <strong style="color:${EMAIL_TEXT};font-size:13px;letter-spacing:0.4px;text-transform:uppercase;">What's next</strong>
+      <ol style="margin:10px 0 0 18px;padding:0;color:${EMAIL_TEXT_SOFT};font-size:14px;line-height:1.65;">
+        <li>Click the button above and set your password.</li>
+        <li>You'll land on Day 1 automatically.</li>
+        <li>Work through one day at a time at your own pace.</li>
+      </ol>
+    </div>
+  `;
+  const html = renderEmailShell({
+    preheader: "You're enrolled. Set your password and Day 1 is ready to go.",
+    eyebrow: '5-Day Masterclass · Enrolled',
+    bodyHtml
+  });
 
   const text = `Welcome to the CredX 5-Day Masterclass
 
@@ -176,40 +204,25 @@ export const MASTERCLASS_EMAIL_DAYS: MasterclassDayContent[] = [
 ];
 
 function renderMasterclassDayEmail(params: { firstName: string; portalLink: string; day: MasterclassDayContent }) {
-  const accent = params.day.isBonus ? '#f59e0b' : '#00c6fb';
+  const accent = params.day.isBonus ? '#f59e0b' : EMAIL_CYAN;
   const subject = `${params.day.title} — ${params.day.tagline} | CredX Masterclass`;
-  const objectivesHtml = params.day.objectives.map((o) => `<li style="margin:0 0 8px;color:#d5dfeb;">${o}</li>`).join('');
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>${subject}</title></head>
-<body style="margin:0;padding:0;background:#0d1420;font-family:Arial,Helvetica,sans-serif;color:#e9eef6;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0d1420;padding:24px 12px;">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
-        <tr><td style="height:6px;background:${accent};font-size:0;line-height:0;">&nbsp;</td></tr>
-        <tr><td style="padding:32px 28px 22px;text-align:center;border-bottom:1px solid #243247;">
-          <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
-          <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">5-Day Masterclass${params.day.isBonus ? ' · Bonus' : ''}</div>
-        </td></tr>
-        <tr><td style="padding:30px 28px 8px;">
-          <p style="margin:0 0 6px;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:${accent};font-weight:700;">${params.day.title}</p>
-          <h1 style="margin:0 0 12px;font-size:26px;line-height:1.25;color:#ffffff;">${params.day.tagline}</h1>
-          <p style="margin:0 0 18px;color:#d5dfeb;font-size:16px;line-height:1.65;">Hi ${params.firstName || 'there'} — ${params.day.summary}</p>
-          <p style="margin:18px 0 8px;color:#ffffff;font-weight:700;">What you'll learn today</p>
-          <ul style="margin:0 0 18px;padding-left:20px;color:#d5dfeb;font-size:15px;line-height:1.65;">${objectivesHtml}</ul>
-          <div style="text-align:center;padding:14px 0 6px;">
-            <a href="${params.portalLink}" style="display:inline-block;background:${accent};color:#0d1420;text-decoration:none;padding:15px 30px;border-radius:12px;font-weight:800;font-size:16px;">Open Day ${params.day.day} in your portal</a>
-          </div>
-          <p style="margin:18px 0 0;color:#9fb0c5;font-size:13px;line-height:1.6;">Each day has two short lessons, the slide follow-along, key terms, and concrete action steps.</p>
-        </td></tr>
-        <tr><td style="padding:22px 28px 28px;color:#9fb0c5;font-size:12px;line-height:1.6;border-top:1px solid #243247;">
-          Questions? Reply to this email or write to <a href="mailto:contact@credxme.com" style="color:${accent};">contact@credxme.com</a>.
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  const objectivesHtml = params.day.objectives.map((o) => `<li style="margin:0 0 8px;color:${EMAIL_TEXT_SOFT};">${o}</li>`).join('');
+  const bodyHtml = `
+    <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">${params.day.tagline}</h1>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Hi ${params.firstName || 'there'} — ${params.day.summary}</p>
+    <div style="margin:18px 0;padding:16px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;">
+      <strong style="color:${accent};font-size:12px;letter-spacing:0.4px;text-transform:uppercase;">What you'll learn today</strong>
+      <ul style="margin:10px 0 0;padding-left:20px;color:${EMAIL_TEXT_SOFT};font-size:14px;line-height:1.7;">${objectivesHtml}</ul>
+    </div>
+    ${emailButton(params.portalLink, `Open Day ${params.day.day} in your portal`, accent)}
+    <p style="margin:18px 0 0;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">Each day has two short lessons, the slide follow-along, key terms, and real-life Q&amp;A.</p>
+  `;
+  const html = renderEmailShell({
+    preheader: `${params.day.title}: ${params.day.tagline}.`,
+    eyebrow: `${params.day.title}${params.day.isBonus ? ' · Bonus' : ''}`,
+    accent,
+    bodyHtml
+  });
 
   const text = `${params.day.title} — ${params.day.tagline}
 
@@ -379,40 +392,25 @@ function renderPasswordSetupEmail(params: {
     : 'Your CredX portal is ready. Use the secure link below to set a password and log in for the first time.';
   const expiresLabel = params.expiresAt.toUTCString();
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${headline}</title>
-</head>
-<body style="margin:0;padding:0;background:#0d1420;font-family:Arial,Helvetica,sans-serif;color:#e9eef6;">
-  <div style="width:100%;background:#0d1420;padding:32px 16px;">
-    <div style="max-width:640px;margin:0 auto;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
-      <div style="height:6px;background:#c9a227;"></div>
-      <div style="background:linear-gradient(135deg,#111a28,#1b2739);padding:34px 32px 26px;text-align:center;border-bottom:1px solid #243247;">
-        <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
-        <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">Secure access to your client portal</div>
-      </div>
-      <div style="padding:32px;">
-        <h1 style="margin:0 0 12px;font-size:26px;color:#ffffff;">${headline}</h1>
-        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Hi ${params.firstName || 'there'},</p>
-        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">${intro}</p>
-        <div style="text-align:center;padding:18px 0 6px;">
-          <a href="${params.setupLink}" style="display:inline-block;background:#c9a227;color:#111a28;text-decoration:none;padding:15px 28px;border-radius:12px;font-weight:800;font-size:16px;">${isReset ? 'Reset password' : 'Set my password'}</a>
-        </div>
-        <p style="margin:20px 0 8px;color:#9fb0c5;font-size:13px;line-height:1.6;">This link expires on ${expiresLabel}. For your security, it can only be used once.</p>
-        <p style="margin:0 0 8px;color:#9fb0c5;font-size:13px;line-height:1.6;">If you didn't request this, you can safely ignore the email.</p>
-      </div>
-      <div style="padding:24px 32px 32px;color:#9fb0c5;font-size:13px;line-height:1.6;border-top:1px solid #243247;">
-        <strong style="color:#ffffff;">CredX</strong><br />
-        Credit Repair & Financial Strategy Support<br />
-        Sent from hello@credxme.com
+  const bodyHtml = `
+    <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">${headline}</h1>
+    <p style="margin:0 0 12px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Hi ${params.firstName || 'there'},</p>
+    <p style="margin:0 0 4px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">${intro}</p>
+    ${emailButton(params.setupLink, isReset ? 'Reset password' : 'Set my password')}
+    <div style="margin-top:18px;padding:14px 16px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;display:flex;gap:12px;align-items:flex-start;">
+      <div style="font-size:18px;line-height:1.2;">🔒</div>
+      <div>
+        <strong style="color:${EMAIL_SUCCESS};font-size:11px;letter-spacing:0.4px;text-transform:uppercase;display:block;margin-bottom:4px;">Encrypted &amp; one-time</strong>
+        <span style="color:${EMAIL_TEXT_MUTED};font-size:13px;line-height:1.55;">This link expires on ${expiresLabel} and can only be used once. Your password is hashed before it's saved — even CredX staff can't read it.</span>
       </div>
     </div>
-  </div>
-</body>
-</html>`;
+    <p style="margin:14px 0 0;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">If you didn't request this, you can safely ignore this email — no account changes are made until you act.</p>
+  `;
+  const html = renderEmailShell({
+    preheader: isReset ? 'Reset your CredX password using the secure link below.' : 'Your CredX portal is ready — set your password to sign in.',
+    eyebrow: isReset ? 'Account · Password Reset' : 'Account · Password Setup',
+    bodyHtml
+  });
 
   const text = `${headline}
 
@@ -468,40 +466,19 @@ function renderPortalReadyEmail(params: {
   setupLink: string;
 }) {
   const subject = 'Set your CredX password to access your portal';
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${subject}</title>
-</head>
-<body style="margin:0;padding:0;background:#0d1420;font-family:Arial,Helvetica,sans-serif;color:#e9eef6;">
-  <div style="width:100%;background:#0d1420;padding:32px 16px;">
-    <div style="max-width:640px;margin:0 auto;background:#111a28;border:1px solid #243247;border-radius:18px;overflow:hidden;">
-      <div style="height:6px;background:#c9a227;"></div>
-      <div style="background:linear-gradient(135deg,#111a28,#1b2739);padding:34px 32px 26px;text-align:center;border-bottom:1px solid #243247;">
-        <div style="font-size:30px;font-weight:800;color:#ffffff;letter-spacing:0.03em;">CredX</div>
-        <div style="margin-top:8px;color:#c8d3e1;font-size:14px;">Your portal is ready</div>
-      </div>
-      <div style="padding:32px;">
-        <h1 style="margin:0 0 12px;font-size:26px;color:#ffffff;">You're all set, ${params.firstName || 'there'}.</h1>
-        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Your contract is signed, your profile is on file, and your credit monitoring credentials are connected. Your CredX portal is ready.</p>
-        <p style="margin:0 0 14px;color:#d5dfeb;font-size:16px;line-height:1.65;">Before you can enter the portal, you need to create your password using the secure button below.</p>
-        <div style="text-align:center;padding:18px 0 6px;">
-          <a href="${params.setupLink}" style="display:inline-block;background:#c9a227;color:#111a28;text-decoration:none;padding:15px 28px;border-radius:12px;font-weight:800;font-size:16px;">Set my password</a>
-        </div>
-        <p style="margin:18px 0 8px;color:#d5dfeb;font-size:14px;line-height:1.6;">After your password is set, you can sign in to your portal here: <a href="${params.loginLink}" style="color:#c9a227;">${params.loginLink}</a></p>
-        <p style="margin:12px 0 8px;color:#9fb0c5;font-size:13px;line-height:1.6;">If you ever need to reset it again, use this secure link: <a href="${params.setupLink}" style="color:#c9a227;">${params.setupLink}</a></p>
-      </div>
-      <div style="padding:24px 32px 32px;color:#9fb0c5;font-size:13px;line-height:1.6;border-top:1px solid #243247;">
-        <strong style="color:#ffffff;">CredX</strong><br />
-        Credit Repair & Financial Strategy Support<br />
-        Sent from hello@credxme.com
-      </div>
-    </div>
-  </div>
-</body>
-</html>`;
+  const bodyHtml = `
+    <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">You're all set, ${params.firstName || 'there'}.</h1>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Your contract is signed, your profile is on file, and your credit monitoring credentials are connected. Your CredX portal is ready.</p>
+    <p style="margin:0 0 4px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Before you can enter the portal, you need to create your password using the secure button below.</p>
+    ${emailButton(params.setupLink, 'Set my password')}
+    <p style="margin:18px 0 8px;color:${EMAIL_TEXT_SOFT};font-size:14px;line-height:1.6;">After your password is set, you can sign in to your portal here:<br /><a href="${params.loginLink}" style="color:${EMAIL_CYAN};word-break:break-all;">${params.loginLink}</a></p>
+    <p style="margin:12px 0 0;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">If you ever need to reset it again, use this same secure link.</p>
+  `;
+  const html = renderEmailShell({
+    preheader: 'Your CredX portal is ready. Set your password to sign in.',
+    eyebrow: 'Portal · Ready',
+    bodyHtml
+  });
 
   const text = `Set your CredX password to access your portal
 
