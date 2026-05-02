@@ -937,11 +937,31 @@ button:hover,
 .mc-day-card-title { font-family: var(--cx-font-display); font-size: 13px; font-weight: 700; line-height: 1.4; color: #f1f5f9; word-break: break-word; }
 .mc-day-card-done { font-size: 11px; color: #22c55e; font-weight: 700; margin-top: 8px; }
 
+/* Masterclass day panel uses the dark-surface theme so the masterclass
+   feel matches the rest of the dashboard. Without this override the
+   inherited .panel background was near-white, hiding all the light text. */
+.panel.mc-day-panel {
+  background: var(--cx-bg-2, #0b1220);
+  color: var(--cx-text-soft, #e2e8f0);
+  border: 1px solid var(--cx-border-subtle, rgba(255,255,255,0.10));
+  box-shadow: var(--cx-shadow-md, 0 18px 36px rgba(0,0,0,0.28));
+}
+.panel.mc-day-panel h1,
+.panel.mc-day-panel h2,
+.panel.mc-day-panel h3,
+.panel.mc-day-panel h4 { color: var(--cx-text, #f8fafc); }
+.panel.mc-day-panel p,
+.panel.mc-day-panel li,
+.panel.mc-day-panel span,
+.panel.mc-day-panel summary,
+.panel.mc-day-panel strong,
+.panel.mc-day-panel .helper-text { color: var(--cx-text-soft, #e2e8f0); }
+
 .mc-day-panel.is-bonus { border-color: rgba(245,158,11,0.22); }
 .mc-day-panel-head { display: flex; gap: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 16px; }
-.mc-day-panel-title { font-size: clamp(22px, 2.6vw, 30px); font-weight: 800; letter-spacing: -0.3px; margin-top: 4px; color: #ffffff; }
+.mc-day-panel-title { font-size: clamp(22px, 2.6vw, 30px); font-weight: 800; letter-spacing: -0.3px; margin-top: 4px; color: var(--cx-text, #ffffff); }
 .mc-day-panel-img { width: 220px; height: 140px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(0,198,251,0.22); }
-.mc-day-panel-summary { color: #e2e8f0; font-size: 15px; line-height: 1.75; margin-bottom: 24px; }
+.mc-day-panel-summary { color: var(--cx-text-soft, #e2e8f0); font-size: 15px; line-height: 1.75; margin-bottom: 24px; }
 
 .mc-section { margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); }
 .mc-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
