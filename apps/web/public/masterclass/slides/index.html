@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>5-Day Credit Repair Master Class | CredX</title>
 <script src="https://statics.moonshot.cn/kimi-ppt/html-gen/static/tailwindcss@4_0805.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Poppins:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
 <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css" rel="stylesheet"/>
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.0/dist/echarts.min.js"></script>
@@ -20,50 +20,216 @@
         }
     </style>
 <style>
-        body {
-            color: #f8fafc;
-            font-family: 'Inter', sans-serif;
-        }
-        .font-display {
-            font-family: 'Poppins', sans-serif;
-        }
-        .font-body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* White-tint info panels on slides: force readable contrast.
-           These boxes were 20% white over a dark slide with white text on top,
-           which rendered as low-contrast grey-on-grey. */
-        .ppt-slide .bg-white\/20 {
-            background: rgba(255,255,255,0.96) !important;
-            color: #0d1420 !important;
-        }
-        .ppt-slide .bg-white\/20 *,
-        .ppt-slide .bg-white\/20 .text-white\/80 {
-            color: #0d1420 !important;
-        }
-    </style>
+  /* CredX design tokens — kept inline so the iframe doesn't need extra
+     network round-trips. Synced with apps/web/src/design-tokens.css. */
+  :root {
+    --cx-bg: #060a12;
+    --cx-bg-2: #0b1220;
+    --cx-bg-3: #101a2b;
+    --cx-text: #f8fafc;
+    --cx-text-soft: #e2e8f0;
+    --cx-text-muted: #cbd5e1;
+    --cx-text-dim: #94a3b8;
+    --cx-cyan: #00c6fb;
+    --cx-cyan-2: #00e5ff;
+    --cx-success: #22c55e;
+    --cx-gold: #f59e0b;
+    --cx-border: rgba(133,157,186,0.18);
+    --cx-border-strong: rgba(0,198,251,0.35);
+    --cx-font: 'IBM Plex Sans', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  }
+
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    color: var(--cx-text);
+    font-family: var(--cx-font) !important;
+    background: var(--cx-bg) !important;
+    padding: 0 !important;
+    overflow: hidden;
+  }
+  .font-display, .font-body { font-family: var(--cx-font) !important; }
+
+  /* === Carousel layout === */
+  .cx-carousel {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 24px 80px;
+    background: radial-gradient(circle at 30% 20%, rgba(0,198,251,0.06), transparent 60%), var(--cx-bg);
+  }
+  .cx-stage {
+    position: relative;
+    width: 100%;
+    max-width: 1280px;
+    aspect-ratio: 16 / 9;
+    max-height: calc(100vh - 96px);
+  }
+  .ppt-slide {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 32px !important;
+    border-radius: 18px;
+    border: 1px solid var(--cx-border);
+    box-shadow: 0 28px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,198,251,0.05);
+    overflow: hidden !important;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    background: var(--cx-bg-2) !important;
+  }
+  .ppt-slide.is-active {
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 2;
+  }
+
+  /* === Slide aesthetic re-skin (overrides for tailwind classes the
+     auto-gen deck used). Keeps content untouched, retunes colors. */
+  .ppt-slide.\!bg-\[\#1a1f2e\],
+  .ppt-slide[class*="bg-\\[\\#1a1f2e\\]"] {
+    background: var(--cx-bg-2) !important;
+  }
+  .ppt-slide [class*="bg-\\[\\#252b3d\\]"],
+  .ppt-slide [class*="bg-\\[\\#1e2536\\]"] {
+    background: var(--cx-bg-3) !important;
+    border-color: var(--cx-border) !important;
+  }
+  .ppt-slide [class*="text-\\[\\#22d3ee\\]"],
+  .ppt-slide [class*="text-\\[\\#3b82f6\\]"] { color: var(--cx-cyan) !important; }
+  .ppt-slide [class*="bg-\\[\\#22d3ee\\]"] { background: var(--cx-cyan) !important; }
+  .ppt-slide [class*="border-\\[\\#22d3ee\\]"] { border-color: var(--cx-cyan) !important; }
+  .ppt-slide [class*="from-\\[\\#22d3ee\\]"],
+  .ppt-slide [class*="from-\\[\\#3b82f6\\]"] {
+    --tw-gradient-from: var(--cx-cyan) !important;
+  }
+  .ppt-slide [class*="to-\\[\\#3b82f6\\]"] {
+    --tw-gradient-to: color-mix(in srgb, var(--cx-cyan) 60%, transparent) !important;
+  }
+
+  /* White-tint info panels: force opaque white with dark text. */
+  .ppt-slide .bg-white\/20 {
+    background: rgba(255,255,255,0.96) !important;
+    color: #0d1420 !important;
+    border: 1px solid rgba(0,0,0,0.08) !important;
+  }
+  .ppt-slide .bg-white\/20 *,
+  .ppt-slide .bg-white\/20 .text-white\/80 { color: #0d1420 !important; }
+
+  /* === Carousel chrome === */
+  .cx-bar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 24px;
+    background: rgba(11,18,32,0.92);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--cx-border);
+    z-index: 10;
+    font-family: var(--cx-font);
+  }
+  .cx-bar-side { display: flex; align-items: center; gap: 12px; min-width: 180px; }
+  .cx-bar-side--end { justify-content: flex-end; }
+  .cx-day-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(0,198,251,0.14);
+    border: 1px solid var(--cx-border-strong);
+    color: var(--cx-cyan);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+  }
+  .cx-counter {
+    color: var(--cx-text-soft);
+    font-size: 13px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .cx-counter strong { color: var(--cx-text); font-weight: 700; }
+  .cx-progress {
+    flex: 1;
+    height: 4px;
+    margin: 0 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+    max-width: 240px;
+  }
+  .cx-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--cx-cyan), var(--cx-cyan-2));
+    transition: width 0.25s ease;
+  }
+  .cx-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--cx-border);
+    background: var(--cx-bg-3);
+    color: var(--cx-text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 16px;
+  }
+  .cx-nav:hover:not(:disabled) {
+    border-color: var(--cx-cyan);
+    color: var(--cx-cyan);
+    box-shadow: 0 0 16px rgba(0,198,251,0.25);
+  }
+  .cx-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+  .cx-nav:focus-visible { outline: 2px solid var(--cx-cyan); outline-offset: 2px; }
+  .cx-help {
+    color: var(--cx-text-dim);
+    font-size: 11px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .cx-help kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    margin: 0 2px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--cx-border);
+    color: var(--cx-text-soft);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  @media (max-width: 720px) {
+    .cx-stage { aspect-ratio: auto; height: calc(100vh - 96px); }
+    .ppt-slide { padding: 18px !important; font-size: 12px; }
+    .cx-help { display: none; }
+    .cx-bar-side { min-width: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ppt-slide, .cx-progress-fill, .cx-nav { transition: none !important; }
+  }
+</style>
 </head>
-<body class="bg-gray-900 py-8">
-<script>
-(function(){
-  try {
-    var params = new URLSearchParams(window.location.search);
-    var day = parseInt(params.get('day') || '0', 10);
-    if (!day) return;
-    var ranges = { 1:[3,6], 2:[7,10], 3:[11,14], 4:[15,18], 5:[19,22], 6:[23,23] };
-    var range = ranges[day];
-    if (!range) return;
-    document.addEventListener('DOMContentLoaded', function(){
-      var slides = document.querySelectorAll('.ppt-slide');
-      slides.forEach(function(el){
-        var idAttr = el.getAttribute('id') || '';
-        var n = parseInt(idAttr.replace('slide-', ''), 10);
-        if (!Number.isFinite(n) || n < range[0] || n > range[1]) el.style.display = 'none';
-      });
-    });
-  } catch (e) {}
-})();
-</script>
+<body>
+<div class="cx-carousel">
+  <div class="cx-stage" id="cx-stage">
 <!-- Slide 1: Cover -->
 <div id="slide-1" class="ppt-slide !bg-[#1a1f2e]" type="cover">
 <img alt="Cover" class="absolute inset-0 w-full h-full object-cover opacity-20" src="cover_image.jpg"/>
@@ -1962,5 +2128,120 @@
 </div>
 </div>
 </div>
+  </div><!-- /.cx-stage -->
+</div><!-- /.cx-carousel -->
+
+<div class="cx-bar" role="navigation" aria-label="Slide navigation">
+  <div class="cx-bar-side">
+    <span class="cx-day-pill" id="cx-day-pill">CredX Masterclass</span>
+  </div>
+  <div class="cx-bar-side" style="flex:1;justify-content:center;">
+    <button type="button" class="cx-nav" id="cx-prev" aria-label="Previous slide" title="Previous (←)">
+      <i class="fas fa-chevron-left" aria-hidden="true"></i>
+    </button>
+    <span class="cx-counter" id="cx-counter"><strong>1</strong>&nbsp;/&nbsp;<span id="cx-total">1</span></span>
+    <div class="cx-progress" aria-hidden="true"><div class="cx-progress-fill" id="cx-progress-fill"></div></div>
+    <button type="button" class="cx-nav" id="cx-next" aria-label="Next slide" title="Next (→)">
+      <i class="fas fa-chevron-right" aria-hidden="true"></i>
+    </button>
+  </div>
+  <div class="cx-bar-side cx-bar-side--end">
+    <span class="cx-help"><kbd>←</kbd><kbd>→</kbd> to navigate</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  var DAY_RANGES = { 1:[3,6], 2:[7,10], 3:[11,14], 4:[15,18], 5:[19,22], 6:[23,23] };
+  var DAY_LABELS = {
+    1: 'Day 1 · Credit Fundamentals',
+    2: 'Day 2 · Disputes & Removals',
+    3: 'Day 3 · Advanced Tactics',
+    4: 'Day 4 · Building Positive Credit',
+    5: 'Day 5 · Business Credit',
+    6: 'Bonus Day · Generational Wealth'
+  };
+
+  var params = new URLSearchParams(window.location.search);
+  var day = parseInt(params.get('day') || '0', 10);
+  var range = DAY_RANGES[day] || null;
+
+  document.addEventListener('DOMContentLoaded', function(){
+    var allSlides = Array.prototype.slice.call(document.querySelectorAll('.ppt-slide'));
+    var slides = allSlides;
+
+    // Filter to a single day if ?day=N
+    if (range) {
+      slides = allSlides.filter(function(el){
+        var n = parseInt((el.id || '').replace('slide-', ''), 10);
+        return Number.isFinite(n) && n >= range[0] && n <= range[1];
+      });
+      // Hide everything that isn't in the day
+      allSlides.forEach(function(el){
+        if (slides.indexOf(el) === -1) el.style.display = 'none';
+      });
+    }
+    if (!slides.length) slides = allSlides;
+
+    var dayPill = document.getElementById('cx-day-pill');
+    if (dayPill) dayPill.textContent = day && DAY_LABELS[day] ? DAY_LABELS[day] : 'CredX Masterclass';
+
+    var totalEl = document.getElementById('cx-total');
+    var counterEl = document.getElementById('cx-counter').querySelector('strong');
+    var progressEl = document.getElementById('cx-progress-fill');
+    var prevBtn = document.getElementById('cx-prev');
+    var nextBtn = document.getElementById('cx-next');
+    totalEl.textContent = String(slides.length);
+
+    var index = 0;
+
+    // Honor #slide-N deep link
+    var hash = (window.location.hash || '').replace('#', '');
+    if (hash) {
+      var i = slides.findIndex(function(el){ return el.id === hash; });
+      if (i >= 0) index = i;
+    }
+
+    function render() {
+      slides.forEach(function(el, i){ el.classList.toggle('is-active', i === index); });
+      counterEl.textContent = String(index + 1);
+      progressEl.style.width = (slides.length <= 1 ? 100 : ((index + 1) / slides.length * 100)) + '%';
+      prevBtn.disabled = index === 0;
+      nextBtn.disabled = index === slides.length - 1;
+      try {
+        history.replaceState(null, '', '#' + slides[index].id);
+      } catch (e) { /* no-op for sandboxed iframes */ }
+    }
+    function go(delta) {
+      var next = Math.min(slides.length - 1, Math.max(0, index + delta));
+      if (next === index) return;
+      index = next;
+      render();
+    }
+
+    prevBtn.addEventListener('click', function(){ go(-1); });
+    nextBtn.addEventListener('click', function(){ go(1); });
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(-1); }
+      else if (e.key === 'Home') { e.preventDefault(); index = 0; render(); }
+      else if (e.key === 'End') { e.preventDefault(); index = slides.length - 1; render(); }
+    });
+
+    // Swipe support for touch devices
+    var touchStartX = null;
+    document.addEventListener('touchstart', function(e){ touchStartX = e.changedTouches[0].clientX; }, { passive: true });
+    document.addEventListener('touchend', function(e){
+      if (touchStartX === null) return;
+      var dx = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+      touchStartX = null;
+    });
+
+    render();
+  });
+})();
+</script>
+
 </body>
 </html>
