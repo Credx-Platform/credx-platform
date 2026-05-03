@@ -565,7 +565,15 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
           }
         }
       } catch (analysisErr) {
-        console.error('Auto-analysis generation failed:', analysisErr);
+        const e = analysisErr instanceof Error ? analysisErr : new Error(String(analysisErr));
+        console.error('AUTO_ANALYSIS_FAILED', {
+          clientId: client.id,
+          name: e.name,
+          message: e.message,
+          code: (e as any).code,
+          meta: (e as any).meta,
+          stack: e.stack
+        });
       }
     }
 

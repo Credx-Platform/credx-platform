@@ -1471,22 +1471,44 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     }
   };
 
+  // Progressive tier unlock:
+  // Tier 0: paid client just landed in portal — Overview + Profile only.
+  // Tier 1: report uploaded → Analysis tab unlocks.
+  // Tier 2: payment confirmed (status ACTIVE) → full menu including Disputes.
+  const clientStatusUpper = (client?.status || '').toUpperCase();
+  const tier2 = ['ACTIVE', 'PAST_DUE'].includes(clientStatusUpper);
+  const tier1 = tier2 || hasCreditReport || hasAnalysis;
+
   const navItems: Array<{ key: PortalTab; label: string }> = masterclassOnly
     ? [
         { key: 'masterclass', label: '5-Day Masterclass' },
         { key: 'profile', label: 'Profile' },
         { key: 'resources', label: 'Credit Builders' }
       ]
-    : [
-        { key: 'overview', label: 'Overview' },
-        ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
-        { key: 'analysis', label: 'Analysis & Reports' },
-        { key: 'profile', label: 'Profile' },
-        { key: 'disputes', label: 'Disputes' },
-        { key: 'activity', label: 'Activity' },
-        { key: 'resources', label: 'Credit Builders' },
-        { key: 'tasks', label: 'Tasks' }
-      ];
+    : tier2
+      ? [
+          { key: 'overview', label: 'Overview' },
+          ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
+          { key: 'analysis', label: 'Analysis & Reports' },
+          { key: 'profile', label: 'Profile' },
+          { key: 'disputes', label: 'Disputes' },
+          { key: 'activity', label: 'Activity' },
+          { key: 'resources', label: 'Credit Builders' },
+          { key: 'tasks', label: 'Tasks' }
+        ]
+      : tier1
+        ? [
+            { key: 'overview', label: 'Overview' },
+            ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
+            { key: 'analysis', label: 'Analysis & Reports' },
+            { key: 'profile', label: 'Profile' },
+            { key: 'resources', label: 'Credit Builders' }
+          ]
+        : [
+            { key: 'overview', label: 'Overview' },
+            ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
+            { key: 'profile', label: 'Profile' }
+          ];
 
   return (
     <div className="shell client-shell">
@@ -1554,9 +1576,13 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             <>
               <section className="hero-card hero-card--dispute">
                 <div className="hero-dispute-content">
-                  <p className="eyebrow">Dispute Status</p>
-                  <h1 className="hero-dispute-title">{disputeHeadline}</h1>
-                  <p>{disputeSummary}</p>
+                  <p className="eyebrow">Welcome to CredX</p>
+                  <h1 className="hero-dispute-title">{user?.firstName ? `Hi ${user.firstName} — your portal is live.` : 'Your portal is live.'}</h1>
+                  <p>{tier2
+                    ? disputeSummary
+                    : tier1
+                      ? "Your credit report is on file. Open Analysis & Reports to review your CredX analysis and next steps."
+                      : "First step: pull a fresh credit report from one of our partners below, then upload it for your free CredX analysis."}</p>
                   <div className="hero-scores">
                     <CreditScoreGauge bureau="Experian" score={typeof progress?.scores?.experian === 'number' ? progress.scores.experian : null} />
                     <CreditScoreGauge bureau="Equifax" score={typeof progress?.scores?.equifax === 'number' ? progress.scores.equifax : null} />
@@ -1565,28 +1591,21 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                 </div>
               </section>
 
+              {/* Tier 0: no report yet — guide them to pull + upload */}
               {!hasCreditReport && (
                 <section className="panel" style={{ border: '2px dashed #00c6fb', background: 'rgba(0,198,251,0.03)' }}>
                   <div className="panel-header">
                     <div>
                       <p className="eyebrow" style={{ color: '#00c6fb' }}>Next Step</p>
-                      <h2>Pull your credit report, then upload it</h2>
+                      <h2>Pull your credit report for a free analysis</h2>
                     </div>
                   </div>
-                  <div style={{ padding: '0.5rem 0 0' }}>
-                    <p style={{ marginBottom: '1rem' }}>
-                      Your CredX analysis and dispute strategy are waiting on your credit report.
-                      Use one of the providers below to pull a fresh tri-merge report (Experian + Equifax + TransUnion),
-                      download the PDF or HTML, then drop it into the Analysis tab.
+                  <div style={{ padding: '0.25rem 0 0' }}>
+                    <p style={{ marginBottom: '0.85rem', fontSize: '15px', lineHeight: 1.6 }}>
+                      <strong style={{ color: '#cbd5e1' }}>If you skipped credit monitoring on the application</strong>, choose one of these two affiliate providers to pull a fresh tri-merge report.
+                      Once it's in your hands, come back here and upload — your CredX analysis is generated automatically.
                     </p>
-                    <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1.25rem' }}>
-                      <strong style={{ color: '#cbd5e1' }}>How to do it</strong> —
-                      1) Open one of the affiliate links below in a new tab.
-                      2) Sign up (most providers offer a $1 trial).
-                      3) Download or save the report as PDF / HTML.
-                      4) Come back to the Analysis tab and upload it. Your analysis is generated automatically the moment it lands.
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', margin: '1rem 0 0.75rem' }}>
                       <a
                         href="https://www.identityiq.com/"
                         target="_blank"
@@ -1605,18 +1624,28 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                       >
                         Pull report at MyFreeScoreNow ↗
                       </a>
+                    </div>
+                    <p className="helper-text" style={{ marginTop: '0.75rem' }}>
+                      <strong>Already have it?</strong> Add your monitoring sign-in credentials or upload the report directly — both options live below. The full menu unlocks once your analysis is ready.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginTop: '0.75rem' }}>
                       <button
                         type="button"
                         className="ghost-button"
                         onClick={() => setActiveTab('analysis')}
-                        style={{ justifyContent: 'center' }}
+                        style={{ background: '#101a2b', border: '1px solid rgba(0,198,251,0.35)', color: '#f8fafc', justifyContent: 'center' }}
                       >
-                        I already have it — go to Analysis →
+                        Add monitoring sign-in credentials →
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => setActiveTab('analysis')}
+                        style={{ background: '#101a2b', border: '1px solid rgba(34,197,94,0.35)', color: '#f8fafc', justifyContent: 'center' }}
+                      >
+                        Upload report for free analysis →
                       </button>
                     </div>
-                    <p className="helper-text">
-                      Accepted formats: PDF, HTML, HTM, PNG, JPG, JPEG, WEBP. We use these provider links to keep CredX running — there's no extra cost to you.
-                    </p>
                   </div>
                 </section>
               )}
