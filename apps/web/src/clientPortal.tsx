@@ -477,7 +477,25 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
       {wizardError ? <div className="error-banner">{wizardError}</div> : null}
       <div className="dispute-list">
         {loadingContract ? <div className="empty-state-card">Loading your agreement...</div> : null}
-        {needsContract && contractText ? <form className="dispute-card-live" onSubmit={submitContract}><div className="dispute-card-top"><strong>Step 1, sign your agreement</strong></div><div className="dispute-meta" style={{ display: 'block' }}><p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.agreement}</p><p style={{ whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>{contractText.disclosure}</p><input className="chat-input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your full name" /><label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginTop: '1rem' }}><input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} /><span>I have read and agree to the contract and disclosures.</span></label><button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim()} style={{ marginTop: '1rem' }}>{busyStep === 'contract' ? 'Signing...' : 'Sign contract'}</button></div></form> : null}
+        {needsContract && contractText ? (
+          <form className="dispute-card-live contract-card" onSubmit={submitContract}>
+            <div className="dispute-card-top"><strong>Step 1, sign your agreement</strong></div>
+            <div className="contract-body" tabIndex={0}>
+              <p>{contractText.agreement}</p>
+              <p>{contractText.disclosure}</p>
+            </div>
+            <div className="contract-actions">
+              <input className="chat-input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your full name" />
+              <label className="contract-agree">
+                <input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} />
+                <span>I have read and agree to the contract and disclosures.</span>
+              </label>
+              <button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim()}>
+                {busyStep === 'contract' ? 'Signing...' : 'Sign contract'}
+              </button>
+            </div>
+          </form>
+        ) : null}
         {needsApplication ? <form className="dispute-card-live" onSubmit={submitApplication}><div className="dispute-card-top"><strong>Step 2, complete intake</strong><span className="security-note-inline" aria-label="Encrypted">🔒 Encrypted</span></div><div className="field-grid"><input className="chat-input" value={wizardState.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Full name" /><input className="chat-input" value={wizardState.email} onChange={(e) => setField('email', e.target.value)} placeholder="Email" /><input className="chat-input" value={wizardState.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="Phone" /><input className="chat-input" value={wizardState.address1} onChange={(e) => setField('address1', e.target.value)} placeholder="Address line 1" /><input className="chat-input" value={wizardState.address2} onChange={(e) => setField('address2', e.target.value)} placeholder="Address line 2" /><input className="chat-input" value={wizardState.city} onChange={(e) => setField('city', e.target.value)} placeholder="City" /><input className="chat-input" value={wizardState.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" /><input className="chat-input" value={wizardState.zip} onChange={(e) => setField('zip', e.target.value)} placeholder="ZIP" /><input className="chat-input" value={wizardState.dob} onChange={(e) => setField('dob', e.target.value)} placeholder="Date of birth (YYYY-MM-DD)" /><input className="chat-input" type="password" value={wizardState.ssn} onChange={(e) => setField('ssn', e.target.value)} placeholder="SSN" autoComplete="off" /><button className="ghost-button" type="submit" disabled={busyStep === 'application'}>{busyStep === 'application' ? 'Saving...' : 'Save intake'}</button></div><p className="helper-text" style={{ marginTop: '0.5rem' }}>SSN and date of birth are encrypted before they're saved. Only the last 4 digits of your SSN are ever shown back to you.</p></form> : null}
         {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}>
           <div className="dispute-card-top">
