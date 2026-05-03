@@ -466,40 +466,48 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
       }
     });
 
-    let workflowResult = null;
+    let workflowResult: any = null;
     if (docType === 'credit_report') {
       workflowResult = await completeOnboardingWorkflow(client.id, secureDoc);
+    }
 
-      // Parse uploaded PDF/HTML into CreditReport + Tradeline rows via AI Gateway.
-      // Fail-soft: if the gateway is unconfigured or the call errors, the upload still
-      // succeeds and the rule-based analyzer simply produces nothing this round.
+    // Respond NOW so Railway's edge proxy doesn't drop the connection while we
+    // run the AI Gateway extraction (up to 60s) + auto-analysis. The frontend
+    // polls /api/progress/me, so the parsed report + analysis appear there.
+    res.json({
+      success: true,
+      document: { fileName: safeName, type: docType, uploadedAt, secure: true, sizeBytes: req.file.size },
+      workflow: workflowResult,
+      analysisPending: docType === 'credit_report'
+    });
+
+    if (docType !== 'credit_report') return;
+
+    // Capture the buffer/mime by closure — req.file may be GC'd after response.
+    const fileBuffer = req.file.buffer;
+    const fileMime = req.file.mimetype;
+    const clientId = client.id;
+    const ts = uploadedAt;
+    const baseWorkflow = workflow;
+
+    setImmediate(async () => {
       try {
-        const extracted = await extractReport({
-          buffer: req.file.buffer,
-          mimeType: req.file.mimetype,
-          filename: safeName
-        });
-
+        const extracted = await extractReport({ buffer: fileBuffer, mimeType: fileMime, filename: safeName });
         if (extracted) {
-          // Replace any prior CreditReport+Tradelines so a fresh upload yields
-          // a fresh analysis (otherwise the old extracted data sticks around).
-          const existingReports = await prisma.creditReport.findMany({
-            where: { clientId: client.id },
-            select: { id: true }
-          });
+          const existingReports = await prisma.creditReport.findMany({ where: { clientId }, select: { id: true } });
           if (existingReports.length) {
             const ids = existingReports.map(r => r.id);
             await prisma.tradeline.deleteMany({ where: { creditReportId: { in: ids } } });
             await prisma.creditReport.deleteMany({ where: { id: { in: ids } } });
           }
           for (const bureauReport of extracted.bureauReports) {
-            const pulledAt = bureauReport.pulledAt ? new Date(bureauReport.pulledAt) : new Date(uploadedAt);
+            const pulledAt = bureauReport.pulledAt ? new Date(bureauReport.pulledAt) : new Date(ts);
             await prisma.creditReport.create({
               data: {
-                clientId: client.id,
+                clientId,
                 bureau: bureauReport.bureau,
                 source: extracted.source,
-                pulledAt: Number.isFinite(pulledAt.getTime()) ? pulledAt : new Date(uploadedAt),
+                pulledAt: Number.isFinite(pulledAt.getTime()) ? pulledAt : new Date(ts),
                 rawPayload: { rich: extracted.richPayload, raw: extracted.rawPayload } as any,
                 tradelines: {
                   create: bureauReport.tradelines.map(t => ({
@@ -516,7 +524,7 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
           }
           await prisma.activityEvent.create({
             data: {
-              clientId: client.id,
+              clientId,
               type: 'CREDIT_REPORT_PARSED',
               message: `Parsed ${extracted.bureauReports.length} bureau report(s) from uploaded file.`,
               metadata: {
@@ -531,10 +539,9 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
         console.error('Credit-report extraction failed:', (parseErr as Error).message);
       }
 
-      // Auto-generate credit analysis if credit report data exists
       try {
         const clientWithReports = await prisma.client.findUnique({
-          where: { id: client.id },
+          where: { id: clientId },
           include: {
             user: true,
             creditReports: { orderBy: { pulledAt: 'desc' }, include: { tradelines: true } }
@@ -543,7 +550,7 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
 
         if (clientWithReports && clientWithReports.creditReports.length > 0) {
           const existingAnalysis = await prisma.clientProgress.findUnique({
-            where: { clientId: client.id },
+            where: { clientId },
             select: { analysis: true }
           });
 
@@ -554,20 +561,20 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
             });
 
             await prisma.clientProgress.update({
-              where: { clientId: client.id },
+              where: { clientId },
               data: {
                 analysis: analysis as any,
                 workflow: {
-                  ...(workflow as any || {}),
+                  ...(baseWorkflow as any || {}),
                   stage: 'analysis_ready',
-                  updatedAt: uploadedAt,
+                  updatedAt: ts,
                   next: ['review_analysis', 'begin_disputes']
                 }
               }
             });
 
             await prisma.client.update({
-              where: { id: client.id },
+              where: { id: clientId },
               data: {
                 status: 'ANALYSIS_READY',
                 analysisSummary: analysis.clientFacingSummary.slice(0, 500) + '...'
@@ -576,21 +583,18 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
 
             await prisma.activityEvent.create({
               data: {
-                clientId: client.id,
+                clientId,
                 type: 'ANALYSIS_AUTO_GENERATED',
                 message: `Credit analysis auto-generated after report upload: ${analysis.keyFindings.length} findings identified.`,
                 metadata: { findingCount: analysis.keyFindings.length, disputeCount: analysis.disputeOpportunities.length }
               }
             });
-
-            (workflowResult as any).analysisGenerated = true;
-            (workflowResult as any).analysisFindings = analysis.keyFindings.length;
           }
         }
       } catch (analysisErr) {
         const e = analysisErr instanceof Error ? analysisErr : new Error(String(analysisErr));
         console.error('AUTO_ANALYSIS_FAILED', {
-          clientId: client.id,
+          clientId,
           name: e.name,
           message: e.message,
           code: (e as any).code,
@@ -598,13 +602,8 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
           stack: e.stack
         });
       }
-    }
-
-    return res.json({
-      success: true,
-      document: { fileName: safeName, type: docType, uploadedAt, secure: true, sizeBytes: req.file.size },
-      workflow: workflowResult
     });
+    return;
   } catch (error) {
     next(error);
   }
