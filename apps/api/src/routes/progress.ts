@@ -434,8 +434,20 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
       data: { uploadedDocs, workflow }
     });
 
-    await prisma.document.create({
-      data: {
+    await prisma.document.upsert({
+      where: {
+        clientId_fileName: {
+          clientId: client.id,
+          fileName: safeName
+        }
+      },
+      update: {
+        type: toPrismaDocumentType(docType),
+        s3Key: storageKey,
+        contentType: req.file.mimetype,
+        uploadedAt: new Date(uploadedAt)
+      },
+      create: {
         clientId: client.id,
         type: toPrismaDocumentType(docType),
         fileName: safeName,
@@ -469,6 +481,17 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
         });
 
         if (extracted) {
+          // Replace any prior CreditReport+Tradelines so a fresh upload yields
+          // a fresh analysis (otherwise the old extracted data sticks around).
+          const existingReports = await prisma.creditReport.findMany({
+            where: { clientId: client.id },
+            select: { id: true }
+          });
+          if (existingReports.length) {
+            const ids = existingReports.map(r => r.id);
+            await prisma.tradeline.deleteMany({ where: { creditReportId: { in: ids } } });
+            await prisma.creditReport.deleteMany({ where: { id: { in: ids } } });
+          }
           for (const bureauReport of extracted.bureauReports) {
             const pulledAt = bureauReport.pulledAt ? new Date(bureauReport.pulledAt) : new Date(uploadedAt);
             await prisma.creditReport.create({
@@ -477,7 +500,7 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
                 bureau: bureauReport.bureau,
                 source: extracted.source,
                 pulledAt: Number.isFinite(pulledAt.getTime()) ? pulledAt : new Date(uploadedAt),
-                rawPayload: extracted.rawPayload as any,
+                rawPayload: { rich: extracted.richPayload, raw: extracted.rawPayload } as any,
                 tradelines: {
                   create: bureauReport.tradelines.map(t => ({
                     creditorName: t.creditorName,
