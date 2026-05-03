@@ -347,6 +347,13 @@ export async function extractReport(input: {
   }
 
   const clipped = clampText(text);
+  console.log('[reportExtractor] sending to LLM', {
+    filename: input.filename,
+    mimeType: input.mimeType,
+    rawTextLength: text.length,
+    clippedLength: clipped.length,
+    textPreview: clipped.slice(0, 400)
+  });
   const result = await callAiGateway({
     systemPrompt: SYSTEM_PROMPT,
     userPrompt: USER_PROMPT_TEMPLATE(clipped),
@@ -354,7 +361,17 @@ export async function extractReport(input: {
     temperature: 0.1
   });
 
-  if (!result) return null;
+  if (!result) {
+    console.warn('[reportExtractor] callAiGateway returned null (key/network/timeout)');
+    return null;
+  }
+
+  console.log('[reportExtractor] LLM response received', {
+    model: result.model,
+    responseLength: result.text.length,
+    responseHead: result.text.slice(0, 400),
+    responseTail: result.text.slice(-200)
+  });
 
   const parsed = extractJsonObject(result.text) as {
     scores?: unknown[];
@@ -362,8 +379,16 @@ export async function extractReport(input: {
     accounts?: unknown[];
   } | null;
 
-  if (!parsed || (!Array.isArray(parsed.accounts) && !parsed.personalProfile)) {
-    console.warn('[reportExtractor] LLM returned no parseable structure');
+  if (!parsed) {
+    console.warn('[reportExtractor] extractJsonObject returned null — no { ... } block in response');
+    return null;
+  }
+  if (!Array.isArray(parsed.accounts) && !parsed.personalProfile) {
+    console.warn('[reportExtractor] parsed JSON missing both accounts[] and personalProfile', {
+      keys: Object.keys(parsed),
+      accountsType: typeof (parsed as any).accounts,
+      profileType: typeof parsed.personalProfile
+    });
     return null;
   }
 
