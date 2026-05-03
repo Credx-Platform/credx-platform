@@ -72,9 +72,15 @@ export function extractJsonObject(raw: string): unknown | null {
   const start = candidate.indexOf('{');
   const end = candidate.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
+  const slice = candidate.slice(start, end + 1);
   try {
-    return JSON.parse(candidate.slice(start, end + 1));
-  } catch {
+    return JSON.parse(slice);
+  } catch (err) {
+    console.warn('[extractJsonObject] JSON.parse failed', {
+      message: (err as Error).message,
+      sliceLength: slice.length,
+      sliceTail: slice.slice(-300)
+    });
     return null;
   }
 }

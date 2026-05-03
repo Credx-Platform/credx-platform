@@ -357,7 +357,10 @@ export async function extractReport(input: {
   const result = await callAiGateway({
     systemPrompt: SYSTEM_PROMPT,
     userPrompt: USER_PROMPT_TEMPLATE(clipped),
-    maxTokens: 12000,
+    // Multi-bureau reports with full account + paymentHistory data routinely
+    // produce 30–40k chars of JSON (~10–13k tokens). 12k was too tight and
+    // truncated mid-object, which JSON.parse silently rejected.
+    maxTokens: 32000,
     temperature: 0.1
   });
 
