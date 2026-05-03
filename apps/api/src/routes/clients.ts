@@ -413,3 +413,68 @@ clientsRouter.post('/:id/analysis/auto', requireAuth, async (req: AuthedRequest,
     next(error);
   }
 });
+
+// Staff-only: wipe a client's credit reports, tradelines, uploaded docs,
+// prisma documents, progress analysis JSON, and reset to LEAD status.
+// Use when a file is stuck or the client needs a clean restart.
+clientsRouter.post('/:id/reset', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+
+    // 1. Delete credit reports and their tradelines
+    const reports = await prisma.creditReport.findMany({ where: { clientId: id }, select: { id: true } });
+    if (reports.length) {
+      const ids = reports.map(r => r.id);
+      await prisma.tradeline.deleteMany({ where: { creditReportId: { in: ids } } });
+      await prisma.creditReport.deleteMany({ where: { id: { in: ids } } });
+    }
+
+    // 2. Delete prisma documents
+    await prisma.document.deleteMany({ where: { clientId: id } });
+
+    // 3. Clear progress analysis JSON and reset workflow/onboarding
+    const existing = await prisma.clientProgress.findUnique({ where: { clientId: id } });
+    if (existing) {
+      await prisma.clientProgress.update({
+        where: { clientId: id },
+        data: {
+          analysis: null as any,
+          uploadedDocs: [],
+          workflow: { stage: 'signup_received', updatedAt: new Date().toISOString(), next: [] },
+          onboarding: { status: 'pending', signupAt: null, completedAt: null },
+          scores: { equifax: null, experian: null, transunion: null },
+          disputes: []
+        }
+      });
+    }
+
+    // 4. Reset client status to LEAD and wipe analysis summaries
+    const client = await prisma.client.update({
+      where: { id },
+      data: {
+        status: 'LEAD',
+        analysisSummary: null,
+        disputePlanSummary: null,
+        estimatedTimelineMonths: null,
+        serviceTier: 'ESSENTIAL',
+        portalRestricted: false,
+        activatedAt: null,
+        upgradeOfferedAt: null
+      },
+      include: { user: true, documents: true, activities: true, payments: true }
+    });
+
+    // 5. Log the reset as an activity
+    await prisma.activityEvent.create({
+      data: {
+        clientId: id,
+        type: 'FILE_RESET',
+        message: `Staff reset client file. Credit reports, documents, and analysis cleared. Status reset to LEAD.`
+      }
+    });
+
+    return res.json({ success: true, client });
+  } catch (error) {
+    next(error);
+  }
+});

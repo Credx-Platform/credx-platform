@@ -517,6 +517,29 @@ function ClientDetailRoute({ token }: { token: string }) {
               <div className="client-workspace-actions">
                 <button onClick={saveStatus} disabled={saving}>{saving ? 'Saving...' : 'Save Status'}</button>
               </div>
+              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <p className="helper-text" style={{ color: '#f87171', marginBottom: '0.5rem' }}>⚠️ Staff action — use only when client needs a fresh start.</p>
+                <button
+                  style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #991b1b', padding: '0.5rem 0.75rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                  onClick={async () => {
+                    if (!confirm(`Reset ${fullName}'s file? This will wipe credit reports, uploaded documents, analysis JSON, and reset them to LEAD status. This cannot be undone.`)) return;
+                    setSaving(true);
+                    try {
+                      const res = await apiFetch<{ success: boolean }>(`/api/clients/${client.id}/reset`, token, { method: 'POST' });
+                      if (res.success) {
+                        // Reload the client detail so the UI refreshes
+                        const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
+                        setClient(updated.client);
+                        setStatusValue('LEAD');
+                      }
+                    } catch (err) {
+                      alert(`Reset failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >🗑️ Reset / Start Fresh</button>
+              </div>
             </div>
           </div>
         ) : null}

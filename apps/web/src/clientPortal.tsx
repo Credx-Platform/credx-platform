@@ -1377,8 +1377,17 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     setWelcomeLeaving(false);
   };
 
+  const previousUserIdRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
-    if (!token || !user || welcomeShownRef.current) return;
+    if (!token || !user) return;
+    const prevId = previousUserIdRef.current;
+    // Identity changed (login/logout cycle) — allow welcome to re-fire
+    if (prevId !== undefined && prevId !== user.id) {
+      welcomeShownRef.current = false;
+    }
+    previousUserIdRef.current = user.id;
+    if (welcomeShownRef.current) return;
     welcomeShownRef.current = true;
     setShowWelcome(true);
     setWelcomeLeaving(false);
@@ -1388,7 +1397,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
       clearTimeout(leaveTimer);
       clearTimeout(removeTimer);
     };
-  }, [token, user]);
+  }, [token, user?.id]);
 
   const dismissWelcome = () => {
     setWelcomeLeaving(true);
@@ -1413,26 +1422,6 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const hasAnalysis = !!(client?.analysisSummary || progress?.analysis);
   const needsAnalysis = hasCreditReport && !hasAnalysis;
   const analysisReady = hasCreditReport && hasAnalysis;
-
-  if (!token) {
-    if (onboardingOnly) {
-      return <div className="auth-shell client-auth-shell"><div className="auth-card client-auth-card"><div className="brand-mark brand-mark--centered"><img src={BRAND_LOGO} alt="CredX" className="brand-logo" /></div><p className="eyebrow">CredX Onboarding</p><h1>Continue your signup</h1><p className="helper-text">Use the secure link from your welcome email to review your agreement and finish your intake.</p></div></div>;
-    }
-    return <ClientLogin email={email} password={password} onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleLogin} onResetPassword={handleResetPassword} loading={loading} error={error} resetMessage={resetMessage} />;
-  }
-
-  if (onboardingOnly) {
-    return (
-      <div className="shell client-shell">
-        <main className="main" style={{ marginLeft: 0 }}>
-          <header className="topbar"><div><div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">CredX Onboarding</p></div><h1 className="top-title">Complete your signup</h1><p className="helper-text">Review your agreement, finish your intake, and connect your credit monitoring provider.</p></div></header>
-          {error ? <div className="error-banner">{error}</div> : null}
-          {!progress?.onboarding?.completedAt && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
-          {progress?.onboarding?.completedAt ? <section className="panel"><div className="empty-state-card">Signup complete. Check your email for the password setup link to access your client portal.</div></section> : null}
-        </main>
-      </div>
-    );
-  }
 
   const [activeMcDay, setActiveMcDay] = useState<LessonDay | null>(null);
   const masterclassEnrolled = !!progress?.education?.masterclassEnrolled;
@@ -1509,6 +1498,27 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
             { key: 'profile', label: 'Profile' }
           ];
+
+  // Early returns sit AFTER all hooks to satisfy rules-of-hooks under StrictMode.
+  if (!token) {
+    if (onboardingOnly) {
+      return <div className="auth-shell client-auth-shell"><div className="auth-card client-auth-card"><div className="brand-mark brand-mark--centered"><img src={BRAND_LOGO} alt="CredX" className="brand-logo" /></div><p className="eyebrow">CredX Onboarding</p><h1>Continue your signup</h1><p className="helper-text">Use the secure link from your welcome email to review your agreement and finish your intake.</p></div></div>;
+    }
+    return <ClientLogin email={email} password={password} onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleLogin} onResetPassword={handleResetPassword} loading={loading} error={error} resetMessage={resetMessage} />;
+  }
+
+  if (onboardingOnly) {
+    return (
+      <div className="shell client-shell">
+        <main className="main" style={{ marginLeft: 0 }}>
+          <header className="topbar"><div><div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">CredX Onboarding</p></div><h1 className="top-title">Complete your signup</h1><p className="helper-text">Review your agreement, finish your intake, and connect your credit monitoring provider.</p></div></header>
+          {error ? <div className="error-banner">{error}</div> : null}
+          {!progress?.onboarding?.completedAt && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
+          {progress?.onboarding?.completedAt ? <section className="panel"><div className="empty-state-card">Signup complete. Check your email for the password setup link to access your client portal.</div></section> : null}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="shell client-shell">
