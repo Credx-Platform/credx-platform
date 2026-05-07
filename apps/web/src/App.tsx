@@ -621,10 +621,51 @@ function ClientDetailRoute({ token }: { token: string }) {
   );
 }
 
+function printAdminDisputeQueue(disputes: DisputeRecord[]) {
+  const today = new Date().toLocaleString();
+  const rows = disputes.map((d) => `<tr>
+    <td>${escapeAdmin(`${d.client.user.firstName} ${d.client.user.lastName}`)}<br><span style="color:#64748b;font-size:11px;">${escapeAdmin(d.client.user.email)}</span></td>
+    <td>${escapeAdmin(d.creditorName)}</td>
+    <td>${escapeAdmin(bureauLabel(d.bureau))}</td>
+    <td>${escapeAdmin(d.status.replace('_', ' '))}</td>
+    <td>Round ${d.round}</td>
+    <td>${escapeAdmin(formatDate(d.createdAt))}</td>
+    <td>${escapeAdmin(d.reason || '')}</td>
+  </tr>`).join('');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>CredX Dispute Queue — ${today}</title>
+<style>
+  body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;}
+  h1{margin:0 0 4px;font-size:20px;} .muted{color:#64748b;font-size:12px;margin-bottom:14px;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th,td{border:1px solid #94a3b8;padding:6px 8px;text-align:left;vertical-align:top;}
+  th{background:#e2e8f0;}
+  @media print{ body{padding:0.4in;} }
+</style></head><body>
+  <h1>CredX Dispute Queue</h1>
+  <div class="muted">Printed ${today} · ${disputes.length} item${disputes.length === 1 ? '' : 's'}</div>
+  <table>
+    <thead><tr><th>Client</th><th>Creditor</th><th>Bureau</th><th>Status</th><th>Round</th><th>Opened</th><th>Reason</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7">No dispute items.</td></tr>'}</tbody>
+  </table>
+</body></html>`;
+  const w = window.open('', '_blank', 'noopener,noreferrer');
+  if (!w) return;
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { try { w.print(); } catch {} }, 250);
+}
+
+function escapeAdmin(s: unknown): string {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+}
+
 function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRecord[] }) {
   const active = disputes.filter((item) => !['COMPLETED', 'REJECTED'].includes(item.status));
   const completed = disputes.filter((item) => item.status === 'COMPLETED').length;
   const responseDue = disputes.filter((item) => item.status === 'RESPONSE_DUE').length;
+  const [subTab, setSubTab] = useState<'queue' | 'manager' | 'print'>('queue');
 
   return (
     <div className="page-grid">
@@ -645,57 +686,102 @@ function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRe
         <div className="panel-header">
           <div>
             <p className="eyebrow">Dispute Section</p>
-            <h2>Recent dispute queue</h2>
-            <p className="helper-text">A quick view of the newest dispute items before you jump into the full manager.</p>
+            <h2>{subTab === 'queue' ? 'Recent dispute queue' : subTab === 'manager' ? 'Client dispute operations' : 'Print queue'}</h2>
+            <p className="helper-text">{subTab === 'print' ? 'A clean, paper-ready view of every active dispute item, ready for printing or filing.' : 'A quick view of the newest dispute items before you jump into the full manager.'}</p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <button type="button" className={`tab ${subTab === 'queue' ? 'active' : ''}`} onClick={() => setSubTab('queue')}>Queue</button>
+            <button type="button" className={`tab ${subTab === 'manager' ? 'active' : ''}`} onClick={() => setSubTab('manager')}>Manager</button>
+            <button type="button" className={`tab ${subTab === 'print' ? 'active' : ''}`} onClick={() => setSubTab('print')}>Print</button>
           </div>
         </div>
 
-        <div className="dispute-route-table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Client</th>
-                <th>Creditor</th>
-                <th>Bureau</th>
-                <th>Status</th>
-                <th>Round</th>
-                <th>Opened</th>
-              </tr>
-            </thead>
-            <tbody>
-              {disputes.length ? [...disputes]
-                .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-                .slice(0, 8)
-                .map((dispute) => (
-                  <tr key={dispute.id}>
-                    <td>
-                      <strong>{dispute.client.user.firstName} {dispute.client.user.lastName}</strong>
-                      <div className="cell-subtext">{dispute.client.user.email}</div>
-                    </td>
-                    <td>{dispute.creditorName}</td>
-                    <td>{bureauLabel(dispute.bureau)}</td>
-                    <td><span className={statusClass(dispute.status)}>{dispute.status.replace('_', ' ')}</span></td>
-                    <td>Round {dispute.round}</td>
-                    <td>{formatDate(dispute.createdAt)}</td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan={6} className="empty-row">No dispute items yet.</td>
-                  </tr>
-                )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+        {subTab === 'queue' ? (
+          <div className="dispute-route-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Creditor</th>
+                  <th>Bureau</th>
+                  <th>Status</th>
+                  <th>Round</th>
+                  <th>Opened</th>
+                </tr>
+              </thead>
+              <tbody>
+                {disputes.length ? [...disputes]
+                  .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+                  .slice(0, 8)
+                  .map((dispute) => (
+                    <tr key={dispute.id}>
+                      <td>
+                        <strong>{dispute.client.user.firstName} {dispute.client.user.lastName}</strong>
+                        <div className="cell-subtext">{dispute.client.user.email}</div>
+                      </td>
+                      <td>{dispute.creditorName}</td>
+                      <td>{bureauLabel(dispute.bureau)}</td>
+                      <td><span className={statusClass(dispute.status)}>{dispute.status.replace('_', ' ')}</span></td>
+                      <td>Round {dispute.round}</td>
+                      <td>{formatDate(dispute.createdAt)}</td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={6} className="empty-row">No dispute items yet.</td>
+                    </tr>
+                  )}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
 
-      <section className="panel">
-        <div className="panel-header">
+        {subTab === 'manager' ? (
+          <DisputeManager token={token} />
+        ) : null}
+
+        {subTab === 'print' ? (
           <div>
-            <p className="eyebrow">Dispute Manager</p>
-            <h2>Client Dispute Operations</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+              <button type="button" className="ghost-button" onClick={() => printAdminDisputeQueue(disputes)} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>
+                🖨 Print full dispute queue
+              </button>
+              <span className="helper-text" style={{ margin: 0 }}>Opens a paper-formatted version of every dispute and triggers your browser's print dialog.</span>
+            </div>
+            <div className="dispute-route-table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Client</th>
+                    <th>Creditor</th>
+                    <th>Bureau</th>
+                    <th>Status</th>
+                    <th>Round</th>
+                    <th>Opened</th>
+                    <th>Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {disputes.length ? disputes.map((d) => (
+                    <tr key={d.id}>
+                      <td>
+                        <strong>{d.client.user.firstName} {d.client.user.lastName}</strong>
+                        <div className="cell-subtext">{d.client.user.email}</div>
+                      </td>
+                      <td>{d.creditorName}</td>
+                      <td>{bureauLabel(d.bureau)}</td>
+                      <td><span className={statusClass(d.status)}>{d.status.replace('_', ' ')}</span></td>
+                      <td>Round {d.round}</td>
+                      <td>{formatDate(d.createdAt)}</td>
+                      <td>{d.reason || '—'}</td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={7} className="empty-row">No dispute items to print.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-        <DisputeManager token={token} />
+        ) : null}
       </section>
     </div>
   );

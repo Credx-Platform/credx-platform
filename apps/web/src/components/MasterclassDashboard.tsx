@@ -65,8 +65,8 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
               style={{ ['--card-accent' as string]: d.accent } as CSSProperties}
             >
               <div className="mc-day-card-num">{d.isBonus ? '★' : `0${d.day}`}</div>
-              <div className="mc-day-card-badge">{d.eyebrow.split('·')[0].trim()}</div>
-              <div className="mc-day-card-title">{d.tagline}</div>
+              <div className="mc-day-card-badge">{d.isBonus ? 'Bonus' : `Day ${d.day}`}</div>
+              <div className="mc-day-card-title">{d.isBonus ? 'Bonus Day' : `Day ${d.day}`}</div>
               {done ? <div className="mc-day-card-done">✓ Completed</div> : null}
             </button>
           );

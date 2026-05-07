@@ -728,25 +728,243 @@ function ActivitySection({ progress, client }: { progress: Progress | null; clie
   );
 }
 
-function DisputesSection({ client, progress }: { client: Client | null; progress: Progress | null; }) {
+const BUREAU_ADDRESSES: Record<string, { name: string; lines: string[] }> = {
+  equifax:    { name: 'Equifax Information Services LLC', lines: ['P.O. Box 740256', 'Atlanta, GA 30374'] },
+  experian:   { name: 'Experian',                          lines: ['P.O. Box 4500', 'Allen, TX 75013'] },
+  transunion: { name: 'TransUnion Consumer Solutions',     lines: ['P.O. Box 2000', 'Chester, PA 19016'] }
+};
+
+type DisputeLetter = { bureau: string; bureauLabel: string; filename: string; html: string; items: any[] };
+
+function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | null, client: Client | null): string {
+  const bureau = BUREAU_ADDRESSES[bureauKey] || { name: bureauKey, lines: [] };
+  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Consumer';
+  const addrLines = [
+    client?.currentAddressLine1,
+    client?.currentAddressLine2,
+    [client?.currentCity, client?.currentState, client?.currentPostalCode].filter(Boolean).join(', ')
+  ].filter(Boolean);
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>Dispute Letter — ${escapeHtml(bureau.name)}</title>
+<style>
+  body{font-family:Georgia,Times New Roman,serif;color:#111;background:#fff;margin:0;padding:48px 56px;font-size:13.5px;line-height:1.55;}
+  .row{display:flex;justify-content:space-between;align-items:flex-start;}
+  .blk{margin-bottom:18px;}
+  h1{font-size:18px;margin:24px 0 14px;}
+  table{width:100%;border-collapse:collapse;margin:12px 0;}
+  th,td{border:1px solid #888;padding:6px 8px;text-align:left;font-size:12.5px;vertical-align:top;}
+  th{background:#eee;}
+  .sig{margin-top:48px;}
+  @media print { body{padding:0.6in;} }
+</style></head>
+<body>
+  <div class="row">
+    <div class="blk">
+      <strong>${escapeHtml(name)}</strong><br>
+      ${addrLines.map((l) => escapeHtml(String(l))).join('<br>') || ''}
+    </div>
+    <div class="blk">${escapeHtml(today)}</div>
+  </div>
+
+  <div class="blk">
+    <strong>${escapeHtml(bureau.name)}</strong><br>
+    ${bureau.lines.map((l) => escapeHtml(l)).join('<br>')}
+  </div>
+
+  <div class="blk">Re: Formal dispute of inaccurate information on my credit file</div>
+
+  <p>To Whom It May Concern,</p>
+
+  <p>Under the Fair Credit Reporting Act (15 U.S.C. § 1681i), I am formally disputing the
+  following items appearing on my credit report. These items are inaccurate, incomplete,
+  or unverifiable, and I am requesting that they be investigated and corrected or removed.</p>
+
+  <h1>Disputed Items</h1>
+  <table>
+    <thead><tr><th style="width:30%;">Account</th><th style="width:25%;">Issue</th><th>Reason for Dispute</th></tr></thead>
+    <tbody>
+      ${items.map((it: any) => `<tr>
+        <td>${escapeHtml(it.accountName || '')}</td>
+        <td>${escapeHtml(it.issue || '')}</td>
+        <td>${escapeHtml(it.reason || '')}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>
+
+  <p>Please complete your reinvestigation within the 30-day window required by the FCRA
+  and forward the results, along with any updated copy of my credit file, to the address
+  above. If any of the items above cannot be verified, they must be deleted from my file.</p>
+
+  <p>Sincerely,</p>
+
+  <div class="sig">
+    ____________________________<br>
+    ${escapeHtml(name)}
+  </div>
+</body></html>`;
+}
+
+function generateDisputeLettersFromAnalysis(progress: Progress | null, user: User | null, client: Client | null): DisputeLetter[] {
+  const analysis = progress?.analysis as any;
+  const ops: any[] = (analysis && analysis.disputeOpportunities) || [];
+  if (!ops.length) return [];
+  const grouped = new Map<string, any[]>();
+  for (const op of ops) {
+    for (const b of (op.bureaus || [])) {
+      const key = String(b).toLowerCase();
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(op);
+    }
+  }
+  const out: DisputeLetter[] = [];
+  for (const [bureauKey, items] of grouped) {
+    const meta = BUREAU_ADDRESSES[bureauKey];
+    out.push({
+      bureau: bureauKey,
+      bureauLabel: meta?.name || bureauKey,
+      filename: `credx-dispute-${bureauKey}-${new Date().toISOString().slice(0, 10)}.html`,
+      html: buildDisputeLetterHtml(bureauKey, items, user, client),
+      items
+    });
+  }
+  return out;
+}
+
+function downloadLetter(letter: DisputeLetter) {
+  const blob = new Blob([letter.html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = letter.filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function printLetter(letter: DisputeLetter) {
+  const w = window.open('', '_blank', 'noopener,noreferrer');
+  if (!w) return;
+  w.document.open();
+  w.document.write(letter.html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { try { w.print(); } catch {} }, 250);
+}
+
+function DisputesSection({ user, client, progress }: { user: User | null; client: Client | null; progress: Progress | null; }) {
   const disputes = normalizeDisputes(client, progress);
+  const status = (client?.status || '').toUpperCase();
+  const isActive = ['ACTIVE', 'PAST_DUE'].includes(status);
+
+  const [subTab, setSubTab] = useState<'active' | 'letters' | 'print'>('active');
+  const [letters, setLetters] = useState<DisputeLetter[]>([]);
+  const [genMessage, setGenMessage] = useState<string | null>(null);
+
+  const generate = () => {
+    const next = generateDisputeLettersFromAnalysis(progress, user, client);
+    setLetters(next);
+    if (!next.length) {
+      setGenMessage('No negative items were found in your analysis. Once your analysis publishes dispute opportunities, you can generate letters from this button.');
+    } else {
+      setGenMessage(`${next.length} bureau letter${next.length === 1 ? '' : 's'} generated.`);
+      setSubTab('letters');
+    }
+  };
+
+  if (!isActive) {
+    return (
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Disputes</p><h2>Dispute access locked</h2></div></div>
+        <div className="empty-state-card">
+          <strong>This area unlocks once your client status is Active.</strong>
+          <p>Status today: {prettyStatus(client?.status || 'pending')}. After your enrollment is finalized, the dispute generator, your bureau letters, and the print queue all appear here.</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="panel">
-      <div className="panel-header"><div><p className="eyebrow">Disputes</p><h2>Accounts, status, and changes</h2></div></div>
-      <div className="dispute-list">
-        {disputes.length ? disputes.map((dispute) => (
-          <div key={dispute.id} className="dispute-card-live">
-            <div className="dispute-card-top"><strong>{dispute.account}</strong><span className={`status-badge status-${String(dispute.status).toLowerCase()}`}>{prettyStatus(dispute.status)}</span></div>
-            <div className="dispute-meta"><span>{dispute.bureau} · Round {dispute.round}</span><span>{dispute.accountNumber ? `Acct ${dispute.accountNumber}` : 'Account number not shown'}</span></div>
-            <div className="dispute-meta"><span><strong>Current status:</strong> {prettyStatus(dispute.status)}</span><span><strong>What changed:</strong> {dispute.changed}</span></div>
-            <div className="dispute-change-grid">
-              <div className="change-chip"><span>Reason</span><strong>{dispute.reason}</strong></div>
-              <div className="change-chip"><span>Last movement</span><strong>{dispute.changed}</strong></div>
-              <div className="change-chip"><span>Next step</span><strong>{String(dispute.status).toUpperCase() === 'COMPLETED' ? 'Monitor bureau update' : 'Continue investigation and await response'}</strong></div>
-            </div>
-          </div>
-        )) : <div className="empty-state-card">No dispute accounts have been published to your portal yet.</div>}
+      <div className="panel-header">
+        <div><p className="eyebrow">Disputes</p><h2>Bureau letters, status, and print queue</h2></div>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          <button type="button" className={`tab ${subTab === 'active' ? 'active' : ''}`} onClick={() => setSubTab('active')}>Active</button>
+          <button type="button" className={`tab ${subTab === 'letters' ? 'active' : ''}`} onClick={() => setSubTab('letters')}>Letters</button>
+          <button type="button" className={`tab ${subTab === 'print' ? 'active' : ''}`} onClick={() => setSubTab('print')}>Print</button>
+        </div>
       </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+        <button type="button" className="ghost-button" onClick={generate} style={{ background: '#a855f7', color: '#fff', border: 'none', fontWeight: 700 }}>
+          ✉ Generate Dispute Letters from Analysis
+        </button>
+        <span className="helper-text" style={{ margin: 0 }}>{genMessage || 'Pulls all negative items from your CredX analysis and groups them per bureau.'}</span>
+      </div>
+
+      {subTab === 'active' ? (
+        <div className="dispute-list">
+          {disputes.length ? disputes.map((dispute) => (
+            <div key={dispute.id} className="dispute-card-live">
+              <div className="dispute-card-top"><strong>{dispute.account}</strong><span className={`status-badge status-${String(dispute.status).toLowerCase()}`}>{prettyStatus(dispute.status)}</span></div>
+              <div className="dispute-meta"><span>{dispute.bureau} · Round {dispute.round}</span><span>{dispute.accountNumber ? `Acct ${dispute.accountNumber}` : 'Account number not shown'}</span></div>
+              <div className="dispute-meta"><span><strong>Current status:</strong> {prettyStatus(dispute.status)}</span><span><strong>What changed:</strong> {dispute.changed}</span></div>
+              <div className="dispute-change-grid">
+                <div className="change-chip"><span>Reason</span><strong>{dispute.reason}</strong></div>
+                <div className="change-chip"><span>Last movement</span><strong>{dispute.changed}</strong></div>
+                <div className="change-chip"><span>Next step</span><strong>{String(dispute.status).toUpperCase() === 'COMPLETED' ? 'Monitor bureau update' : 'Continue investigation and await response'}</strong></div>
+              </div>
+            </div>
+          )) : <div className="empty-state-card">No dispute accounts have been published to your portal yet.</div>}
+        </div>
+      ) : null}
+
+      {subTab === 'letters' ? (
+        <div className="dispute-list">
+          {letters.length ? letters.map((letter) => (
+            <div key={letter.bureau} className="dispute-card-live">
+              <div className="dispute-card-top">
+                <strong>{letter.bureauLabel}</strong>
+                <span className="status-badge status-pending">{letter.items.length} item{letter.items.length === 1 ? '' : 's'}</span>
+              </div>
+              <div className="dispute-meta"><span>Items grouped from your analysis and addressed to {letter.bureauLabel}.</span></div>
+              <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>
+                {letter.items.map((it, i) => (
+                  <li key={i} style={{ fontSize: '0.82rem', color: '#cbd5e1', padding: '2px 0' }}>• {it.accountName} — {it.issue}</li>
+                ))}
+              </ul>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+                <button type="button" className="ghost-button" onClick={() => downloadLetter(letter)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
+                <button type="button" className="ghost-button" onClick={() => printLetter(letter)}>🖨 Print this letter</button>
+              </div>
+            </div>
+          )) : <div className="empty-state-card">No letters generated yet — hit the purple button above to build them from your analysis.</div>}
+        </div>
+      ) : null}
+
+      {subTab === 'print' ? (
+        <div>
+          {letters.length ? (
+            <>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
+                <button type="button" className="ghost-button" onClick={() => letters.forEach(printLetter)} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>🖨 Print all bureau letters</button>
+                <span className="helper-text" style={{ margin: 0 }}>Opens each letter in a new tab and triggers the print dialog.</span>
+              </div>
+              <div className="dispute-list">
+                {letters.map((letter) => (
+                  <div key={letter.bureau} className="dispute-card-live">
+                    <div className="dispute-card-top"><strong>{letter.bureauLabel}</strong><button type="button" className="ghost-button" onClick={() => printLetter(letter)}>🖨 Print</button></div>
+                    <iframe title={`Preview ${letter.bureauLabel}`} srcDoc={letter.html} style={{ width: '100%', height: '420px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: '#fff', marginTop: '0.5rem' }} />
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="empty-state-card">Generate the dispute letters first, then come back here to print them.</div>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -960,7 +1178,83 @@ function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { to
   );
 }
 
-function AnalysisUploadCard({ token, progress, refreshAll }: { token: string; progress: Progress | null; refreshAll: () => Promise<void>; }) {
+function escapeHtml(s: string): string {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+}
+
+function buildAnalysisReportHtml(user: User | null, client: Client | null, analysis: any): string {
+  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'CredX Client';
+  const stats = analysis?.overallStats || {};
+  const findings = analysis?.keyFindings || [];
+  const disputeOps = analysis?.disputeOpportunities || [];
+  const bureaus = analysis?.bureauSummaries || [];
+  const plan = analysis?.actionPlan || [];
+  const summary = analysis?.clientFacingSummary || '';
+  const education = analysis?.educationSection || '';
+  const generated = new Date().toLocaleString();
+  const bureauLabel = (b: string) => b === 'equifax' ? 'Equifax' : b === 'experian' ? 'Experian' : 'TransUnion';
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>CredX Analysis — ${escapeHtml(name)}</title>
+<style>
+  body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;background:#fff;margin:0;padding:32px;}
+  h1{margin:0 0 4px;font-size:24px;}h2{margin:24px 0 8px;font-size:18px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;}
+  .muted{color:#64748b;font-size:13px;}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0;}
+  .stat{padding:12px;border:1px solid #e2e8f0;border-radius:8px;}
+  .stat span{display:block;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;}
+  .stat strong{display:block;font-size:20px;margin-top:4px;}
+  .item{padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;}
+  .item .top{display:flex;justify-content:space-between;align-items:center;}
+  .badge{padding:2px 8px;border-radius:4px;font-size:11px;text-transform:uppercase;font-weight:700;}
+  .b-critical{background:#fee2e2;color:#dc2626;}.b-high{background:#fed7aa;color:#ea580c;}.b-medium{background:#fef3c7;color:#ca8a04;}.b-low{background:#dcfce7;color:#16a34a;}
+  .bureau-pill{display:inline-block;padding:2px 8px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:11px;font-weight:600;margin-right:4px;}
+  pre{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6;color:#374151;background:#f8fafc;padding:12px;border-radius:8px;}
+  @media print { body{padding:0;} h2{page-break-after:avoid;} .item{page-break-inside:avoid;} }
+</style></head>
+<body>
+  <h1>CredX Professional Credit Analysis</h1>
+  <div class="muted">Prepared for ${escapeHtml(name)} · ${escapeHtml(generated)}</div>
+  <div class="grid">
+    <div class="stat"><span>Total Accounts</span><strong>${stats.totalAccounts ?? 0}</strong></div>
+    <div class="stat"><span>Negatives</span><strong>${stats.totalNegativeAccounts ?? 0}</strong></div>
+    <div class="stat"><span>Total Balance</span><strong>$${(stats.totalBalance ?? 0).toLocaleString()}</strong></div>
+    <div class="stat"><span>Dispute Ops</span><strong>${disputeOps.length}</strong></div>
+  </div>
+
+  <h2>Key Findings</h2>
+  ${findings.map((f: any) => `
+    <div class="item">
+      <div class="top"><strong>${escapeHtml(f.title || '')}</strong><span class="badge b-${escapeHtml((f.severity || 'low'))}">${escapeHtml(f.severity || '')}</span></div>
+      <div class="muted" style="margin-top:4px;">${escapeHtml(f.description || '')}</div>
+      <div style="margin-top:6px;color:#2563eb;font-weight:600;">→ ${escapeHtml(f.recommendation || '')}</div>
+    </div>`).join('')}
+
+  <h2>Bureau Snapshot</h2>
+  ${bureaus.map((b: any) => `<div class="item"><strong>${escapeHtml(b.label || '')}</strong><div class="muted">${b.totalAccounts} accounts · ${b.negativeAccounts} negative · $${(b.totalBalance || 0).toLocaleString()} balance</div></div>`).join('')}
+
+  <h2>Dispute Opportunities</h2>
+  ${disputeOps.map((op: any) => `
+    <div class="item">
+      <div class="top"><strong>${escapeHtml(op.accountName || '')}</strong><span class="badge b-${escapeHtml(op.priority || 'low')}">${escapeHtml(op.priority || '')} priority</span></div>
+      <div class="muted" style="margin-top:4px;">${escapeHtml(op.issue || '')}</div>
+      <div style="margin-top:4px;"><strong>Reason:</strong> ${escapeHtml(op.reason || '')}</div>
+      <div style="margin-top:6px;">${(op.bureaus || []).map((b: string) => `<span class="bureau-pill">${escapeHtml(bureauLabel(b))}</span>`).join('')}</div>
+    </div>`).join('')}
+
+  <h2>Action Plan</h2>
+  ${plan.map((p: any) => `
+    <div class="item">
+      <div class="top"><strong>Phase ${p.phase}: ${escapeHtml(p.title || '')}</strong><span class="muted">~${p.estimatedWeeks} weeks</span></div>
+      <div class="muted" style="margin-top:4px;">${escapeHtml(p.description || '')}</div>
+      <ul>${(p.tasks || []).map((t: string) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+    </div>`).join('')}
+
+  ${summary ? `<h2>Executive Summary</h2><pre>${escapeHtml(summary)}</pre>` : ''}
+  ${education ? `<h2>Understanding Your Credit</h2><pre>${escapeHtml(education)}</pre>` : ''}
+</body></html>`;
+}
+
+function AnalysisUploadCard({ token, user, client, progress, refreshAll }: { token: string; user: User | null; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; }) {
   const uploadedDocs = progress?.uploadedDocs || [];
   const creditDocs = uploadedDocs.filter((d) => (d.type || '').toLowerCase().includes('credit'));
   const hasReport = creditDocs.length > 0;
@@ -968,6 +1262,27 @@ function AnalysisUploadCard({ token, progress, refreshAll }: { token: string; pr
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showInline, setShowInline] = useState(false);
+
+  const analysis = progress?.analysis as any;
+  const hasAnalysis = analysis && typeof analysis === 'object' && analysis.keyFindings;
+  const overallStats = hasAnalysis ? (analysis.overallStats || {}) : {};
+  const findings = hasAnalysis ? (analysis.keyFindings || []) : [];
+  const disputeOps = hasAnalysis ? (analysis.disputeOpportunities || []) : [];
+
+  const downloadAnalysis = () => {
+    if (!hasAnalysis) return;
+    const html = buildAnalysisReportHtml(user, client, analysis);
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `credx-analysis-${(user?.lastName || 'report').toLowerCase()}-${new Date().toISOString().slice(0,10)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1020,6 +1335,38 @@ function AnalysisUploadCard({ token, progress, refreshAll }: { token: string; pr
       {message ? <p className="helper-text" style={{ color: '#22c55e', marginTop: '0.5rem' }}>{message}</p> : null}
       {error ? <div className="error-banner" style={{ marginTop: '0.5rem' }}>{error}</div> : null}
       <p className="helper-text">Accepted formats: PDF, HTML, HTM, PNG, JPG, JPEG, WEBP.</p>
+
+      {hasAnalysis ? (
+        <div style={{ marginTop: '1rem', padding: '0.85rem 1rem', borderRadius: '12px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.35)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem' }}>
+            <div>
+              <strong style={{ color: '#22c55e', fontSize: '0.95rem' }}>✓ Analysis ready</strong>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '2px' }}>
+                {(overallStats.totalAccounts || 0)} accounts · {(overallStats.totalNegativeAccounts || 0)} negative · {disputeOps.length} dispute opportunities
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button type="button" className="ghost-button" onClick={() => setShowInline((v) => !v)} style={{ background: '#101a2b', border: '1px solid rgba(255,255,255,0.15)', fontWeight: 600 }}>
+                {showInline ? 'Hide quick view' : 'View report'}
+              </button>
+              <button type="button" className="ghost-button" onClick={downloadAnalysis} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>
+                ⬇ Download Analysis
+              </button>
+            </div>
+          </div>
+          {showInline ? (
+            <div style={{ marginTop: '0.85rem', display: 'grid', gap: '0.5rem' }}>
+              {findings.slice(0, 3).map((f: any, i: number) => (
+                <div key={f.id || i} style={{ padding: '0.5rem 0.75rem', background: 'rgba(15,23,42,0.55)', borderRadius: '8px', fontSize: '0.82rem', color: '#cbd5e1' }}>
+                  <strong style={{ color: '#f1f5f9' }}>{f.title}</strong>
+                  <div style={{ marginTop: '2px', fontSize: '0.78rem', color: '#94a3b8' }}>{f.description}</div>
+                </div>
+              ))}
+              <p className="helper-text" style={{ margin: '0.25rem 0 0' }}>Full report (findings, bureau breakdown, action plan) is rendered below.</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1080,7 +1427,7 @@ function MonitoringConnectCard({ token, progress, refreshAll }: { token: string;
   );
 }
 
-function AnalysisSection({ token, client, progress, refreshAll }: { token: string; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; }) {
+function AnalysisSection({ token, user, client, progress, refreshAll }: { token: string; user: User | null; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; }) {
   const analysis = progress?.analysis as any;
   const hasAnalysis = analysis && typeof analysis === 'object' && analysis.keyFindings;
 
@@ -1109,7 +1456,7 @@ function AnalysisSection({ token, client, progress, refreshAll }: { token: strin
   if (!hasAnalysis) {
     return (
       <div className="page-grid">
-        <AnalysisUploadCard token={token} progress={progress} refreshAll={refreshAll} />
+        <AnalysisUploadCard token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} />
         <section className="panel">
           <div className="panel-header"><div><p className="eyebrow">Credit Analysis</p><h2>Your analysis report</h2></div></div>
           <div className="empty-state-card">
@@ -1127,7 +1474,7 @@ function AnalysisSection({ token, client, progress, refreshAll }: { token: strin
 
   return (
     <div className="page-grid">
-      <AnalysisUploadCard token={token} progress={progress} refreshAll={refreshAll} />
+      <AnalysisUploadCard token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} />
       <section className="hero-card hero-card--compact">
         <div>
           <p className="eyebrow">Credit Analysis</p>
@@ -1735,10 +2082,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           ) : null}
 
           {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
-          {activeTab === 'disputes' ? <DisputesSection client={client} progress={progress} /> : null}
+          {activeTab === 'disputes' ? <DisputesSection user={user} client={client} progress={progress} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
-          {activeTab === 'analysis' ? <AnalysisSection token={token} client={client} progress={progress} refreshAll={refreshAll} /> : null}
+          {activeTab === 'analysis' ? <AnalysisSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} /> : null}
 
           {activeTab === 'masterclass' ? (
             <MasterclassDashboard
