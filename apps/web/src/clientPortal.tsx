@@ -931,13 +931,120 @@ function printLetter(letter: DisputeLetter) {
   setTimeout(() => { try { w.print(); } catch {} }, 250);
 }
 
-function DisputesSection({ user, client, progress }: { user: User | null; client: Client | null; progress: Progress | null; }) {
+function buildFtcReportHtml(user: User | null, client: Client | null, allItems: any[]): string {
+  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Consumer';
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const addr = [client?.currentAddressLine1, client?.currentAddressLine2, [client?.currentCity, client?.currentState, client?.currentPostalCode].filter(Boolean).join(', ')].filter(Boolean);
+  const ssn = client?.ssnLast4 ? `XXX-XX-${client.ssnLast4}` : '__________';
+  const rows = allItems.map((it) => `<tr><td>${escapeHtml(it.accountName || '')}</td><td>${escapeHtml(it.issue || '')}</td><td>${escapeHtml((it.bureaus || []).map((b: string) => b === 'equifax' ? 'Equifax' : b === 'experian' ? 'Experian' : 'TransUnion').join(', '))}</td><td>${escapeHtml(it.reason || '')}</td></tr>`).join('');
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>FTC Report — ${escapeHtml(name)}</title>
+<style>
+  body{font-family:Helvetica,Arial,sans-serif;color:#0f172a;background:#fff;margin:0;padding:48px 56px;font-size:13.5px;line-height:1.6;}
+  h1{font-size:22px;margin:0 0 4px;}h2{font-size:16px;margin:18px 0 8px;border-bottom:1px solid #0f172a;padding-bottom:4px;}
+  table{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:12.5px;}
+  th,td{border:1px solid #94a3b8;padding:6px 8px;text-align:left;vertical-align:top;}
+  th{background:#0f172a;color:#fff;}
+  .meta{font-size:12.5px;color:#475569;margin-bottom:14px;}
+  .sig{margin-top:42px;}
+  @media print { body{padding:0.55in 0.6in;} }
+</style></head><body>
+  <h1>Identity Theft / Inaccurate Reporting Complaint</h1>
+  <div class="meta">Filed via the Federal Trade Commission · ReportFraud.ftc.gov · ${escapeHtml(today)}</div>
+
+  <h2>Consumer Information</h2>
+  <p><strong>Name:</strong> ${escapeHtml(name)}<br>
+  <strong>Address:</strong> ${addr.map((l) => escapeHtml(String(l))).join(', ') || '__________'}<br>
+  <strong>SSN:</strong> ${escapeHtml(ssn)}<br>
+  <strong>Email:</strong> ${escapeHtml(user?.email || '')}<br>
+  <strong>Phone:</strong> ${escapeHtml(user?.phone || '__________')}</p>
+
+  <h2>Statement of the Complaint</h2>
+  <p>I am formally reporting the following items appearing on my credit file as inaccurate, unauthorized, or unverifiable. Each item has already been disputed in writing with the credit bureau(s) listed, pursuant to my rights under the Fair Credit Reporting Act (FCRA), 15 U.S.C. § 1681 et seq., and the Fair Debt Collection Practices Act (FDCPA), 15 U.S.C. § 1692 et seq.</p>
+
+  <h2>Disputed Items</h2>
+  <table>
+    <thead><tr><th>Account</th><th>Issue</th><th>Bureau(s)</th><th>Reason</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4" style="font-style:italic;">No items.</td></tr>'}</tbody>
+  </table>
+
+  <h2>Requested Remedy</h2>
+  <ul>
+    <li>Initiate an FTC investigation into the inaccurate reporting and any associated identity theft activity.</li>
+    <li>Provide me with an FTC Identity Theft Report (if applicable) for use under § 605B of the FCRA.</li>
+    <li>Coordinate as needed with the Consumer Financial Protection Bureau, the credit bureaus, and the listed furnishers.</li>
+  </ul>
+
+  <p>I certify that the foregoing is true and correct to the best of my knowledge.</p>
+
+  <div class="sig">____________________________<br>${escapeHtml(name)} — ${escapeHtml(today)}</div>
+</body></html>`;
+}
+
+function buildCfpbReportHtml(user: User | null, client: Client | null, allItems: any[]): string {
+  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Consumer';
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const addr = [client?.currentAddressLine1, client?.currentAddressLine2, [client?.currentCity, client?.currentState, client?.currentPostalCode].filter(Boolean).join(', ')].filter(Boolean);
+  const rows = allItems.map((it) => `<tr><td>${escapeHtml(it.accountName || '')}</td><td>${escapeHtml((it.bureaus || []).map((b: string) => b === 'equifax' ? 'Equifax' : b === 'experian' ? 'Experian' : 'TransUnion').join(', '))}</td><td>${escapeHtml(it.issue || '')}</td><td>${escapeHtml(it.reason || '')}</td></tr>`).join('');
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>CFPB Complaint — ${escapeHtml(name)}</title>
+<style>
+  body{font-family:Helvetica,Arial,sans-serif;color:#0f172a;background:#fff;margin:0;padding:48px 56px;font-size:13.5px;line-height:1.6;}
+  h1{font-size:22px;margin:0 0 4px;}h2{font-size:16px;margin:18px 0 8px;border-bottom:1px solid #0f172a;padding-bottom:4px;}
+  table{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:12.5px;}
+  th,td{border:1px solid #94a3b8;padding:6px 8px;text-align:left;vertical-align:top;}
+  th{background:#0f172a;color:#fff;}
+  .meta{font-size:12.5px;color:#475569;margin-bottom:14px;}
+  .sig{margin-top:42px;}
+  @media print { body{padding:0.55in 0.6in;} }
+</style></head><body>
+  <h1>Consumer Financial Protection Bureau Complaint</h1>
+  <div class="meta">Filed via consumerfinance.gov/complaint · ${escapeHtml(today)}</div>
+
+  <h2>Consumer</h2>
+  <p><strong>${escapeHtml(name)}</strong><br>${addr.map((l) => escapeHtml(String(l))).join(', ') || ''}<br>${escapeHtml(user?.email || '')} · ${escapeHtml(user?.phone || '')}</p>
+
+  <h2>Subject</h2>
+  <p>Failure to investigate and remove inaccurate, unverified, or unauthorized items from my credit report following formal dispute under 15 U.S.C. § 1681i.</p>
+
+  <h2>What Happened</h2>
+  <p>Pursuant to my rights under the Fair Credit Reporting Act (FCRA) and the Fair Debt Collection Practices Act (FDCPA), I sent formal dispute letters by certified mail to the credit bureaus listed below. The reporting parties failed to provide adequate verification, failed to respond within the 30-day window required by 15 U.S.C. § 1681i, and/or continued reporting items I have flagged as inaccurate or unauthorized.</p>
+
+  <h2>Disputed Items</h2>
+  <table>
+    <thead><tr><th>Account</th><th>Bureau(s)</th><th>Issue</th><th>Reason</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4" style="font-style:italic;">No items.</td></tr>'}</tbody>
+  </table>
+
+  <h2>Resolution Requested</h2>
+  <ul>
+    <li>CFPB to require each reporting bureau to remove the disputed items or produce verifiable proof under § 1681i within 15 days.</li>
+    <li>CFPB to investigate any furnisher non-compliance with § 1681s-2 obligations.</li>
+    <li>CFPB to confirm in writing that all required corrections have been transmitted to my credit file.</li>
+  </ul>
+
+  <p>I declare under penalty of perjury that the foregoing is true and correct.</p>
+
+  <div class="sig">____________________________<br>${escapeHtml(name)} — ${escapeHtml(today)}</div>
+</body></html>`;
+}
+
+type DisputesSectionProps = {
+  user: User | null;
+  client: Client | null;
+  progress: Progress | null;
+  letters: DisputeLetter[];
+  setLetters: (letters: DisputeLetter[]) => void;
+  filings: { ftc: DisputeLetter | null; cfpb: DisputeLetter | null };
+  setFilings: (filings: { ftc: DisputeLetter | null; cfpb: DisputeLetter | null }) => void;
+};
+
+function DisputesSection({ user, client, progress, letters, setLetters, filings, setFilings }: DisputesSectionProps) {
   const disputes = normalizeDisputes(client, progress);
   const status = (client?.status || '').toUpperCase();
   const isActive = ['ACTIVE', 'PAST_DUE'].includes(status);
 
-  const [subTab, setSubTab] = useState<'active' | 'letters' | 'print'>('active');
-  const [letters, setLetters] = useState<DisputeLetter[]>([]);
+  const [subTab, setSubTab] = useState<'active' | 'letters' | 'print' | 'ftc' | 'cfpb'>('active');
   const [genMessage, setGenMessage] = useState<string | null>(null);
 
   const generate = () => {
@@ -946,9 +1053,53 @@ function DisputesSection({ user, client, progress }: { user: User | null; client
     if (!next.length) {
       setGenMessage('No negative items were found in your analysis. Once your analysis publishes dispute opportunities, you can generate letters from this button.');
     } else {
-      setGenMessage(`${next.length} bureau letter${next.length === 1 ? '' : 's'} generated.`);
+      setGenMessage(`${next.length} bureau letter${next.length === 1 ? '' : 's'} generated and saved across your portal.`);
       setSubTab('letters');
     }
+  };
+
+  const allItems = useMemo(() => {
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const l of letters) for (const it of l.items) {
+      const key = `${it.accountName || ''}|${it.issue || ''}`;
+      if (!seen.has(key)) { seen.add(key); out.push(it); }
+    }
+    return out;
+  }, [letters]);
+
+  const generateFtc = () => {
+    if (!letters.length) {
+      setGenMessage('Generate your bureau letters first — the FTC report bundles those same items.');
+      return;
+    }
+    const html = buildFtcReportHtml(user, client, allItems);
+    const filing: DisputeLetter = {
+      bureau: 'ftc',
+      bureauLabel: 'Federal Trade Commission',
+      filename: `credx-ftc-report-${(user?.lastName || 'consumer').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.html`,
+      html,
+      items: allItems
+    };
+    setFilings({ ...filings, ftc: filing });
+    setGenMessage('FTC report generated. Download or print below.');
+  };
+
+  const generateCfpb = () => {
+    if (!letters.length) {
+      setGenMessage('Generate your bureau letters first — the CFPB complaint references the same dispute file.');
+      return;
+    }
+    const html = buildCfpbReportHtml(user, client, allItems);
+    const filing: DisputeLetter = {
+      bureau: 'cfpb',
+      bureauLabel: 'Consumer Financial Protection Bureau',
+      filename: `credx-cfpb-complaint-${(user?.lastName || 'consumer').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.html`,
+      html,
+      items: allItems
+    };
+    setFilings({ ...filings, cfpb: filing });
+    setGenMessage('CFPB complaint generated. Download or print below.');
   };
 
   if (!isActive) {
@@ -963,27 +1114,43 @@ function DisputesSection({ user, client, progress }: { user: User | null; client
     );
   }
 
+  const renderItem = (it: any, i: number) => (
+    <li key={i} style={{ fontSize: '0.88rem', color: '#f1f5f9', fontWeight: 500, padding: '3px 0' }}>• <strong style={{ color: '#fff' }}>{it.accountName}</strong> — {it.issue}</li>
+  );
+
   return (
     <section className="panel">
       <div className="panel-header">
-        <div><p className="eyebrow">Disputes</p><h2>Bureau letters, status, and print queue</h2></div>
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <div><p className="eyebrow">Disputes</p><h2>Bureau letters, FTC + CFPB filings, print queue</h2></div>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
           <button type="button" className={`tab ${subTab === 'active' ? 'active' : ''}`} onClick={() => setSubTab('active')}>Active</button>
           <button type="button" className={`tab ${subTab === 'letters' ? 'active' : ''}`} onClick={() => setSubTab('letters')}>Letters</button>
           <button type="button" className={`tab ${subTab === 'print' ? 'active' : ''}`} onClick={() => setSubTab('print')}>Print</button>
+          <button type="button" className={`tab ${subTab === 'ftc' ? 'active' : ''}`} onClick={() => setSubTab('ftc')}>FTC</button>
+          <button type="button" className={`tab ${subTab === 'cfpb' ? 'active' : ''}`} onClick={() => setSubTab('cfpb')}>CFPB</button>
         </div>
+      </div>
+
+      <div style={{ marginBottom: '0.85rem', padding: '8px 12px', borderRadius: '8px', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.35)', color: '#fbbf24', fontSize: '0.82rem', fontWeight: 600 }}>
+        Beta mode: the standard 45-day waiting period before FTC and CFPB escalation is waived so you can test the full flow now.
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
         <button type="button" className="ghost-button" onClick={generate} style={{ background: '#a855f7', color: '#fff', border: 'none', fontWeight: 700 }}>
           ✉ Generate Dispute Letters from Analysis
         </button>
-        <span className="helper-text" style={{ margin: 0 }}>{genMessage || 'Pulls all negative items from your CredX analysis and groups them per bureau.'}</span>
+        <span className="helper-text" style={{ margin: 0, color: '#cbd5e1' }}>{genMessage || 'Pulls all negative items from your CredX analysis and groups them per bureau. Generated letters populate every dispute view across your portal.'}</span>
       </div>
 
       {subTab === 'active' ? (
         <div className="dispute-list">
-          {disputes.length ? disputes.map((dispute) => (
+          {letters.length ? letters.flatMap((letter) => letter.items.map((it, i) => (
+            <div key={`${letter.bureau}-${i}`} className="dispute-card-live">
+              <div className="dispute-card-top"><strong style={{ color: '#fff' }}>{it.accountName}</strong><span className="status-badge status-pending">{letter.bureauLabel}</span></div>
+              <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>{it.issue}</span></div>
+              <div className="dispute-meta" style={{ color: '#cbd5e1' }}><span><strong>Reason:</strong> {it.reason}</span></div>
+            </div>
+          ))) : disputes.length ? disputes.map((dispute) => (
             <div key={dispute.id} className="dispute-card-live">
               <div className="dispute-card-top"><strong>{dispute.account}</strong><span className={`status-badge status-${String(dispute.status).toLowerCase()}`}>{prettyStatus(dispute.status)}</span></div>
               <div className="dispute-meta"><span>{dispute.bureau} · Round {dispute.round}</span><span>{dispute.accountNumber ? `Acct ${dispute.accountNumber}` : 'Account number not shown'}</span></div>
@@ -994,7 +1161,7 @@ function DisputesSection({ user, client, progress }: { user: User | null; client
                 <div className="change-chip"><span>Next step</span><strong>{String(dispute.status).toUpperCase() === 'COMPLETED' ? 'Monitor bureau update' : 'Continue investigation and await response'}</strong></div>
               </div>
             </div>
-          )) : <div className="empty-state-card">No dispute accounts have been published to your portal yet.</div>}
+          )) : <div className="empty-state-card">No dispute items yet. Generate dispute letters above to populate this view from your analysis.</div>}
         </div>
       ) : null}
 
@@ -1003,18 +1170,16 @@ function DisputesSection({ user, client, progress }: { user: User | null; client
           {letters.length ? letters.map((letter) => (
             <div key={letter.bureau} className="dispute-card-live">
               <div className="dispute-card-top">
-                <strong>{letter.bureauLabel}</strong>
+                <strong style={{ color: '#fff' }}>{letter.bureauLabel}</strong>
                 <span className="status-badge status-pending">{letter.items.length} item{letter.items.length === 1 ? '' : 's'}</span>
               </div>
-              <div className="dispute-meta"><span>Items grouped from your analysis and addressed to {letter.bureauLabel}.</span></div>
+              <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>Items grouped from your analysis and addressed to <strong style={{ color: '#fff' }}>{letter.bureauLabel}</strong>.</span></div>
               <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>
-                {letter.items.map((it, i) => (
-                  <li key={i} style={{ fontSize: '0.82rem', color: '#cbd5e1', padding: '2px 0' }}>• {it.accountName} — {it.issue}</li>
-                ))}
+                {letter.items.map(renderItem)}
               </ul>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
                 <button type="button" className="ghost-button" onClick={() => downloadLetter(letter)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
-                <button type="button" className="ghost-button" onClick={() => printLetter(letter)}>🖨 Print this letter</button>
+                <button type="button" className="ghost-button" onClick={() => printLetter(letter)} style={{ color: '#f8fafc', fontWeight: 600 }}>🖨 Print this letter</button>
               </div>
             </div>
           )) : <div className="empty-state-card">No letters generated yet — hit the purple button above to build them from your analysis.</div>}
@@ -1027,12 +1192,12 @@ function DisputesSection({ user, client, progress }: { user: User | null; client
             <>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
                 <button type="button" className="ghost-button" onClick={() => letters.forEach(printLetter)} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>🖨 Print all bureau letters</button>
-                <span className="helper-text" style={{ margin: 0 }}>Opens each letter in a new tab and triggers the print dialog.</span>
+                <span className="helper-text" style={{ margin: 0, color: '#cbd5e1' }}>Opens each letter in a new tab and triggers the print dialog.</span>
               </div>
               <div className="dispute-list">
                 {letters.map((letter) => (
                   <div key={letter.bureau} className="dispute-card-live">
-                    <div className="dispute-card-top"><strong>{letter.bureauLabel}</strong><button type="button" className="ghost-button" onClick={() => printLetter(letter)}>🖨 Print</button></div>
+                    <div className="dispute-card-top"><strong style={{ color: '#fff' }}>{letter.bureauLabel}</strong><button type="button" className="ghost-button" onClick={() => printLetter(letter)} style={{ color: '#f8fafc', fontWeight: 600 }}>🖨 Print</button></div>
                     <iframe title={`Preview ${letter.bureauLabel}`} srcDoc={letter.html} style={{ width: '100%', height: '420px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: '#fff', marginTop: '0.5rem' }} />
                   </div>
                 ))}
@@ -1040,6 +1205,56 @@ function DisputesSection({ user, client, progress }: { user: User | null; client
             </>
           ) : (
             <div className="empty-state-card">Generate the dispute letters first, then come back here to print them.</div>
+          )}
+        </div>
+      ) : null}
+
+      {subTab === 'ftc' ? (
+        <div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+            <button type="button" className="ghost-button" onClick={generateFtc} style={{ background: '#ef4444', color: '#fff', border: 'none', fontWeight: 700 }} disabled={!letters.length}>
+              ⚖ Generate FTC report
+            </button>
+            <span className="helper-text" style={{ margin: 0, color: '#cbd5e1' }}>{letters.length ? 'Bundles every disputed item into a single FTC complaint with your contact info, the bureau list, and the requested remedy.' : 'Generate dispute letters above first, then come back here.'}</span>
+          </div>
+          {filings.ftc ? (
+            <div className="dispute-card-live">
+              <div className="dispute-card-top"><strong style={{ color: '#fff' }}>FTC Identity Theft / Inaccurate Reporting Complaint</strong><span className="status-badge status-pending">{filings.ftc.items.length} item{filings.ftc.items.length === 1 ? '' : 's'}</span></div>
+              <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>Ready to file via <a href="https://reportfraud.ftc.gov" target="_blank" rel="noreferrer" style={{ color: '#fbbf24' }}>ReportFraud.ftc.gov</a> — attach this PDF as your written statement.</span></div>
+              <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>{filings.ftc.items.map(renderItem)}</ul>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+                <button type="button" className="ghost-button" onClick={() => downloadLetter(filings.ftc!)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
+                <button type="button" className="ghost-button" onClick={() => printLetter(filings.ftc!)} style={{ color: '#f8fafc', fontWeight: 600 }}>🖨 Print</button>
+              </div>
+              <iframe title="FTC report preview" srcDoc={filings.ftc.html} style={{ width: '100%', height: '420px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: '#fff', marginTop: '0.6rem' }} />
+            </div>
+          ) : (
+            <div className="empty-state-card">No FTC report generated yet.</div>
+          )}
+        </div>
+      ) : null}
+
+      {subTab === 'cfpb' ? (
+        <div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+            <button type="button" className="ghost-button" onClick={generateCfpb} style={{ background: '#2563eb', color: '#fff', border: 'none', fontWeight: 700 }} disabled={!letters.length}>
+              📑 Generate CFPB complaint
+            </button>
+            <span className="helper-text" style={{ margin: 0, color: '#cbd5e1' }}>{letters.length ? 'Bundles every disputed item into a CFPB complaint citing § 1681i + § 1681s-2 with a 15-day response demand.' : 'Generate dispute letters above first, then come back here.'}</span>
+          </div>
+          {filings.cfpb ? (
+            <div className="dispute-card-live">
+              <div className="dispute-card-top"><strong style={{ color: '#fff' }}>CFPB Consumer Complaint</strong><span className="status-badge status-pending">{filings.cfpb.items.length} item{filings.cfpb.items.length === 1 ? '' : 's'}</span></div>
+              <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>File this via <a href="https://www.consumerfinance.gov/complaint/" target="_blank" rel="noreferrer" style={{ color: '#fbbf24' }}>consumerfinance.gov/complaint</a> and attach as your supporting document.</span></div>
+              <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>{filings.cfpb.items.map(renderItem)}</ul>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+                <button type="button" className="ghost-button" onClick={() => downloadLetter(filings.cfpb!)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
+                <button type="button" className="ghost-button" onClick={() => printLetter(filings.cfpb!)} style={{ color: '#f8fafc', fontWeight: 600 }}>🖨 Print</button>
+              </div>
+              <iframe title="CFPB complaint preview" srcDoc={filings.cfpb.html} style={{ width: '100%', height: '420px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: '#fff', marginTop: '0.6rem' }} />
+            </div>
+          ) : (
+            <div className="empty-state-card">No CFPB complaint generated yet.</div>
           )}
         </div>
       ) : null}
@@ -1260,75 +1475,254 @@ function escapeHtml(s: string): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
 }
 
+function categorizeNegatives(analysis: any): Record<string, number> {
+  const provided = (analysis?.derogatoryCounts || {}) as Record<string, number>;
+  const counts = {
+    latePayments: provided.latePayments ?? 0,
+    collections: provided.collections ?? 0,
+    chargeOffs: provided.chargeOffs ?? 0,
+    repossessions: provided.repossessions ?? 0,
+    foreclosures: provided.foreclosures ?? 0,
+    inquiries: provided.inquiries ?? 0,
+    shortSales: provided.shortSales ?? 0,
+    judgments: provided.judgments ?? 0,
+    taxLiens: provided.taxLiens ?? 0,
+    bankruptcies: provided.bankruptcies ?? 0
+  };
+  if (Object.values(counts).some((v) => v > 0)) return counts;
+  // Fallback: classify findings + dispute ops by keyword.
+  const items: any[] = [...(analysis?.disputeOpportunities || []), ...(analysis?.keyFindings || [])];
+  const text = (it: any) => `${it.title || ''} ${it.issue || ''} ${it.reason || ''} ${it.type || ''} ${it.category || ''}`.toLowerCase();
+  for (const it of items) {
+    const t = text(it);
+    if (/late|past[ -]?due/.test(t)) counts.latePayments++;
+    else if (/collection/.test(t)) counts.collections++;
+    else if (/charge[ -]?off/.test(t)) counts.chargeOffs++;
+    else if (/repo|repossess/.test(t)) counts.repossessions++;
+    else if (/foreclos/.test(t)) counts.foreclosures++;
+    else if (/inquir/.test(t)) counts.inquiries++;
+    else if (/short[ -]?sale/.test(t)) counts.shortSales++;
+    else if (/judgment|judgement/.test(t)) counts.judgments++;
+    else if (/tax[ -]?lien/.test(t)) counts.taxLiens++;
+    else if (/bankrupt/.test(t)) counts.bankruptcies++;
+  }
+  return counts;
+}
+
 function buildAnalysisReportHtml(user: User | null, client: Client | null, analysis: any): string {
-  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'CredX Client';
+  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Valued Client';
   const stats = analysis?.overallStats || {};
+  const acctSummary = analysis?.accountSummary || {};
   const findings = analysis?.keyFindings || [];
   const disputeOps = analysis?.disputeOpportunities || [];
   const bureaus = analysis?.bureauSummaries || [];
   const plan = analysis?.actionPlan || [];
   const summary = analysis?.clientFacingSummary || '';
   const education = analysis?.educationSection || '';
-  const generated = new Date().toLocaleString();
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const year = new Date().getFullYear();
+  const negs = categorizeNegatives(analysis);
+  const totalNeg = stats.totalNegativeAccounts ?? Object.values(negs).reduce((a, b) => a + b, 0);
   const bureauLabel = (b: string) => b === 'equifax' ? 'Equifax' : b === 'experian' ? 'Experian' : 'TransUnion';
+  const logo = 'https://credxme.com/images/credx-logo-1.jpg';
+  const negColor = (n: number) => n > 0 ? '#dc2626' : '#16a34a';
+
+  const negRow = (label: string, n: number) => `<tr><td>${label}</td><td style="color:${negColor(n)};font-weight:700;">${n}</td></tr>`;
+
   return `<!doctype html>
-<html><head><meta charset="utf-8"><title>CredX Analysis — ${escapeHtml(name)}</title>
+<html><head><meta charset="utf-8"><title>CredX Credit Analysis Report — ${escapeHtml(name)}</title>
 <style>
-  body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;background:#fff;margin:0;padding:32px;}
-  h1{margin:0 0 4px;font-size:24px;}h2{margin:24px 0 8px;font-size:18px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;}
-  .muted{color:#64748b;font-size:13px;}
-  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0;}
-  .stat{padding:12px;border:1px solid #e2e8f0;border-radius:8px;}
-  .stat span{display:block;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;}
-  .stat strong{display:block;font-size:20px;margin-top:4px;}
-  .item{padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;}
-  .item .top{display:flex;justify-content:space-between;align-items:center;}
+  *{box-sizing:border-box;}
+  body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#0f172a;background:#fff;margin:0;padding:0;line-height:1.55;}
+  .page{padding:64px 72px;max-width:820px;margin:0 auto;page-break-after:always;}
+  .page:last-of-type{page-break-after:auto;}
+  /* Cover */
+  .cover{display:flex;flex-direction:column;align-items:center;text-align:center;}
+  .cover-logo{width:104px;height:104px;border-radius:18px;object-fit:cover;background:#0f172a;margin-bottom:18px;box-shadow:0 8px 24px rgba(15,23,42,0.18);}
+  .brand-name{font-size:30px;font-weight:800;letter-spacing:-0.01em;margin:6px 0 4px;color:#0f172a;}
+  .brand-email{font-size:13px;color:#64748b;}
+  .brand-rule{height:2px;background:#0f172a;width:100%;margin:28px 0 32px;border-radius:2px;}
+  .cover-h1{font-size:36px;font-weight:800;margin:60px 0 28px;color:#0f172a;letter-spacing:-0.01em;}
+  .cover-eyebrow{font-size:14px;color:#64748b;margin-bottom:8px;}
+  .cover-name{font-size:26px;font-weight:700;color:#0f172a;margin:0 0 22px;}
+  .cover-tag{font-size:14px;color:#475569;max-width:520px;margin:0 auto;}
+  .cover-foot{margin-top:90px;font-size:13px;color:#475569;}
+  .cover-foot strong{display:block;margin-bottom:4px;color:#0f172a;}
+  /* Section pages */
+  h1.section{font-size:26px;font-weight:800;color:#0f172a;margin:0 0 6px;letter-spacing:-0.01em;}
+  .section-rule{height:2px;background:#0f172a;width:100%;margin:0 0 22px;border-radius:2px;}
+  h2.sub{font-size:16px;font-weight:700;color:#0f172a;margin:18px 0 10px;}
+  h3.sub{font-size:15px;font-weight:700;color:#0f172a;margin:14px 0 8px;}
+  p{margin:0 0 12px;color:#1e293b;font-size:13.5px;}
+  .info-callout{border-left:3px solid #0f172a;background:#f8fafc;padding:14px 18px;border-radius:0 8px 8px 0;margin:8px 0 14px;}
+  .info-callout strong{display:block;color:#0f172a;margin-bottom:6px;}
+  .info-callout .row{font-size:13px;margin:2px 0;}
+  .range-poor{color:#dc2626;}.range-fair{color:#ea580c;}.range-good{color:#0ea5e9;}.range-excellent{color:#16a34a;}
+  table.cred{width:100%;border-collapse:separate;border-spacing:0;margin:6px 0 22px;font-size:13.5px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
+  table.cred th{background:#0f172a;color:#fff;text-align:left;padding:11px 14px;font-weight:700;font-size:13px;}
+  table.cred td{padding:11px 14px;border-top:1px solid #e2e8f0;color:#0f172a;}
+  table.cred tr:first-child td{border-top:0;}
+  table.cred tfoot td{background:#0f172a;color:#fff;font-weight:700;}
+  /* Findings + ops */
+  .item{padding:11px 14px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px;background:#fff;}
+  .item .top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
   .badge{padding:2px 8px;border-radius:4px;font-size:11px;text-transform:uppercase;font-weight:700;}
-  .b-critical{background:#fee2e2;color:#dc2626;}.b-high{background:#fed7aa;color:#ea580c;}.b-medium{background:#fef3c7;color:#ca8a04;}.b-low{background:#dcfce7;color:#16a34a;}
+  .b-critical,.b-high{background:#fee2e2;color:#dc2626;}.b-medium{background:#fef3c7;color:#ca8a04;}.b-low{background:#dcfce7;color:#16a34a;}
   .bureau-pill{display:inline-block;padding:2px 8px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:11px;font-weight:600;margin-right:4px;}
-  pre{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6;color:#374151;background:#f8fafc;padding:12px;border-radius:8px;}
-  @media print { body{padding:0;} h2{page-break-after:avoid;} .item{page-break-inside:avoid;} }
+  pre.body{white-space:pre-wrap;font-family:inherit;font-size:13.5px;line-height:1.65;color:#1e293b;background:#f8fafc;padding:14px 16px;border-radius:8px;border:1px solid #e2e8f0;}
+  /* Footer */
+  footer{border-top:1px solid #e2e8f0;margin-top:24px;padding:18px 72px 28px;text-align:center;font-size:12px;color:#64748b;}
+  footer .disc{display:block;margin-bottom:4px;}
+  @media print {
+    body{margin:0;}
+    .page{padding:0.55in 0.6in;max-width:none;}
+    footer{padding:14px 0.6in 18px;}
+    h1.section, h2.sub, table.cred, .item{page-break-inside:avoid;}
+  }
 </style></head>
 <body>
-  <h1>CredX Professional Credit Analysis</h1>
-  <div class="muted">Prepared for ${escapeHtml(name)} · ${escapeHtml(generated)}</div>
-  <div class="grid">
-    <div class="stat"><span>Total Accounts</span><strong>${stats.totalAccounts ?? 0}</strong></div>
-    <div class="stat"><span>Negatives</span><strong>${stats.totalNegativeAccounts ?? 0}</strong></div>
-    <div class="stat"><span>Total Balance</span><strong>$${(stats.totalBalance ?? 0).toLocaleString()}</strong></div>
-    <div class="stat"><span>Dispute Ops</span><strong>${disputeOps.length}</strong></div>
-  </div>
 
-  <h2>Key Findings</h2>
-  ${findings.map((f: any) => `
-    <div class="item">
-      <div class="top"><strong>${escapeHtml(f.title || '')}</strong><span class="badge b-${escapeHtml((f.severity || 'low'))}">${escapeHtml(f.severity || '')}</span></div>
-      <div class="muted" style="margin-top:4px;">${escapeHtml(f.description || '')}</div>
-      <div style="margin-top:6px;color:#2563eb;font-weight:600;">→ ${escapeHtml(f.recommendation || '')}</div>
-    </div>`).join('')}
+  <!-- COVER -->
+  <section class="page cover">
+    <img src="${logo}" alt="CredX" class="cover-logo" onerror="this.style.display='none'" />
+    <div class="brand-name">CredX</div>
+    <div class="brand-email">contact@credxme.com</div>
+    <div class="brand-rule"></div>
 
-  <h2>Bureau Snapshot</h2>
-  ${bureaus.map((b: any) => `<div class="item"><strong>${escapeHtml(b.label || '')}</strong><div class="muted">${b.totalAccounts} accounts · ${b.negativeAccounts} negative · $${(b.totalBalance || 0).toLocaleString()} balance</div></div>`).join('')}
+    <h1 class="cover-h1">Credit Analysis Report</h1>
+    <div class="cover-eyebrow">Prepared For</div>
+    <div class="cover-name">${escapeHtml(name)}</div>
+    <p class="cover-tag">Comprehensive overview of your credit profile and factors impacting your credit score.</p>
 
-  <h2>Dispute Opportunities</h2>
-  ${disputeOps.map((op: any) => `
-    <div class="item">
-      <div class="top"><strong>${escapeHtml(op.accountName || '')}</strong><span class="badge b-${escapeHtml(op.priority || 'low')}">${escapeHtml(op.priority || '')} priority</span></div>
-      <div class="muted" style="margin-top:4px;">${escapeHtml(op.issue || '')}</div>
-      <div style="margin-top:4px;"><strong>Reason:</strong> ${escapeHtml(op.reason || '')}</div>
-      <div style="margin-top:6px;">${(op.bureaus || []).map((b: string) => `<span class="bureau-pill">${escapeHtml(bureauLabel(b))}</span>`).join('')}</div>
-    </div>`).join('')}
+    <div class="cover-foot">
+      <strong>Prepared by CredX</strong>
+      ${escapeHtml(today)}
+    </div>
+  </section>
 
-  <h2>Action Plan</h2>
-  ${plan.map((p: any) => `
-    <div class="item">
-      <div class="top"><strong>Phase ${p.phase}: ${escapeHtml(p.title || '')}</strong><span class="muted">~${p.estimatedWeeks} weeks</span></div>
-      <div class="muted" style="margin-top:4px;">${escapeHtml(p.description || '')}</div>
-      <ul>${(p.tasks || []).map((t: string) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
-    </div>`).join('')}
+  <!-- UNDERSTANDING -->
+  <section class="page">
+    <h1 class="section">Understanding Your Credit Score</h1>
+    <div class="section-rule"></div>
 
-  ${summary ? `<h2>Executive Summary</h2><pre>${escapeHtml(summary)}</pre>` : ''}
-  ${education ? `<h2>Understanding Your Credit</h2><pre>${escapeHtml(education)}</pre>` : ''}
+    <h2 class="sub">What is a Credit Score?</h2>
+    <p>Your credit score is a numerical representation of your creditworthiness used by lenders to assess risk.</p>
+
+    <div class="info-callout">
+      <strong>Credit Score Ranges:</strong>
+      <div class="row range-poor">• 300-579: Poor</div>
+      <div class="row range-fair">• 580-669: Fair</div>
+      <div class="row range-good">• 670-739: Good</div>
+      <div class="row range-excellent">• 740+: Excellent</div>
+    </div>
+  </section>
+
+  <!-- CREDIT PROFILE -->
+  <section class="page">
+    <h1 class="section">Your Credit Profile</h1>
+    <div class="section-rule"></div>
+
+    <h2 class="sub">Your Credit Scores</h2>
+    <p style="margin-bottom:14px;color:#475569;font-size:13px;">Bureau scores at the time of this analysis.</p>
+
+    <h3 class="sub">Account Summary</h3>
+    <table class="cred">
+      <thead><tr><th>Account Type</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>Open Credit Cards</td><td>${acctSummary.openCreditCards ?? 0}</td></tr>
+        <tr><td>Closed Credit Cards</td><td>${acctSummary.closedCreditCards ?? 0}</td></tr>
+        <tr><td>Maxed Credit Cards</td><td>${acctSummary.maxedCreditCards ?? 0}</td></tr>
+        <tr><td>Open Loans</td><td>${acctSummary.openLoans ?? 0}</td></tr>
+        <tr><td>Closed Loans</td><td>${acctSummary.closedLoans ?? 0}</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub">Derogatory Accounts</h3>
+    <table class="cred">
+      <thead><tr><th>Type</th><th>Count</th></tr></thead>
+      <tbody>
+        ${negRow('Late Payments', negs.latePayments)}
+        ${negRow('Collections', negs.collections)}
+        ${negRow('Charge Offs', negs.chargeOffs)}
+        ${negRow('Repossessions', negs.repossessions)}
+        ${negRow('Foreclosures', negs.foreclosures)}
+        ${negRow('Inquiries', negs.inquiries)}
+        ${negRow('Short Sales', negs.shortSales)}
+        ${negRow('Judgments', negs.judgments)}
+        ${negRow('Tax Liens', negs.taxLiens)}
+        ${negRow('Bankruptcies', negs.bankruptcies)}
+      </tbody>
+      <tfoot><tr><td>Total Negative Accounts</td><td>${totalNeg}</td></tr></tfoot>
+    </table>
+  </section>
+
+  ${findings.length ? `
+  <section class="page">
+    <h1 class="section">Key Findings</h1>
+    <div class="section-rule"></div>
+    ${findings.map((f: any) => `
+      <div class="item">
+        <div class="top"><strong>${escapeHtml(f.title || '')}</strong><span class="badge b-${escapeHtml(f.severity || 'low')}">${escapeHtml(f.severity || '')}</span></div>
+        <p style="margin:6px 0 0;color:#475569;font-size:13px;">${escapeHtml(f.description || '')}</p>
+        ${f.recommendation ? `<p style="margin:6px 0 0;color:#0f172a;font-weight:600;">→ ${escapeHtml(f.recommendation)}</p>` : ''}
+      </div>`).join('')}
+  </section>` : ''}
+
+  ${disputeOps.length ? `
+  <section class="page">
+    <h1 class="section">Dispute Opportunities</h1>
+    <div class="section-rule"></div>
+    ${disputeOps.map((op: any) => `
+      <div class="item">
+        <div class="top"><strong>${escapeHtml(op.accountName || '')}</strong><span class="badge b-${escapeHtml(op.priority || 'low')}">${escapeHtml(op.priority || '')} priority</span></div>
+        <p style="margin:6px 0 0;color:#475569;font-size:13px;">${escapeHtml(op.issue || '')}</p>
+        <p style="margin:4px 0 0;color:#0f172a;"><strong>Reason:</strong> ${escapeHtml(op.reason || '')}</p>
+        <div style="margin-top:6px;">${(op.bureaus || []).map((b: string) => `<span class="bureau-pill">${escapeHtml(bureauLabel(b))}</span>`).join('')}</div>
+      </div>`).join('')}
+  </section>` : ''}
+
+  ${bureaus.length ? `
+  <section class="page">
+    <h1 class="section">Bureau Snapshot</h1>
+    <div class="section-rule"></div>
+    <table class="cred">
+      <thead><tr><th>Bureau</th><th>Accounts</th><th>Negative</th><th>Balance</th></tr></thead>
+      <tbody>
+        ${bureaus.map((b: any) => `<tr><td>${escapeHtml(b.label || '')}</td><td>${b.totalAccounts ?? 0}</td><td>${b.negativeAccounts ?? 0}</td><td>$${(b.totalBalance ?? 0).toLocaleString()}</td></tr>`).join('')}
+      </tbody>
+    </table>
+  </section>` : ''}
+
+  ${plan.length ? `
+  <section class="page">
+    <h1 class="section">Action Plan</h1>
+    <div class="section-rule"></div>
+    ${plan.map((p: any) => `
+      <div class="item">
+        <div class="top"><strong>Phase ${p.phase}: ${escapeHtml(p.title || '')}</strong><span style="color:#64748b;font-size:12px;">~${p.estimatedWeeks} weeks</span></div>
+        <p style="margin:6px 0 0;color:#475569;font-size:13px;">${escapeHtml(p.description || '')}</p>
+        <ul style="margin:6px 0 0 18px;padding:0;">${(p.tasks || []).map((t: string) => `<li style="margin-bottom:3px;">${escapeHtml(t)}</li>`).join('')}</ul>
+      </div>`).join('')}
+  </section>` : ''}
+
+  ${summary ? `
+  <section class="page">
+    <h1 class="section">Executive Summary</h1>
+    <div class="section-rule"></div>
+    <pre class="body">${escapeHtml(summary)}</pre>
+  </section>` : ''}
+
+  ${education ? `
+  <section class="page">
+    <h1 class="section">Understanding Your Credit</h1>
+    <div class="section-rule"></div>
+    <pre class="body">${escapeHtml(education)}</pre>
+  </section>` : ''}
+
+  <footer>
+    <span class="disc">Disclaimer: This analysis is for informational purposes only and does not constitute legal advice.</span>
+    <span>© ${year} CredX (contact@credxme.com)</span>
+  </footer>
 </body></html>`;
 }
 
@@ -1424,7 +1818,7 @@ function AnalysisUploadCard({ token, user, client, progress, refreshAll }: { tok
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button type="button" className="ghost-button" onClick={() => setShowInline((v) => !v)} style={{ background: '#101a2b', border: '1px solid rgba(255,255,255,0.15)', fontWeight: 600 }}>
+              <button type="button" className="ghost-button" onClick={() => setShowInline((v) => !v)} style={{ background: '#101a2b', color: '#f8fafc', border: '1px solid rgba(0,198,251,0.55)', fontWeight: 700 }}>
                 {showInline ? 'Hide quick view' : 'View report'}
               </button>
               <button type="button" className="ghost-button" onClick={downloadAnalysis} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>
@@ -1852,6 +2246,46 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const disputes = normalizeDisputes(client, progress);
   const pendingTasks = tasks.filter((task) => !task.completed).length;
   const activeDisputes = disputes.filter((d) => !['COMPLETED', 'REJECTED'].includes(String(d.status).toUpperCase()));
+
+  const lettersStorageKey = user?.id ? `credx-dispute-letters-${user.id}` : null;
+  const filingsStorageKey = user?.id ? `credx-dispute-filings-${user.id}` : null;
+  const [generatedLetters, setGeneratedLetters] = useState<DisputeLetter[]>([]);
+  const [filings, setFilings] = useState<{ ftc: DisputeLetter | null; cfpb: DisputeLetter | null }>({ ftc: null, cfpb: null });
+
+  useEffect(() => {
+    if (!lettersStorageKey || typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(lettersStorageKey);
+      if (raw) setGeneratedLetters(JSON.parse(raw));
+    } catch {}
+    if (filingsStorageKey) {
+      try {
+        const raw = localStorage.getItem(filingsStorageKey);
+        if (raw) setFilings(JSON.parse(raw));
+      } catch {}
+    }
+  }, [lettersStorageKey, filingsStorageKey]);
+
+  const persistLetters = (next: DisputeLetter[]) => {
+    setGeneratedLetters(next);
+    if (lettersStorageKey && typeof window !== 'undefined') {
+      try { localStorage.setItem(lettersStorageKey, JSON.stringify(next)); } catch {}
+    }
+  };
+
+  const persistFilings = (next: { ftc: DisputeLetter | null; cfpb: DisputeLetter | null }) => {
+    setFilings(next);
+    if (filingsStorageKey && typeof window !== 'undefined') {
+      try { localStorage.setItem(filingsStorageKey, JSON.stringify(next)); } catch {}
+    }
+  };
+
+  const lettersByBureau = useMemo(() => {
+    const map: Record<string, DisputeLetter> = {};
+    for (const l of generatedLetters) map[l.bureau] = l;
+    return map;
+  }, [generatedLetters]);
+  const generatedItemsCount = generatedLetters.reduce((sum, l) => sum + (l.items?.length || 0), 0);
   const disputeHeadline = activeDisputes.length > 0
     ? `${activeDisputes.length} active dispute${activeDisputes.length === 1 ? '' : 's'}`
     : disputes.length > 0
@@ -2152,15 +2586,38 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                 <ul className="activity-list">
                   <li><strong>Credit monitoring</strong><span>{progress?.workflow?.next?.length ? progress.workflow.next.map(prettyStatus).join(', ') : 'No next step posted yet.'}</span></li>
                   <li><strong>Analysis report</strong><span>{client?.analysisSummary || 'Pending report review.'}</span></li>
-                  <li><strong>Dispute strategy</strong><span>{client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Pending publication.'}</span></li>
-                  <li><strong>Open tasks</strong><span>{pendingTasks} pending · {disputes.length} dispute{disputes.length === 1 ? '' : 's'} on file</span></li>
+                  <li><strong>Dispute strategy</strong><span>{generatedLetters.length ? `${generatedItemsCount} items live across ${generatedLetters.length} bureau letter${generatedLetters.length === 1 ? '' : 's'}` : (client?.disputePlanSummary || progress?.disputeStrategy?.objective || 'Pending publication.')}</span></li>
+                  <li><strong>FTC + CFPB</strong><span>{filings.ftc ? 'FTC report ready' : 'FTC pending'} · {filings.cfpb ? 'CFPB complaint ready' : 'CFPB pending'}</span></li>
+                  <li><strong>Open tasks</strong><span>{pendingTasks} pending · {disputes.length + generatedItemsCount} dispute item{disputes.length + generatedItemsCount === 1 ? '' : 's'} on file</span></li>
                 </ul>
               </section>
+
+              {tier2 && generatedLetters.length ? (
+                <section className="panel">
+                  <div className="panel-header">
+                    <div><p className="eyebrow" style={{ color: '#a855f7' }}>Disputed items</p><h2>Live across your portal</h2></div>
+                    <button type="button" className="ghost-button" onClick={() => setActiveTab('disputes')} style={{ background: '#a855f7', color: '#fff', border: 'none', fontWeight: 700 }}>Open dispute desk →</button>
+                  </div>
+                  <div className="dispute-list">
+                    {generatedLetters.map((letter) => (
+                      <div key={letter.bureau} className="dispute-card-live">
+                        <div className="dispute-card-top"><strong style={{ color: '#fff' }}>{letter.bureauLabel}</strong><span className="status-badge status-pending">{letter.items.length} item{letter.items.length === 1 ? '' : 's'}</span></div>
+                        <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>
+                          {letter.items.slice(0, 4).map((it: any, i: number) => (
+                            <li key={i} style={{ fontSize: '0.86rem', color: '#f1f5f9', fontWeight: 500, padding: '2px 0' }}>• <strong style={{ color: '#fff' }}>{it.accountName}</strong> — {it.issue}</li>
+                          ))}
+                          {letter.items.length > 4 ? <li style={{ fontSize: '0.78rem', color: '#94a3b8', padding: '2px 0' }}>+ {letter.items.length - 4} more</li> : null}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
             </>
           ) : null}
 
           {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
-          {activeTab === 'disputes' ? <DisputesSection user={user} client={client} progress={progress} /> : null}
+          {activeTab === 'disputes' ? <DisputesSection user={user} client={client} progress={progress} letters={generatedLetters} setLetters={persistLetters} filings={filings} setFilings={persistFilings} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
           {activeTab === 'analysis' ? <AnalysisSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} /> : null}
