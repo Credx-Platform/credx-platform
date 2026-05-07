@@ -728,13 +728,39 @@ function ActivitySection({ progress, client }: { progress: Progress | null; clie
   );
 }
 
-const BUREAU_ADDRESSES: Record<string, { name: string; lines: string[] }> = {
-  equifax:    { name: 'Equifax Information Services LLC', lines: ['P.O. Box 740256', 'Atlanta, GA 30374'] },
-  experian:   { name: 'Experian',                          lines: ['P.O. Box 4500', 'Allen, TX 75013'] },
-  transunion: { name: 'TransUnion Consumer Solutions',     lines: ['P.O. Box 2000', 'Chester, PA 19016'] }
+type BureauAddr = { name: string; lines: string[]; line1: string; city: string; state: string; zip: string };
+const BUREAU_ADDRESSES: Record<string, BureauAddr> = {
+  equifax:    { name: 'Equifax Information Services LLC', lines: ['P.O. Box 740256', 'Atlanta, GA 30374'], line1: 'P.O. Box 740256', city: 'Atlanta',  state: 'GA', zip: '30374' },
+  experian:   { name: 'Experian',                          lines: ['P.O. Box 4500',   'Allen, TX 75013'],   line1: 'P.O. Box 4500',   city: 'Allen',    state: 'TX', zip: '75013' },
+  transunion: { name: 'TransUnion Consumer Solutions',     lines: ['P.O. Box 2000',   'Chester, PA 19016'], line1: 'P.O. Box 2000',   city: 'Chester',  state: 'PA', zip: '19016' }
 };
 
 type DisputeLetter = { bureau: string; bureauLabel: string; filename: string; html: string; items: any[] };
+
+type MailedRecord = {
+  bureau: string;
+  bureauLabel: string;
+  lobId: string;
+  expectedDeliveryDate: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  certified: boolean;
+  mailedAt: string;
+};
+
+type ClassifiedResponse = {
+  id: string;
+  fileName: string;
+  ingestedAt: string;
+  classification: {
+    bureau?: string;
+    overallDecision?: string;
+    summary?: string;
+    recommendation?: string;
+    extractedText?: string;
+    outcomes?: Array<{ account: string; decision: string; reason: string; needsMov: boolean }>;
+  };
+};
 
 function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | null, client: Client | null, inquiries: any[] = []): string {
   const bureau = BUREAU_ADDRESSES[bureauKey] || { name: bureauKey, lines: [] };
@@ -1030,6 +1056,7 @@ function buildCfpbReportHtml(user: User | null, client: Client | null, allItems:
 }
 
 type DisputesSectionProps = {
+  token: string;
   user: User | null;
   client: Client | null;
   progress: Progress | null;
@@ -1037,15 +1064,105 @@ type DisputesSectionProps = {
   setLetters: (letters: DisputeLetter[]) => void;
   filings: { ftc: DisputeLetter | null; cfpb: DisputeLetter | null };
   setFilings: (filings: { ftc: DisputeLetter | null; cfpb: DisputeLetter | null }) => void;
+  mailed: Record<string, MailedRecord>;
+  setMailed: (mailed: Record<string, MailedRecord>) => void;
+  responses: ClassifiedResponse[];
+  setResponses: (responses: ClassifiedResponse[]) => void;
 };
 
-function DisputesSection({ user, client, progress, letters, setLetters, filings, setFilings }: DisputesSectionProps) {
+function DisputesSection({ token, user, client, progress, letters, setLetters, filings, setFilings, mailed, setMailed, responses, setResponses }: DisputesSectionProps) {
   const disputes = normalizeDisputes(client, progress);
   const status = (client?.status || '').toUpperCase();
   const isActive = ['ACTIVE', 'PAST_DUE'].includes(status);
 
-  const [subTab, setSubTab] = useState<'active' | 'letters' | 'print' | 'ftc' | 'cfpb'>('active');
+  const [subTab, setSubTab] = useState<'active' | 'letters' | 'print' | 'ftc' | 'cfpb' | 'mail' | 'responses'>('active');
   const [genMessage, setGenMessage] = useState<string | null>(null);
+  const [mailingBureau, setMailingBureau] = useState<string | null>(null);
+  const [mailError, setMailError] = useState<string | null>(null);
+  const [respBusy, setRespBusy] = useState(false);
+  const [respError, setRespError] = useState<string | null>(null);
+
+  const fromAddressReady = !!(client?.currentAddressLine1 && client?.currentCity && client?.currentState && client?.currentPostalCode);
+
+  const mailViaLob = async (letter: DisputeLetter) => {
+    setMailError(null);
+    if (!fromAddressReady) {
+      setMailError('Save your full mailing address in the Profile tab before mailing — Lob requires a return address.');
+      return;
+    }
+    const bureauAddr = BUREAU_ADDRESSES[letter.bureau];
+    if (!bureauAddr) {
+      setMailError(`No mailing address on file for ${letter.bureauLabel}.`);
+      return;
+    }
+    const senderName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'CredX Client';
+    setMailingBureau(letter.bureau);
+    try {
+      const result = await apiFetch<MailedRecord & { id: string }>('/api/disputes/lob/send', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          description: `CredX dispute · ${letter.bureauLabel}`,
+          to: {
+            name: bureauAddr.name,
+            address_line1: bureauAddr.line1,
+            address_city: bureauAddr.city,
+            address_state: bureauAddr.state,
+            address_zip: bureauAddr.zip
+          },
+          from: {
+            name: senderName,
+            address_line1: client!.currentAddressLine1!,
+            address_line2: client!.currentAddressLine2 || undefined,
+            address_city: client!.currentCity!,
+            address_state: client!.currentState!,
+            address_zip: client!.currentPostalCode!
+          },
+          html: letter.html,
+          color: false,
+          doubleSided: true,
+          certified: true,
+          metadata: { bureau: letter.bureau, items: String(letter.items.length) }
+        })
+      });
+      const record: MailedRecord = {
+        bureau: letter.bureau,
+        bureauLabel: letter.bureauLabel,
+        lobId: result.id,
+        expectedDeliveryDate: result.expectedDeliveryDate || null,
+        trackingNumber: result.trackingNumber || null,
+        trackingUrl: result.trackingUrl || null,
+        certified: result.certified ?? true,
+        mailedAt: new Date().toISOString()
+      };
+      setMailed({ ...mailed, [letter.bureau]: record });
+      setSubTab('mail');
+    } catch (err) {
+      setMailError(err instanceof Error ? err.message : 'Lob mailing failed.');
+    } finally {
+      setMailingBureau(null);
+    }
+  };
+
+  const ingestResponse = async (file: File) => {
+    setRespError(null);
+    setRespBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const result = await apiUpload<{ classification: ClassifiedResponse['classification'] }>('/api/disputes/response/classify', token, fd);
+      const record: ClassifiedResponse = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        fileName: file.name,
+        ingestedAt: new Date().toISOString(),
+        classification: result.classification
+      };
+      setResponses([record, ...responses]);
+    } catch (err) {
+      setRespError(err instanceof Error ? err.message : 'Could not classify the response.');
+    } finally {
+      setRespBusy(false);
+    }
+  };
 
   const generate = () => {
     const next = generateDisputeLettersFromAnalysis(progress, user, client);
@@ -1128,6 +1245,8 @@ function DisputesSection({ user, client, progress, letters, setLetters, filings,
           <button type="button" className={`tab ${subTab === 'print' ? 'active' : ''}`} onClick={() => setSubTab('print')}>Print</button>
           <button type="button" className={`tab ${subTab === 'ftc' ? 'active' : ''}`} onClick={() => setSubTab('ftc')}>FTC</button>
           <button type="button" className={`tab ${subTab === 'cfpb' ? 'active' : ''}`} onClick={() => setSubTab('cfpb')}>CFPB</button>
+          <button type="button" className={`tab ${subTab === 'mail' ? 'active' : ''}`} onClick={() => setSubTab('mail')}>Mail · Lob</button>
+          <button type="button" className={`tab ${subTab === 'responses' ? 'active' : ''}`} onClick={() => setSubTab('responses')}>Responses</button>
         </div>
       </div>
 
@@ -1180,9 +1299,19 @@ function DisputesSection({ user, client, progress, letters, setLetters, filings,
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
                 <button type="button" className="ghost-button" onClick={() => downloadLetter(letter)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
                 <button type="button" className="ghost-button" onClick={() => printLetter(letter)} style={{ color: '#f8fafc', fontWeight: 600 }}>🖨 Print this letter</button>
+                <button type="button" className="ghost-button" onClick={() => mailViaLob(letter)} disabled={mailingBureau === letter.bureau} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>
+                  {mailingBureau === letter.bureau ? 'Mailing…' : mailed[letter.bureau] ? '📮 Re-mail via Lob' : '📮 Mail via Lob (certified)'}
+                </button>
               </div>
+              {mailed[letter.bureau] ? (
+                <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#a3e635' }}>
+                  Mailed {new Date(mailed[letter.bureau].mailedAt).toLocaleDateString()} · Lob {mailed[letter.bureau].lobId}
+                  {mailed[letter.bureau].expectedDeliveryDate ? ` · ETA ${mailed[letter.bureau].expectedDeliveryDate}` : ''}
+                </div>
+              ) : null}
             </div>
           )) : <div className="empty-state-card">No letters generated yet — hit the purple button above to build them from your analysis.</div>}
+          {mailError ? <div className="error-banner" style={{ marginTop: '0.5rem' }}>{mailError}</div> : null}
         </div>
       ) : null}
 
@@ -1256,6 +1385,65 @@ function DisputesSection({ user, client, progress, letters, setLetters, filings,
           ) : (
             <div className="empty-state-card">No CFPB complaint generated yet.</div>
           )}
+        </div>
+      ) : null}
+
+      {subTab === 'mail' ? (
+        <div>
+          <div style={{ marginBottom: '0.85rem', padding: '8px 12px', borderRadius: '8px', background: 'rgba(14,165,233,0.10)', border: '1px solid rgba(14,165,233,0.35)', color: '#7dd3fc', fontSize: '0.82rem', fontWeight: 600 }}>
+            CredX prints + mails certified through Lob (~$1.50 per letter, billed to CredX). USPS tracking lands here automatically.
+          </div>
+          {!fromAddressReady ? (
+            <div className="empty-state-card"><strong>Save your full mailing address first.</strong><p>Lob requires a valid return address. Open the Profile tab, fill in line 1, city, state, and ZIP, then come back.</p></div>
+          ) : null}
+          <div className="dispute-list">
+            {Object.values(mailed).length ? Object.values(mailed).map((rec) => (
+              <div key={rec.lobId} className="dispute-card-live">
+                <div className="dispute-card-top"><strong style={{ color: '#fff' }}>{rec.bureauLabel}</strong><span className="status-badge status-pending">Lob {rec.certified ? 'Certified' : 'First-class'}</span></div>
+                <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>Lob ID {rec.lobId} · Mailed {new Date(rec.mailedAt).toLocaleDateString()}</span></div>
+                {rec.expectedDeliveryDate ? <div className="dispute-meta" style={{ color: '#cbd5e1' }}><span>Expected delivery: {rec.expectedDeliveryDate}</span></div> : null}
+                {rec.trackingNumber ? <div className="dispute-meta" style={{ color: '#cbd5e1' }}><span>Tracking: <strong style={{ color: '#fff' }}>{rec.trackingNumber}</strong></span></div> : null}
+                {rec.trackingUrl ? <div style={{ marginTop: '6px' }}><a className="ghost-button" href={rec.trackingUrl} target="_blank" rel="noreferrer" style={{ color: '#7dd3fc', fontWeight: 600 }}>Open Lob letter →</a></div> : null}
+              </div>
+            )) : <div className="empty-state-card">Nothing mailed yet. Open the Letters tab and hit "Mail via Lob" on a letter.</div>}
+          </div>
+          {mailError ? <div className="error-banner" style={{ marginTop: '0.5rem' }}>{mailError}</div> : null}
+        </div>
+      ) : null}
+
+      {subTab === 'responses' ? (
+        <div>
+          <div style={{ marginBottom: '0.85rem', padding: '8px 12px', borderRadius: '8px', background: 'rgba(168,85,247,0.10)', border: '1px solid rgba(168,85,247,0.35)', color: '#d8b4fe', fontSize: '0.82rem', fontWeight: 600 }}>
+            Upload the bureau's reply (PDF or photo). CredX runs it through a vision model and grades the response: deleted / verified / updated / needs MOV.
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+            <input type="file" accept=".pdf,image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) ingestResponse(f); e.target.value = ''; }} disabled={respBusy} className="chat-input" />
+            {respBusy ? <span className="helper-text" style={{ margin: 0, color: '#cbd5e1' }}>Reading the response…</span> : null}
+          </div>
+          {respError ? <div className="error-banner" style={{ marginBottom: '0.5rem' }}>{respError}</div> : null}
+          <div className="dispute-list">
+            {responses.length ? responses.map((r) => (
+              <div key={r.id} className="dispute-card-live">
+                <div className="dispute-card-top">
+                  <strong style={{ color: '#fff' }}>{(r.classification.bureau || 'Bureau').toString().toUpperCase()} · {prettyStatus(r.classification.overallDecision || 'unknown')}</strong>
+                  <span className="status-badge status-pending">{r.classification.outcomes?.length || 0} item{(r.classification.outcomes?.length || 0) === 1 ? '' : 's'}</span>
+                </div>
+                <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>{r.classification.summary || '—'}</span></div>
+                {r.classification.recommendation ? <div className="dispute-meta" style={{ color: '#fbbf24' }}><span><strong>Next step:</strong> {r.classification.recommendation}</span></div> : null}
+                {(r.classification.outcomes || []).length ? (
+                  <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>
+                    {r.classification.outcomes!.map((o, i) => (
+                      <li key={i} style={{ fontSize: '0.86rem', color: '#f1f5f9', padding: '2px 0' }}>
+                        • <strong style={{ color: '#fff' }}>{o.account}</strong> — {prettyStatus(o.decision)}{o.needsMov ? ' (needs MOV)' : ''}<br />
+                        <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>{o.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#94a3b8' }}>{r.fileName} · {new Date(r.ingestedAt).toLocaleString()}</div>
+              </div>
+            )) : <div className="empty-state-card">No bureau responses ingested yet.</div>}
+          </div>
         </div>
       ) : null}
     </section>
@@ -2249,8 +2437,12 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
   const lettersStorageKey = user?.id ? `credx-dispute-letters-${user.id}` : null;
   const filingsStorageKey = user?.id ? `credx-dispute-filings-${user.id}` : null;
+  const mailedStorageKey = user?.id ? `credx-dispute-mailed-${user.id}` : null;
+  const responsesStorageKey = user?.id ? `credx-dispute-responses-${user.id}` : null;
   const [generatedLetters, setGeneratedLetters] = useState<DisputeLetter[]>([]);
   const [filings, setFilings] = useState<{ ftc: DisputeLetter | null; cfpb: DisputeLetter | null }>({ ftc: null, cfpb: null });
+  const [mailed, setMailed] = useState<Record<string, MailedRecord>>({});
+  const [responses, setResponses] = useState<ClassifiedResponse[]>([]);
 
   useEffect(() => {
     if (!lettersStorageKey || typeof window === 'undefined') return;
@@ -2264,7 +2456,19 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         if (raw) setFilings(JSON.parse(raw));
       } catch {}
     }
-  }, [lettersStorageKey, filingsStorageKey]);
+    if (mailedStorageKey) {
+      try {
+        const raw = localStorage.getItem(mailedStorageKey);
+        if (raw) setMailed(JSON.parse(raw));
+      } catch {}
+    }
+    if (responsesStorageKey) {
+      try {
+        const raw = localStorage.getItem(responsesStorageKey);
+        if (raw) setResponses(JSON.parse(raw));
+      } catch {}
+    }
+  }, [lettersStorageKey, filingsStorageKey, mailedStorageKey, responsesStorageKey]);
 
   const persistLetters = (next: DisputeLetter[]) => {
     setGeneratedLetters(next);
@@ -2277,6 +2481,20 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     setFilings(next);
     if (filingsStorageKey && typeof window !== 'undefined') {
       try { localStorage.setItem(filingsStorageKey, JSON.stringify(next)); } catch {}
+    }
+  };
+
+  const persistMailed = (next: Record<string, MailedRecord>) => {
+    setMailed(next);
+    if (mailedStorageKey && typeof window !== 'undefined') {
+      try { localStorage.setItem(mailedStorageKey, JSON.stringify(next)); } catch {}
+    }
+  };
+
+  const persistResponses = (next: ClassifiedResponse[]) => {
+    setResponses(next);
+    if (responsesStorageKey && typeof window !== 'undefined') {
+      try { localStorage.setItem(responsesStorageKey, JSON.stringify(next)); } catch {}
     }
   };
 
@@ -2617,7 +2835,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           ) : null}
 
           {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
-          {activeTab === 'disputes' ? <DisputesSection user={user} client={client} progress={progress} letters={generatedLetters} setLetters={persistLetters} filings={filings} setFilings={persistFilings} /> : null}
+          {activeTab === 'disputes' ? <DisputesSection token={token} user={user} client={client} progress={progress} letters={generatedLetters} setLetters={persistLetters} filings={filings} setFilings={persistFilings} mailed={mailed} setMailed={persistMailed} responses={responses} setResponses={persistResponses} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
           {activeTab === 'analysis' ? <AnalysisSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} /> : null}
