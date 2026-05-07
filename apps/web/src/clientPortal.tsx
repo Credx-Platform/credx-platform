@@ -2639,8 +2639,49 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
               </div>
             </section>
           ) : null}
+
+          <CrossPromoFooter
+            isPaid={tier2}
+            isMasterclassEnrolled={masterclassEnrolled}
+            isMasterclassOnly={masterclassOnly}
+          />
         </div>
       </main>
     </div>
+  );
+}
+
+function CrossPromoFooter({ isPaid, isMasterclassEnrolled, isMasterclassOnly }: { isPaid: boolean; isMasterclassEnrolled: boolean; isMasterclassOnly: boolean; }) {
+  const showMasterclassOffer = isPaid && !isMasterclassEnrolled;
+  const showPaidUpgrade = isMasterclassOnly || (isMasterclassEnrolled && !isPaid);
+  if (!showMasterclassOffer && !showPaidUpgrade) return null;
+
+  return (
+    <section className="panel" style={{ borderColor: showPaidUpgrade ? 'rgba(34,197,94,0.45)' : 'rgba(0,198,251,0.45)', background: showPaidUpgrade ? 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(15,23,42,0.6))' : 'linear-gradient(135deg, rgba(0,198,251,0.08), rgba(15,23,42,0.6))' }}>
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow" style={{ color: showPaidUpgrade ? '#22c55e' : '#00c6fb' }}>{showPaidUpgrade ? 'Upgrade Path' : 'Add-On Education'}</p>
+          <h2 style={{ color: '#fff' }}>{showPaidUpgrade ? 'Move from masterclass to full credit repair' : 'Add the 5-Day Masterclass'}</h2>
+        </div>
+      </div>
+      <p className="helper-text" style={{ color: '#cbd5e1', marginTop: 0, fontSize: '0.95rem', lineHeight: 1.6 }}>
+        {showPaidUpgrade
+          ? 'You already know the framework. Upgrade to a paid CredX subscription and we run it for you — automated bureau letters, FTC + CFPB escalation, dispute tracking, and credit-coach support all included.'
+          : 'Get the same 5-day curriculum your CredX coach uses internally — credit fundamentals, dispute decoded, advanced tactics, building positive credit, and business credit. Stack it on top of your active subscription so the work and the education move together.'}
+      </p>
+      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginTop: '0.85rem' }}>
+        {showPaidUpgrade ? (
+          <>
+            <a className="ghost-button" href="/signup?upgrade=paid" style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, textDecoration: 'none' }}>Upgrade to paid subscription →</a>
+            <a className="ghost-button" href="/signup?compare=tiers" style={{ background: '#101a2b', color: '#f8fafc', border: '1px solid rgba(34,197,94,0.45)', fontWeight: 600, textDecoration: 'none' }}>Compare service tiers</a>
+          </>
+        ) : (
+          <>
+            <a className="ghost-button" href="/signup?offer=masterclass" style={{ background: '#00c6fb', color: '#060a12', border: 'none', fontWeight: 700, textDecoration: 'none' }}>Add the 5-Day Masterclass →</a>
+            <a className="ghost-button" href="/signup?offer=masterclass&preview=1" style={{ background: '#101a2b', color: '#f8fafc', border: '1px solid rgba(0,198,251,0.45)', fontWeight: 600, textDecoration: 'none' }}>Preview the curriculum</a>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
