@@ -736,7 +736,7 @@ const BUREAU_ADDRESSES: Record<string, { name: string; lines: string[] }> = {
 
 type DisputeLetter = { bureau: string; bureauLabel: string; filename: string; html: string; items: any[] };
 
-function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | null, client: Client | null): string {
+function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | null, client: Client | null, inquiries: any[] = []): string {
   const bureau = BUREAU_ADDRESSES[bureauKey] || { name: bureauKey, lines: [] };
   const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Consumer';
   const addrLines = [
@@ -744,27 +744,41 @@ function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | nu
     client?.currentAddressLine2,
     [client?.currentCity, client?.currentState, client?.currentPostalCode].filter(Boolean).join(', ')
   ].filter(Boolean);
+  const ssnDisplay = client?.ssnLast4 ? `XXX-XX-${client.ssnLast4}` : '__________';
+  const dobDisplay = '__________';
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const inquiriesRows = inquiries.length
+    ? inquiries.map((q: any) => `<tr><td>${escapeHtml(q.creditor || q.name || '')}</td><td>${escapeHtml(q.date || '')}</td><td>${escapeHtml(q.reason || 'Inquiry was not authorized by me.')}</td></tr>`).join('')
+    : `<tr><td colspan="3" style="font-style:italic;color:#444;">[List unauthorized inquiries here — none flagged in this round.]</td></tr>`;
+
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>Dispute Letter — ${escapeHtml(bureau.name)}</title>
 <style>
-  body{font-family:Georgia,Times New Roman,serif;color:#111;background:#fff;margin:0;padding:48px 56px;font-size:13.5px;line-height:1.55;}
-  .row{display:flex;justify-content:space-between;align-items:flex-start;}
-  .blk{margin-bottom:18px;}
-  h1{font-size:18px;margin:24px 0 14px;}
-  table{width:100%;border-collapse:collapse;margin:12px 0;}
+  body{font-family:Georgia,"Times New Roman",serif;color:#111;background:#fff;margin:0;padding:48px 56px;font-size:13.5px;line-height:1.6;}
+  .row{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap;}
+  .blk{margin-bottom:14px;}
+  h1{font-size:17px;margin:22px 0 10px;border-bottom:1px solid #333;padding-bottom:4px;}
+  h2{font-size:14px;margin:18px 0 6px;}
+  table{width:100%;border-collapse:collapse;margin:10px 0 14px;}
   th,td{border:1px solid #888;padding:6px 8px;text-align:left;font-size:12.5px;vertical-align:top;}
   th{background:#eee;}
-  .sig{margin-top:48px;}
-  @media print { body{padding:0.6in;} }
+  ul{margin:6px 0 12px 22px;padding:0;}
+  li{margin-bottom:4px;}
+  .meta{font-size:12.5px;}
+  .sig{margin-top:42px;}
+  .small{font-size:11.5px;color:#444;}
+  @media print { body{padding:0.6in;} h1{page-break-after:avoid;} h2{page-break-after:avoid;} table{page-break-inside:avoid;} }
 </style></head>
 <body>
   <div class="row">
-    <div class="blk">
-      <strong>${escapeHtml(name)}</strong><br>
-      ${addrLines.map((l) => escapeHtml(String(l))).join('<br>') || ''}
+    <div class="blk meta">
+      <strong>Full name:</strong> ${escapeHtml(name)}<br>
+      <strong>Current address:</strong> ${addrLines.map((l) => escapeHtml(String(l))).join(', ') || '__________'}<br>
+      <strong>SSN:</strong> ${escapeHtml(ssnDisplay)}<br>
+      <strong>Date of birth:</strong> ${escapeHtml(dobDisplay)}
     </div>
-    <div class="blk">${escapeHtml(today)}</div>
+    <div class="blk meta"><strong>Date:</strong> ${escapeHtml(today)}</div>
   </div>
 
   <div class="blk">
@@ -772,29 +786,78 @@ function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | nu
     ${bureau.lines.map((l) => escapeHtml(l)).join('<br>')}
   </div>
 
-  <div class="blk">Re: Formal dispute of inaccurate information on my credit file</div>
+  <p><strong>Dear Credit Bureau:</strong></p>
 
-  <p>To Whom It May Concern,</p>
+  <p>I am writing to formally dispute the accuracy and validity of certain items appearing
+  on my credit report in accordance with my rights under the Fair Credit Reporting Act
+  (FCRA) (15 U.S.C. § 1681 et seq.) and the Fair Debt Collection Practices Act (FDCPA)
+  (15 U.S.C. § 1692 et seq.). I demand the immediate removal of the following items
+  due to their unlawful presence on my credit report:</p>
 
-  <p>Under the Fair Credit Reporting Act (15 U.S.C. § 1681i), I am formally disputing the
-  following items appearing on my credit report. These items are inaccurate, incomplete,
-  or unverifiable, and I am requesting that they be investigated and corrected or removed.</p>
+  <h1>1. Unauthorized Third-Party Collections</h1>
 
-  <h1>Disputed Items</h1>
+  <p>According to 15 U.S.C. § 1692e, it is illegal for a debt collector to report false
+  or misleading information to the credit bureaus. I am requesting verification of the
+  following alleged debt(s):</p>
+
   <table>
-    <thead><tr><th style="width:30%;">Account</th><th style="width:25%;">Issue</th><th>Reason for Dispute</th></tr></thead>
+    <thead><tr>
+      <th style="width:28%;">Creditor / Account</th>
+      <th style="width:22%;">Issue</th>
+      <th style="width:30%;">Reason</th>
+      <th>Instruction</th>
+    </tr></thead>
     <tbody>
       ${items.map((it: any) => `<tr>
-        <td>${escapeHtml(it.accountName || '')}</td>
+        <td>${escapeHtml(it.accountName || '')}${it.accountNumber ? `<br><span class="small">Acct ${escapeHtml(it.accountNumber)}</span>` : ''}</td>
         <td>${escapeHtml(it.issue || '')}</td>
         <td>${escapeHtml(it.reason || '')}</td>
+        <td>${escapeHtml(it.instruction || it.recommendation || 'Delete this item from my credit file.')}</td>
       </tr>`).join('')}
     </tbody>
   </table>
 
-  <p>Please complete your reinvestigation within the 30-day window required by the FCRA
-  and forward the results, along with any updated copy of my credit file, to the address
-  above. If any of the items above cannot be verified, they must be deleted from my file.</p>
+  <p>For each item above, I demand that the reporting party provide:</p>
+  <ul>
+    <li>A copy of the original signed contract proving my consent and liability for this debt.</li>
+    <li>A chain of custody showing how the debt was acquired.</li>
+    <li>Proof that this debt was lawfully assigned in compliance with 15 U.S.C. § 1692g (Validation of Debts).</li>
+  </ul>
+
+  <p>Failure to provide the above documentation within 30 days will constitute a violation
+  of 15 U.S.C. § 1692k, making the reporting party liable for damages.</p>
+
+  <h1>2. Unauthorized Inquiries</h1>
+
+  <p>Per 15 U.S.C. § 1681b, a company must have permissible purpose to conduct a hard
+  inquiry on my credit report. I demand the immediate removal of the following inquiries,
+  as I did not authorize them:</p>
+
+  <table>
+    <thead><tr>
+      <th style="width:40%;">Inquiring Party</th>
+      <th style="width:20%;">Date</th>
+      <th>Reason</th>
+    </tr></thead>
+    <tbody>${inquiriesRows}</tbody>
+  </table>
+
+  <p>Under 15 U.S.C. § 1681n, any entity that unlawfully accesses my credit file without
+  proper authorization is subject to statutory damages, attorney's fees, and punitive damages.</p>
+
+  <h1>Final Demand</h1>
+
+  <p>As required under 15 U.S.C. § 1681i (Procedure in Case of Disputed Accuracy), you
+  have 30 days to conduct a thorough investigation and remove the inaccurate information.
+  Failure to do so will result in a complaint being filed with the Consumer Financial
+  Protection Bureau (CFPB), the Federal Trade Commission (FTC), and the Attorney
+  General's Office.</p>
+
+  <p>I expect a written response confirming the removal of these disputed accounts and
+  inquiries. Any further attempt to report unverifiable or unauthorized information will
+  be considered a willful violation of federal law.</p>
+
+  <p>Please send all correspondence to my mailing address listed above.</p>
 
   <p>Sincerely,</p>
 
@@ -809,6 +872,20 @@ function generateDisputeLettersFromAnalysis(progress: Progress | null, user: Use
   const analysis = progress?.analysis as any;
   const ops: any[] = (analysis && analysis.disputeOpportunities) || [];
   if (!ops.length) return [];
+
+  // Try to detect inquiry-type items from analysis (keyFindings or a dedicated `inquiries` field).
+  const inquiriesByBureau = new Map<string, any[]>();
+  const candidateInquiries: any[] = Array.isArray(analysis?.unauthorizedInquiries)
+    ? analysis.unauthorizedInquiries
+    : (analysis?.keyFindings || []).filter((f: any) => /inquir/i.test(`${f.title || ''} ${f.type || ''} ${f.category || ''}`));
+  for (const q of candidateInquiries) {
+    for (const b of (q.bureaus || [q.bureau].filter(Boolean) || [])) {
+      const key = String(b).toLowerCase();
+      if (!inquiriesByBureau.has(key)) inquiriesByBureau.set(key, []);
+      inquiriesByBureau.get(key)!.push(q);
+    }
+  }
+
   const grouped = new Map<string, any[]>();
   for (const op of ops) {
     for (const b of (op.bureaus || [])) {
@@ -820,11 +897,12 @@ function generateDisputeLettersFromAnalysis(progress: Progress | null, user: Use
   const out: DisputeLetter[] = [];
   for (const [bureauKey, items] of grouped) {
     const meta = BUREAU_ADDRESSES[bureauKey];
+    const inquiries = inquiriesByBureau.get(bureauKey) || [];
     out.push({
       bureau: bureauKey,
       bureauLabel: meta?.name || bureauKey,
       filename: `credx-dispute-${bureauKey}-${new Date().toISOString().slice(0, 10)}.html`,
-      html: buildDisputeLetterHtml(bureauKey, items, user, client),
+      html: buildDisputeLetterHtml(bureauKey, items, user, client, inquiries),
       items
     });
   }
