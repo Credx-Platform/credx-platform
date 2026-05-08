@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 
@@ -32,8 +33,16 @@ contractsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => 
   try {
     const signedName = String(req.body?.signed_name || '').trim();
     const agreed = req.body?.agreed === true || req.body?.agreed === 'true';
+    const signatureRaw = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
     if (!signedName) return res.status(400).json({ error: 'Signed name is required' });
     if (!agreed) return res.status(400).json({ error: 'Agreement must be acknowledged' });
+    if (!signatureRaw) return res.status(400).json({ error: 'Drawn signature is required' });
+    if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(signatureRaw)) {
+      return res.status(400).json({ error: 'Invalid signature payload' });
+    }
+    if (signatureRaw.length > 800_000) {
+      return res.status(413).json({ error: 'Signature image is too large' });
+    }
 
     const client = await prisma.client.findUnique({
       where: { userId: req.auth!.sub },
@@ -42,15 +51,28 @@ contractsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => 
     if (!client || !client.progress) return res.status(404).json({ error: 'Client not found' });
 
     const signedAt = new Date().toISOString();
-    const contractId = crypto.randomUUID();
+    const contractId = randomUUID();
     const progress = client.progress as any;
+
+    const signatureRecord = {
+      contractId,
+      signedName,
+      signedAt,
+      dataUrl: signatureRaw,
+      agreementText: AGREEMENT_TEXT,
+      disclosureStatement: DISCLOSURE_STATEMENT,
+      cancellationNotice: buildCancellationNotice(signedAt),
+      ipAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket?.remoteAddress || null,
+      userAgent: req.headers['user-agent'] || null
+    };
 
     const updated = await prisma.clientProgress.update({
       where: { clientId: client.id },
       data: {
         onboarding: {
           ...(progress.onboarding || {}),
-          status: 'contract_signed'
+          status: 'contract_signed',
+          signature: signatureRecord
         },
         workflow: {
           ...(progress.workflow || {}),
@@ -58,6 +80,24 @@ contractsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => 
           updatedAt: signedAt,
           next: ['complete_application', 'select_credit_report_provider']
         }
+      }
+    });
+
+    await prisma.agreement.create({
+      data: {
+        clientId: client.id,
+        status: 'SIGNED',
+        signedAt: new Date(signedAt),
+        sentAt: new Date(signedAt)
+      }
+    });
+
+    await prisma.activityEvent.create({
+      data: {
+        clientId: client.id,
+        type: 'CONTRACT_SIGNED',
+        message: `Service agreement signed by ${signedName}.`,
+        metadata: { contractId, signedAt }
       }
     });
 

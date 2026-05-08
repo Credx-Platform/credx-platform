@@ -84,6 +84,9 @@ function renderWelcomeLeadEmail(params: { firstName: string; contractLink: strin
   const isMasterclass = params.offerType === 'masterclass';
   const subject = isMasterclass ? 'Welcome to the CredX 5-Day Masterclass' : "Welcome to CredX — Here's Your Next Step";
   const headline = isMasterclass ? 'Welcome to the CredX 5-Day Masterclass' : 'Welcome to CredX';
+  const tagline = isMasterclass
+    ? 'Five days. Six lessons. The same playbook our coaches use internally.'
+    : 'A guided, end-to-end credit-repair workflow with AI coaching and human support.';
   const intro = isMasterclass
     ? "You're in. Your next step is to open your secure onboarding link so you can review the agreement, complete your intake, and unlock the masterclass inside CredX."
     : 'Your inquiry has been received. Your next step is to open your secure onboarding link so you can review the agreement and complete your intake.';
@@ -100,14 +103,49 @@ function renderWelcomeLeadEmail(params: { firstName: string; contractLink: strin
         'Complete your intake and connect your monitoring provider.',
         'Watch for your portal-ready email once onboarding is complete.'
       ];
+  const valueProps = isMasterclass
+    ? [
+        ['📚', 'Full 5-day curriculum + bonus wealth day'],
+        ['🛠️', 'DIY workflow inside your CredX portal'],
+        ['🤝', 'Affiliate stack of vetted credit-builder tools']
+      ]
+    : [
+        ['🧭', 'Guided workflow — disputes, FTC, CFPB, all tracked for you'],
+        ['🤖', 'AI coaching plus direct human coach access'],
+        ['🛡️', 'Bank-grade encryption on every document and identifier']
+      ];
+  const valuePropsHtml = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 18px;">
+      ${valueProps.map(([emoji, label]) => `<tr><td style="padding:0 0 8px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;">
+          <tr>
+            <td style="padding:12px 14px;width:38px;font-size:20px;line-height:1;">${emoji}</td>
+            <td style="padding:12px 14px 12px 0;color:${EMAIL_TEXT_SOFT};font-family:${EMAIL_FONT};font-size:14px;line-height:1.55;font-weight:500;">${label}</td>
+          </tr>
+        </table>
+      </td></tr>`).join('')}
+    </table>`;
 
   const bodyHtml = `
-    <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">${headline}</h1>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(135deg,rgba(0,198,251,0.16),rgba(168,85,247,0.10));border:1px solid ${EMAIL_BORDER};border-radius:14px;margin:0 0 22px;">
+      <tr><td style="padding:24px 24px 20px;">
+        <div style="font-family:${EMAIL_FONT};font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:${EMAIL_CYAN};margin-bottom:8px;">${isMasterclass ? '5-Day Masterclass' : 'Welcome aboard'}</div>
+        <h1 style="margin:0 0 8px;font-family:${EMAIL_FONT};font-size:28px;line-height:1.2;color:${EMAIL_TEXT};font-weight:700;letter-spacing:-0.4px;">${headline}</h1>
+        <p style="margin:0;color:${EMAIL_TEXT_MUTED};font-size:14px;line-height:1.6;">${tagline}</p>
+      </td></tr>
+    </table>
     <p style="margin:0 0 12px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Hi ${params.firstName || 'there'},</p>
-    <p style="margin:0 0 4px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">${intro}</p>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">${intro}</p>
+    ${valuePropsHtml}
+    <div style="margin:8px 0 6px;font-family:${EMAIL_FONT};font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${EMAIL_CYAN};">What happens next</div>
     ${emailNumberedSteps(steps)}
-    ${emailButton(params.contractLink, 'Open Secure Onboarding')}
-    <p style="margin:18px 0 0;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">If the button doesn't open, copy and paste this link into your browser:<br /><span style="color:${EMAIL_TEXT};word-break:break-all;">${params.contractLink}</span></p>
+    ${emailButton(params.contractLink, isMasterclass ? '🔓 Unlock the Masterclass' : '🚀 Open Secure Onboarding')}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 0;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;">
+      <tr><td style="padding:14px 16px;color:${EMAIL_TEXT_MUTED};font-size:13px;line-height:1.65;font-family:${EMAIL_FONT};">
+        <strong style="color:${EMAIL_TEXT};">Need a hand?</strong> Reply to this email or write to <a href="mailto:contact@credxme.com" style="color:${EMAIL_CYAN};text-decoration:none;font-weight:600;">contact@credxme.com</a> and a CredX coach will reach back out within one business day.
+      </td></tr>
+    </table>
+    <p style="margin:18px 0 0;color:${EMAIL_TEXT_DIM};font-size:12px;line-height:1.6;">If the button doesn't open, copy and paste this link into your browser:<br /><span style="color:${EMAIL_TEXT};word-break:break-all;font-size:12px;">${params.contractLink}</span></p>
   `;
   const html = renderEmailShell({
     preheader: isMasterclass ? 'Open your secure onboarding to unlock the 5-Day Masterclass.' : 'Open your secure onboarding to begin your CredX journey.',
