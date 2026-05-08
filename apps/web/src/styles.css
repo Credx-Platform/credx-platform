@@ -17,11 +17,20 @@ body {
   min-height: 100vh;
   color: var(--cx-text-soft);
   font-family: var(--cx-font-body);
-  background:
+  font-weight: 500;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  letter-spacing: -0.005em;
+  background-color: #060a12;
+  background-image:
     linear-gradient(180deg, rgba(6,10,18,.82), rgba(6,10,18,.96)),
     radial-gradient(circle at top right, rgba(0,198,251,.14), transparent 28%),
-    url('/images/credx-hero-bg.jpg') center/cover fixed no-repeat;
+    url('/images/credx-hero-bg.jpg');
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: center top, center top, center center;
+  background-size: auto, auto, contain;
+  background-attachment: fixed, fixed, fixed;
 }
+h1, h2, h3, h4, .top-title, .hero-dispute-title { letter-spacing: -0.025em; font-weight: 700; }
 
 /* Default: inline links read in brand cyan with subtle underline so clients
    notice them. Surface-styled anchors (.ghost-button, .resource-link-card,

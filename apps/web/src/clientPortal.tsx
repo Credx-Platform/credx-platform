@@ -2759,22 +2759,47 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         <div className="page-grid">
           {activeTab === 'overview' ? (
             <>
-              <section className="hero-card hero-card--dispute">
-                <div className="hero-dispute-content">
-                  <p className="eyebrow">Welcome to CredX</p>
-                  <h1 className="hero-dispute-title">{user?.firstName ? `Hi ${user.firstName} — your portal is live.` : 'Your portal is live.'}</h1>
-                  <p>{tier2
-                    ? disputeSummary
-                    : tier1
-                      ? "Your credit report is on file. Open Analysis & Reports to review your CredX analysis and next steps."
-                      : "First step: pull a fresh credit report from one of our partners below, then upload it for your free CredX analysis."}</p>
-                  <div className="hero-scores">
-                    <CreditScoreGauge bureau="Experian" score={typeof progress?.scores?.experian === 'number' ? progress.scores.experian : null} />
-                    <CreditScoreGauge bureau="Equifax" score={typeof progress?.scores?.equifax === 'number' ? progress.scores.equifax : null} />
-                    <CreditScoreGauge bureau="TransUnion" score={typeof progress?.scores?.transunion === 'number' ? progress.scores.transunion : null} />
-                  </div>
-                </div>
-              </section>
+              {(() => {
+                const analysisAny = (progress?.analysis as any) || null;
+                const subjectName = (analysisAny?.clientProfile?.name && String(analysisAny.clientProfile.name).trim())
+                  || `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
+                const subjectFirst = subjectName ? subjectName.split(/\s+/)[0] : '';
+                const summaryText = analysisAny?.clientFacingSummary
+                  || client?.analysisSummary
+                  || (tier2 ? disputeSummary : tier1
+                    ? "Your credit report is on file. Open Analysis & Reports to review your CredX analysis and next steps."
+                    : "First step: pull a fresh credit report from one of our partners below, then upload it for your free CredX analysis.");
+                const findings = (analysisAny?.keyFindings || []).slice(0, 3);
+                const sExp = typeof progress?.scores?.experian === 'number' ? progress.scores.experian : (analysisAny?.bureauScores || []).find((b: any) => b.bureau === 'EXPERIAN')?.score ?? null;
+                const sEq = typeof progress?.scores?.equifax === 'number' ? progress.scores.equifax : (analysisAny?.bureauScores || []).find((b: any) => b.bureau === 'EQUIFAX')?.score ?? null;
+                const sTu = typeof progress?.scores?.transunion === 'number' ? progress.scores.transunion : (analysisAny?.bureauScores || []).find((b: any) => b.bureau === 'TRANSUNION')?.score ?? null;
+                return (
+                  <section className="hero-card hero-card--dispute">
+                    <div className="hero-dispute-content">
+                      <p className="eyebrow">Welcome to CredX</p>
+                      <h1 className="hero-dispute-title">{subjectFirst ? `Hi ${subjectFirst} — your portal is live.` : 'Your portal is live.'}</h1>
+                      <p>{summaryText}</p>
+                      {findings.length ? (
+                        <div style={{ marginTop: '0.85rem' }}>
+                          <p className="eyebrow" style={{ marginBottom: '0.4rem' }}>What we found</p>
+                          <ul style={{ margin: 0, padding: '0 0 0 1.1rem', display: 'grid', gap: '0.35rem' }}>
+                            {findings.map((f: any) => (
+                              <li key={f.id || f.title} style={{ fontSize: '0.92rem', lineHeight: 1.5 }}>
+                                <strong>{f.title}</strong>{f.description ? ` — ${f.description}` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      <div className="hero-scores">
+                        <CreditScoreGauge bureau="Experian" score={typeof sExp === 'number' ? sExp : null} />
+                        <CreditScoreGauge bureau="Equifax" score={typeof sEq === 'number' ? sEq : null} />
+                        <CreditScoreGauge bureau="TransUnion" score={typeof sTu === 'number' ? sTu : null} />
+                      </div>
+                    </div>
+                  </section>
+                );
+              })()}
 
               {/* Tier 0: no report yet — guide them to pull + upload */}
               {!hasCreditReport && (
