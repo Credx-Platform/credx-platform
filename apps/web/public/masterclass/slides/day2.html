@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CredX Master Class — Day 2: Disputes Decoded</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="deck-stage.js"></script>
+<style>
+  /* ── Design tokens ── */
+  :root {
+    --bg:         #111a24;
+    --bg-primary: #1a2332;
+    --bg-mid:     #1e2c3d;
+    --surface:    #243347;
+    --elevated:   #2c3e52;
+    --accent:     #00b4d8;
+    --accent-lt:  #48cae4;
+    --accent-bright: #90e0ef;
+    --accent-deep:#0077b6;
+    --fg:         #ffffff;
+    --fg2:        #a8b8cc;
+    --fg3:        #5a7a9a;
+    --success:    #22c55e;
+    --warning:    #f59e0b;
+    --error:      #ef4444;
+    --border:     rgba(255,255,255,0.10);
+
+    /* Slide type scale */
+    --t-hero:    96px;
+    --t-title:   72px;
+    --t-head:    56px;
+    --t-sub:     40px;
+    --t-body:    32px;
+    --t-small:   26px;
+    --t-xs:      22px;
+
+    --font: 'DM Sans', system-ui, sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: #000;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Slide base ── */
+  section {
+    width: 100%;
+    height: 100%;
+    background: var(--bg-primary);
+    color: var(--fg);
+    font-family: var(--font);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── Reusable layout helpers ── */
+  .slide-pad {
+    padding: 90px 110px 80px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .day-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,180,216,0.12);
+    border: 1px solid rgba(0,180,216,0.35);
+    color: var(--accent-lt);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 8px 20px;
+    border-radius: 9999px;
+    margin-bottom: 36px;
+    width: fit-content;
+  }
+
+  .slide-title {
+    font-size: var(--t-head);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 44px;
+    color: var(--fg);
+  }
+
+  .slide-title span.accent { color: var(--accent); }
+
+  .divider {
+    width: 64px;
+    height: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    margin-bottom: 44px;
+  }
+
+  /* ── Card grid ── */
+  .card-grid {
+    display: grid;
+    gap: 24px;
+    flex: 1;
+  }
+  .card-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+  .card-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card-grid.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-lt));
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .card:hover::before { opacity: 1; }
+
+  .card-num {
+    font-family: var(--mono);
+    font-size: var(--t-head);
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .card-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--fg);
+    line-height: 1.2;
+  }
+
+  .card-body {
+    font-size: 24px;
+    color: var(--fg2);
+    line-height: 1.55;
+    flex: 1;
+  }
+
+  .tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .tag {
+    background: rgba(0,180,216,0.10);
+    border: 1px solid rgba(0,180,216,0.25);
+    color: var(--accent-lt);
+    font-size: 24px;
+    font-weight: 500;
+    padding: 5px 14px;
+    border-radius: 9999px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Affiliate link buttons ── */
+  .affiliate-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 28px;
+    border-radius: 9999px;
+    font-size: 24px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: none;
+    white-space: nowrap;
+  }
+
+  .affiliate-btn.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+    color: #fff;
+    box-shadow: 0 0 24px rgba(0,180,216,0.35);
+  }
+  .affiliate-btn.primary:hover {
+    filter: brightness(1.12);
+    box-shadow: 0 0 36px rgba(0,180,216,0.55);
+    transform: translateY(-2px);
+  }
+
+  .affiliate-btn.outline {
+    background: rgba(0,180,216,0.08);
+    border: 1.5px solid rgba(0,180,216,0.45);
+    color: var(--accent-lt);
+  }
+  .affiliate-btn.outline:hover {
+    background: rgba(0,180,216,0.16);
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  .affiliate-btn.ghost {
+    background: rgba(255,255,255,0.05);
+    border: 1.5px solid rgba(255,255,255,0.15);
+    color: var(--fg2);
+  }
+  .affiliate-btn.ghost:hover {
+    background: rgba(255,255,255,0.10);
+    color: var(--fg);
+    transform: translateY(-2px);
+  }
+
+  .btn-icon {
+    width: 22px;
+    height: 22px;
+    opacity: 0.8;
+  }
+
+  .affiliate-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: auto;
+    padding-top: 32px;
+  }
+
+  /* ── Step list ── */
+  .step-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    flex: 1;
+  }
+
+  .step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 24px 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+
+  .step-num {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .step-content { flex: 1; }
+  .step-title {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .step-body {
+    font-size: 24px;
+    color: var(--fg2);
+    line-height: 1.5;
+  }
+
+  /* ── Big stat ── */
+  .stat-block {
+    text-align: center;
+    padding: 40px 32px;
+  }
+  .stat-num {
+    font-family: var(--mono);
+    font-size: 96px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: var(--t-small);
+    color: var(--fg2);
+    margin-top: 12px;
+    font-weight: 500;
+  }
+
+  /* ── Right-column layout ── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 36px;
+    flex: 1;
+  }
+  .two-col.ratio-6-4 { grid-template-columns: 6fr 4fr; }
+  .two-col.ratio-5-5 { grid-template-columns: 1fr 1fr; }
+
+  /* ── Highlight box ── */
+  .highlight-box {
+    background: rgba(0,180,216,0.08);
+    border: 1.5px solid rgba(0,180,216,0.3);
+    border-radius: 14px;
+    padding: 28px 32px;
+    color: var(--fg2);
+    font-size: 24px;
+    line-height: 1.6;
+  }
+  .highlight-box strong { color: var(--accent-lt); }
+
+  /* ── Warning/error box ── */
+  .alert-box {
+    background: rgba(245,158,11,0.08);
+    border: 1.5px solid rgba(245,158,11,0.3);
+    border-radius: 14px;
+    padding: 24px 28px;
+  }
+  .alert-label {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--warning);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+  .alert-body {
+    font-size: 24px;
+    color: var(--fg2);
+    line-height: 1.5;
+  }
+
+  /* ── Timeline ── */
+  .timeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-top: 24px;
+  }
+  .timeline-node {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+  }
+  .timeline-node:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), rgba(0,180,216,0.2));
+  }
+  .timeline-dot {
+    width: 40px;
+    height: 40px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    position: relative;
+    z-index: 1;
+  }
+  .timeline-label {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--fg);
+    text-align: center;
+  }
+  .timeline-sub {
+    font-size: 24px;
+    color: var(--fg3);
+    text-align: center;
+  }
+
+  /* ── List items ── */
+  .bullet-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .bullet-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    font-size: 24px;
+    color: var(--fg2);
+    line-height: 1.5;
+  }
+  .bullet-list li::before {
+    content: '';
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-top: 8px;
+  }
+
+  /* ── Check list ── */
+  .check-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .check-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    font-size: 24px;
+    color: var(--fg2);
+    line-height: 1.5;
+  }
+  .check-list li .chk {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    background: rgba(34,197,94,0.15);
+    border: 1.5px solid rgba(34,197,94,0.4);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+  }
+  .check-list li .chk svg { width: 14px; height: 14px; stroke: var(--success); stroke-width: 2.5; fill: none; }
+
+  .cross-list li .chk {
+    background: rgba(239,68,68,0.12);
+    border-color: rgba(239,68,68,0.35);
+  }
+  .cross-list li .chk svg { stroke: var(--error); }
+
+  /* ── Section header slides ── */
+  .section-hero {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    clip-path: inset(0);
+  }
+  .section-hero .glow {
+    position: absolute;
+    top: -200px;
+    right: -200px;
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(0,180,216,0.18) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .section-hero .glow-left {
+    top: auto;
+    bottom: -300px;
+    left: -200px;
+    right: auto;
+    background: radial-gradient(circle, rgba(0,119,182,0.15) 0%, transparent 65%);
+  }
+  .section-hero-content {
+    padding: 0 110px;
+    position: relative;
+    z-index: 1;
+  }
+  .day-big {
+    font-family: var(--mono);
+    font-size: 200px;
+    font-weight: 700;
+    line-height: 1;
+    color: rgba(0,180,216,0.08);
+    position: absolute;
+    right: 80px;
+    bottom: 20px;
+    letter-spacing: -0.05em;
+    user-select: none;
+    clip-path: inset(0 0 0 0);
+  }
+
+  /* ── Decorative bg elements ── */
+  .bg-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,180,216,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,180,216,0.04) 1px, transparent 1px);
+    background-size: 80px 80px;
+    pointer-events: none;
+  }
+
+  /* ── Compact info row ── */
+  .info-row {
+    display: flex;
+    gap: 20px;
+    align-items: stretch;
+  }
+  .info-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 24px;
+    font-size: 24px;
+    color: var(--fg2);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .info-pill strong { color: var(--accent-lt); }
+
+  /* ── Red flag ── */
+  .red-flag {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 24px;
+    color: rgba(239,68,68,0.8);
+    margin-top: 8px;
+    font-weight: 500;
+  }
+  .red-flag::before {
+    content: '⚑';
+    font-size: 24px;
+  }
+
+  /* ── FICO donut visual ── */
+  .fico-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+  }
+  .fico-bar-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .fico-bar-label {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--fg);
+    width: 240px;
+    flex-shrink: 0;
+  }
+  .fico-bar-pct {
+    font-family: var(--mono);
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--accent);
+    width: 80px;
+    flex-shrink: 0;
+  }
+  .fico-bar-track {
+    flex: 1;
+    height: 16px;
+    background: var(--surface);
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+  .fico-bar-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  }
+  .fico-bar-desc {
+    font-size: 24px;
+    color: var(--fg2);
+    width: 380px;
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+
+  /* ── Quote block ── */
+  .quote-block {
+    background: var(--surface);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 14px 14px 0;
+    padding: 28px 32px;
+    font-size: var(--t-small);
+    color: var(--fg2);
+    font-style: italic;
+    line-height: 1.6;
+  }
+
+  /* ── Score range bar ── */
+  .score-bar {
+    height: 20px;
+    border-radius: 9999px;
+    background: linear-gradient(90deg,
+      #ef4444 0%, #f97316 20%, #eab308 40%, #22c55e 65%, #00b4d8 100%
+    );
+    position: relative;
+    margin: 20px 0;
+  }
+  .score-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 24px;
+    color: var(--fg3);
+  }
+
+  /* ── Overlap logo watermark ── */
+  .logo-watermark {
+    position: absolute;
+    bottom: 40px;
+    right: 60px;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    overflow: hidden;
+    opacity: 0.35;
+  }
+  .logo-watermark img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* ── Two-col fact sheet ── */
+  .fact-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .fact-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+  .fact-row-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--fg);
+    margin-bottom: 6px;
+  }
+  .fact-row-body {
+    font-size: 24px;
+    color: var(--fg2);
+    line-height: 1.5;
+  }
+  .fact-row-flag {
+    margin-top: 8px;
+  }
+
+  /* ── Bottom CTA strip ── */
+  .cta-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 28px 40px;
+    background: rgba(0,180,216,0.07);
+    border-top: 1px solid rgba(0,180,216,0.2);
+    border-radius: 16px;
+    margin-top: auto;
+  }
+  .cta-strip-text {
+    font-size: var(--t-xs);
+    color: var(--fg2);
+  }
+  .cta-strip-text strong { color: var(--fg); }
+
+  /* ── Final slide ── */
+  .finale {
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    padding: 80px 120px;
+    gap: 0;
+  }
+  .finale .glow-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 1000px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(0,180,216,0.14) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── Transition ── */
+  deck-stage::part(slide) {
+    animation: none;
+  }
+</style>
+</head>
+<body>
+
+<deck-stage width="1920" height="1080">
+  <!-- Slide 07 · DAY 2 HEADER -->
+  <section data-label="07 Day 2 Header">
+    <div class="section-hero" style="background:linear-gradient(135deg,#111a24 0%,#1a2332 100%);">
+      <div class="glow"></div>
+      <div class="glow glow-left"></div>
+      <div class="bg-grid"></div>
+      <div class="section-hero-content" style="position:relative;z-index:1;">
+        <div class="day-badge">Day 02 of 05</div>
+        <h2 style="font-size:var(--t-title);font-weight:700;line-height:1.0;letter-spacing:-0.03em;margin-bottom:28px;">
+          The Dispute Process<br><span style="color:var(--accent);">Decoded</span>
+        </h2>
+        <p style="font-size:34px;color:var(--fg2);max-width:700px;line-height:1.5;margin-bottom:48px;">Your legal rights and the exact process that forces credit bureaus to investigate and remove errors.</p>
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div style="display:flex;align-items:center;gap:16px;font-size:26px;color:var(--fg2);">
+            <div style="width:10px;height:10px;background:var(--accent);border-radius:50%;flex-shrink:0;"></div>
+            FCRA Rights — know your federal protections
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;font-size:26px;color:var(--fg2);">
+            <div style="width:10px;height:10px;background:var(--accent);border-radius:50%;flex-shrink:0;"></div>
+            FDCPA Protection — stop abusive collection practices
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;font-size:26px;color:var(--fg2);">
+            <div style="width:10px;height:10px;background:var(--accent);border-radius:50%;flex-shrink:0;"></div>
+            Step-by-step dispute procedures
+          </div>
+        </div>
+      </div>
+      <div class="day-big">02</div>
+    </div>
+  </section>
+
+  <!-- Slide 08 · FCRA RIGHTS -->
+  <section data-label="08 FCRA Rights">
+    <div class="slide-pad">
+      <div class="day-badge">Day 02 · The Dispute Process</div>
+      <h2 class="slide-title">Your Rights Under the FCRA</h2>
+
+      <div class="card-grid cols-2" style="gap:24px;flex:1;">
+        <div style="display:flex;flex-direction:column;gap:18px;">
+          <div class="card" style="padding:24px 28px;">
+            <div class="card-title" style="color:var(--accent-lt);">Right to Access</div>
+            <div class="card-body">You have the right to obtain all information in consumer reporting agency files about you.</div>
+            <div style="margin-top:10px;font-size:24px;color:var(--accent);font-weight:600;">One free report every 12 months from each bureau</div>
+          </div>
+          <div class="card" style="padding:24px 28px;">
+            <div class="card-title" style="color:var(--accent-lt);">Right to Dispute</div>
+            <div class="card-body">You can dispute incomplete or inaccurate information. The agency must investigate unless your dispute is frivolous.</div>
+            <div style="margin-top:10px;font-size:24px;color:var(--accent);font-weight:600;">Must be investigated within 30 days</div>
+          </div>
+          <div class="card" style="padding:24px 28px;">
+            <div class="card-title" style="color:var(--accent-lt);">Right to Delete</div>
+            <div class="card-body">Inaccurate, incomplete, or unverifiable information must be removed or corrected within 30 days of your dispute.</div>
+            <div style="margin-top:10px;font-size:24px;color:var(--accent);font-weight:600;">Agencies must notify you of results</div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:18px;">
+          <div class="card" style="padding:24px 28px;background:rgba(0,180,216,0.06);border-color:rgba(0,180,216,0.2);">
+            <div class="card-title" style="color:var(--accent-lt);">Right to Sue</div>
+            <div class="card-body">If a credit reporting agency violates your FCRA rights, you can sue in state or federal court for damages.</div>
+            <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+              <div style="font-size:24px;color:var(--fg2);"><strong style="color:var(--warning);">Willful:</strong> Actual + punitive damages, attorney fees &amp; costs</div>
+              <div style="font-size:24px;color:var(--fg2);"><strong style="color:var(--fg3);">Negligent:</strong> Actual damages and attorney fees</div>
+            </div>
+          </div>
+          <div class="highlight-box" style="flex:1;">
+            <div style="font-size:24px;font-weight:700;color:var(--accent-lt);margin-bottom:14px;">Additional Rights</div>
+            <ul class="bullet-list">
+              <li>Right to know who requested your report</li>
+              <li>Right to opt-out of pre-screened offers</li>
+              <li>Right to seek damages from violators</li>
+              <li>Right to place security freezes on your file</li>
+            </ul>
+          </div>
+          <a href="https://www.consumer.ftc.gov/articles/fair-credit-reporting-act" target="_blank" class="affiliate-btn primary" style="justify-content:center;">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Know My FCRA Rights →
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="logo-watermark"><img src="assets/logo.jpg" alt="credX"></div>
+  </section>
+
+  <!-- Slide 09 · FDCPA -->
+  <section data-label="09 FDCPA">
+    <div class="slide-pad">
+      <div class="day-badge">Day 02 · The Dispute Process</div>
+      <h2 class="slide-title">FDCPA Protection Against Debt Collectors</h2>
+
+      <div class="two-col" style="gap:28px;flex:1;">
+        <div style="display:flex;flex-direction:column;gap:18px;">
+          <div style="font-size:24px;font-weight:700;color:var(--error);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Collectors CANNOT</div>
+          <ul class="check-list cross-list" style="gap:14px;">
+            <li><span class="chk"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Call before 8 AM or after 9 PM</li>
+            <li><span class="chk"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Call you at work if told to stop</li>
+            <li><span class="chk"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Use profane or abusive language</li>
+            <li><span class="chk"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Threaten action they can't legally take</li>
+            <li><span class="chk"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Discuss your debt with third parties</li>
+            <li><span class="chk"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Continue contact after cease letter</li>
+          </ul>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:18px;">
+          <div style="font-size:24px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Collectors MUST</div>
+          <ul class="check-list" style="gap:14px;">
+            <li><span class="chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> Send written validation notice within 5 days</li>
+            <li><span class="chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> Identify themselves as debt collectors</li>
+            <li><span class="chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> Provide debt amount and creditor name</li>
+            <li><span class="chk"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span> Honor your verification request</li>
+          </ul>
+
+          <div class="alert-box" style="margin-top:auto;">
+            <div class="alert-label">Important Note</div>
+            <div class="alert-body">A cease &amp; desist stops communication but doesn't eliminate the debt. Collectors can still sue — but you'll have legal leverage if they violate your rights.</div>
+          </div>
+
+          <a href="https://www.consumer.ftc.gov/articles/fair-debt-collection-practices-act" target="_blank" class="affiliate-btn primary" style="justify-content:center;">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Download Cease &amp; Desist Template
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="logo-watermark"><img src="assets/logo.jpg" alt="credX"></div>
+  </section>
+
+  <!-- Slide 10 · DISPUTE STEPS -->
+  <section data-label="10 Dispute Steps">
+    <div class="slide-pad">
+      <div class="day-badge">Day 02 · The Dispute Process</div>
+      <h2 class="slide-title">The Complete Dispute Process</h2>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;flex:1;">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">Document the Error</div>
+              <div class="step-body">Screenshot or print the error. Note the account number, creditor name, and exactly what's wrong. Gather supporting documents.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">Write Your Dispute Letter</div>
+              <div class="step-body">State what you're disputing and why. Include copies (not originals) of supporting documents. Request deletion or correction.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">Send Certified Mail</div>
+              <div class="step-body">Always send disputes via certified mail with return receipt. This creates proof of delivery and starts the 30-day investigation clock.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="step-item">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">Wait for Investigation</div>
+              <div class="step-body">Bureaus have 30 days to investigate (45 if you provide additional information). They must forward your dispute to the data furnisher.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">5</div>
+            <div class="step-content">
+              <div class="step-title">Review the Results</div>
+              <div class="step-body">You'll receive written results. If deleted, verify on your updated report. If unresolved, escalate to advanced tactics in Day 3.</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-top:auto;">
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;text-align:center;">
+              <div style="font-size:24px;color:var(--fg3);margin-bottom:4px;">Dispute Sent</div>
+              <div style="font-size:28px;font-weight:700;color:var(--accent);">Day 0</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;text-align:center;">
+              <div style="font-size:24px;color:var(--fg3);margin-bottom:4px;">Investigation</div>
+              <div style="font-size:28px;font-weight:700;color:var(--accent);">Day 30</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;text-align:center;">
+              <div style="font-size:24px;color:var(--fg3);margin-bottom:4px;">Results</div>
+              <div style="font-size:28px;font-weight:700;color:var(--accent);">Day 35</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;text-align:center;">
+              <div style="font-size:24px;color:var(--fg3);margin-bottom:4px;">Updated</div>
+              <div style="font-size:28px;font-weight:700;color:var(--accent);">Day 45</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="affiliate-row">
+        <a href="https://credxme.com/portal" target="_blank" class="affiliate-btn primary">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Get My Dispute Letter Templates
+        </a>
+        <a href="https://www.usps.com/ship/insurance-extra-services.htm" target="_blank" class="affiliate-btn outline">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          USPS Certified Mail Service
+        </a>
+      </div>
+    </div>
+    <div class="logo-watermark"><img src="assets/logo.jpg" alt="credX"></div>
+  </section>
+
+</deck-stage>
+
+</body>
+</html>

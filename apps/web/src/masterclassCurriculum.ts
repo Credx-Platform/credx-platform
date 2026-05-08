@@ -10,7 +10,7 @@ export type LessonDay = {
   summary: string;
   image: string;
   accent: string;
-  slidesRange: { from: number; to: number };
+  slidesPath: string;
   objectives: string[];
   videos: [LessonVideo, LessonVideo];
   glossary: GlossaryTerm[];
@@ -18,6 +18,18 @@ export type LessonDay = {
   qa: LessonQA[];
   isBonus?: boolean;
 };
+
+export const MASTERCLASS_INTRO = {
+  slug: 'intro-course-overview',
+  title: 'Course Overview',
+  eyebrow: 'Welcome',
+  tagline: 'Your 5-day credit transformation',
+  summary:
+    'Two slides that orient you to the entire master class — what you will walk away knowing, what to do each day, and how the affiliate stack inside the slides supports the strategy.',
+  image: '/masterclass/cover_image.jpg',
+  accent: '#48cae4',
+  slidesPath: '/masterclass/slides/intro.html'
+} as const;
 
 export const DAY_ACCENTS: Record<number, string> = {
   1: '#00c6fb', // cyan — fundamentals
@@ -39,7 +51,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     summary:
       'Today you find out what a credit score actually is, what makes it go up or down, and how to read your own credit report. Think of this as the rulebook everyone needs before they start playing the credit game.',
     image: '/masterclass/day1_image.jpg',
-    slidesRange: { from: 3, to: 6 },
+    slidesPath: '/masterclass/slides/day1.html',
     objectives: [
       'Know the 5 things that make up your FICO score and which matter most.',
       'Pull your free credit report from all 3 bureaus the right way.',
@@ -108,7 +120,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     summary:
       'There are real laws that protect you and force credit bureaus to fix mistakes. Most people do not know about them. Today you learn the laws, how to write a dispute letter that actually works, and what happens after you send it.',
     image: '/masterclass/day2_image.jpg',
-    slidesRange: { from: 7, to: 10 },
+    slidesPath: '/masterclass/slides/day2.html',
     objectives: [
       'Understand your rights under the FCRA and FDCPA in plain English.',
       'Write a clear, simple dispute letter that bureaus must investigate.',
@@ -175,7 +187,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     summary:
       'Most disputes get fixed in Round 1. The stubborn ones need extra pressure. Today you learn 3 advanced tools: 609 letters, debt validation, and how to use government agencies to make bureaus and collectors comply.',
     image: '/masterclass/day3_image.jpg',
-    slidesRange: { from: 11, to: 14 },
+    slidesPath: '/masterclass/slides/day3.html',
     objectives: [
       'Use a 609 letter to demand the bureau show their proof.',
       'Force a collector to prove the debt is actually theirs to collect.',
@@ -242,7 +254,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     summary:
       'Removing bad stuff is half the job. The other half is adding good payment history that says "I am responsible." Today you learn the safest, fastest ways to build positive credit without taking on real risk.',
     image: '/masterclass/day4_image.jpg',
-    slidesRange: { from: 15, to: 18 },
+    slidesPath: '/masterclass/slides/day4.html',
     objectives: [
       'Become an authorized user on a strong card to import good history.',
       'Pick the right secured credit card and use it the right way.',
@@ -309,7 +321,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     summary:
       'Business credit is its own separate score for your company. Done right, your business can qualify for cards, lines, and loans without using your personal credit. Today you learn how to set the foundation and open your first business tradelines.',
     image: '/masterclass/day5_image.jpg',
-    slidesRange: { from: 19, to: 22 },
+    slidesPath: '/masterclass/slides/day5.html',
     objectives: [
       'Set up a real business profile that lenders trust (LLC, EIN, bank account, address).',
       'Open Net-30 vendor accounts to start a business credit file.',
@@ -377,7 +389,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     summary:
       'Credit is a tool. The goal is wealth — money and assets that outlive you and help your family. Today connects everything you have learned to the bigger picture: investing, real estate, and the structures that protect what you build.',
     image: '/masterclass/final_image.jpg',
-    slidesRange: { from: 23, to: 23 },
+    slidesPath: '/masterclass/slides/bonus.html',
     objectives: [
       'Use strong credit to qualify for better real-estate financing.',
       'Set up a simple, automatic investing routine.',

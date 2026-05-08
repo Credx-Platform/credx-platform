@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { MASTERCLASS_DAYS, type LessonDay } from '../masterclassCurriculum';
+import { MASTERCLASS_DAYS, MASTERCLASS_INTRO, type LessonDay } from '../masterclassCurriculum';
 import { MASTERCLASS_QUIZZES, QUIZ_PASSING_SCORE, type DayQuiz } from '../masterclassQuizzes';
+
+type IntroSelection = { kind: 'intro' };
+type DaySelection = { kind: 'day'; day: number };
+type Selection = IntroSelection | DaySelection;
 
 export type QuizSubmitResult = {
   passed: boolean;
@@ -36,37 +40,48 @@ export default function MasterclassDashboard({
   onSubmitQuiz,
   onActiveDayChange
 }: Props) {
-  const [activeDay, setActiveDay] = useState<number>(() => {
-    if (typeof window === 'undefined') return 1;
-    const stored = sessionStorage.getItem('credx-masterclass-day');
+  const [selection, setSelection] = useState<Selection>(() => {
+    if (typeof window === 'undefined') return { kind: 'day', day: 1 };
+    const stored = sessionStorage.getItem('credx-masterclass-selection');
+    if (stored === 'intro') return { kind: 'intro' };
     if (stored) {
       const n = Number(stored);
-      if (Number.isFinite(n) && n >= 1 && n <= MASTERCLASS_DAYS.length) return n;
+      if (Number.isFinite(n) && n >= 1 && n <= MASTERCLASS_DAYS.length) return { kind: 'day', day: n };
     }
-    return 1;
+    return { kind: 'day', day: 1 };
   });
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('credx-masterclass-day', String(activeDay));
-    }
-  }, [activeDay]);
+    if (typeof window === 'undefined') return;
+    sessionStorage.setItem('credx-masterclass-selection', selection.kind === 'intro' ? 'intro' : String(selection.day));
+  }, [selection]);
 
+  const isIntro = selection.kind === 'intro';
+  const activeDay = isIntro ? 0 : selection.day;
   const day = useMemo<LessonDay>(() => {
+    if (isIntro) return MASTERCLASS_DAYS[0]; // placeholder; not used when isIntro
     return MASTERCLASS_DAYS.find((d) => d.day === activeDay) || MASTERCLASS_DAYS[0];
-  }, [activeDay]);
+  }, [activeDay, isIntro]);
 
+  // Notify parent so the topbar accent can match the active day's color.
   useEffect(() => {
-    onActiveDayChange?.(day);
-  }, [day, onActiveDayChange]);
+    if (isIntro) {
+      onActiveDayChange?.({ ...MASTERCLASS_DAYS[0], slug: MASTERCLASS_INTRO.slug, title: MASTERCLASS_INTRO.title, eyebrow: MASTERCLASS_INTRO.eyebrow, tagline: MASTERCLASS_INTRO.tagline, summary: MASTERCLASS_INTRO.summary, image: MASTERCLASS_INTRO.image, accent: MASTERCLASS_INTRO.accent } as LessonDay);
+    } else {
+      onActiveDayChange?.(day);
+    }
+  }, [day, isIntro, onActiveDayChange]);
 
-  const slidesSrc = `/masterclass/slides/index.html?day=${day.day}#slide-${day.slidesRange.from}`;
-  const isCompleted = completedDays.includes(day.slug);
-  const isBonus = !!day.isBonus;
-  const accent = day.accent;
-  const dayQuiz = useMemo<DayQuiz | null>(() => MASTERCLASS_QUIZZES.find((q) => q.slug === day.slug) || null, [day.slug]);
-  const quizPassed = passedQuizzes.includes(day.slug);
-  const dayAttempt = quizAttempts[day.slug];
+  const slidesSrc = isIntro ? MASTERCLASS_INTRO.slidesPath : day.slidesPath;
+  const isCompleted = !isIntro && completedDays.includes(day.slug);
+  const isBonus = !isIntro && !!day.isBonus;
+  const accent = isIntro ? MASTERCLASS_INTRO.accent : day.accent;
+  const dayQuiz = useMemo<DayQuiz | null>(
+    () => (isIntro ? null : (MASTERCLASS_QUIZZES.find((q) => q.slug === day.slug) || null)),
+    [day.slug, isIntro]
+  );
+  const quizPassed = !isIntro && passedQuizzes.includes(day.slug);
+  const dayAttempt = isIntro ? undefined : quizAttempts[day.slug];
 
   return (
     <div className="mc-shell" style={{ ['--day-accent' as string]: accent } as CSSProperties}>
@@ -83,15 +98,26 @@ export default function MasterclassDashboard({
       </section>
 
       <section className="mc-day-grid">
+        <button
+          key="intro"
+          type="button"
+          onClick={() => setSelection({ kind: 'intro' })}
+          className={`mc-day-card${isIntro ? ' is-active' : ''}`}
+          style={{ ['--card-accent' as string]: MASTERCLASS_INTRO.accent } as CSSProperties}
+        >
+          <div className="mc-day-card-num">★</div>
+          <div className="mc-day-card-badge">Intro</div>
+          <div className="mc-day-card-title">Course Overview</div>
+        </button>
         {MASTERCLASS_DAYS.map((d) => {
           const done = completedDays.includes(d.slug);
-          const isActive = d.day === activeDay;
+          const isActive = !isIntro && d.day === activeDay;
           const passed = passedQuizzes.includes(d.slug);
           return (
             <button
               key={d.day}
               type="button"
-              onClick={() => setActiveDay(d.day)}
+              onClick={() => setSelection({ kind: 'day', day: d.day })}
               className={`mc-day-card${isActive ? ' is-active' : ''}${d.isBonus ? ' is-bonus' : ''}${done ? ' is-done' : ''}`}
               style={{ ['--card-accent' as string]: d.accent } as CSSProperties}
             >
@@ -104,6 +130,34 @@ export default function MasterclassDashboard({
         })}
       </section>
 
+      {isIntro ? (
+        <section className="panel mc-day-panel">
+          <header className="mc-day-panel-head">
+            <div>
+              <p className="eyebrow" style={{ color: MASTERCLASS_INTRO.accent }}>{MASTERCLASS_INTRO.eyebrow}</p>
+              <h2 className="mc-day-panel-title">{MASTERCLASS_INTRO.tagline}</h2>
+            </div>
+            <img src={MASTERCLASS_INTRO.image} alt={MASTERCLASS_INTRO.title} className="mc-day-panel-img" style={{ borderColor: MASTERCLASS_INTRO.accent }} />
+          </header>
+          <p className="mc-day-panel-summary">{MASTERCLASS_INTRO.summary}</p>
+          <div className="mc-section">
+            <h3 className="mc-section-h">Course preview</h3>
+            <div className="mc-slides-frame">
+              <iframe src={MASTERCLASS_INTRO.slidesPath} title="Course Overview slides" />
+            </div>
+            <p className="mc-slides-help">
+              <a href={MASTERCLASS_INTRO.slidesPath} target="_blank" rel="noopener noreferrer">Open in a new tab →</a>
+            </p>
+          </div>
+          <div className="mc-day-footer">
+            <button type="button" className="mc-complete-btn" onClick={() => setSelection({ kind: 'day', day: 1 })}>
+              Start with Day 1 →
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {!isIntro ? (
       <section className={`panel mc-day-panel${isBonus ? ' is-bonus' : ''}`}>
         <header className="mc-day-panel-head">
           <div>
@@ -154,7 +208,7 @@ export default function MasterclassDashboard({
             <iframe src={slidesSrc} title={`${day.title} slides`} />
           </div>
           <p className="mc-slides-help">
-            Slides {day.slidesRange.from}–{day.slidesRange.to} of the masterclass deck.{' '}
+            Day {day.day} chapter of the masterclass deck.{' '}
             <a href={slidesSrc} target="_blank" rel="noopener noreferrer">Open in a new tab →</a>
           </p>
         </div>
@@ -225,12 +279,13 @@ export default function MasterclassDashboard({
             <div className="mc-complete-state">✓ Day {day.day} marked complete</div>
           ) : null}
           {activeDay < MASTERCLASS_DAYS.length ? (
-            <button type="button" className="ghost-button" onClick={() => setActiveDay(activeDay + 1)}>
+            <button type="button" className="ghost-button" onClick={() => setSelection({ kind: 'day', day: activeDay + 1 })}>
               Next day →
             </button>
           ) : null}
         </div>
       </section>
+      ) : null}
     </div>
   );
 }
