@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import MasterclassDashboard from './components/MasterclassDashboard';
 import type { LessonDay } from './masterclassCurriculum';
+import { FILING_WORKFLOWS, type FilingWorkflow } from './filingWorkflows';
 
 type User = {
   id: string;
@@ -586,7 +587,7 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
                 To generate your professional credit analysis, upload your credit report below.
                 We accept PDF, HTML, and screenshots.
               </p>
-              <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+              <p style={{ fontSize: '0.8rem', color: '#64748b' }}>
                 Your analysis will appear here within minutes of upload.
               </p>
             </div>
@@ -597,7 +598,7 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
               <p style={{ margin: '0.75rem 0', color: '#64748b' }}>
                 Your credit report has been received. The CredX team is preparing your analysis.
               </p>
-              <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+              <p style={{ fontSize: '0.8rem', color: '#64748b' }}>
                 Check back shortly or refresh this page.
               </p>
             </div>
@@ -762,16 +763,24 @@ type ClassifiedResponse = {
   };
 };
 
-function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | null, client: Client | null, inquiries: any[] = []): string {
-  const bureau = BUREAU_ADDRESSES[bureauKey] || { name: bureauKey, lines: [] };
-  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Consumer';
-  const addrLines = [
+function resolveLetterSubject(progress: Progress | null, user: User | null, client: Client | null): { name: string; addrLines: string[]; ssnDisplay: string; dobDisplay: string } {
+  const cp = (progress?.analysis as any)?.clientProfile as { name?: string; address?: string; ssnLast4?: string; dob?: string } | undefined;
+  const fallbackName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
+  const name = (cp?.name && cp.name.trim()) || fallbackName || 'Consumer';
+  const fallbackAddr = [
     client?.currentAddressLine1,
     client?.currentAddressLine2,
     [client?.currentCity, client?.currentState, client?.currentPostalCode].filter(Boolean).join(', ')
-  ].filter(Boolean);
-  const ssnDisplay = client?.ssnLast4 ? `XXX-XX-${client.ssnLast4}` : '__________';
-  const dobDisplay = '__________';
+  ].filter(Boolean) as string[];
+  const addrLines = cp?.address && cp.address.trim() ? [cp.address.trim()] : fallbackAddr;
+  const ssnDisplay = cp?.ssnLast4 ? `XXX-XX-${cp.ssnLast4}` : (client?.ssnLast4 ? `XXX-XX-${client.ssnLast4}` : '__________');
+  const dobDisplay = cp?.dob && cp.dob !== '(on file, encrypted)' ? cp.dob : '__________';
+  return { name, addrLines, ssnDisplay, dobDisplay };
+}
+
+function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | null, client: Client | null, inquiries: any[] = [], progress: Progress | null = null): string {
+  const bureau = BUREAU_ADDRESSES[bureauKey] || { name: bureauKey, lines: [] };
+  const { name, addrLines, ssnDisplay, dobDisplay } = resolveLetterSubject(progress, user, client);
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const inquiriesRows = inquiries.length
@@ -928,7 +937,7 @@ function generateDisputeLettersFromAnalysis(progress: Progress | null, user: Use
       bureau: bureauKey,
       bureauLabel: meta?.name || bureauKey,
       filename: `credx-dispute-${bureauKey}-${new Date().toISOString().slice(0, 10)}.html`,
-      html: buildDisputeLetterHtml(bureauKey, items, user, client, inquiries),
+      html: buildDisputeLetterHtml(bureauKey, items, user, client, inquiries, progress),
       items
     });
   }
@@ -957,11 +966,12 @@ function printLetter(letter: DisputeLetter) {
   setTimeout(() => { try { w.print(); } catch {} }, 250);
 }
 
-function buildFtcReportHtml(user: User | null, client: Client | null, allItems: any[]): string {
-  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Consumer';
+function buildFtcReportHtml(user: User | null, client: Client | null, allItems: any[], progress: Progress | null = null): string {
+  const subject = resolveLetterSubject(progress, user, client);
+  const name = subject.name;
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const addr = [client?.currentAddressLine1, client?.currentAddressLine2, [client?.currentCity, client?.currentState, client?.currentPostalCode].filter(Boolean).join(', ')].filter(Boolean);
-  const ssn = client?.ssnLast4 ? `XXX-XX-${client.ssnLast4}` : '__________';
+  const addr = subject.addrLines;
+  const ssn = subject.ssnDisplay;
   const rows = allItems.map((it) => `<tr><td>${escapeHtml(it.accountName || '')}</td><td>${escapeHtml(it.issue || '')}</td><td>${escapeHtml((it.bureaus || []).map((b: string) => b === 'equifax' ? 'Equifax' : b === 'experian' ? 'Experian' : 'TransUnion').join(', '))}</td><td>${escapeHtml(it.reason || '')}</td></tr>`).join('');
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>FTC Report — ${escapeHtml(name)}</title>
@@ -1007,10 +1017,11 @@ function buildFtcReportHtml(user: User | null, client: Client | null, allItems: 
 </body></html>`;
 }
 
-function buildCfpbReportHtml(user: User | null, client: Client | null, allItems: any[]): string {
-  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Consumer';
+function buildCfpbReportHtml(user: User | null, client: Client | null, allItems: any[], progress: Progress | null = null): string {
+  const subject = resolveLetterSubject(progress, user, client);
+  const name = subject.name;
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const addr = [client?.currentAddressLine1, client?.currentAddressLine2, [client?.currentCity, client?.currentState, client?.currentPostalCode].filter(Boolean).join(', ')].filter(Boolean);
+  const addr = subject.addrLines;
   const rows = allItems.map((it) => `<tr><td>${escapeHtml(it.accountName || '')}</td><td>${escapeHtml((it.bureaus || []).map((b: string) => b === 'equifax' ? 'Equifax' : b === 'experian' ? 'Experian' : 'TransUnion').join(', '))}</td><td>${escapeHtml(it.issue || '')}</td><td>${escapeHtml(it.reason || '')}</td></tr>`).join('');
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>CFPB Complaint — ${escapeHtml(name)}</title>
@@ -1053,6 +1064,71 @@ function buildCfpbReportHtml(user: User | null, client: Client | null, allItems:
 
   <div class="sig">____________________________<br>${escapeHtml(name)} — ${escapeHtml(today)}</div>
 </body></html>`;
+}
+
+function FilingWalkthrough({ workflow }: { workflow: FilingWorkflow }) {
+  const accent = workflow.agency === 'FTC' ? '#dc2626' : '#1d4ed8';
+  const accentSoft = workflow.agency === 'FTC' ? 'rgba(220,38,38,0.08)' : 'rgba(29,78,216,0.08)';
+  const accentBorder = workflow.agency === 'FTC' ? 'rgba(220,38,38,0.45)' : 'rgba(29,78,216,0.45)';
+  return (
+    <div style={{ marginTop: '1rem', padding: '14px 16px', borderRadius: '12px', background: accentSoft, border: `1px solid ${accentBorder}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <strong style={{ color: '#0f172a', fontSize: '0.98rem' }}>{workflow.title}</strong>
+        <span style={{ fontSize: '0.78rem', color: '#475569' }}>~{workflow.estimatedMinutes} min · {workflow.responseSla}</span>
+      </div>
+      <a href={workflow.portalUrl} target="_blank" rel="noreferrer" className="ghost-button" style={{ background: accent, color: '#fff', border: 'none', fontWeight: 700, display: 'inline-block', marginBottom: '0.75rem' }}>
+        ↗ Open {workflow.portalLabel}
+      </a>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.6rem', marginBottom: '0.75rem' }}>
+        <div style={{ background: '#fff', border: '1px solid rgba(15,23,42,0.12)', borderRadius: '10px', padding: '8px 10px' }}>
+          <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px', fontWeight: 700 }}>Before you start</div>
+          <ul style={{ margin: 0, padding: '0 0 0 1rem', fontSize: '0.82rem', color: '#1e293b' }}>
+            {workflow.prerequisites.map((p) => <li key={p} style={{ marginBottom: '2px' }}>{p}</li>)}
+          </ul>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid rgba(15,23,42,0.12)', borderRadius: '10px', padding: '8px 10px' }}>
+          <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px', fontWeight: 700 }}>Attach</div>
+          <ul style={{ margin: 0, padding: '0 0 0 1rem', fontSize: '0.82rem', color: '#1e293b' }}>
+            {workflow.attachments.map((a) => <li key={a} style={{ marginBottom: '2px' }}>{a}</li>)}
+          </ul>
+        </div>
+        <div style={{ background: '#fff', border: '1px solid rgba(15,23,42,0.12)', borderRadius: '10px', padding: '8px 10px' }}>
+          <div style={{ fontSize: '0.72rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px', fontWeight: 700 }}>Cite (already in your PDF)</div>
+          <ul style={{ margin: 0, padding: '0 0 0 1rem', fontSize: '0.82rem', color: '#1e293b' }}>
+            {workflow.legalCitations.map((c) => <li key={c} style={{ marginBottom: '2px' }}>{c}</li>)}
+          </ul>
+        </div>
+      </div>
+
+      <ol style={{ margin: '0 0 0.75rem', padding: '0 0 0 0.5rem', listStyle: 'none' }}>
+        {workflow.steps.map((step) => (
+          <li key={step.number} style={{ display: 'flex', gap: '0.65rem', padding: '0.5rem 0', borderTop: step.number === 1 ? 'none' : '1px solid rgba(15,23,42,0.12)' }}>
+            <div style={{ flexShrink: 0, width: '26px', height: '26px', borderRadius: '50%', background: accent, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.78rem' }}>{step.number}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: '#0f172a', fontWeight: 700, fontSize: '0.9rem' }}>{step.title}</div>
+              <div style={{ color: '#1e293b', fontSize: '0.84rem', marginTop: '2px' }}>{step.detail}</div>
+              {step.fieldHints && step.fieldHints.length ? (
+                <ul style={{ margin: '4px 0 0', padding: '0 0 0 1rem', fontSize: '0.78rem', color: '#475569' }}>
+                  {step.fieldHints.map((h) => <li key={h}>{h}</li>)}
+                </ul>
+              ) : null}
+              {step.link ? (
+                <a href={step.link.url} target="_blank" rel="noreferrer" style={{ color: '#b45309', fontSize: '0.82rem', fontWeight: 700, display: 'inline-block', marginTop: '4px' }}>{step.link.label} →</a>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.45)', borderRadius: '10px', padding: '8px 10px' }}>
+        <div style={{ fontSize: '0.72rem', color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px', fontWeight: 700 }}>What happens next</div>
+        <ul style={{ margin: 0, padding: '0 0 0 1rem', fontSize: '0.82rem', color: '#14532d' }}>
+          {workflow.whatHappensNext.map((n) => <li key={n} style={{ marginBottom: '2px' }}>{n}</li>)}
+        </ul>
+      </div>
+    </div>
+  );
 }
 
 type DisputesSectionProps = {
@@ -1190,11 +1266,12 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
       setGenMessage('Generate your bureau letters first — the FTC report bundles those same items.');
       return;
     }
-    const html = buildFtcReportHtml(user, client, allItems);
+    const html = buildFtcReportHtml(user, client, allItems, progress);
+    const subjectLast = ((progress?.analysis as any)?.clientProfile?.name || `${user?.firstName || ''} ${user?.lastName || ''}`).trim().split(/\s+/).pop() || 'consumer';
     const filing: DisputeLetter = {
       bureau: 'ftc',
       bureauLabel: 'Federal Trade Commission',
-      filename: `credx-ftc-report-${(user?.lastName || 'consumer').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.html`,
+      filename: `credx-ftc-report-${String(subjectLast).toLowerCase()}-${new Date().toISOString().slice(0, 10)}.html`,
       html,
       items: allItems
     };
@@ -1207,11 +1284,12 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
       setGenMessage('Generate your bureau letters first — the CFPB complaint references the same dispute file.');
       return;
     }
-    const html = buildCfpbReportHtml(user, client, allItems);
+    const html = buildCfpbReportHtml(user, client, allItems, progress);
+    const subjectLast = ((progress?.analysis as any)?.clientProfile?.name || `${user?.firstName || ''} ${user?.lastName || ''}`).trim().split(/\s+/).pop() || 'consumer';
     const filing: DisputeLetter = {
       bureau: 'cfpb',
       bureauLabel: 'Consumer Financial Protection Bureau',
-      filename: `credx-cfpb-complaint-${(user?.lastName || 'consumer').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.html`,
+      filename: `credx-cfpb-complaint-${String(subjectLast).toLowerCase()}-${new Date().toISOString().slice(0, 10)}.html`,
       html,
       items: allItems
     };
@@ -1232,7 +1310,7 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
   }
 
   const renderItem = (it: any, i: number) => (
-    <li key={i} style={{ fontSize: '0.88rem', color: '#f1f5f9', fontWeight: 500, padding: '3px 0' }}>• <strong style={{ color: '#fff' }}>{it.accountName}</strong> — {it.issue}</li>
+    <li key={i} style={{ fontSize: '0.88rem', color: '#1e293b', fontWeight: 500, padding: '3px 0' }}>• <strong style={{ color: '#0f172a' }}>{it.accountName}</strong> — {it.issue}</li>
   );
 
   return (
@@ -1250,7 +1328,7 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
         </div>
       </div>
 
-      <div style={{ marginBottom: '0.85rem', padding: '8px 12px', borderRadius: '8px', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.35)', color: '#fbbf24', fontSize: '0.82rem', fontWeight: 600 }}>
+      <div style={{ marginBottom: '0.85rem', padding: '8px 12px', borderRadius: '8px', background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.55)', color: '#92400e', fontSize: '0.82rem', fontWeight: 600 }}>
         Beta mode: the standard 45-day waiting period before FTC and CFPB escalation is waived so you can test the full flow now.
       </div>
 
@@ -1258,16 +1336,16 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
         <button type="button" className="ghost-button" onClick={generate} style={{ background: '#a855f7', color: '#fff', border: 'none', fontWeight: 700 }}>
           ✉ Generate Dispute Letters from Analysis
         </button>
-        <span className="helper-text" style={{ margin: 0, color: '#cbd5e1' }}>{genMessage || 'Pulls all negative items from your CredX analysis and groups them per bureau. Generated letters populate every dispute view across your portal.'}</span>
+        <span className="helper-text" style={{ margin: 0, color: '#475569' }}>{genMessage || 'Pulls all negative items from your CredX analysis and groups them per bureau. Generated letters populate every dispute view across your portal.'}</span>
       </div>
 
       {subTab === 'active' ? (
         <div className="dispute-list">
           {letters.length ? letters.flatMap((letter) => letter.items.map((it, i) => (
             <div key={`${letter.bureau}-${i}`} className="dispute-card-live">
-              <div className="dispute-card-top"><strong style={{ color: '#fff' }}>{it.accountName}</strong><span className="status-badge status-pending">{letter.bureauLabel}</span></div>
-              <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>{it.issue}</span></div>
-              <div className="dispute-meta" style={{ color: '#cbd5e1' }}><span><strong>Reason:</strong> {it.reason}</span></div>
+              <div className="dispute-card-top"><strong style={{ color: '#0f172a' }}>{it.accountName}</strong><span className="status-badge status-pending">{letter.bureauLabel}</span></div>
+              <div className="dispute-meta" style={{ color: '#334155' }}><span>{it.issue}</span></div>
+              <div className="dispute-meta" style={{ color: '#475569' }}><span><strong>Reason:</strong> {it.reason}</span></div>
             </div>
           ))) : disputes.length ? disputes.map((dispute) => (
             <div key={dispute.id} className="dispute-card-live">
@@ -1289,22 +1367,22 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
           {letters.length ? letters.map((letter) => (
             <div key={letter.bureau} className="dispute-card-live">
               <div className="dispute-card-top">
-                <strong style={{ color: '#fff' }}>{letter.bureauLabel}</strong>
+                <strong style={{ color: '#0f172a' }}>{letter.bureauLabel}</strong>
                 <span className="status-badge status-pending">{letter.items.length} item{letter.items.length === 1 ? '' : 's'}</span>
               </div>
-              <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>Items grouped from your analysis and addressed to <strong style={{ color: '#fff' }}>{letter.bureauLabel}</strong>.</span></div>
+              <div className="dispute-meta" style={{ color: '#334155' }}><span>Items grouped from your analysis and addressed to <strong style={{ color: '#0f172a' }}>{letter.bureauLabel}</strong>.</span></div>
               <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>
                 {letter.items.map(renderItem)}
               </ul>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
                 <button type="button" className="ghost-button" onClick={() => downloadLetter(letter)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
-                <button type="button" className="ghost-button" onClick={() => printLetter(letter)} style={{ color: '#f8fafc', fontWeight: 600 }}>🖨 Print this letter</button>
+                <button type="button" className="ghost-button" onClick={() => printLetter(letter)} style={{ color: '#0f172a', fontWeight: 600 }}>🖨 Print this letter</button>
                 <button type="button" className="ghost-button" onClick={() => mailViaLob(letter)} disabled={mailingBureau === letter.bureau} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>
                   {mailingBureau === letter.bureau ? 'Mailing…' : mailed[letter.bureau] ? '📮 Re-mail via Lob' : '📮 Mail via Lob (certified)'}
                 </button>
               </div>
               {mailed[letter.bureau] ? (
-                <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#a3e635' }}>
+                <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#15803d', fontWeight: 600 }}>
                   Mailed {new Date(mailed[letter.bureau].mailedAt).toLocaleDateString()} · Lob {mailed[letter.bureau].lobId}
                   {mailed[letter.bureau].expectedDeliveryDate ? ` · ETA ${mailed[letter.bureau].expectedDeliveryDate}` : ''}
                 </div>
@@ -1321,12 +1399,12 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
             <>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
                 <button type="button" className="ghost-button" onClick={() => letters.forEach(printLetter)} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>🖨 Print all bureau letters</button>
-                <span className="helper-text" style={{ margin: 0, color: '#cbd5e1' }}>Opens each letter in a new tab and triggers the print dialog.</span>
+                <span className="helper-text" style={{ margin: 0, color: '#475569' }}>Opens each letter in a new tab and triggers the print dialog.</span>
               </div>
               <div className="dispute-list">
                 {letters.map((letter) => (
                   <div key={letter.bureau} className="dispute-card-live">
-                    <div className="dispute-card-top"><strong style={{ color: '#fff' }}>{letter.bureauLabel}</strong><button type="button" className="ghost-button" onClick={() => printLetter(letter)} style={{ color: '#f8fafc', fontWeight: 600 }}>🖨 Print</button></div>
+                    <div className="dispute-card-top"><strong style={{ color: '#0f172a' }}>{letter.bureauLabel}</strong><button type="button" className="ghost-button" onClick={() => printLetter(letter)} style={{ color: '#0f172a', fontWeight: 600 }}>🖨 Print</button></div>
                     <iframe title={`Preview ${letter.bureauLabel}`} srcDoc={letter.html} style={{ width: '100%', height: '420px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: '#fff', marginTop: '0.5rem' }} />
                   </div>
                 ))}
@@ -1344,22 +1422,23 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
             <button type="button" className="ghost-button" onClick={generateFtc} style={{ background: '#ef4444', color: '#fff', border: 'none', fontWeight: 700 }} disabled={!letters.length}>
               ⚖ Generate FTC report
             </button>
-            <span className="helper-text" style={{ margin: 0, color: '#cbd5e1' }}>{letters.length ? 'Bundles every disputed item into a single FTC complaint with your contact info, the bureau list, and the requested remedy.' : 'Generate dispute letters above first, then come back here.'}</span>
+            <span className="helper-text" style={{ margin: 0, color: '#475569' }}>{letters.length ? 'Bundles every disputed item into a single FTC complaint with your contact info, the bureau list, and the requested remedy.' : 'Generate dispute letters above first, then come back here.'}</span>
           </div>
           {filings.ftc ? (
             <div className="dispute-card-live">
-              <div className="dispute-card-top"><strong style={{ color: '#fff' }}>FTC Identity Theft / Inaccurate Reporting Complaint</strong><span className="status-badge status-pending">{filings.ftc.items.length} item{filings.ftc.items.length === 1 ? '' : 's'}</span></div>
-              <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>Ready to file via <a href="https://reportfraud.ftc.gov" target="_blank" rel="noreferrer" style={{ color: '#fbbf24' }}>ReportFraud.ftc.gov</a> — attach this PDF as your written statement.</span></div>
+              <div className="dispute-card-top"><strong style={{ color: '#0f172a' }}>FTC Identity Theft / Inaccurate Reporting Complaint</strong><span className="status-badge status-pending">{filings.ftc.items.length} item{filings.ftc.items.length === 1 ? '' : 's'}</span></div>
+              <div className="dispute-meta" style={{ color: '#334155' }}><span>Ready to file via <a href="https://reportfraud.ftc.gov" target="_blank" rel="noreferrer" style={{ color: '#b45309', fontWeight: 600 }}>ReportFraud.ftc.gov</a> — attach this PDF as your written statement.</span></div>
               <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>{filings.ftc.items.map(renderItem)}</ul>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
                 <button type="button" className="ghost-button" onClick={() => downloadLetter(filings.ftc!)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
-                <button type="button" className="ghost-button" onClick={() => printLetter(filings.ftc!)} style={{ color: '#f8fafc', fontWeight: 600 }}>🖨 Print</button>
+                <button type="button" className="ghost-button" onClick={() => printLetter(filings.ftc!)} style={{ color: '#0f172a', fontWeight: 600 }}>🖨 Print</button>
               </div>
               <iframe title="FTC report preview" srcDoc={filings.ftc.html} style={{ width: '100%', height: '420px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: '#fff', marginTop: '0.6rem' }} />
             </div>
           ) : (
             <div className="empty-state-card">No FTC report generated yet.</div>
           )}
+          <FilingWalkthrough workflow={FILING_WORKFLOWS.ftc} />
         </div>
       ) : null}
 
@@ -1369,28 +1448,29 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
             <button type="button" className="ghost-button" onClick={generateCfpb} style={{ background: '#2563eb', color: '#fff', border: 'none', fontWeight: 700 }} disabled={!letters.length}>
               📑 Generate CFPB complaint
             </button>
-            <span className="helper-text" style={{ margin: 0, color: '#cbd5e1' }}>{letters.length ? 'Bundles every disputed item into a CFPB complaint citing § 1681i + § 1681s-2 with a 15-day response demand.' : 'Generate dispute letters above first, then come back here.'}</span>
+            <span className="helper-text" style={{ margin: 0, color: '#475569' }}>{letters.length ? 'Bundles every disputed item into a CFPB complaint citing § 1681i + § 1681s-2 with a 15-day response demand.' : 'Generate dispute letters above first, then come back here.'}</span>
           </div>
           {filings.cfpb ? (
             <div className="dispute-card-live">
-              <div className="dispute-card-top"><strong style={{ color: '#fff' }}>CFPB Consumer Complaint</strong><span className="status-badge status-pending">{filings.cfpb.items.length} item{filings.cfpb.items.length === 1 ? '' : 's'}</span></div>
-              <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>File this via <a href="https://www.consumerfinance.gov/complaint/" target="_blank" rel="noreferrer" style={{ color: '#fbbf24' }}>consumerfinance.gov/complaint</a> and attach as your supporting document.</span></div>
+              <div className="dispute-card-top"><strong style={{ color: '#0f172a' }}>CFPB Consumer Complaint</strong><span className="status-badge status-pending">{filings.cfpb.items.length} item{filings.cfpb.items.length === 1 ? '' : 's'}</span></div>
+              <div className="dispute-meta" style={{ color: '#334155' }}><span>File this via <a href="https://www.consumerfinance.gov/complaint/" target="_blank" rel="noreferrer" style={{ color: '#b45309', fontWeight: 600 }}>consumerfinance.gov/complaint</a> and attach as your supporting document.</span></div>
               <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>{filings.cfpb.items.map(renderItem)}</ul>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
                 <button type="button" className="ghost-button" onClick={() => downloadLetter(filings.cfpb!)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
-                <button type="button" className="ghost-button" onClick={() => printLetter(filings.cfpb!)} style={{ color: '#f8fafc', fontWeight: 600 }}>🖨 Print</button>
+                <button type="button" className="ghost-button" onClick={() => printLetter(filings.cfpb!)} style={{ color: '#0f172a', fontWeight: 600 }}>🖨 Print</button>
               </div>
               <iframe title="CFPB complaint preview" srcDoc={filings.cfpb.html} style={{ width: '100%', height: '420px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: '#fff', marginTop: '0.6rem' }} />
             </div>
           ) : (
             <div className="empty-state-card">No CFPB complaint generated yet.</div>
           )}
+          <FilingWalkthrough workflow={FILING_WORKFLOWS.cfpb} />
         </div>
       ) : null}
 
       {subTab === 'mail' ? (
         <div>
-          <div style={{ marginBottom: '0.85rem', padding: '8px 12px', borderRadius: '8px', background: 'rgba(14,165,233,0.10)', border: '1px solid rgba(14,165,233,0.35)', color: '#7dd3fc', fontSize: '0.82rem', fontWeight: 600 }}>
+          <div style={{ marginBottom: '0.85rem', padding: '8px 12px', borderRadius: '8px', background: 'rgba(14,165,233,0.15)', border: '1px solid rgba(14,165,233,0.55)', color: '#0c4a6e', fontSize: '0.82rem', fontWeight: 600 }}>
             CredX prints + mails certified through Lob (~$1.50 per letter, billed to CredX). USPS tracking lands here automatically.
           </div>
           {!fromAddressReady ? (
@@ -1399,11 +1479,11 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
           <div className="dispute-list">
             {Object.values(mailed).length ? Object.values(mailed).map((rec) => (
               <div key={rec.lobId} className="dispute-card-live">
-                <div className="dispute-card-top"><strong style={{ color: '#fff' }}>{rec.bureauLabel}</strong><span className="status-badge status-pending">Lob {rec.certified ? 'Certified' : 'First-class'}</span></div>
-                <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>Lob ID {rec.lobId} · Mailed {new Date(rec.mailedAt).toLocaleDateString()}</span></div>
-                {rec.expectedDeliveryDate ? <div className="dispute-meta" style={{ color: '#cbd5e1' }}><span>Expected delivery: {rec.expectedDeliveryDate}</span></div> : null}
-                {rec.trackingNumber ? <div className="dispute-meta" style={{ color: '#cbd5e1' }}><span>Tracking: <strong style={{ color: '#fff' }}>{rec.trackingNumber}</strong></span></div> : null}
-                {rec.trackingUrl ? <div style={{ marginTop: '6px' }}><a className="ghost-button" href={rec.trackingUrl} target="_blank" rel="noreferrer" style={{ color: '#7dd3fc', fontWeight: 600 }}>Open Lob letter →</a></div> : null}
+                <div className="dispute-card-top"><strong style={{ color: '#0f172a' }}>{rec.bureauLabel}</strong><span className="status-badge status-pending">Lob {rec.certified ? 'Certified' : 'First-class'}</span></div>
+                <div className="dispute-meta" style={{ color: '#334155' }}><span>Lob ID {rec.lobId} · Mailed {new Date(rec.mailedAt).toLocaleDateString()}</span></div>
+                {rec.expectedDeliveryDate ? <div className="dispute-meta" style={{ color: '#475569' }}><span>Expected delivery: {rec.expectedDeliveryDate}</span></div> : null}
+                {rec.trackingNumber ? <div className="dispute-meta" style={{ color: '#475569' }}><span>Tracking: <strong style={{ color: '#0f172a' }}>{rec.trackingNumber}</strong></span></div> : null}
+                {rec.trackingUrl ? <div style={{ marginTop: '6px' }}><a className="ghost-button" href={rec.trackingUrl} target="_blank" rel="noreferrer" style={{ color: '#0369a1', fontWeight: 600 }}>Open Lob letter →</a></div> : null}
               </div>
             )) : <div className="empty-state-card">Nothing mailed yet. Open the Letters tab and hit "Mail via Lob" on a letter.</div>}
           </div>
@@ -1413,34 +1493,34 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
 
       {subTab === 'responses' ? (
         <div>
-          <div style={{ marginBottom: '0.85rem', padding: '8px 12px', borderRadius: '8px', background: 'rgba(168,85,247,0.10)', border: '1px solid rgba(168,85,247,0.35)', color: '#d8b4fe', fontSize: '0.82rem', fontWeight: 600 }}>
+          <div style={{ marginBottom: '0.85rem', padding: '8px 12px', borderRadius: '8px', background: 'rgba(168,85,247,0.18)', border: '1px solid rgba(168,85,247,0.55)', color: '#581c87', fontSize: '0.82rem', fontWeight: 600 }}>
             Upload the bureau's reply (PDF or photo). CredX runs it through a vision model and grades the response: deleted / verified / updated / needs MOV.
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
             <input type="file" accept=".pdf,image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) ingestResponse(f); e.target.value = ''; }} disabled={respBusy} className="chat-input" />
-            {respBusy ? <span className="helper-text" style={{ margin: 0, color: '#cbd5e1' }}>Reading the response…</span> : null}
+            {respBusy ? <span className="helper-text" style={{ margin: 0, color: '#475569' }}>Reading the response…</span> : null}
           </div>
           {respError ? <div className="error-banner" style={{ marginBottom: '0.5rem' }}>{respError}</div> : null}
           <div className="dispute-list">
             {responses.length ? responses.map((r) => (
               <div key={r.id} className="dispute-card-live">
                 <div className="dispute-card-top">
-                  <strong style={{ color: '#fff' }}>{(r.classification.bureau || 'Bureau').toString().toUpperCase()} · {prettyStatus(r.classification.overallDecision || 'unknown')}</strong>
+                  <strong style={{ color: '#0f172a' }}>{(r.classification.bureau || 'Bureau').toString().toUpperCase()} · {prettyStatus(r.classification.overallDecision || 'unknown')}</strong>
                   <span className="status-badge status-pending">{r.classification.outcomes?.length || 0} item{(r.classification.outcomes?.length || 0) === 1 ? '' : 's'}</span>
                 </div>
-                <div className="dispute-meta" style={{ color: '#e2e8f0' }}><span>{r.classification.summary || '—'}</span></div>
-                {r.classification.recommendation ? <div className="dispute-meta" style={{ color: '#fbbf24' }}><span><strong>Next step:</strong> {r.classification.recommendation}</span></div> : null}
+                <div className="dispute-meta" style={{ color: '#334155' }}><span>{r.classification.summary || '—'}</span></div>
+                {r.classification.recommendation ? <div className="dispute-meta" style={{ color: '#92400e' }}><span><strong>Next step:</strong> {r.classification.recommendation}</span></div> : null}
                 {(r.classification.outcomes || []).length ? (
                   <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>
                     {r.classification.outcomes!.map((o, i) => (
-                      <li key={i} style={{ fontSize: '0.86rem', color: '#f1f5f9', padding: '2px 0' }}>
-                        • <strong style={{ color: '#fff' }}>{o.account}</strong> — {prettyStatus(o.decision)}{o.needsMov ? ' (needs MOV)' : ''}<br />
-                        <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>{o.reason}</span>
+                      <li key={i} style={{ fontSize: '0.86rem', color: '#1e293b', padding: '2px 0' }}>
+                        • <strong style={{ color: '#0f172a' }}>{o.account}</strong> — {prettyStatus(o.decision)}{o.needsMov ? ' (needs MOV)' : ''}<br />
+                        <span style={{ color: '#64748b', fontSize: '0.78rem' }}>{o.reason}</span>
                       </li>
                     ))}
                   </ul>
                 ) : null}
-                <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#94a3b8' }}>{r.fileName} · {new Date(r.ingestedAt).toLocaleString()}</div>
+                <div style={{ marginTop: '6px', fontSize: '0.78rem', color: '#64748b' }}>{r.fileName} · {new Date(r.ingestedAt).toLocaleString()}</div>
               </div>
             )) : <div className="empty-state-card">No bureau responses ingested yet.</div>}
           </div>
@@ -1698,7 +1778,7 @@ function categorizeNegatives(analysis: any): Record<string, number> {
 }
 
 function buildAnalysisReportHtml(user: User | null, client: Client | null, analysis: any): string {
-  const name = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Valued Client';
+  const name = (analysis?.clientProfile?.name && String(analysis.clientProfile.name).trim()) || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Valued Client';
   const stats = analysis?.overallStats || {};
   const acctSummary = analysis?.accountSummary || {};
   const findings = analysis?.keyFindings || [];
@@ -2001,7 +2081,7 @@ function AnalysisUploadCard({ token, user, client, progress, refreshAll }: { tok
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem' }}>
             <div>
               <strong style={{ color: '#22c55e', fontSize: '0.95rem' }}>✓ Analysis ready</strong>
-              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '2px' }}>
+              <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '2px' }}>
                 {(overallStats.totalAccounts || 0)} accounts · {(overallStats.totalNegativeAccounts || 0)} negative · {disputeOps.length} dispute opportunities
               </div>
             </div>
@@ -2122,7 +2202,7 @@ function AnalysisSection({ token, user, client, progress, refreshAll }: { token:
           <div className="empty-state-card">
             <strong>Analysis appears here automatically</strong>
             <p>Once your credit report uploads above, CredX runs your analysis within seconds. If your file is being reviewed manually, the analysis will show up here when ready.</p>
-            <p style={{ marginTop: '12px', fontSize: '0.85rem', color: '#94a3b8' }}>
+            <p style={{ marginTop: '12px', fontSize: '0.85rem', color: '#64748b' }}>
               Status: {client?.status || 'Pending'} · Reports uploaded: {client?.documents?.filter(d => d.type === 'CREDIT_REPORT').length || 0}
             </p>
           </div>
@@ -2707,7 +2787,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                   </div>
                   <div style={{ padding: '0.25rem 0 0' }}>
                     <p style={{ marginBottom: '0.85rem', fontSize: '15px', lineHeight: 1.6 }}>
-                      <strong style={{ color: '#cbd5e1' }}>If you skipped credit monitoring on the application</strong>, choose one of these two affiliate providers to pull a fresh tri-merge report.
+                      <strong style={{ color: '#0f172a' }}>If you skipped credit monitoring on the application</strong>, choose one of these two affiliate providers to pull a fresh tri-merge report.
                       Once it's in your hands, come back here and upload — your CredX analysis is generated automatically.
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', margin: '1rem 0 0.75rem' }}>
@@ -2819,12 +2899,12 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                   <div className="dispute-list">
                     {generatedLetters.map((letter) => (
                       <div key={letter.bureau} className="dispute-card-live">
-                        <div className="dispute-card-top"><strong style={{ color: '#fff' }}>{letter.bureauLabel}</strong><span className="status-badge status-pending">{letter.items.length} item{letter.items.length === 1 ? '' : 's'}</span></div>
+                        <div className="dispute-card-top"><strong style={{ color: '#0f172a' }}>{letter.bureauLabel}</strong><span className="status-badge status-pending">{letter.items.length} item{letter.items.length === 1 ? '' : 's'}</span></div>
                         <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>
                           {letter.items.slice(0, 4).map((it: any, i: number) => (
-                            <li key={i} style={{ fontSize: '0.86rem', color: '#f1f5f9', fontWeight: 500, padding: '2px 0' }}>• <strong style={{ color: '#fff' }}>{it.accountName}</strong> — {it.issue}</li>
+                            <li key={i} style={{ fontSize: '0.86rem', color: '#1e293b', fontWeight: 500, padding: '2px 0' }}>• <strong style={{ color: '#0f172a' }}>{it.accountName}</strong> — {it.issue}</li>
                           ))}
-                          {letter.items.length > 4 ? <li style={{ fontSize: '0.78rem', color: '#94a3b8', padding: '2px 0' }}>+ {letter.items.length - 4} more</li> : null}
+                          {letter.items.length > 4 ? <li style={{ fontSize: '0.78rem', color: '#64748b', padding: '2px 0' }}>+ {letter.items.length - 4} more</li> : null}
                         </ul>
                       </div>
                     ))}
