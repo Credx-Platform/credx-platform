@@ -956,14 +956,55 @@ function downloadLetter(letter: DisputeLetter) {
   URL.revokeObjectURL(url);
 }
 
+async function downloadPdfLetter(letter: DisputeLetter): Promise<void> {
+  const mod = await import('html2pdf.js');
+  const html2pdf = (mod as { default?: any }).default ?? (mod as any);
+  const container = document.createElement('div');
+  container.innerHTML = letter.html;
+  container.style.position = 'fixed';
+  container.style.left = '-10000px';
+  container.style.top = '0';
+  container.style.width = '8.5in';
+  document.body.appendChild(container);
+  try {
+    await html2pdf()
+      .set({
+        margin: [0.55, 0.6, 0.55, 0.6],
+        filename: letter.filename.replace(/\.html?$/i, '.pdf'),
+        image: { type: 'jpeg', quality: 0.96 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      })
+      .from(container)
+      .save();
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
 function printLetter(letter: DisputeLetter) {
-  const w = window.open('', '_blank', 'noopener,noreferrer');
-  if (!w) return;
-  w.document.open();
-  w.document.write(letter.html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => { try { w.print(); } catch {} }, 250);
+  const existing = document.getElementById('credx-print-frame');
+  if (existing) existing.remove();
+  const iframe = document.createElement('iframe');
+  iframe.id = 'credx-print-frame';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.srcdoc = letter.html;
+  iframe.onload = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch {
+      // ignore — popup blockers etc.
+    }
+  };
+  document.body.appendChild(iframe);
 }
 
 function buildFtcReportHtml(user: User | null, client: Client | null, allItems: any[], progress: Progress | null = null): string {
@@ -1375,10 +1416,10 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
                 {letter.items.map(renderItem)}
               </ul>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-                <button type="button" className="ghost-button" onClick={() => downloadLetter(letter)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
+                <button type="button" className="ghost-button" onClick={() => downloadLetter(letter)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download HTML</button>
                 <button type="button" className="ghost-button" onClick={() => printLetter(letter)} style={{ color: '#0f172a', fontWeight: 600 }}>🖨 Print this letter</button>
-                <button type="button" className="ghost-button" onClick={() => mailViaLob(letter)} disabled={mailingBureau === letter.bureau} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>
-                  {mailingBureau === letter.bureau ? 'Mailing…' : mailed[letter.bureau] ? '📮 Re-mail via Lob' : '📮 Mail via Lob (certified)'}
+                <button type="button" className="ghost-button" onClick={() => { downloadPdfLetter(letter).catch((e) => setMailError(e instanceof Error ? e.message : 'PDF generation failed.')); }} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>
+                  📄 Download PDF for mailing
                 </button>
               </div>
               {mailed[letter.bureau] ? (
@@ -1430,7 +1471,8 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
               <div className="dispute-meta" style={{ color: '#334155' }}><span>Ready to file via <a href="https://reportfraud.ftc.gov" target="_blank" rel="noreferrer" style={{ color: '#b45309', fontWeight: 600 }}>ReportFraud.ftc.gov</a> — attach this PDF as your written statement.</span></div>
               <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>{filings.ftc.items.map(renderItem)}</ul>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-                <button type="button" className="ghost-button" onClick={() => downloadLetter(filings.ftc!)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
+                <button type="button" className="ghost-button" onClick={() => downloadLetter(filings.ftc!)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download HTML</button>
+                <button type="button" className="ghost-button" onClick={() => { downloadPdfLetter(filings.ftc!).catch((e) => setMailError(e instanceof Error ? e.message : 'PDF generation failed.')); }} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>📄 Download PDF</button>
                 <button type="button" className="ghost-button" onClick={() => printLetter(filings.ftc!)} style={{ color: '#0f172a', fontWeight: 600 }}>🖨 Print</button>
               </div>
               <iframe title="FTC report preview" srcDoc={filings.ftc.html} style={{ width: '100%', height: '420px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: '#fff', marginTop: '0.6rem' }} />
@@ -1456,7 +1498,8 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
               <div className="dispute-meta" style={{ color: '#334155' }}><span>File this via <a href="https://www.consumerfinance.gov/complaint/" target="_blank" rel="noreferrer" style={{ color: '#b45309', fontWeight: 600 }}>consumerfinance.gov/complaint</a> and attach as your supporting document.</span></div>
               <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>{filings.cfpb.items.map(renderItem)}</ul>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-                <button type="button" className="ghost-button" onClick={() => downloadLetter(filings.cfpb!)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download</button>
+                <button type="button" className="ghost-button" onClick={() => downloadLetter(filings.cfpb!)} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>⬇ Download HTML</button>
+                <button type="button" className="ghost-button" onClick={() => { downloadPdfLetter(filings.cfpb!).catch((e) => setMailError(e instanceof Error ? e.message : 'PDF generation failed.')); }} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>📄 Download PDF</button>
                 <button type="button" className="ghost-button" onClick={() => printLetter(filings.cfpb!)} style={{ color: '#0f172a', fontWeight: 600 }}>🖨 Print</button>
               </div>
               <iframe title="CFPB complaint preview" srcDoc={filings.cfpb.html} style={{ width: '100%', height: '420px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: '#fff', marginTop: '0.6rem' }} />
