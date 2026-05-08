@@ -576,44 +576,83 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
             console.error('Profile auto-populate from report failed:', (subjectErr as Error).message);
           }
 
-          const existingAnalysis = await prisma.clientProgress.findUnique({
+          const existingProgress = await prisma.clientProgress.findUnique({
             where: { clientId },
-            select: { analysis: true }
+            select: { analysis: true, scores: true }
           });
 
-          if (!existingAnalysis?.analysis) {
-            const analysis = CreditAnalysisService.generate({
-              client: clientWithReports as any,
-              creditReports: clientWithReports.creditReports as any
-            });
+          const analysis = CreditAnalysisService.generate({
+            client: clientWithReports as any,
+            creditReports: clientWithReports.creditReports as any
+          });
 
-            await prisma.clientProgress.update({
-              where: { clientId },
-              data: {
-                analysis: analysis as any,
-                workflow: {
-                  ...(baseWorkflow as any || {}),
-                  stage: 'analysis_ready',
-                  updatedAt: ts,
-                  next: ['review_analysis', 'begin_disputes']
-                }
+          const newScores: { experian: number | null; equifax: number | null; transunion: number | null } = { experian: null, equifax: null, transunion: null };
+          for (const s of analysis.bureauScores || []) {
+            if (typeof s.score !== 'number') continue;
+            if (s.bureau === 'EXPERIAN') newScores.experian = s.score;
+            else if (s.bureau === 'EQUIFAX') newScores.equifax = s.score;
+            else if (s.bureau === 'TRANSUNION') newScores.transunion = s.score;
+          }
+
+          const prevScores = (existingProgress?.scores as { experian?: number | null; equifax?: number | null; transunion?: number | null } | null) || { experian: null, equifax: null, transunion: null };
+          const deltas: Array<{ bureau: 'experian' | 'equifax' | 'transunion'; from: number | null; to: number | null; delta: number | null }> = (['experian', 'equifax', 'transunion'] as const).map((b) => {
+            const from = (prevScores as any)?.[b] ?? null;
+            const to = newScores[b];
+            const delta = (typeof from === 'number' && typeof to === 'number') ? (to - from) : null;
+            return { bureau: b, from, to, delta };
+          });
+          const movedDeltas = deltas.filter(d => d.delta !== null && d.delta !== 0);
+
+          await prisma.clientProgress.update({
+            where: { clientId },
+            data: {
+              analysis: analysis as any,
+              scores: newScores as any,
+              workflow: {
+                ...(baseWorkflow as any || {}),
+                stage: 'analysis_ready',
+                updatedAt: ts,
+                next: ['review_analysis', 'begin_disputes']
               }
-            });
+            }
+          });
 
-            await prisma.client.update({
-              where: { id: clientId },
-              data: {
-                status: 'ANALYSIS_READY',
-                analysisSummary: analysis.clientFacingSummary.slice(0, 500) + '...'
-              }
-            });
+          await prisma.client.update({
+            where: { id: clientId },
+            data: {
+              status: 'ANALYSIS_READY',
+              analysisSummary: analysis.clientFacingSummary.slice(0, 500) + '...'
+            }
+          });
 
+          if (!existingProgress?.analysis) {
             await prisma.activityEvent.create({
               data: {
                 clientId,
                 type: 'ANALYSIS_AUTO_GENERATED',
                 message: `Credit analysis auto-generated after report upload: ${analysis.keyFindings.length} findings identified.`,
                 metadata: { findingCount: analysis.keyFindings.length, disputeCount: analysis.disputeOpportunities.length }
+              }
+            });
+          }
+
+          if (movedDeltas.length) {
+            const summary = movedDeltas.map(d => `${d.bureau} ${d.from ?? '—'} → ${d.to ?? '—'} (${d.delta! > 0 ? '+' : ''}${d.delta})`).join(' · ');
+            await prisma.activityEvent.create({
+              data: {
+                clientId,
+                type: 'SCORE_DELTA',
+                message: `Score update from new report: ${summary}`,
+                metadata: { deltas: movedDeltas, scores: newScores }
+              }
+            });
+          } else if (!existingProgress?.scores && (newScores.experian || newScores.equifax || newScores.transunion)) {
+            await prisma.activityEvent.create({
+              data: {
+                clientId,
+                type: 'SCORE_BASELINE',
+                message: `Initial scores recorded: experian ${newScores.experian ?? '—'}, equifax ${newScores.equifax ?? '—'}, transunion ${newScores.transunion ?? '—'}`,
+                metadata: { scores: newScores }
               }
             });
           }
