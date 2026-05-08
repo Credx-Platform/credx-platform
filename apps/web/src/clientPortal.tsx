@@ -3206,8 +3206,8 @@ function CrossPromoFooter({ isPaid, isMasterclassEnrolled, isMasterclassOnly }: 
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginTop: '0.85rem' }}>
         {showPaidUpgrade ? (
           <>
-            <a className="ghost-button" href="/signup?upgrade=paid" style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, textDecoration: 'none' }}>Upgrade to paid subscription →</a>
-            <a className="ghost-button" href="/signup?compare=tiers" style={{ background: '#101a2b', color: '#f8fafc', border: '1px solid rgba(34,197,94,0.45)', fontWeight: 600, textDecoration: 'none' }}>Compare service tiers</a>
+            <a className="ghost-button" href="/signup?offer=program" style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, textDecoration: 'none' }}>Upgrade to paid subscription →</a>
+            <a className="ghost-button" href="/#pricing" style={{ background: '#101a2b', color: '#f8fafc', border: '1px solid rgba(34,197,94,0.45)', fontWeight: 600, textDecoration: 'none' }}>Compare service tiers</a>
           </>
         ) : (
           <>

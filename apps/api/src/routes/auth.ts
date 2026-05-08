@@ -30,7 +30,9 @@ const registerSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   phone: z.string().optional(),
-  offerInterest: z.enum(['program', 'masterclass']).optional()
+  offerInterest: z.enum(['program', 'masterclass']).optional(),
+  referralSource: z.string().max(80).optional(),
+  referralDetail: z.string().max(160).optional()
 });
 
 authRouter.post('/register', async (req, res, next) => {
@@ -52,7 +54,14 @@ authRouter.post('/register', async (req, res, next) => {
             status: 'LEAD',
             progress: {
               create: {
-                onboarding: { status: 'pending', signupAt: new Date().toISOString(), completedAt: null },
+                onboarding: {
+                  status: 'pending',
+                  signupAt: new Date().toISOString(),
+                  completedAt: null,
+                  referralSource: data.referralSource || null,
+                  referralDetail: data.referralDetail || null,
+                  initialOfferInterest: data.offerInterest || null
+                },
                 education: {
                   masterclassEnrolled: data.offerInterest === 'masterclass',
                   masterclassAccess: data.offerInterest === 'masterclass',
@@ -191,6 +200,70 @@ authRouter.post('/password-setup/complete', async (req, res, next) => {
     const token = signToken({ sub: record.user.id, role: record.user.role });
     const { passwordHash: _omit, ...safeUser } = record.user;
     return res.json({ user: safeUser, token });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const upgradeSchema = z.object({
+  offerInterest: z.enum(['program', 'masterclass']),
+  phone: z.string().optional(),
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().min(1).optional()
+});
+
+authRouter.post('/upgrade', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const data = upgradeSchema.parse(req.body);
+    const user = await prisma.user.findUnique({
+      where: { id: req.auth!.sub },
+      include: { client: { include: { progress: true } } }
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user.client?.progress) return res.status(404).json({ error: 'Client progress not found' });
+
+    const userPatch: Record<string, unknown> = {};
+    if (data.firstName && data.firstName !== user.firstName) userPatch.firstName = data.firstName;
+    if (data.lastName && data.lastName !== user.lastName) userPatch.lastName = data.lastName;
+    if (data.phone && data.phone !== user.phone) userPatch.phone = data.phone;
+    if (Object.keys(userPatch).length) {
+      await prisma.user.update({ where: { id: user.id }, data: userPatch });
+    }
+
+    const education = (user.client.progress.education as Record<string, unknown>) || {};
+    const onboarding = (user.client.progress.onboarding as Record<string, unknown>) || {};
+    const upgradeHistory = Array.isArray((onboarding as any).upgradeHistory) ? [...(onboarding as any).upgradeHistory as any[]] : [];
+    upgradeHistory.push({ at: new Date().toISOString(), to: data.offerInterest });
+
+    const nextEducation = { ...education } as Record<string, unknown>;
+    if (data.offerInterest === 'masterclass') {
+      nextEducation.masterclassEnrolled = true;
+      nextEducation.masterclassAccess = true;
+      if (!nextEducation.enrolledAt) nextEducation.enrolledAt = new Date().toISOString();
+      nextEducation.offerEligibleUntil = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    }
+
+    await prisma.clientProgress.update({
+      where: { clientId: user.client.id },
+      data: {
+        education: nextEducation as any,
+        onboarding: { ...onboarding, upgradeHistory, lastUpgradeAt: new Date().toISOString(), lastOfferInterest: data.offerInterest } as any
+      }
+    });
+
+    const refreshed = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: { client: { include: { progress: true } } }
+    });
+    const token = signToken({ sub: user.id, role: user.role });
+    const { passwordHash: _omit, client, ...safeUser } = refreshed!;
+    return res.json({
+      user: safeUser,
+      token,
+      client,
+      progress: client?.progress ?? null,
+      offerInterest: data.offerInterest
+    });
   } catch (error) {
     next(error);
   }

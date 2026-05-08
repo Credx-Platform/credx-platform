@@ -4,198 +4,516 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CredX Sign Up</title>
-<meta name="description" content="Sign up for CredX directly. Choose the guided program or 5-Day Masterclass and submit your intake.">
+<meta name="description" content="Sign up for CredX or upgrade your existing account.">
 <style>
-:root{--bg:#07111f;--bg2:#0d1b31;--bg3:#112543;--bg4:#173457;--border:rgba(147,197,253,.15);--border-c:rgba(34,211,238,.35);--white:#f8fbff;--text:#dbe8ff;--muted:#9fb5d6;--cyan:#22d3ee;--cyan-dim:rgba(34,211,238,.16);--shadow:0 30px 80px rgba(0,0,0,.35)}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at top,#13335e 0%,#08111d 42%,#050a12 100%);color:var(--text)}
-a{color:inherit}.page{min-height:100vh;padding:32px 18px 48px}.shell{max-width:1120px;margin:0 auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:26px}.brand{display:flex;align-items:center;gap:12px;text-decoration:none}.brand img{width:44px;height:44px;border-radius:12px;object-fit:cover;box-shadow:0 10px 30px rgba(0,0,0,.25)}.brand-copy{display:flex;flex-direction:column}.brand-copy strong{color:var(--white);font-size:16px}.brand-copy span{font-size:12px;color:var(--muted)}.top-actions{display:flex;gap:10px;flex-wrap:wrap}.top-link{padding:10px 14px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.03);text-decoration:none;color:var(--text);font-size:13px}.top-link.primary{background:linear-gradient(135deg,var(--cyan),#2563eb);color:#03111b;border-color:transparent;font-weight:700}.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:start}.panel{background:linear-gradient(180deg,rgba(8,17,31,.86),rgba(8,17,31,.68));border:1px solid var(--border);border-radius:28px;box-shadow:var(--shadow);backdrop-filter:blur(18px)}.intro{padding:34px}.eyebrow{display:inline-flex;padding:8px 12px;border-radius:999px;background:var(--cyan-dim);border:1px solid var(--border-c);color:var(--cyan);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.intro h1{margin:18px 0 14px;font-size:48px;line-height:1.05;color:var(--white)}.intro p{margin:0 0 18px;color:var(--muted);line-height:1.7;font-size:16px}.path-grid{display:grid;gap:14px;margin-top:22px}.path-card{padding:18px;border:1px solid var(--border);border-radius:20px;background:rgba(255,255,255,.03)}.path-card.active{border-color:var(--border-c);background:rgba(34,211,238,.1)}.path-card h3{margin:0 0 8px;color:var(--white);font-size:18px}.path-card p{margin:0;color:var(--muted);font-size:14px;line-height:1.6}.mini-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.mini-btn{padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--border);text-decoration:none;font-size:14px}.mini-btn strong{color:var(--white)}.form-wrap{padding:30px}.form-wrap h2{margin:0 0 8px;color:var(--white);font-size:30px}.form-wrap p{margin:0 0 22px;color:var(--muted);line-height:1.6}.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}.form-row.single{grid-template-columns:1fr}.form-group label{display:block;margin:0 0 8px;font-size:13px;color:#c8daf7;font-weight:600}.form-group input,.form-group select{width:100%;padding:14px 14px;border-radius:14px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--white);font-size:14px;outline:none}.form-group input::placeholder{color:#86a3c8}.choice-group{display:grid;grid-template-columns:1fr 1fr;gap:12px}.choice-card{position:relative;display:flex;align-items:center;gap:10px;padding:14px 15px;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.03);cursor:pointer;min-height:58px}.choice-card.active{border-color:var(--border-c);background:rgba(34,211,238,.11)}.choice-card input{position:absolute;opacity:0;pointer-events:none}.choice-dot{width:14px;height:14px;border-radius:50%;border:2px solid #6f8db2;display:inline-block;flex-shrink:0}.choice-card.active .choice-dot{border-color:var(--cyan);background:var(--cyan);box-shadow:0 0 0 3px rgba(34,211,238,.15)}.conditional-field{display:none;margin-top:12px}.conditional-field.show{display:block}.cb-row{display:flex;gap:12px;align-items:flex-start;margin:18px 0 14px}.cb-row input{margin-top:3px}.cb-row label{font-size:13px;color:var(--muted);line-height:1.5}.action-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}.form-submit,.secondary-btn{appearance:none;border:none;cursor:pointer;padding:14px 18px;border-radius:14px;font-weight:700;font-size:14px}.form-submit{background:linear-gradient(135deg,var(--cyan),#2563eb);color:#03111b;flex:1}.secondary-btn{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);text-decoration:none;text-align:center}.success-panel{display:none;text-align:center;padding:8px 0 4px}.success-icon{font-size:38px}.success-title{margin-top:8px;color:var(--white);font-size:24px;font-weight:800}.success-msg{margin-top:8px;color:var(--muted);line-height:1.6}.success-links{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:18px}.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(24px);background:#07111f;border:1px solid var(--border);color:var(--white);padding:12px 16px;border-radius:14px;opacity:0;pointer-events:none;transition:.25s;z-index:20;box-shadow:var(--shadow)}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}.toast.error{border-color:rgba(248,113,113,.4)}@media (max-width:980px){.hero{grid-template-columns:1fr}.intro h1{font-size:38px}}@media (max-width:640px){.page{padding:18px 14px 40px}.topbar{flex-direction:column;align-items:flex-start}.form-row,.choice-group{grid-template-columns:1fr}.intro,.form-wrap{padding:22px}.intro h1{font-size:32px}}</style>
+:root {
+  --bg: #07111f;
+  --card: rgba(8, 17, 31, 0.82);
+  --border: rgba(147, 197, 253, 0.18);
+  --border-strong: rgba(34, 211, 238, 0.45);
+  --white: #f8fbff;
+  --text: #dbe8ff;
+  --muted: #9fb5d6;
+  --cyan: #22d3ee;
+  --error: #fca5a5;
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  background: radial-gradient(ellipse at top, #13335e 0%, #08111d 50%, #050a12 100%);
+  color: var(--text);
+  min-height: 100vh;
+}
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 18px 36px;
+}
+.topbar {
+  max-width: 460px;
+  margin: 0 auto 24px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+.brand img {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.brand strong { color: var(--white); font-size: 15px; }
+.top-link {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+}
+.top-link:hover { color: var(--white); border-bottom-color: var(--border-strong); }
+
+.card {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+  padding: 32px 28px;
+}
+.eyebrow {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid var(--border-strong);
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  line-height: 1.15;
+  color: var(--white);
+}
+.subhead {
+  margin: 0 0 22px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.upgrade-banner {
+  display: none;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.upgrade-banner.show { display: block; }
+.upgrade-banner strong { color: var(--white); }
+
+.field { display: block; margin-bottom: 14px; }
+.field label, .field > span {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c8daf7;
+  margin-bottom: 6px;
+}
+.field input, .field select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--white);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field input::placeholder { color: #86a3c8; }
+.field input:focus, .field select:focus { border-color: var(--border-strong); }
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.field-row .field { margin-bottom: 14px; }
+
+.consent {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 4px 0 18px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.consent input { margin-top: 3px; flex-shrink: 0; }
+
+.submit {
+  width: 100%;
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  padding: 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--cyan), #2563eb);
+  color: #03111b;
+  font-weight: 700;
+  font-size: 15px;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.submit:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(34, 211, 238, 0.32); }
+.submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.alt-link {
+  display: block;
+  text-align: center;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+.alt-link:hover { color: var(--white); }
+.alt-link a { color: var(--cyan); text-decoration: none; }
+
+.error-banner {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: var(--error);
+  font-size: 13px;
+  line-height: 1.5;
+  display: none;
+}
+.error-banner.show { display: block; }
+
+.success-panel { display: none; text-align: center; padding: 8px 0 0; }
+.success-panel.show { display: block; }
+.success-icon { font-size: 42px; }
+.success-title { margin: 8px 0 6px; color: var(--white); font-size: 22px; font-weight: 700; }
+.success-msg { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.success-links { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+.success-links a {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.success-links a:hover { color: var(--white); border-color: var(--border-strong); }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(24px);
+  background: #07111f;
+  border: 1px solid var(--border);
+  color: var(--white);
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.25s;
+  z-index: 20;
+  box-shadow: var(--shadow);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.error { border-color: rgba(248, 113, 113, 0.4); }
+
+@media (max-width: 480px) {
+  .field-row { grid-template-columns: 1fr; gap: 0; }
+  .card { padding: 24px 20px; }
+  h1 { font-size: 24px; }
+}
+</style>
 </head>
 <body>
 <div class="page">
- <div class="shell">
   <div class="topbar">
-   <a class="brand" href="/">
-    <img src="/images/credx-logo-1.jpg" alt="CredX logo">
-    <div class="brand-copy">
-     <strong>CredX</strong>
-     <span>Direct sign-up page</span>
-    </div>
-   </a>
-   <div class="top-actions">
-    <a class="top-link" href="/">Back to landing page</a>
-    <a class="top-link" href="/portal">Client portal login</a>
-    <a class="top-link primary" href="/signup?offer=program">Program sign up</a>
-   </div>
+    <a class="brand" href="/">
+      <img src="/images/credx-logo-1.jpg" alt="CredX">
+      <strong>CredX</strong>
+    </a>
+    <a class="top-link" href="/portal">Portal login</a>
   </div>
 
-  <div class="hero">
-   <div class="panel intro">
-    <div class="eyebrow">Direct CredX intake</div>
-    <h1>Choose your path and sign up.</h1>
-    <p>This page is built for fast links, DMs, text messages, ads, and QR codes. Pick the CredX path that fits you, submit your intake, and your lead will go straight into the admin workflow for follow-up.</p>
-    <div class="path-grid">
-     <div class="path-card" id="programCard">
-      <h3>CredX Program + AI + Coaching</h3>
-      <p>Best for people who want guided support, file review, structured next steps, dispute workflow visibility, and portal-based progress tracking.</p>
-     </div>
-     <div class="path-card" id="masterclassCard">
-      <h3>5-Day Masterclass DIY Guide</h3>
-      <p>Best for people who want education first, a structured DIY path, and a lower-friction way to learn credit, disputes, rebuilding, and funding readiness.</p>
-     </div>
-    </div>
-    <div class="mini-actions">
-     <a class="mini-btn" href="/signup?offer=program"><strong>Program:</strong> guided support</a>
-     <a class="mini-btn" href="/signup?offer=masterclass"><strong>Masterclass:</strong> DIY education</a>
-     <a class="mini-btn" href="/portal"><strong>Already a client?</strong> Open portal</a>
-    </div>
-   </div>
+  <form class="card" id="signupForm" novalidate>
+    <div class="eyebrow" id="eyebrow">CredX Sign Up</div>
+    <h1 id="formHeading">Get started with CredX</h1>
+    <p class="subhead" id="formSubhead">Short form below — your details go straight into the CredX pipeline for review.</p>
 
-   <div class="panel form-wrap">
-    <h2>Start your CredX sign up</h2>
-    <p>Complete the short intake below. Once submitted, your information goes into the CredX admin pipeline for review and follow-up.</p>
+    <div class="upgrade-banner" id="upgradeBanner">
+      <strong id="upgradeBannerName">Welcome back.</strong>
+      <span id="upgradeBannerBody"> You're already signed in. Submit to add this plan to your account — no need to sign up again.</span>
+    </div>
 
-    <div id="form-panel">
-     <div class="form-row">
-      <div class="form-group"><label for="firstName">First Name</label><input id="firstName" type="text" placeholder="First name"></div>
-      <div class="form-group"><label for="lastName">Last Name</label><input id="lastName" type="text" placeholder="Last name"></div>
-     </div>
-     <div class="form-row">
-      <div class="form-group"><label for="email">Email</label><input id="email" type="email" placeholder="Email address"></div>
-      <div class="form-group"><label for="phone">Phone</label><input id="phone" type="tel" placeholder="Phone number"></div>
-     </div>
-     <div class="form-row single">
-      <div class="form-group">
-       <label for="creditGoal">Primary Goal</label>
-       <select id="creditGoal">
-        <option value="">Select one</option>
-        <option value="Remove negative items">Remove negative items</option>
-        <option value="Prepare for financing">Prepare for financing</option>
-        <option value="Rebuild after collections or charge-offs">Rebuild after collections or charge-offs</option>
-        <option value="General credit improvement">General credit improvement</option>
-       </select>
+    <div class="error-banner" id="errorBanner"></div>
+
+    <div id="formFields">
+      <div class="field-row">
+        <div class="field">
+          <label for="firstName">First name</label>
+          <input id="firstName" type="text" autocomplete="given-name" placeholder="First">
+        </div>
+        <div class="field">
+          <label for="lastName">Last name</label>
+          <input id="lastName" type="text" autocomplete="family-name" placeholder="Last">
+        </div>
       </div>
-     </div>
-     <div class="form-row single">
-      <div class="form-group">
-       <label>Which CredX offer are you interested in?</label>
-       <div class="choice-group" id="offerInterestGroup">
-        <label class="choice-card"><input type="radio" name="offerInterest" value="program"><span class="choice-dot"></span><span>CredX Program + AI + Coaching</span></label>
-        <label class="choice-card"><input type="radio" name="offerInterest" value="masterclass"><span class="choice-dot"></span><span>5-Day Masterclass DIY Guide</span></label>
-       </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com">
       </div>
-     </div>
-     <div class="form-row single">
-      <div class="form-group">
-       <label>How did you hear about us?</label>
-       <div class="choice-group" id="heardAboutGroup">
-        <label class="choice-card"><input type="radio" name="heardAbout" value="YouTube"><span class="choice-dot"></span><span>YouTube</span></label>
-        <label class="choice-card"><input type="radio" name="heardAbout" value="Instagram"><span class="choice-dot"></span><span>Instagram</span></label>
-        <label class="choice-card"><input type="radio" name="heardAbout" value="TikTok"><span class="choice-dot"></span><span>TikTok</span></label>
-        <label class="choice-card"><input type="radio" name="heardAbout" value="Facebook"><span class="choice-dot"></span><span>Facebook</span></label>
-        <label class="choice-card"><input type="radio" name="heardAbout" value="Friend or family"><span class="choice-dot"></span><span>Friend or family</span></label>
-        <label class="choice-card"><input type="radio" name="heardAbout" value="Other"><span class="choice-dot"></span><span>Other</span></label>
-       </div>
-       <div class="conditional-field" id="referralNameWrap">
-        <input id="referralName" type="text" placeholder="Who referred you?">
-       </div>
-       <div class="conditional-field" id="heardAboutOtherWrap">
-        <input id="heardAboutOther" type="text" placeholder="Tell us where you found us">
-       </div>
+
+      <div class="field">
+        <label for="phone">Phone <span style="opacity:.6;font-weight:400">(optional)</span></label>
+        <input id="phone" type="tel" autocomplete="tel" placeholder="(555) 555-1234">
       </div>
-     </div>
-     <div class="cb-row">
-      <input id="consent" type="checkbox">
-      <label for="consent">I confirm the information submitted is accurate to the best of my knowledge.</label>
-     </div>
-     <div class="action-row">
-      <button class="form-submit" id="submitBtn" type="button">Confirm & Submit</button>
-      <a class="secondary-btn" href="/portal">Already have a portal account?</a>
-     </div>
+
+      <div class="field">
+        <label for="offerInterest">Plan</label>
+        <select id="offerInterest">
+          <option value="program">CredX Program (guided + AI + coaching)</option>
+          <option value="masterclass">5-Day Masterclass (DIY education)</option>
+        </select>
+      </div>
+
+      <div class="field" id="referralField">
+        <label for="referralSource">How did you hear about us?</label>
+        <select id="referralSource">
+          <option value="">Select one</option>
+          <option value="YouTube">YouTube</option>
+          <option value="Instagram">Instagram</option>
+          <option value="TikTok">TikTok</option>
+          <option value="Facebook">Facebook</option>
+          <option value="Friend or family">Friend or family</option>
+          <option value="Search">Search engine</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="field" id="referralDetailField" style="display:none">
+        <label for="referralDetail" id="referralDetailLabel">Who referred you?</label>
+        <input id="referralDetail" type="text" placeholder="Name or source">
+      </div>
+
+      <label class="consent">
+        <input id="consent" type="checkbox">
+        <span>I confirm the information I'm submitting is accurate.</span>
+      </label>
+
+      <button class="submit" id="submitBtn" type="submit">Create my account</button>
+
+      <a class="alt-link" id="altLink" href="/portal">Already have an account? <a href="/portal">Sign in</a></a>
     </div>
 
     <div class="success-panel" id="successPanel">
-     <div class="success-icon">✅</div>
-     <div class="success-title">Sign-up received</div>
-     <div class="success-msg">Thanks — your intake was submitted successfully. A CredX specialist can follow up after review.</div>
-     <div class="success-links">
-      <a class="secondary-btn" href="/">Back to main site</a>
-      <a class="secondary-btn" href="/portal">Client portal login</a>
-     </div>
+      <div class="success-icon">✅</div>
+      <div class="success-title" id="successTitle">Sign-up received</div>
+      <p class="success-msg" id="successMsg">Thanks — your details are in the CredX pipeline. Check your email for what's next.</p>
+      <div class="success-links">
+        <a href="/">Back to homepage</a>
+        <a href="/portal">Open portal</a>
+      </div>
     </div>
-   </div>
-  </div>
- </div>
+  </form>
 </div>
+
 <div class="toast" id="toast"></div>
+
 <script>
-const API_BASE='https://credxapi-production.up.railway.app';
-const params=new URLSearchParams(window.location.search);
-const requestedOffer=params.get('offer');
-function generateTempPassword(){
- return 'Credx!' + Math.random().toString(36).slice(2,10) + '9A';
+const API_BASE = 'https://credxapi-production.up.railway.app';
+const TOKEN_KEY = 'credx-client-token';
+const params = new URLSearchParams(window.location.search);
+const requestedOffer = params.get('offer') === 'masterclass' ? 'masterclass' : 'program';
+
+const els = {
+  form: document.getElementById('signupForm'),
+  heading: document.getElementById('formHeading'),
+  subhead: document.getElementById('formSubhead'),
+  eyebrow: document.getElementById('eyebrow'),
+  upgradeBanner: document.getElementById('upgradeBanner'),
+  upgradeBannerName: document.getElementById('upgradeBannerName'),
+  upgradeBannerBody: document.getElementById('upgradeBannerBody'),
+  errorBanner: document.getElementById('errorBanner'),
+  fields: document.getElementById('formFields'),
+  successPanel: document.getElementById('successPanel'),
+  successTitle: document.getElementById('successTitle'),
+  successMsg: document.getElementById('successMsg'),
+  firstName: document.getElementById('firstName'),
+  lastName: document.getElementById('lastName'),
+  email: document.getElementById('email'),
+  phone: document.getElementById('phone'),
+  offerInterest: document.getElementById('offerInterest'),
+  referralSource: document.getElementById('referralSource'),
+  referralDetail: document.getElementById('referralDetail'),
+  referralDetailField: document.getElementById('referralDetailField'),
+  referralDetailLabel: document.getElementById('referralDetailLabel'),
+  referralField: document.getElementById('referralField'),
+  consent: document.getElementById('consent'),
+  submitBtn: document.getElementById('submitBtn'),
+  altLink: document.getElementById('altLink'),
+  toast: document.getElementById('toast')
+};
+
+let mode = 'register'; // or 'upgrade'
+let existingToken = null;
+
+function showToast(msg, type) {
+  els.toast.textContent = msg;
+  els.toast.className = 'toast show' + (type === 'error' ? ' error' : '');
+  setTimeout(() => { els.toast.className = 'toast'; }, 3200);
 }
-const heardAboutInputs=[...document.querySelectorAll('input[name="heardAbout"]')];
-const offerInterestInputs=[...document.querySelectorAll('input[name="offerInterest"]')];
-const referralNameWrap=document.getElementById('referralNameWrap');
-const heardAboutOtherWrap=document.getElementById('heardAboutOtherWrap');
-let selectedOfferInterest='program';
-function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>{t.className='toast';},3200);}
-function syncOfferInterestUI(){
- offerInterestInputs.forEach(input=>input.closest('.choice-card').classList.toggle('active',input.checked));
- selectedOfferInterest=offerInterestInputs.find(input=>input.checked)?.value||'program';
- document.getElementById('programCard').classList.toggle('active',selectedOfferInterest==='program');
- document.getElementById('masterclassCard').classList.toggle('active',selectedOfferInterest==='masterclass');
+function showError(msg) {
+  els.errorBanner.textContent = msg;
+  els.errorBanner.classList.add('show');
 }
-function syncHeardAboutUI(){
- const selected=heardAboutInputs.find(input=>input.checked)?.value||'';
- heardAboutInputs.forEach(input=>input.closest('.choice-card').classList.toggle('active',input.checked));
- referralNameWrap.classList.toggle('show',selected==='Friend or family');
- heardAboutOtherWrap.classList.toggle('show',selected==='Other');
- if(selected!=='Friend or family') document.getElementById('referralName').value='';
- if(selected!=='Other') document.getElementById('heardAboutOther').value='';
-}
-function selectOffer(value){
- const target=offerInterestInputs.find(input=>input.value===value) || offerInterestInputs[0];
- if(target){ target.checked=true; syncOfferInterestUI(); }
-}
-heardAboutInputs.forEach(input=>input.addEventListener('change',syncHeardAboutUI));
-offerInterestInputs.forEach(input=>input.addEventListener('change',syncOfferInterestUI));
-syncHeardAboutUI();
-selectOffer(requestedOffer==='masterclass'?'masterclass':'program');
-async function submitForm(){
- const btn=document.getElementById('submitBtn');
- const payload={
-  firstName:document.getElementById('firstName').value.trim(),
-  lastName:document.getElementById('lastName').value.trim(),
-  email:document.getElementById('email').value.trim().toLowerCase(),
-  phone:document.getElementById('phone').value.trim()||undefined,
-  offerInterest:selectedOfferInterest,
-  password:generateTempPassword()
- };
- if(!payload.firstName||!payload.lastName||!payload.email){showToast('Please complete first name, last name, and email.','error');return;}
- if(!/\S+@\S+\.\S+/.test(payload.email)){showToast('Please enter a valid email.','error');return;}
- if(!document.getElementById('consent').checked){showToast('Please confirm your information is accurate.','error');return;}
- btn.disabled=true;btn.textContent='Submitting...';
- try{
-  const res=await fetch(`${API_BASE}/api/auth/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  const body=await res.json().catch(()=>null);
-  if(res.status===409){
-   showToast('This email is already in the system. Use portal reset password or contact support to continue onboarding.','error');
-   btn.disabled=false;btn.textContent='Confirm & Submit';
-   return;
+function clearError() { els.errorBanner.classList.remove('show'); }
+
+function syncReferralDetail() {
+  const v = els.referralSource.value;
+  if (v === 'Friend or family') {
+    els.referralDetailLabel.textContent = "Who referred you?";
+    els.referralDetailField.style.display = 'block';
+  } else if (v === 'Other' || v === 'Search') {
+    els.referralDetailLabel.textContent = v === 'Search' ? 'Which search engine or term?' : 'Tell us where you found us';
+    els.referralDetailField.style.display = 'block';
+  } else {
+    els.referralDetailField.style.display = 'none';
+    els.referralDetail.value = '';
   }
-  if(!res.ok) throw new Error(body?.error||'Submission failed');
-  document.getElementById('form-panel').style.display='none';
-  document.getElementById('successPanel').style.display='block';
-  showToast('Signup created. Opening your contract...');
-  const nextUrl=`/start?token=${encodeURIComponent(body.token)}#onboarding`;
-  setTimeout(()=>{ window.location.assign(nextUrl); }, 600);
- }catch(err){
-  showToast(err.message||'Submission failed','error');
-  btn.disabled=false;btn.textContent='Confirm & Submit';
- }
 }
-document.getElementById('submitBtn').addEventListener('click',submitForm);
+els.referralSource.addEventListener('change', syncReferralDetail);
+
+function applyRequestedOffer() {
+  if (requestedOffer === 'masterclass') els.offerInterest.value = 'masterclass';
+  else els.offerInterest.value = 'program';
+}
+
+function setUpgradeMode(user) {
+  mode = 'upgrade';
+  els.eyebrow.textContent = 'CredX Account Upgrade';
+  els.heading.textContent = 'Add this plan to your account';
+  els.subhead.textContent = "We've prefilled your details from your existing CredX account. Confirm or update them, pick the plan, and we'll add it without creating a duplicate account.";
+  els.upgradeBannerName.textContent = `Welcome back, ${user.firstName || 'CredX member'}.`;
+  els.upgradeBanner.classList.add('show');
+  els.firstName.value = user.firstName || '';
+  els.lastName.value = user.lastName || '';
+  els.email.value = user.email || '';
+  els.email.readOnly = true;
+  els.email.style.opacity = '0.7';
+  els.phone.value = user.phone || '';
+  els.submitBtn.textContent = 'Confirm upgrade';
+  // Hide referral on upgrade — we already know how they got here.
+  els.referralField.style.display = 'none';
+  els.referralDetailField.style.display = 'none';
+  // Clearer alt link.
+  els.altLink.innerHTML = '<a href="/portal">Cancel and go back to portal</a>';
+}
+
+async function tryAttachExistingSession() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/me`, { headers: { authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      if (res.status === 401) localStorage.removeItem(TOKEN_KEY);
+      return;
+    }
+    const body = await res.json();
+    existingToken = token;
+    setUpgradeMode(body);
+  } catch (e) {
+    // ignore — fall back to register flow
+  }
+}
+
+async function submit(event) {
+  event.preventDefault();
+  clearError();
+  const firstName = els.firstName.value.trim();
+  const lastName = els.lastName.value.trim();
+  const email = els.email.value.trim().toLowerCase();
+  const phone = els.phone.value.trim() || undefined;
+  const offerInterest = els.offerInterest.value === 'masterclass' ? 'masterclass' : 'program';
+
+  if (!firstName || !lastName) { showError('Enter your first and last name.'); return; }
+  if (!email || !/\S+@\S+\.\S+/.test(email)) { showError('Enter a valid email.'); return; }
+  if (!els.consent.checked) { showError('Confirm your information is accurate.'); return; }
+
+  els.submitBtn.disabled = true;
+  const originalText = els.submitBtn.textContent;
+  els.submitBtn.textContent = mode === 'upgrade' ? 'Updating…' : 'Submitting…';
+
+  try {
+    if (mode === 'upgrade' && existingToken) {
+      const res = await fetch(`${API_BASE}/api/auth/upgrade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${existingToken}` },
+        body: JSON.stringify({ offerInterest, phone, firstName, lastName })
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body && body.error || 'Upgrade failed');
+      if (body && body.token) localStorage.setItem(TOKEN_KEY, body.token);
+      els.fields.style.display = 'none';
+      els.upgradeBanner.classList.remove('show');
+      els.successTitle.textContent = 'Upgrade applied';
+      els.successMsg.textContent = offerInterest === 'masterclass'
+        ? "Masterclass access has been added to your account. Open the portal to start Day 1."
+        : "Your account is set for the CredX program. Check the portal for your next steps.";
+      els.successPanel.classList.add('show');
+      showToast('Upgrade saved');
+      setTimeout(() => { window.location.assign('/portal'); }, 1200);
+      return;
+    }
+
+    // Plain registration — generate a temp password the user later resets via email link.
+    const tempPassword = 'Credx!' + Math.random().toString(36).slice(2, 10) + '9A';
+    const referralSource = els.referralSource.value || undefined;
+    const referralDetail = els.referralDetail.value.trim() || undefined;
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName, lastName, email, phone,
+        password: tempPassword,
+        offerInterest,
+        referralSource, referralDetail
+      })
+    });
+    const body = await res.json().catch(() => null);
+    if (res.status === 409) {
+      showError("This email is already in our system. If it's yours, sign in to the portal and choose to upgrade — or use Reset password.");
+      els.submitBtn.disabled = false;
+      els.submitBtn.textContent = originalText;
+      return;
+    }
+    if (!res.ok) throw new Error(body && body.error || 'Submission failed');
+    if (body && body.token) localStorage.setItem(TOKEN_KEY, body.token);
+    showToast('Welcome to CredX. Opening your contract…');
+    const nextUrl = `/start?token=${encodeURIComponent(body.token)}#onboarding`;
+    setTimeout(() => { window.location.assign(nextUrl); }, 600);
+  } catch (err) {
+    showError(err.message || 'Submission failed.');
+    els.submitBtn.disabled = false;
+    els.submitBtn.textContent = originalText;
+  }
+}
+
+els.form.addEventListener('submit', submit);
+applyRequestedOffer();
+tryAttachExistingSession();
 </script>
 </body>
 </html>
