@@ -8,7 +8,7 @@ billingRouter.get('/plans', (_req, res) => {
     plans: [
       { code: 'MASTERCLASS', oneTime: 47, monthly: null, note: '+ applicable taxes & processing fees.' },
       { code: 'ESSENTIAL', setupFee: 150, monthly: 75 },
-      { code: 'PREMIUM', oneTime: 447, monthly: null, guarantee: '90-day money-back guarantee' },
+      { code: 'PREMIUM', oneTime: 447, monthly: null, guarantee: '+50 point score-increase guarantee within 90 days, or full refund' },
       { code: 'FAMILY', setupFee: 300, monthly: 95 }
     ]
   });

@@ -8,6 +8,7 @@ import { sendMasterclassWelcomeEmail, sendMasterclassDayEmail, MASTERCLASS_EMAIL
 import { buildPasswordSetupLink, issuePasswordSetupToken } from '../lib/passwordSetup.js';
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { gradeSubmission, QUIZ_MAX_ATTEMPTS_BEFORE_COOLDOWN, QUIZ_COOLDOWN_MS, QUIZ_ANSWER_KEYS } from '../lib/masterclassQuizAnswers.js';
 
 export const masterclassRouter = Router();
 
@@ -137,6 +138,10 @@ masterclassRouter.post('/progress', requireAuth, async (req: AuthedRequest, res,
 
     const education = (client.progress.education as Record<string, unknown>) || {};
     const completed = Array.isArray(education.masterclassProgress) ? (education.masterclassProgress as string[]) : [];
+    const passedQuizzes = Array.isArray((education as any).masterclassPassedQuizzes) ? ((education as any).masterclassPassedQuizzes as string[]) : [];
+    if (!passedQuizzes.includes(daySlug)) {
+      return res.status(403).json({ error: 'Quiz must be passed (80%+) before this day can be marked complete.' });
+    }
     if (!completed.includes(daySlug)) completed.push(daySlug);
 
     const updated = await prisma.clientProgress.update({
@@ -153,6 +158,100 @@ masterclassRouter.post('/progress', requireAuth, async (req: AuthedRequest, res,
     });
 
     return res.json({ ok: true, completedDays: completed, education: updated.education });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const quizSchema = z.object({
+  daySlug: z.string().refine((s) => VALID_DAY_SLUGS.has(s), 'Unknown day slug'),
+  answers: z.record(z.string(), z.number().int().min(0).max(10))
+});
+
+masterclassRouter.post('/quiz', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    if (!req.auth?.sub) return res.status(401).json({ error: 'Unauthorized' });
+    const { daySlug, answers } = quizSchema.parse(req.body);
+    const client = await prisma.client.findUnique({
+      where: { userId: req.auth.sub },
+      include: { progress: true }
+    });
+    if (!client?.progress) return res.status(404).json({ error: 'Client progress not found' });
+
+    const education = (client.progress.education as Record<string, unknown>) || {};
+    const attemptsLog = ((education as any).masterclassQuizAttempts || {}) as Record<string, { count: number; lastAttemptAt: string; cooldownUntil?: string | null }>;
+    const dayLog = attemptsLog[daySlug] || { count: 0, lastAttemptAt: '', cooldownUntil: null };
+
+    if (dayLog.cooldownUntil) {
+      const until = new Date(dayLog.cooldownUntil).getTime();
+      if (Number.isFinite(until) && Date.now() < until) {
+        return res.status(429).json({ error: 'Cooldown active. Try again later.', cooldownUntil: dayLog.cooldownUntil });
+      }
+    }
+
+    const grade = gradeSubmission(daySlug, answers);
+    if (!grade) return res.status(400).json({ error: 'No quiz key for this day' });
+
+    const passedQuizzes = Array.isArray((education as any).masterclassPassedQuizzes) ? [...(education as any).masterclassPassedQuizzes as string[]] : [];
+    let cooldownUntil: string | null = dayLog.cooldownUntil || null;
+    let nextCount = (dayLog.count || 0) + 1;
+
+    if (grade.passed) {
+      if (!passedQuizzes.includes(daySlug)) passedQuizzes.push(daySlug);
+      cooldownUntil = null;
+      nextCount = 0;
+    } else if (nextCount >= QUIZ_MAX_ATTEMPTS_BEFORE_COOLDOWN) {
+      cooldownUntil = new Date(Date.now() + QUIZ_COOLDOWN_MS).toISOString();
+      nextCount = 0;
+    }
+
+    const nextAttemptsLog = {
+      ...attemptsLog,
+      [daySlug]: { count: nextCount, lastAttemptAt: new Date().toISOString(), cooldownUntil }
+    };
+
+    await prisma.clientProgress.update({
+      where: { clientId: client.id },
+      data: {
+        education: {
+          ...education,
+          masterclassQuizAttempts: nextAttemptsLog,
+          masterclassPassedQuizzes: passedQuizzes
+        }
+      }
+    });
+
+    return res.json({
+      passed: grade.passed,
+      correct: grade.correct,
+      total: grade.total,
+      percent: Math.round(grade.percent * 100),
+      cooldownUntil,
+      attemptsRemaining: cooldownUntil ? 0 : Math.max(0, QUIZ_MAX_ATTEMPTS_BEFORE_COOLDOWN - nextCount)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+masterclassRouter.get('/quiz/state', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    if (!req.auth?.sub) return res.status(401).json({ error: 'Unauthorized' });
+    const client = await prisma.client.findUnique({
+      where: { userId: req.auth.sub },
+      include: { progress: true }
+    });
+    if (!client?.progress) return res.status(404).json({ error: 'Client progress not found' });
+    const education = (client.progress.education as Record<string, unknown>) || {};
+    const passedQuizzes = Array.isArray((education as any).masterclassPassedQuizzes) ? ((education as any).masterclassPassedQuizzes as string[]) : [];
+    const attempts = ((education as any).masterclassQuizAttempts || {}) as Record<string, { count: number; lastAttemptAt: string; cooldownUntil?: string | null }>;
+    return res.json({
+      passedQuizzes,
+      attempts,
+      passingScore: 0.8,
+      maxAttemptsBeforeCooldown: QUIZ_MAX_ATTEMPTS_BEFORE_COOLDOWN,
+      knownDays: QUIZ_ANSWER_KEYS.map(k => ({ day: k.day, slug: k.slug, total: Object.keys(k.answers).length }))
+    });
   } catch (error) {
     next(error);
   }

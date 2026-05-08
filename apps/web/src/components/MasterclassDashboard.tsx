@@ -1,14 +1,41 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { MASTERCLASS_DAYS, type LessonDay } from '../masterclassCurriculum';
+import { MASTERCLASS_QUIZZES, QUIZ_PASSING_SCORE, type DayQuiz } from '../masterclassQuizzes';
+
+export type QuizSubmitResult = {
+  passed: boolean;
+  correct: number;
+  total: number;
+  percent: number;
+  cooldownUntil?: string | null;
+  attemptsRemaining: number;
+};
+
+export type QuizAttemptState = {
+  count: number;
+  lastAttemptAt: string;
+  cooldownUntil?: string | null;
+};
 
 type Props = {
   firstName?: string;
   completedDays: string[];
+  passedQuizzes?: string[];
+  quizAttempts?: Record<string, QuizAttemptState>;
   onMarkComplete?: (slug: string) => void;
+  onSubmitQuiz?: (slug: string, answers: Record<string, number>) => Promise<QuizSubmitResult>;
   onActiveDayChange?: (day: LessonDay) => void;
 };
 
-export default function MasterclassDashboard({ firstName, completedDays, onMarkComplete, onActiveDayChange }: Props) {
+export default function MasterclassDashboard({
+  firstName,
+  completedDays,
+  passedQuizzes = [],
+  quizAttempts = {},
+  onMarkComplete,
+  onSubmitQuiz,
+  onActiveDayChange
+}: Props) {
   const [activeDay, setActiveDay] = useState<number>(() => {
     if (typeof window === 'undefined') return 1;
     const stored = sessionStorage.getItem('credx-masterclass-day');
@@ -37,6 +64,9 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
   const isCompleted = completedDays.includes(day.slug);
   const isBonus = !!day.isBonus;
   const accent = day.accent;
+  const dayQuiz = useMemo<DayQuiz | null>(() => MASTERCLASS_QUIZZES.find((q) => q.slug === day.slug) || null, [day.slug]);
+  const quizPassed = passedQuizzes.includes(day.slug);
+  const dayAttempt = quizAttempts[day.slug];
 
   return (
     <div className="mc-shell" style={{ ['--day-accent' as string]: accent } as CSSProperties}>
@@ -56,6 +86,7 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
         {MASTERCLASS_DAYS.map((d) => {
           const done = completedDays.includes(d.slug);
           const isActive = d.day === activeDay;
+          const passed = passedQuizzes.includes(d.slug);
           return (
             <button
               key={d.day}
@@ -67,7 +98,7 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
               <div className="mc-day-card-num">{d.isBonus ? '★' : `0${d.day}`}</div>
               <div className="mc-day-card-badge">{d.isBonus ? 'Bonus' : `Day ${d.day}`}</div>
               <div className="mc-day-card-title">{d.isBonus ? 'Bonus Day' : `Day ${d.day}`}</div>
-              {done ? <div className="mc-day-card-done">✓ Completed</div> : null}
+              {done ? <div className="mc-day-card-done">✓ Completed</div> : passed ? <div className="mc-day-card-done">Quiz passed</div> : null}
             </button>
           );
         })}
@@ -161,10 +192,34 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
           </div>
         ) : null}
 
+        {dayQuiz ? (
+          <div className="mc-section">
+            <h3 className="mc-section-h">Day {day.day} quiz <span style={{ fontWeight: 400, opacity: 0.7, fontSize: '0.85em' }}>— score {Math.round(QUIZ_PASSING_SCORE * 100)}%+ to unlock completion</span></h3>
+            <DayQuizForm
+              quiz={dayQuiz}
+              accent={accent}
+              passed={quizPassed}
+              attempt={dayAttempt}
+              disabled={!onSubmitQuiz}
+              onSubmit={async (answers) => {
+                if (!onSubmitQuiz) throw new Error('Quiz submission unavailable');
+                return onSubmitQuiz(day.slug, answers);
+              }}
+            />
+          </div>
+        ) : null}
+
         <div className="mc-day-footer">
           {!isCompleted && onMarkComplete ? (
-            <button type="button" className="mc-complete-btn" onClick={() => onMarkComplete(day.slug)}>
-              Mark Day {day.day} complete
+            <button
+              type="button"
+              className="mc-complete-btn"
+              onClick={() => onMarkComplete(day.slug)}
+              disabled={!quizPassed}
+              title={quizPassed ? undefined : 'Pass the quiz with 80%+ to unlock'}
+              style={!quizPassed ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >
+              {quizPassed ? `Mark Day ${day.day} complete` : `Pass the quiz to mark Day ${day.day} complete`}
             </button>
           ) : isCompleted ? (
             <div className="mc-complete-state">✓ Day {day.day} marked complete</div>
@@ -176,6 +231,173 @@ export default function MasterclassDashboard({ firstName, completedDays, onMarkC
           ) : null}
         </div>
       </section>
+    </div>
+  );
+}
+
+function DayQuizForm({
+  quiz,
+  accent,
+  passed,
+  attempt,
+  disabled,
+  onSubmit
+}: {
+  quiz: DayQuiz;
+  accent: string;
+  passed: boolean;
+  attempt?: QuizAttemptState;
+  disabled?: boolean;
+  onSubmit: (answers: Record<string, number>) => Promise<QuizSubmitResult>;
+}) {
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<QuizSubmitResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    setAnswers({});
+    setResult(null);
+    setError(null);
+  }, [quiz.slug]);
+
+  const cooldownUntil = result?.cooldownUntil || attempt?.cooldownUntil || null;
+  const cooldownActive = !!cooldownUntil && new Date(cooldownUntil).getTime() > now;
+
+  useEffect(() => {
+    if (!cooldownActive) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [cooldownActive]);
+
+  const allAnswered = quiz.questions.every((q) => Number.isInteger(answers[q.id]));
+
+  const handleSubmit = async () => {
+    if (submitting || passed || cooldownActive || disabled) return;
+    if (!allAnswered) {
+      setError('Answer every question before submitting.');
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const next = await onSubmit(answers);
+      setResult(next);
+      if (!next.passed) {
+        // surface the wrong answers via rationale where we can — keep selections but disable retry until cooldown clears
+        if (!next.cooldownUntil) setAnswers({});
+      }
+    } catch (err: unknown) {
+      const e = err as { status?: number; body?: { error?: string; cooldownUntil?: string } } | Error;
+      const status = (e as any)?.status;
+      const body = (e as any)?.body;
+      if (status === 429 && body?.cooldownUntil) {
+        setResult({ passed: false, correct: 0, total: quiz.questions.length, percent: 0, cooldownUntil: body.cooldownUntil, attemptsRemaining: 0 });
+      } else {
+        setError((e as Error).message || 'Quiz submission failed.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cooldownLabel = useMemo(() => {
+    if (!cooldownUntil) return null;
+    const remaining = Math.max(0, new Date(cooldownUntil).getTime() - now);
+    if (!remaining) return null;
+    const totalSeconds = Math.ceil(remaining / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${h}h ${m}m ${s}s`;
+  }, [cooldownUntil, now]);
+
+  if (passed || result?.passed) {
+    return (
+      <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.45)', borderRadius: 12, padding: '14px 16px', color: '#86efac', fontWeight: 600 }}>
+        ✓ You passed this quiz {result ? `(${result.correct}/${result.total} — ${result.percent}%)` : ''}. You can mark Day {quiz.day} complete at the bottom of this page.
+      </div>
+    );
+  }
+
+  const passingPct = Math.round(QUIZ_PASSING_SCORE * 100);
+
+  return (
+    <div className="mc-quiz" style={{ display: 'grid', gap: 14 }}>
+      <p style={{ margin: 0, opacity: 0.8 }}>
+        {quiz.questions.length} questions. Score {passingPct}% or higher to unlock Day {quiz.day} completion.
+        After 3 failed attempts the quiz locks for 24 hours.
+      </p>
+
+      {cooldownActive ? (
+        <div style={{ background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.45)', borderRadius: 12, padding: '14px 16px', color: '#fda4af', fontWeight: 600 }}>
+          You've used all 3 attempts. Quiz unlocks again in {cooldownLabel}. Use the time to rewatch the lessons and review the glossary.
+        </div>
+      ) : null}
+
+      <ol style={{ display: 'grid', gap: 14, paddingLeft: 22, margin: 0 }}>
+        {quiz.questions.map((q) => (
+          <li key={q.id} style={{ display: 'grid', gap: 8 }}>
+            <strong style={{ fontSize: '0.95rem' }}>{q.prompt}</strong>
+            <div style={{ display: 'grid', gap: 6 }}>
+              {q.choices.map((choice, ci) => {
+                const selected = answers[q.id] === ci;
+                const showResult = !!result && !result.passed && !cooldownActive;
+                const isCorrect = q.correctIndex === ci;
+                let tone: CSSProperties = {
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.04)',
+                  color: 'inherit'
+                };
+                if (selected) tone = { border: `1px solid ${accent}`, background: `${accent}26`, color: 'inherit' };
+                if (showResult && selected && !isCorrect) tone = { border: '1px solid rgba(239,68,68,0.55)', background: 'rgba(239,68,68,0.15)', color: '#fda4af' };
+                if (showResult && isCorrect) tone = { border: '1px solid rgba(34,197,94,0.55)', background: 'rgba(34,197,94,0.15)', color: '#86efac' };
+                return (
+                  <label key={ci} style={{ ...tone, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, cursor: cooldownActive || submitting ? 'not-allowed' : 'pointer', fontSize: '0.92rem' }}>
+                    <input
+                      type="radio"
+                      name={q.id}
+                      checked={selected}
+                      disabled={cooldownActive || submitting}
+                      onChange={() => setAnswers((prev) => ({ ...prev, [q.id]: ci }))}
+                      style={{ accentColor: accent }}
+                    />
+                    <span><strong style={{ marginRight: 6, opacity: 0.6 }}>{String.fromCharCode(65 + ci)}.</strong>{choice}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {result && !result.passed && !cooldownActive ? (
+              <div style={{ fontSize: '0.85rem', color: 'rgba(226,232,240,0.78)', borderLeft: `3px solid ${accent}`, paddingLeft: 10 }}>
+                <em>Why:</em> {q.rationale}
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+
+      {error ? <div style={{ color: '#fda4af', fontWeight: 600 }}>{error}</div> : null}
+
+      {result && !result.passed && !cooldownActive ? (
+        <div style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.45)', borderRadius: 12, padding: '12px 14px', color: '#fde68a', fontWeight: 600 }}>
+          You scored {result.correct}/{result.total} ({result.percent}%). You need {passingPct}% to pass.
+          {result.attemptsRemaining > 0 ? ` ${result.attemptsRemaining} attempt${result.attemptsRemaining === 1 ? '' : 's'} left before a 24h cooldown.` : ''}
+        </div>
+      ) : null}
+
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className="mc-complete-btn"
+          onClick={handleSubmit}
+          disabled={cooldownActive || submitting || disabled || !allAnswered}
+          style={{ background: accent, opacity: cooldownActive || submitting || disabled || !allAnswered ? 0.5 : 1 }}
+        >
+          {submitting ? 'Grading…' : result && !result.passed ? 'Submit again' : 'Submit quiz'}
+        </button>
+        {!allAnswered && !cooldownActive ? <span style={{ opacity: 0.7, fontSize: '0.85rem' }}>Answer all {quiz.questions.length} questions to enable submit.</span> : null}
+      </div>
     </div>
   );
 }

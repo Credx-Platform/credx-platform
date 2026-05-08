@@ -52,6 +52,8 @@ type Progress = {
     masterclassEnrolled?: boolean;
     masterclassAccess?: boolean;
     masterclassProgress?: string[];
+    masterclassPassedQuizzes?: string[];
+    masterclassQuizAttempts?: Record<string, { count: number; lastAttemptAt: string; cooldownUntil?: string | null }>;
     affiliateLinks?: Array<{ label: string; url: string; category?: string }>;
     enrolledAt?: string | null;
     offerEligibleUntil?: string | null;
@@ -96,6 +98,15 @@ type WizardState = {
 
 type PortalTab = 'overview' | 'profile' | 'monitoring' | 'disputes' | 'activity' | 'resources' | 'tasks' | 'analysis' | 'masterclass';
 
+export type QuizSubmitResult = {
+  passed: boolean;
+  correct: number;
+  total: number;
+  percent: number;
+  cooldownUntil?: string | null;
+  attemptsRemaining: number;
+};
+
 type SecureUploadState = {
   file: File | null;
   type: string;
@@ -138,6 +149,16 @@ const defaultWizardState: WizardState = {
   monitorPassword: ''
 };
 
+class ApiError extends Error {
+  status: number;
+  body: any;
+  constructor(message: string, status: number, body: any) {
+    super(message);
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
   if (!API_BASE) throw new Error('Missing VITE_API_URL for this deployment');
 
@@ -148,7 +169,7 @@ async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Pr
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   const text = await response.text();
   const body = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error(body?.error ?? `Request failed: ${response.status}`);
+  if (!response.ok) throw new ApiError(body?.error ?? `Request failed: ${response.status}`, response.status, body);
   return body as T;
 }
 
@@ -2771,6 +2792,14 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     () => (progress?.education?.masterclassProgress || []).filter((s): s is string => typeof s === 'string'),
     [progress?.education?.masterclassProgress]
   );
+  const passedMasterclassQuizzes = useMemo(
+    () => (progress?.education?.masterclassPassedQuizzes || []).filter((s): s is string => typeof s === 'string'),
+    [progress?.education?.masterclassPassedQuizzes]
+  );
+  const masterclassQuizAttempts = useMemo(
+    () => progress?.education?.masterclassQuizAttempts || {},
+    [progress?.education?.masterclassQuizAttempts]
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined' || !user) return;
@@ -2799,6 +2828,19 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     } catch (err) {
       console.warn('Failed to mark masterclass day complete', err);
     }
+  };
+
+  const handleSubmitMasterclassQuiz = async (
+    slug: string,
+    answers: Record<string, number>
+  ): Promise<QuizSubmitResult> => {
+    if (!token) throw new Error('Not signed in');
+    const result = await apiFetch<QuizSubmitResult>('/api/masterclass/quiz', token, {
+      method: 'POST',
+      body: JSON.stringify({ daySlug: slug, answers })
+    });
+    await refreshAll();
+    return result;
   };
 
   // Progressive tier unlock:
@@ -3115,7 +3157,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             <MasterclassDashboard
               firstName={user?.firstName || ''}
               completedDays={completedMasterclassDays}
+              passedQuizzes={passedMasterclassQuizzes}
+              quizAttempts={masterclassQuizAttempts}
               onMarkComplete={handleMarkMasterclassDay}
+              onSubmitQuiz={handleSubmitMasterclassQuiz}
               onActiveDayChange={setActiveMcDay}
             />
           ) : null}
