@@ -36,7 +36,14 @@ type Client = {
 type Progress = {
   uploadedDocs?: Array<{ name?: string; type?: string; uploadedAt?: string; fileName?: string; url?: string | null }>;
   workflow?: { stage?: string; updatedAt?: string; next?: string[] };
-  onboarding?: { status?: string; signupAt?: string | null; completedAt?: string | null; portalReadyEmailSentAt?: string | null };
+  onboarding?: {
+    status?: string;
+    signupAt?: string | null;
+    completedAt?: string | null;
+    portalReadyEmailSentAt?: string | null;
+    signature?: { dataUrl?: string; signedName?: string; signedAt?: string; agreementText?: string } | null;
+    [key: string]: unknown;
+  };
   tasks?: Array<{ id: string; title: string; description?: string | null; completed: boolean; dueAt?: string | null }>;
   activities?: Array<{ id: string; message: string; createdAt: string; type?: string }>;
   disputes?: Array<Record<string, unknown>>;
@@ -232,6 +239,100 @@ function scoreBand(score: number): ScoreBand {
 }
 
 type SectionTheme = { title: string; desc: string; accent: string };
+function SignaturePad({ onChange, value }: { onChange: (dataUrl: string | null) => void; value?: string | null }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const drawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const hasInkRef = useRef(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = '#0f172a';
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    if (value) {
+      const img = new window.Image();
+      img.onload = () => { ctx.drawImage(img, 0, 0, rect.width, rect.height); hasInkRef.current = true; };
+      img.src = value;
+    }
+  }, []);
+
+  function pointerPos(e: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function start(e: React.PointerEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    drawingRef.current = true;
+    lastPointRef.current = pointerPos(e);
+    canvasRef.current?.setPointerCapture(e.pointerId);
+  }
+  function move(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return;
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
+    const p = pointerPos(e);
+    const last = lastPointRef.current;
+    if (last) {
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      hasInkRef.current = true;
+    }
+    lastPointRef.current = p;
+  }
+  function end(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    lastPointRef.current = null;
+    try { canvasRef.current?.releasePointerCapture(e.pointerId); } catch {}
+    const dataUrl = canvasRef.current?.toDataURL('image/png') || null;
+    onChange(hasInkRef.current ? dataUrl : null);
+  }
+  function clear() {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    hasInkRef.current = false;
+    onChange(null);
+  }
+
+  return (
+    <div className="signature-pad-wrap">
+      <canvas
+        ref={canvasRef}
+        className="signature-pad-canvas"
+        onPointerDown={start}
+        onPointerMove={move}
+        onPointerUp={end}
+        onPointerLeave={end}
+        onPointerCancel={end}
+      />
+      <div className="signature-pad-row">
+        <span className="signature-pad-label">Sign above with your mouse, finger, or stylus</span>
+        <button type="button" className="signature-pad-clear" onClick={clear}>Clear signature</button>
+      </div>
+    </div>
+  );
+}
+
 const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
   profile: { title: 'Your Profile', desc: 'Personal info, secure documents, and identity verification details.', accent: '#a855f7' },
   monitoring: { title: 'Credit Monitoring', desc: 'Now lives inside Analysis & Reports — upload, review, and connect monitoring in one place.', accent: '#00c6fb' },
@@ -347,6 +448,7 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
   const [busyStep, setBusyStep] = useState<string | null>(null);
   const [wizardError, setWizardError] = useState<string | null>(null);
   const [signatureName, setSignatureName] = useState(`${user.firstName} ${user.lastName}`.trim());
+  const [signatureData, setSignatureData] = useState<string | null>(null);
   const [contractAgreed, setContractAgreed] = useState(false);
   const [docUpload, setDocUpload] = useState<SecureUploadState>({ file: null, type: 'credit_report' });
   const [wizardState, setWizardState] = useState<WizardState>({ ...defaultWizardState, fullName: `${user.firstName} ${user.lastName}`.trim(), email: user.email, phone: user.phone || '' });
@@ -383,7 +485,7 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
     setWizardError(null);
     setBusyStep('contract');
     try {
-      await apiFetch('/api/contracts', token, { method: 'POST', body: JSON.stringify({ signed_name: signatureName, agreed: contractAgreed }) });
+      await apiFetch('/api/contracts', token, { method: 'POST', body: JSON.stringify({ signed_name: signatureName, agreed: contractAgreed, signature: signatureData }) });
       await refreshProgress();
     } catch (error) {
       setWizardError(error instanceof Error ? error.message : 'Unable to sign contract');
@@ -480,20 +582,36 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
         {loadingContract ? <div className="empty-state-card">Loading your agreement...</div> : null}
         {needsContract && contractText ? (
           <form className="dispute-card-live contract-card" onSubmit={submitContract}>
-            <div className="dispute-card-top"><strong>Step 1, sign your agreement</strong></div>
+            <div className="dispute-card-top"><strong>Step 1 — Sign your CredX agreement</strong></div>
             <div className="contract-body" tabIndex={0}>
-              <p>{contractText.agreement}</p>
-              <p>{contractText.disclosure}</p>
+              {contractText.agreement.split(/\n{2,}/).map((paragraph, idx) => {
+                const trimmed = paragraph.trim();
+                const headingMatch = trimmed.match(/^(\d+\.\s+[A-Z][A-Z\s&]+)$/);
+                if (headingMatch) return <h3 key={`a-${idx}`}>{trimmed}</h3>;
+                return <p key={`a-${idx}`}>{trimmed}</p>;
+              })}
+              <h3>Required Federal Disclosures</h3>
+              {contractText.disclosure.split(/\n{2,}/).map((paragraph, idx) => (
+                <p key={`d-${idx}`}>{paragraph.trim()}</p>
+              ))}
             </div>
             <div className="contract-actions">
-              <input className="chat-input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your full name" />
+              <div>
+                <div className="signature-pad-label" style={{ marginBottom: 6 }}>Your signature</div>
+                <SignaturePad value={signatureData} onChange={setSignatureData} />
+              </div>
+              <div>
+                <div className="signature-pad-label" style={{ marginBottom: 6 }}>Printed name</div>
+                <input className="chat-input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder="Type your full legal name" />
+              </div>
               <label className="contract-agree">
                 <input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} />
-                <span>I have read and agree to the contract and disclosures.</span>
+                <span>I have read and agree to the CredX service agreement and federal disclosures above. I understand I can cancel within 3 business days without penalty.</span>
               </label>
-              <button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim()}>
-                {busyStep === 'contract' ? 'Signing...' : 'Sign contract'}
+              <button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim() || !signatureData} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, padding: '12px 18px' }}>
+                {busyStep === 'contract' ? 'Signing...' : '✍ Sign and submit contract'}
               </button>
+              {!signatureData ? <p className="helper-text" style={{ margin: 0, color: '#475569' }}>Draw your signature above to enable the submit button.</p> : null}
             </div>
           </form>
         ) : null}
@@ -763,7 +881,7 @@ type ClassifiedResponse = {
   };
 };
 
-function resolveLetterSubject(progress: Progress | null, user: User | null, client: Client | null): { name: string; addrLines: string[]; ssnDisplay: string; dobDisplay: string } {
+function resolveLetterSubject(progress: Progress | null, user: User | null, client: Client | null): { name: string; addrLines: string[]; ssnDisplay: string; dobDisplay: string; signatureDataUrl: string | null } {
   const cp = (progress?.analysis as any)?.clientProfile as { name?: string; address?: string; ssnLast4?: string; dob?: string } | undefined;
   const fallbackName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
   const name = (cp?.name && cp.name.trim()) || fallbackName || 'Consumer';
@@ -775,12 +893,20 @@ function resolveLetterSubject(progress: Progress | null, user: User | null, clie
   const addrLines = cp?.address && cp.address.trim() ? [cp.address.trim()] : fallbackAddr;
   const ssnDisplay = cp?.ssnLast4 ? `XXX-XX-${cp.ssnLast4}` : (client?.ssnLast4 ? `XXX-XX-${client.ssnLast4}` : '__________');
   const dobDisplay = cp?.dob && cp.dob !== '(on file, encrypted)' ? cp.dob : '__________';
-  return { name, addrLines, ssnDisplay, dobDisplay };
+  const signatureDataUrl = (progress?.onboarding?.signature?.dataUrl && typeof progress.onboarding.signature.dataUrl === 'string') ? progress.onboarding.signature.dataUrl : null;
+  return { name, addrLines, ssnDisplay, dobDisplay, signatureDataUrl };
+}
+
+function signatureBlockHtml(sigDataUrl: string | null, name: string, today: string): string {
+  if (sigDataUrl) {
+    return `<div class="sig"><img src="${sigDataUrl}" alt="Signature" style="max-height:90px;max-width:340px;display:block;margin-bottom:6px;" /><div style="border-top:1px solid #0f172a;padding-top:4px;font-size:12.5px;">${escapeHtml(name)} — ${escapeHtml(today)}</div></div>`;
+  }
+  return `<div class="sig">____________________________<br>${escapeHtml(name)} — ${escapeHtml(today)}</div>`;
 }
 
 function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | null, client: Client | null, inquiries: any[] = [], progress: Progress | null = null): string {
   const bureau = BUREAU_ADDRESSES[bureauKey] || { name: bureauKey, lines: [] };
-  const { name, addrLines, ssnDisplay, dobDisplay } = resolveLetterSubject(progress, user, client);
+  const { name, addrLines, ssnDisplay, dobDisplay, signatureDataUrl } = resolveLetterSubject(progress, user, client);
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const inquiriesRows = inquiries.length
@@ -896,10 +1022,7 @@ function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | nu
 
   <p>Sincerely,</p>
 
-  <div class="sig">
-    ____________________________<br>
-    ${escapeHtml(name)}
-  </div>
+  ${signatureBlockHtml(signatureDataUrl, name, today)}
 </body></html>`;
 }
 
@@ -1054,7 +1177,7 @@ function buildFtcReportHtml(user: User | null, client: Client | null, allItems: 
 
   <p>I certify that the foregoing is true and correct to the best of my knowledge.</p>
 
-  <div class="sig">____________________________<br>${escapeHtml(name)} — ${escapeHtml(today)}</div>
+  ${signatureBlockHtml(subject.signatureDataUrl, name, today)}
 </body></html>`;
 }
 
@@ -1103,7 +1226,7 @@ function buildCfpbReportHtml(user: User | null, client: Client | null, allItems:
 
   <p>I declare under penalty of perjury that the foregoing is true and correct.</p>
 
-  <div class="sig">____________________________<br>${escapeHtml(name)} — ${escapeHtml(today)}</div>
+  ${signatureBlockHtml(subject.signatureDataUrl, name, today)}
 </body></html>`;
 }
 
