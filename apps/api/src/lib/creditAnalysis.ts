@@ -793,6 +793,54 @@ const EDUCATION_SECTION = `
 - Missing collector disclosures or out-of-statute attempts to collect
 `.trim();
 
+export interface ReportSubject {
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  address: string | null;
+  addressLine1: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  dateOfBirth: string | null;
+}
+
+function parseUsAddress(raw: string | null): { line1: string | null; city: string | null; state: string | null; postal: string | null } {
+  if (!raw) return { line1: null, city: null, state: null, postal: null };
+  const cleaned = raw.replace(/\s+/g, ' ').trim();
+  const m = cleaned.match(/^(.+?),\s*([^,]+),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)$/i);
+  if (m) return { line1: m[1].trim(), city: m[2].trim(), state: m[3].toUpperCase(), postal: m[4] };
+  const loose = cleaned.match(/^(.*?)\s+([A-Za-z .'-]+)\s+([A-Z]{2})\s*(\d{5}(?:-\d{4})?)$/);
+  if (loose) return { line1: loose[1].trim(), city: loose[2].trim(), state: loose[3].toUpperCase(), postal: loose[4] };
+  return { line1: cleaned, city: null, state: null, postal: null };
+}
+
+export function deriveReportSubject(profile: PersonalProfile): ReportSubject {
+  const cols = [profile.experian, profile.equifax, profile.transunion].filter(Boolean) as Array<NonNullable<PersonalProfile['experian']>>;
+  const pickName = cols.map(c => c?.name).find(v => typeof v === 'string' && v.trim().length > 0) || null;
+  const pickAddress = cols.map(c => c?.currentAddress).find(v => typeof v === 'string' && v.trim().length > 0) || null;
+  const pickDob = cols.map(c => c?.dateOfBirth).find(v => typeof v === 'string' && v.trim().length > 0) || null;
+  let firstName: string | null = null;
+  let lastName: string | null = null;
+  if (pickName) {
+    const parts = pickName.replace(/\s+/g, ' ').trim().split(' ');
+    if (parts.length === 1) { firstName = parts[0]; }
+    else { firstName = parts.slice(0, -1).join(' '); lastName = parts[parts.length - 1]; }
+  }
+  const addr = parseUsAddress(pickAddress);
+  return {
+    name: pickName,
+    firstName,
+    lastName,
+    address: pickAddress,
+    addressLine1: addr.line1,
+    city: addr.city,
+    state: addr.state,
+    postalCode: addr.postal,
+    dateOfBirth: pickDob,
+  };
+}
+
 export class CreditAnalysisService {
   static generate(input: CreditAnalysisInput): CreditAnalysis {
     const { client, creditReports } = input;
@@ -806,6 +854,7 @@ export class CreditAnalysisService {
     const personalProfile: PersonalProfile = rich?.personalProfile ?? {
       experian: null, equifax: null, transunion: null, publicRecords: []
     };
+    const reportSubject = deriveReportSubject(personalProfile);
 
     const bureauScores: BureauScoreSnapshot[] = rich?.scores ?? [];
 
@@ -861,11 +910,11 @@ export class CreditAnalysisService {
         website: process.env.BRAND_WEBSITE || null
       },
       clientProfile: {
-        name: `${client.user.firstName} ${client.user.lastName}`,
+        name: reportSubject.name || `${client.user.firstName} ${client.user.lastName}`.trim() || 'Consumer',
         email: client.user.email,
-        dob: client.dobEncrypted ? '(on file, encrypted)' : null,
+        dob: reportSubject.dateOfBirth || (client.dobEncrypted ? '(on file, encrypted)' : null),
         ssnLast4: client.ssnLast4,
-        address: [client.currentAddressLine1, client.currentCity, client.currentState, client.currentPostalCode].filter(Boolean).join(', ') || null,
+        address: reportSubject.address || ([client.currentAddressLine1, client.currentCity, client.currentState, client.currentPostalCode].filter(Boolean).join(', ') || null),
         employer: null
       },
       bureauScores,

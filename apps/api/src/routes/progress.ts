@@ -6,7 +6,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { config } from '../config.js';
-import { CreditAnalysisService } from '../lib/creditAnalysis.js';
+import { CreditAnalysisService, deriveReportSubject } from '../lib/creditAnalysis.js';
 import { extractReport } from '../lib/reportExtractor.js';
 import type { DocumentType } from '@prisma/client';
 
@@ -549,6 +549,33 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
         });
 
         if (clientWithReports && clientWithReports.creditReports.length > 0) {
+          try {
+            const richest = clientWithReports.creditReports
+              .map(r => (r.rawPayload as { rich?: { personalProfile?: any } } | null)?.rich?.personalProfile)
+              .find(p => p && (p.experian || p.equifax || p.transunion));
+            if (richest) {
+              const subject = deriveReportSubject(richest);
+              const clientUpdate: Record<string, string> = {};
+              if (!clientWithReports.currentAddressLine1 && subject.addressLine1) clientUpdate.currentAddressLine1 = subject.addressLine1;
+              if (!clientWithReports.currentCity && subject.city) clientUpdate.currentCity = subject.city;
+              if (!clientWithReports.currentState && subject.state) clientUpdate.currentState = subject.state;
+              if (!clientWithReports.currentPostalCode && subject.postalCode) clientUpdate.currentPostalCode = subject.postalCode;
+              if (Object.keys(clientUpdate).length) {
+                await prisma.client.update({ where: { id: clientId }, data: clientUpdate });
+              }
+              const userUpdate: Record<string, string> = {};
+              const fallbackFirst = (clientWithReports.user.firstName || '').trim();
+              const fallbackLast = (clientWithReports.user.lastName || '').trim();
+              if (!fallbackFirst && subject.firstName) userUpdate.firstName = subject.firstName;
+              if (!fallbackLast && subject.lastName) userUpdate.lastName = subject.lastName;
+              if (Object.keys(userUpdate).length) {
+                await prisma.user.update({ where: { id: clientWithReports.userId }, data: userUpdate });
+              }
+            }
+          } catch (subjectErr) {
+            console.error('Profile auto-populate from report failed:', (subjectErr as Error).message);
+          }
+
           const existingAnalysis = await prisma.clientProgress.findUnique({
             where: { clientId },
             select: { analysis: true }
