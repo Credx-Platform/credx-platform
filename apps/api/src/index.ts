@@ -43,7 +43,9 @@ app.use(cors({
     if (config.nodeEnv !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
       return cb(null, true);
     }
-    return cb(new Error(`Origin ${origin} not allowed by CORS`));
+    // Disallow without throwing — browser still blocks (no ACAO header) but
+    // the response stays a clean 204/200 instead of a noisy 500.
+    return cb(null, false);
   },
   credentials: true
 }));
