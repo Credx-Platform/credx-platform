@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /portal
+Disallow: /portal/
+Disallow: /adminportal
+Disallow: /adminportal/
+Disallow: /api/
+
+Sitemap: https://credxme.com/sitemap.xml

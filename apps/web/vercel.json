@@ -21,6 +21,20 @@
     { "source": "/portal/:path*", "destination": "/portal.html" },
     { "source": "/adminportal", "destination": "/adminportal.html" },
     { "source": "/adminportal/:path*", "destination": "/adminportal.html" },
-    { "source": "/masterclass", "destination": "/masterclass.html" }
+    { "source": "/masterclass", "destination": "/masterclass.html" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/terms", "destination": "/terms.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
+      ]
+    }
   ]
 }
