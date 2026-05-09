@@ -59,17 +59,11 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     ],
     videos: [
       {
-        title: 'Lesson 1A — How Your Credit Score Works',
-        description:
-          'A simple breakdown of the 5 ingredients in your FICO score: paying on time (35%), how much of your credit limit you use (30%), how long you have had credit (15%), new accounts (10%), and your mix of accounts (10%). You will see why "pay on time and keep balances low" is the most important rule.',
-        url: null,
+        url: 'https://www.youtube.com/embed/n84lO-rRgxs',
         duration: '12 min'
       },
       {
-        title: 'Lesson 1B — Reading Your Credit Report Like a Pro',
-        description:
-          'Walks through every section of a real credit report: personal info, accounts, inquiries, and public records. You will learn what each line means in plain English and how to tell when something looks wrong.',
-        url: null,
+        url: 'https://www.youtube.com/embed/vPYm4wxqxvQ',
         duration: '15 min'
       }
     ],
@@ -128,17 +122,11 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     ],
     videos: [
       {
-        title: 'Lesson 2A — Your Rights: FCRA + FDCPA',
-        description:
-          'Two laws are on your side. The FCRA controls credit bureaus and gives you the right to dispute anything inaccurate. The FDCPA controls debt collectors and limits how they can contact you. This lesson breaks down each one in plain words.',
-        url: null,
+        url: 'https://www.youtube.com/embed/RLuluEKSCvg',
         duration: '14 min'
       },
       {
-        title: 'Lesson 2B — Writing a Dispute Letter That Works',
-        description:
-          'A template-by-template walkthrough: what to include, what to leave out, how specific to be, and how to mail it so the bureau cannot pretend it never arrived. By the end you will have a letter ready to send.',
-        url: null,
+        url: 'https://www.youtube.com/embed/LZUIPdaJt28',
         duration: '18 min'
       }
     ],
@@ -397,17 +385,11 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     ],
     videos: [
       {
-        title: 'Bonus 6A — Real Estate as Your First Big Win',
-        description:
-          'Why a primary home is usually the first wealth-building purchase, how strong credit unlocks better mortgage rates, and how a single house can compound into multiple properties over a decade.',
-        url: null,
+        url: 'https://www.youtube.com/embed/bswGw96lWzo',
         duration: '14 min'
       },
       {
-        title: 'Bonus 6B — Investing + Legacy',
-        description:
-          'How to start investing with $50/month, why "boring and consistent" beats trying to time the market, and how a basic revocable living trust keeps your assets out of probate so your family actually gets them.',
-        url: null,
+        url: 'https://www.youtube.com/embed/2c8ArvNpopI',
         duration: '16 min'
       }
     ],
