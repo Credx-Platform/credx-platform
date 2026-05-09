@@ -13,6 +13,7 @@ import {
 } from '../lib/passwordSetup.js';
 import { config } from '../config.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { writeAuditLog } from '../lib/audit.js';
 
 export const authRouter = Router();
 
@@ -111,12 +112,19 @@ authRouter.post('/login', async (req, res, next) => {
   try {
     const data = loginSchema.parse(req.body);
     const user = await prisma.user.findUnique({ where: { email: data.email.toLowerCase() } });
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user) {
+      await writeAuditLog({ action: 'LOGIN_FAILED', entityType: 'User', entityId: data.email.toLowerCase(), metadata: { reason: 'no_account', ip: req.ip } });
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     const valid = await bcrypt.compare(data.password, user.passwordHash);
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!valid) {
+      await writeAuditLog({ userId: user.id, action: 'LOGIN_FAILED', entityType: 'User', entityId: user.id, metadata: { reason: 'bad_password', ip: req.ip } });
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     const token = signToken({ sub: user.id, role: user.role });
+    await writeAuditLog({ userId: user.id, action: 'LOGIN_SUCCESS', entityType: 'User', entityId: user.id, metadata: { ip: req.ip, userAgent: req.headers['user-agent'] || null } });
     const { passwordHash: _omitPasswordHash, ...safeUser } = user;
     return res.json({ user: safeUser, token });
   } catch (error) {
@@ -196,6 +204,13 @@ authRouter.post('/password-setup/complete', async (req, res, next) => {
       data: { passwordHash }
     });
     await consumeToken(record.id);
+    await writeAuditLog({
+      userId: record.userId,
+      action: record.purpose === 'reset' ? 'PASSWORD_RESET' : 'PASSWORD_SET',
+      entityType: 'User',
+      entityId: record.userId,
+      metadata: { ip: req.ip }
+    });
 
     const token = signToken({ sub: record.user.id, role: record.user.role });
     const { passwordHash: _omit, ...safeUser } = record.user;

@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { maybeSendPortalReadyEmail } from '../lib/portalReady.js';
+import { encryptPII } from '../lib/encryption.js';
+import { writeAuditLog } from '../lib/audit.js';
 
 export const applicationsRouter = Router();
 
@@ -64,11 +66,19 @@ applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) 
         currentCity: city,
         currentState: state,
         currentPostalCode: zip,
-        dobEncrypted: dob,
-        ssnEncrypted: ssn,
+        dobEncrypted: encryptPII(dob),
+        ssnEncrypted: encryptPII(ssn),
         ssnLast4: ssn.slice(-4),
         status: 'INTAKE_RECEIVED'
       }
+    });
+
+    await writeAuditLog({
+      userId: req.auth!.sub,
+      action: 'INTAKE_SUBMITTED',
+      entityType: 'Client',
+      entityId: user.client.id,
+      metadata: { ssnLast4: ssn.slice(-4), state, zip }
     });
 
     // Monitoring is now optional — fire the portal-ready email as soon as
