@@ -64,11 +64,12 @@ export async function listClientDocuments(clientId: string): Promise<StoredDocum
     prefix: `${BLOB_PREFIX}${clientId}/`,
   });
 
+  // list() doesn't return contentType; callers needing it should head(pathname).
   return blobs.map((blob) => ({
     url: blob.url,
     pathname: blob.pathname,
-    contentType: blob.contentType || 'application/octet-stream',
+    contentType: 'application/octet-stream',
     size: blob.size,
-    uploadedAt: blob.uploadedAt,
+    uploadedAt: blob.uploadedAt.toISOString(),
   }));
 }
