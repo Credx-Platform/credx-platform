@@ -87,6 +87,8 @@ export function DisputeManager({ token }: DisputeManagerProps) {
   const [tradelines, setTradelines] = useState<ImportedTradeline[]>([]);
   const [bureausPrefillKey, setBureausPrefillKey] = useState<string | null>(null);
   const [creditorsPrefillKey, setCreditorsPrefillKey] = useState<string | null>(null);
+  const [pendingBureausKeys, setPendingBureausKeys] = useState<string[]>([]);
+  const [pendingCreditorsKeys, setPendingCreditorsKeys] = useState<string[]>([]);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/clients`, {
@@ -181,13 +183,15 @@ export function DisputeManager({ token }: DisputeManagerProps) {
     setActiveTab('add');
   };
 
-  const handleTradelinePickForBureaus = (key: string) => {
-    setBureausPrefillKey(key);
+  const handleAddTradelinesToBureaus = (keys: string[]) => {
+    if (!keys.length) return;
+    setPendingBureausKeys((p) => [...p, ...keys.filter((k) => !p.includes(k))]);
     setActiveTab('bureaus');
   };
 
-  const handleTradelinePickForCreditors = (key: string) => {
-    setCreditorsPrefillKey(key);
+  const handleAddTradelinesToCreditors = (keys: string[]) => {
+    if (!keys.length) return;
+    setPendingCreditorsKeys((p) => [...p, ...keys.filter((k) => !p.includes(k))]);
     setActiveTab('creditors');
   };
 
@@ -392,10 +396,10 @@ export function DisputeManager({ token }: DisputeManagerProps) {
                 onOpenBureaus={() => setActiveTab('bureaus')}
                 tradelines={tradelines}
                 onRefreshTradelines={fetchTradelines}
-                onPickTradeline={handleTradelinePickForBureaus}
                 onGoToBureaus={() => setActiveTab('bureaus')}
                 onGoToCreditors={() => setActiveTab('creditors')}
-                onPickTradelineForCreditors={handleTradelinePickForCreditors}
+                onAddTradelinesToBureaus={handleAddTradelinesToBureaus}
+                onAddTradelinesToCreditors={handleAddTradelinesToCreditors}
               />
             )}
 
@@ -409,6 +413,8 @@ export function DisputeManager({ token }: DisputeManagerProps) {
                 tradelines={tradelines}
                 prefillKey={bureausPrefillKey}
                 onConsumePrefill={() => setBureausPrefillKey(null)}
+                pendingTradelineKeys={pendingBureausKeys}
+                onConsumePendingKeys={() => setPendingBureausKeys([])}
                 onItemCreated={handleItemCreated}
                 onBackToItems={() => setActiveTab('add')}
                 onOpenTracking={() => setActiveTab('tracking')}
@@ -425,6 +431,8 @@ export function DisputeManager({ token }: DisputeManagerProps) {
                 tradelines={tradelines}
                 prefillKey={creditorsPrefillKey}
                 onConsumePrefill={() => setCreditorsPrefillKey(null)}
+                pendingTradelineKeys={pendingCreditorsKeys}
+                onConsumePendingKeys={() => setPendingCreditorsKeys([])}
                 onItemCreated={handleItemCreated}
                 onBackToItems={() => setActiveTab('add')}
                 onOpenTracking={() => setActiveTab('tracking')}

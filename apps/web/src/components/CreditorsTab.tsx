@@ -11,6 +11,8 @@ interface CreditorsTabProps {
   tradelines: ImportedTradeline[];
   prefillKey?: string | null;
   onConsumePrefill?: () => void;
+  pendingTradelineKeys?: string[];
+  onConsumePendingKeys?: () => void;
   onItemCreated: () => void;
   onBackToItems: () => void;
   onOpenTracking: () => void;
@@ -28,6 +30,7 @@ const accountTypes = [
 
 const disputeReasons = [
   'Not mine',
+  'Inaccurate Reporting',
   'Incorrect balance',
   'Incorrect dates',
   'Account closed',
@@ -141,6 +144,8 @@ export function CreditorsTab({
   tradelines,
   prefillKey,
   onConsumePrefill,
+  pendingTradelineKeys,
+  onConsumePendingKeys,
   onItemCreated,
   onBackToItems,
   onOpenTracking
@@ -190,6 +195,35 @@ export function CreditorsTab({
       onConsumePrefill?.();
     }
   }, [prefillKey, grouped]);
+
+  useEffect(() => {
+    if (!pendingTradelineKeys || !pendingTradelineKeys.length) return;
+    const additions: BatchEntry[] = [];
+    for (const key of pendingTradelineKeys) {
+      if (usedTradelineKeys.has(key)) continue;
+      const g = grouped.find((x) => x.key === key);
+      if (!g) continue;
+      additions.push({
+        localId: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        tradelineKey: g.key,
+        furnisher: g.sample.creditorName || '',
+        accountNumber: g.sample.accountNumber || '',
+        accountType: inferAccountType(g.sample),
+        balance: g.sample.balance != null ? String(g.sample.balance) : '',
+        dateAdded: '',
+        disputeEquifax: g.bureaus.has('EQUIFAX'),
+        disputeExperian: g.bureaus.has('EXPERIAN'),
+        disputeTransunion: g.bureaus.has('TRANSUNION'),
+        reason: 'Inaccurate Reporting',
+        customInstruction: ''
+      });
+    }
+    if (additions.length) {
+      setBatch((b) => [...b, ...additions]);
+      setNotice(`Added ${additions.length} account${additions.length === 1 ? '' : 's'} from the imported report. Press Save & generate letters when ready.`);
+    }
+    onConsumePendingKeys?.();
+  }, [pendingTradelineKeys, grouped]);
 
   const resetForm = () => {
     setFormData(EMPTY_FORM);

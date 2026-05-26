@@ -13,10 +13,10 @@ interface AddItemTabProps {
   onOpenBureaus: () => void;
   tradelines?: ImportedTradeline[];
   onRefreshTradelines?: () => void;
-  onPickTradeline?: (key: string) => void;
   onGoToBureaus?: () => void;
   onGoToCreditors?: () => void;
-  onPickTradelineForCreditors?: (key: string) => void;
+  onAddTradelinesToBureaus?: (keys: string[]) => void;
+  onAddTradelinesToCreditors?: (keys: string[]) => void;
 }
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
@@ -71,8 +71,9 @@ function openPrintWindow(clientLabel: string, items: DisputeItem[]) {
   if (w) { w.document.write(html); w.document.close(); }
 }
 
-export function AddItemTab({ token, items, selectedClientId, selectedClientLabel, onItemsChange, selectedItemIds, onSelectionChange, onOpenBureaus, tradelines = [], onRefreshTradelines, onPickTradeline, onGoToBureaus, onGoToCreditors, onPickTradelineForCreditors }: AddItemTabProps) {
+export function AddItemTab({ token, items, selectedClientId, selectedClientLabel, onItemsChange, selectedItemIds, onSelectionChange, onOpenBureaus, tradelines = [], onRefreshTradelines, onGoToBureaus, onGoToCreditors, onAddTradelinesToBureaus, onAddTradelinesToCreditors }: AddItemTabProps) {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(selectedItemIds));
+  const [selectedTradelineKeys, setSelectedTradelineKeys] = useState<Set<string>>(new Set());
   const [showOnlyNegative, setShowOnlyNegative] = useState(true);
 
   useEffect(() => {
@@ -123,6 +124,36 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
   const clearItemSelection = () => {
     setSelectedItems(new Set());
     onSelectionChange([]);
+  };
+
+  const toggleTradelineSelect = (key: string) => {
+    setSelectedTradelineKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const selectAllVisibleTradelines = () => {
+    const next = new Set(selectedTradelineKeys);
+    for (const g of visibleTradelines) {
+      if (!usedTradelineKeys.has(g.key)) next.add(g.key);
+    }
+    setSelectedTradelineKeys(next);
+  };
+
+  const clearTradelineSelection = () => setSelectedTradelineKeys(new Set());
+
+  const sendSelectedToBureaus = () => {
+    if (!selectedTradelineKeys.size || !onAddTradelinesToBureaus) return;
+    onAddTradelinesToBureaus(Array.from(selectedTradelineKeys));
+    clearTradelineSelection();
+  };
+
+  const sendSelectedToCreditors = () => {
+    if (!selectedTradelineKeys.size || !onAddTradelinesToCreditors) return;
+    onAddTradelinesToCreditors(Array.from(selectedTradelineKeys));
+    clearTradelineSelection();
   };
 
   const handleDelete = async (id: string) => {
@@ -260,16 +291,63 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
 
         {tradelines.length ? (
           <div>
+            {/* BULK ACTION BAR — appears above the list when at least one tradeline is selected */}
+            {(() => {
+              const selectableCount = visibleTradelines.filter((g) => !usedTradelineKeys.has(g.key)).length;
+              const selectedCount = selectedTradelineKeys.size;
+              if (!selectableCount) return null;
+              return (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '0.6rem 0.85rem', background: selectedCount ? 'rgba(0,198,251,0.06)' : '#f8fafc', border: `1px solid ${selectedCount ? 'rgba(0,198,251,0.32)' : '#e2e8f0'}`, borderRadius: 8, marginBottom: 8, fontSize: 12 }}>
+                  {selectedCount ? <strong style={{ color: '#0a4f7a' }}>{selectedCount} selected</strong> : <span style={{ color: '#64748b' }}>Tick negative items below, then add them to a dispute batch.</span>}
+                  <button type="button" onClick={selectAllVisibleTradelines} style={{ fontSize: 11, padding: '3px 9px', background: 'transparent', border: '1px solid #cbd5e1', borderRadius: 4, color: '#475569', cursor: 'pointer', fontWeight: 600 }}>
+                    Select all visible ({selectableCount})
+                  </button>
+                  {selectedCount ? (
+                    <button type="button" onClick={clearTradelineSelection} style={{ fontSize: 11, padding: '3px 9px', background: 'transparent', border: '1px solid #cbd5e1', borderRadius: 4, color: '#475569', cursor: 'pointer', fontWeight: 600 }}>
+                      Clear
+                    </button>
+                  ) : null}
+                  <span style={{ flex: 1 }} />
+                  {onAddTradelinesToBureaus ? (
+                    <button type="button" onClick={sendSelectedToBureaus} disabled={!selectedCount} style={{ fontSize: 11, padding: '4px 10px', background: selectedCount ? '#00c6fb' : '#cbd5e1', color: '#0f1929', border: 'none', borderRadius: 4, fontWeight: 700, cursor: selectedCount ? 'pointer' : 'not-allowed' }}>
+                      + Add {selectedCount || ''} to Bureaus dispute
+                    </button>
+                  ) : null}
+                  {onAddTradelinesToCreditors ? (
+                    <button type="button" onClick={sendSelectedToCreditors} disabled={!selectedCount} style={{ fontSize: 11, padding: '4px 10px', background: selectedCount ? '#a855f7' : '#cbd5e1', color: '#fff', border: 'none', borderRadius: 4, fontWeight: 700, cursor: selectedCount ? 'pointer' : 'not-allowed' }}>
+                      + Add {selectedCount || ''} to Creditors dispute
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })()}
+
             {visibleTradelines.length ? visibleTradelines.map((g) => {
               const used = usedTradelineKeys.has(g.key);
+              const picked = selectedTradelineKeys.has(g.key);
               return (
                 <div
                   key={g.key}
                   className="tradeline-row"
-                  style={used ? { opacity: 0.5, cursor: 'default' } : undefined}
-                  title={used ? 'Already in dispute pipeline' : 'Send to Bureaus or Creditors'}
+                  onClick={() => { if (!used) toggleTradelineSelect(g.key); }}
+                  style={{
+                    ...(used ? { opacity: 0.5, cursor: 'default' } : { cursor: 'pointer' }),
+                    ...(picked ? { background: 'rgba(0,198,251,0.06)', borderColor: 'rgba(0,198,251,0.32)' } : null)
+                  }}
+                  title={used ? 'Already in dispute pipeline' : picked ? 'Click to deselect' : 'Click to select for dispute'}
                 >
-                  <span style={{ width: 16, height: 16, display: 'inline-block' }} />
+                  {used ? (
+                    <span style={{ width: 16, height: 16, display: 'inline-block' }} />
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={picked}
+                      onChange={() => toggleTradelineSelect(g.key)}
+                      onClick={(ev) => ev.stopPropagation()}
+                      aria-label={`Select ${g.sample.creditorName}`}
+                      style={{ width: 16, height: 16, accentColor: '#00c6fb', cursor: 'pointer' }}
+                    />
+                  )}
                   <div>
                     <div className="tradeline-row__name">
                       {g.sample.creditorName || 'Unknown creditor'}
@@ -287,18 +365,6 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
                     ))}
                   </div>
                   <span className="tradeline-row__balance">{g.sample.balance != null ? `$${Number(g.sample.balance).toLocaleString()}` : '—'}</span>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {!used && onPickTradeline ? (
-                      <button type="button" onClick={(ev) => { ev.stopPropagation(); onPickTradeline(g.key); }} style={{ fontSize: 11, padding: '3px 8px', background: '#00c6fb', color: '#0f1929', border: 'none', borderRadius: 4, fontWeight: 700, cursor: 'pointer' }}>
-                        → Bureaus
-                      </button>
-                    ) : null}
-                    {!used && onPickTradelineForCreditors ? (
-                      <button type="button" onClick={(ev) => { ev.stopPropagation(); onPickTradelineForCreditors(g.key); }} style={{ fontSize: 11, padding: '3px 8px', background: '#a855f7', color: '#fff', border: 'none', borderRadius: 4, fontWeight: 700, cursor: 'pointer' }}>
-                        → Creditors
-                      </button>
-                    ) : null}
-                  </div>
                   <span className={g.sample.isNegative ? 'tradeline-row__neg' : ''} aria-hidden={!g.sample.isNegative}>
                     {g.sample.isNegative ? 'Negative' : ''}
                   </span>

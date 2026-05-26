@@ -11,6 +11,8 @@ interface BureausTabProps {
   tradelines: ImportedTradeline[];
   prefillKey?: string | null;
   onConsumePrefill?: () => void;
+  pendingTradelineKeys?: string[];
+  onConsumePendingKeys?: () => void;
   onItemCreated: () => void;
   onBackToItems: () => void;
   onOpenTracking: () => void;
@@ -36,6 +38,7 @@ const accountTypes = [
 
 const disputeReasons = [
   'Not mine',
+  'Inaccurate Reporting',
   'Incorrect balance',
   'Incorrect dates',
   'Account closed',
@@ -43,6 +46,67 @@ const disputeReasons = [
   'Identity theft',
   'Statute of limitations',
   'Other'
+];
+
+type LetterTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  implicitReason?: string;
+  body: string; // {{client_name}} {{client_address}} {{date}} {{bureau_label}} {{bureau_address}} {{accounts_list}}
+};
+
+const LETTER_TEMPLATES: LetterTemplate[] = [
+  {
+    id: 'none',
+    name: 'Default (no template)',
+    description: 'Use the built-in dispute letter body.',
+    body: ''
+  },
+  {
+    id: 'initial_611',
+    name: 'Initial dispute (FCRA §611)',
+    description: 'Standard first-round dispute citing FCRA §611 investigation rights.',
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nUnder the Fair Credit Reporting Act, 15 U.S.C. §1681i, I am exercising my right to dispute the following item(s) appearing on my consumer credit file. Each item below is inaccurate, incomplete, or unverifiable and must be reinvestigated within 30 days as required by §611.\n\n{{accounts_list}}\n\nPlease conduct a reasonable reinvestigation, delete or correct each item that cannot be verified, and forward a free updated copy of my consumer report to the address above upon completion.\n\nSincerely,\n{{client_name}}`
+  },
+  {
+    id: 'mov_round2',
+    name: 'Method of Verification (Round 2)',
+    description: 'Second-round letter demanding the verification procedure under §611(a)(7).',
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nIn response to your prior verification of the item(s) listed below, I am invoking my right under FCRA §611(a)(7) to receive a description of the procedure used to determine the accuracy and completeness of the information, including the business name and address of any furnisher contacted in connection with the verification.\n\n{{accounts_list}}\n\nIf you cannot produce the requested description within 15 days, please delete the disputed item(s) and update my file accordingly.\n\nSincerely,\n{{client_name}}`
+  },
+  {
+    id: 'demand_15day',
+    name: '15-day demand / failure to verify',
+    description: 'Escalation when the bureau missed its statutory deadline.',
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nYou have failed to complete a reasonable reinvestigation of the disputed item(s) below within the time period required by FCRA §611(a)(1). Continued reporting of unverified information violates §611(a)(5)(A) and exposes you to liability under §616 and §617.\n\n{{accounts_list}}\n\nDelete the item(s) immediately and send written confirmation along with an updated free consumer report within 15 days of receipt of this letter.\n\nSincerely,\n{{client_name}}`
+  },
+  {
+    id: 'identity_theft_605b',
+    name: 'Identity Theft Affidavit (FCRA §605B)',
+    description: 'Identity-theft block request — auto-selects the Identity theft reason.',
+    implicitReason: 'Identity theft',
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}} — Identity Theft Block Request\n{{client_address}}\n\nDear {{bureau_label}},\n\nI am a victim of identity theft. Pursuant to FCRA §605B, I demand that the following item(s) be blocked from my consumer report within four (4) business days of receipt of this notice. A copy of my FTC Identity Theft Report and proof of identity are enclosed.\n\n{{accounts_list}}\n\nPlease confirm in writing once the block is in place and that the furnisher(s) and any subsequent purchasers have been notified per §605B(b).\n\nSincerely,\n{{client_name}}`
+  },
+  {
+    id: 'outdated_605',
+    name: 'Outdated information (FCRA §605)',
+    description: '7-year / 10-year reporting limit violations.',
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nThe item(s) listed below exceed the reporting period permitted by FCRA §605 and must be removed from my consumer file. Continued reporting of obsolete information is a violation that subjects you to liability under §616 and §617.\n\n{{accounts_list}}\n\nDelete the item(s) and send written confirmation along with an updated free consumer report within 30 days.\n\nSincerely,\n{{client_name}}`
+  },
+  {
+    id: 'mixed_file',
+    name: 'Mixed file dispute',
+    description: 'Wrong-person reporting / file merging with another consumer.',
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}} — Mixed File\n{{client_address}}\n\nDear {{bureau_label}},\n\nMy consumer file contains information that does not belong to me. The account(s) below appear to be commingled from another consumer with a similar identifier. Please separate the files, remove the foreign data, and confirm in writing once corrected.\n\n{{accounts_list}}\n\nPursuant to FCRA §1681e(b), you are required to maintain reasonable procedures to assure maximum possible accuracy. Mixed-file reporting is per se inaccurate and must be resolved within the §611 timeframe.\n\nSincerely,\n{{client_name}}`
+  },
+  {
+    id: 'inaccurate_generic',
+    name: 'Inaccurate reporting',
+    description: 'Generic inaccuracy challenge — auto-selects the Inaccurate Reporting reason.',
+    implicitReason: 'Inaccurate Reporting',
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nThe following item(s) on my consumer credit report are inaccurate and must be corrected or deleted under FCRA §611. Each entry below is being reported with information that does not match my records and cannot be substantiated by the furnisher.\n\n{{accounts_list}}\n\nReinvestigate, correct or delete the disputed item(s) within 30 days, and forward an updated free consumer report to the address above.\n\nSincerely,\n{{client_name}}`
+  }
 ];
 
 type TradelineGroup = {
@@ -64,6 +128,7 @@ type BatchEntry = {
   disputeTransunion: boolean;
   reason: string;
   customInstruction: string;
+  templateId: string;
 };
 
 function groupTradelines(tradelines: ImportedTradeline[]): TradelineGroup[] {
@@ -96,7 +161,8 @@ const EMPTY_FORM: Omit<BatchEntry, 'localId' | 'tradelineKey'> = {
   disputeExperian: false,
   disputeTransunion: false,
   reason: '',
-  customInstruction: ''
+  customInstruction: '',
+  templateId: 'none'
 };
 
 function escapeHtml(s: unknown): string {
@@ -109,12 +175,27 @@ function entryMatchesBureau(e: BatchEntry, b: BureauKey) {
   return e.disputeTransunion;
 }
 
-function buildBureauLetter(label: string, address: string, entries: BatchEntry[], clientName?: string, clientAddress?: string) {
-  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  const lines = entries.map((e, i) =>
+function renderAccountsList(entries: BatchEntry[]): string {
+  return entries.map((e, i) =>
     `${i + 1}. ${e.furnisher} | ${e.accountNumber || 'Account number pending'} | ${e.accountType.replace(/_/g, ' ')} | Reason: ${e.reason || 'Reason pending'}${e.customInstruction ? ` | Instruction: ${e.customInstruction}` : ''}`
-  );
-  return `${label}\n${address}\n\nDate: ${today}\n\n${clientName ? `Re: ${clientName}\n` : ''}${clientAddress ? `${clientAddress}\n\n` : ''}Dear ${label},\n\nI am writing to dispute the following accounts on my credit report. Please investigate each item and correct or delete any inaccurate, incomplete, or unverifiable reporting.\n\n${lines.join('\n')}\n\nPlease send the investigation results and updated report to the mailing address on file.\n\nSincerely,\n${clientName || '[Client Name]'}`;
+  ).join('\n');
+}
+
+function buildBureauLetter(label: string, address: string, entries: BatchEntry[], clientName?: string, clientAddress?: string, template?: LetterTemplate) {
+  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const accountsList = renderAccountsList(entries);
+
+  if (template && template.id !== 'none' && template.body) {
+    return template.body
+      .replace(/\{\{bureau_label\}\}/g, label)
+      .replace(/\{\{bureau_address\}\}/g, address)
+      .replace(/\{\{date\}\}/g, today)
+      .replace(/\{\{client_name\}\}/g, clientName || '[Client Name]')
+      .replace(/\{\{client_address\}\}/g, clientAddress || '[Client Address]')
+      .replace(/\{\{accounts_list\}\}/g, accountsList);
+  }
+
+  return `${label}\n${address}\n\nDate: ${today}\n\n${clientName ? `Re: ${clientName}\n` : ''}${clientAddress ? `${clientAddress}\n\n` : ''}Dear ${label},\n\nI am writing to dispute the following accounts on my credit report. Please investigate each item and correct or delete any inaccurate, incomplete, or unverifiable reporting.\n\n${accountsList}\n\nPlease send the investigation results and updated report to the mailing address on file.\n\nSincerely,\n${clientName || '[Client Name]'}`;
 }
 
 function openLetterWindow(title: string, body: string) {
@@ -147,6 +228,8 @@ export function BureausTab({
   tradelines,
   prefillKey,
   onConsumePrefill,
+  pendingTradelineKeys,
+  onConsumePendingKeys,
   onItemCreated,
   onBackToItems,
   onOpenTracking
@@ -183,9 +266,19 @@ export function BureausTab({
       disputeExperian: g.bureaus.has('EXPERIAN'),
       disputeTransunion: g.bureaus.has('TRANSUNION'),
       reason: g.sample.isNegative ? 'Not mine' : '',
-      customInstruction: ''
+      customInstruction: '',
+      templateId: 'none'
     });
     setError(null);
+  };
+
+  const handleTemplateChange = (id: string) => {
+    const tpl = LETTER_TEMPLATES.find((t) => t.id === id);
+    setFormData((p) => ({
+      ...p,
+      templateId: id,
+      reason: tpl?.implicitReason ? tpl.implicitReason : p.reason
+    }));
   };
 
   useEffect(() => {
@@ -196,6 +289,39 @@ export function BureausTab({
       onConsumePrefill?.();
     }
   }, [prefillKey, grouped]);
+
+  // Bulk-stage tradelines pushed in from Add Items. Each key becomes a BatchEntry
+  // with the imported-report defaults and "Inaccurate Reporting" as the dispute reason.
+  useEffect(() => {
+    if (!pendingTradelineKeys || !pendingTradelineKeys.length) return;
+    const additions: BatchEntry[] = [];
+    for (const key of pendingTradelineKeys) {
+      // Skip anything that is already saved as a DisputeItem or already in the batch.
+      if (usedTradelineKeys.has(key)) continue;
+      const g = grouped.find((x) => x.key === key);
+      if (!g) continue;
+      additions.push({
+        localId: `b_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        tradelineKey: g.key,
+        furnisher: g.sample.creditorName || '',
+        accountNumber: g.sample.accountNumber || '',
+        accountType: inferAccountType(g.sample),
+        balance: g.sample.balance != null ? String(g.sample.balance) : '',
+        dateAdded: '',
+        disputeEquifax: g.bureaus.has('EQUIFAX'),
+        disputeExperian: g.bureaus.has('EXPERIAN'),
+        disputeTransunion: g.bureaus.has('TRANSUNION'),
+        reason: 'Inaccurate Reporting',
+        customInstruction: '',
+        templateId: 'none'
+      });
+    }
+    if (additions.length) {
+      setBatch((b) => [...b, ...additions]);
+      setNotice(`Added ${additions.length} account${additions.length === 1 ? '' : 's'} from the imported report. Pick a template and Save & generate when ready.`);
+    }
+    onConsumePendingKeys?.();
+  }, [pendingTradelineKeys, grouped]);
 
   const resetForm = () => {
     setFormData(EMPTY_FORM);
@@ -279,21 +405,43 @@ export function BureausTab({
     }
   };
 
+  // Group entries by (bureau, templateId) so each (bureau, template) pair becomes one letter.
+  // Returns a flat list of letter cards in the order: EFX(template1, template2,...), XPN(...), TU(...).
+  const groupByBureauAndTemplate = (entries: BatchEntry[]) => {
+    const out: { bureau: typeof bureauMeta[number]; template: LetterTemplate; entries: BatchEntry[] }[] = [];
+    for (const meta of bureauMeta) {
+      const forBureau = entries.filter((e) => entryMatchesBureau(e, meta.key));
+      if (!forBureau.length) continue;
+      const byTpl = new Map<string, BatchEntry[]>();
+      for (const e of forBureau) {
+        const list = byTpl.get(e.templateId) || [];
+        list.push(e);
+        byTpl.set(e.templateId, list);
+      }
+      // Render in the order templates appear in LETTER_TEMPLATES (stable / predictable).
+      for (const tpl of LETTER_TEMPLATES) {
+        const group = byTpl.get(tpl.id);
+        if (group?.length) out.push({ bureau: meta, template: tpl, entries: group });
+      }
+    }
+    return out;
+  };
+
   const handleSaveAndGenerate = async () => {
     setSaving(true);
     setError(null);
     setNotice(null);
-    // Snapshot before clearing — letters render from the batch the user just confirmed.
     const snapshot = batch.slice();
     try {
       await persistBatch();
       setBatch([]);
       onItemCreated();
-      for (const meta of bureauMeta) {
-        const forBureau = snapshot.filter((e) => entryMatchesBureau(e, meta.key));
-        if (!forBureau.length) continue;
-        const body = buildBureauLetter(meta.label, meta.address, forBureau, clientName, clientAddress);
-        openLetterWindow(`${meta.label} Dispute Letter`, body);
+      for (const group of groupByBureauAndTemplate(snapshot)) {
+        const body = buildBureauLetter(group.bureau.label, group.bureau.address, group.entries, clientName, clientAddress, group.template);
+        const title = group.template.id === 'none'
+          ? `${group.bureau.label} Dispute Letter`
+          : `${group.bureau.label} — ${group.template.name}`;
+        openLetterWindow(title, body);
       }
       setNotice('Batch saved and letters opened in print windows.');
     } catch (err) {
@@ -307,13 +455,8 @@ export function BureausTab({
     setFormData((p) => ({ ...p, disputeEquifax: checked, disputeExperian: checked, disputeTransunion: checked }));
   };
 
-  // Letter preview totals (purely informational — actual print happens via Save & Generate or per-card buttons)
-  const lettersPreview = useMemo(() => {
-    return bureauMeta.map((meta) => ({
-      ...meta,
-      entries: batch.filter((e) => entryMatchesBureau(e, meta.key))
-    }));
-  }, [batch]);
+  // Letter preview cards — one per (bureau, template) pair represented in the batch.
+  const lettersPreview = useMemo(() => groupByBureauAndTemplate(batch), [batch]);
 
   return (
     <div className="bureaus-tab">
@@ -440,6 +583,17 @@ export function BureausTab({
               <input type="number" value={formData.balance} onChange={(e) => setFormData({ ...formData, balance: e.target.value })} placeholder="0.00" disabled={!selectedKey} />
             </div>
             <div className="bt-field">
+              <label>Letter Template</label>
+              <select value={formData.templateId} onChange={(e) => handleTemplateChange(e.target.value)} disabled={!selectedKey}>
+                {LETTER_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              {selectedKey && formData.templateId !== 'none' ? (
+                <small style={{ color: '#64748b', fontSize: '.72rem' }}>
+                  {LETTER_TEMPLATES.find((t) => t.id === formData.templateId)?.description}
+                </small>
+              ) : null}
+            </div>
+            <div className="bt-field">
               <label>Date Added</label>
               <input type="date" value={formData.dateAdded} onChange={(e) => setFormData({ ...formData, dateAdded: e.target.value })} disabled={!selectedKey} />
             </div>
@@ -550,31 +704,35 @@ export function BureausTab({
         <div>
           <div className="bt-batch__title" style={{ marginBottom: '.75rem' }}>
             Letter preview
-            <small>One letter per bureau. Each lists only the accounts flagged for that bureau in the batch above.</small>
+            <small>One letter per bureau × template. Accounts using the same template ride together; mixing templates on one bureau creates additional letters.</small>
           </div>
           <div className="bt-letters">
-            {lettersPreview.map((l) => (
-              <article key={l.key} className="bt-letter">
-                <div>
-                  <span className="pill">{l.short}</span>
-                  <h4>{l.label}</h4>
-                  <p>{l.entries.length} account{l.entries.length === 1 ? '' : 's'} on this letter.</p>
-                </div>
-                {l.entries.length ? (
+            {lettersPreview.length ? lettersPreview.map((l, idx) => {
+              const title = l.template.id === 'none' ? `${l.bureau.label} Dispute Letter` : `${l.bureau.label} — ${l.template.name}`;
+              const filename = l.template.id === 'none'
+                ? `${l.bureau.label.toLowerCase()}-dispute-letter.txt`
+                : `${l.bureau.label.toLowerCase()}-${l.template.id}.txt`;
+              return (
+                <article key={`${l.bureau.key}_${l.template.id}_${idx}`} className="bt-letter">
+                  <div>
+                    <span className="pill">{l.bureau.short}{l.template.id !== 'none' ? ` · ${l.template.name}` : ''}</span>
+                    <h4>{l.bureau.label}</h4>
+                    <p>{l.entries.length} account{l.entries.length === 1 ? '' : 's'} on this letter.</p>
+                  </div>
                   <ol>{l.entries.map((e) => <li key={e.localId}>{e.furnisher}{e.accountNumber ? ` · ${e.accountNumber}` : ''} — {e.reason}</li>)}</ol>
-                ) : (
-                  <p style={{ color: '#94a3b8' }}>No batched accounts flagged for {l.label}.</p>
-                )}
-                <div className="letter-actions">
-                  <button type="button" className="bt-btn bt-btn--primary" disabled={!l.entries.length} onClick={() => openLetterWindow(`${l.label} Dispute Letter`, buildBureauLetter(l.label, l.address, l.entries, clientName, clientAddress))}>
-                    Print letter
-                  </button>
-                  <button type="button" className="bt-btn bt-btn--ghost" disabled={!l.entries.length} onClick={() => saveLetterFile(`${l.label.toLowerCase()}-dispute-letter.txt`, buildBureauLetter(l.label, l.address, l.entries, clientName, clientAddress))}>
-                    Save .txt
-                  </button>
-                </div>
-              </article>
-            ))}
+                  <div className="letter-actions">
+                    <button type="button" className="bt-btn bt-btn--primary" onClick={() => openLetterWindow(title, buildBureauLetter(l.bureau.label, l.bureau.address, l.entries, clientName, clientAddress, l.template))}>
+                      Print letter
+                    </button>
+                    <button type="button" className="bt-btn bt-btn--ghost" onClick={() => saveLetterFile(filename, buildBureauLetter(l.bureau.label, l.bureau.address, l.entries, clientName, clientAddress, l.template))}>
+                      Save .txt
+                    </button>
+                  </div>
+                </article>
+              );
+            }) : (
+              <div className="bt-empty">No accounts in the batch have any bureau checkboxes selected — letters appear once at least one bureau is ticked.</div>
+            )}
           </div>
         </div>
       ) : null}
