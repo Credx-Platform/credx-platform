@@ -14,7 +14,9 @@ interface AddItemTabProps {
   tradelines?: ImportedTradeline[];
   onRefreshTradelines?: () => void;
   onPickTradeline?: (key: string) => void;
-  onGoToDispute?: () => void;
+  onGoToBureaus?: () => void;
+  onGoToCreditors?: () => void;
+  onPickTradelineForCreditors?: (key: string) => void;
 }
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
@@ -69,7 +71,7 @@ function openPrintWindow(clientLabel: string, items: DisputeItem[]) {
   if (w) { w.document.write(html); w.document.close(); }
 }
 
-export function AddItemTab({ token, items, selectedClientId, selectedClientLabel, onItemsChange, selectedItemIds, onSelectionChange, onOpenBureaus, tradelines = [], onRefreshTradelines, onPickTradeline, onGoToDispute }: AddItemTabProps) {
+export function AddItemTab({ token, items, selectedClientId, selectedClientLabel, onItemsChange, selectedItemIds, onSelectionChange, onOpenBureaus, tradelines = [], onRefreshTradelines, onPickTradeline, onGoToBureaus, onGoToCreditors, onPickTradelineForCreditors }: AddItemTabProps) {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(selectedItemIds));
   const [showOnlyNegative, setShowOnlyNegative] = useState(true);
 
@@ -216,7 +218,7 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
         <div>
           <h3>Add Items</h3>
           <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: 2 }}>
-            Pick accounts from the imported report (top) → build the dispute on the Dispute tab → print from Ready to Print (below).
+            Pick accounts from the imported report (top) → build a batch on Bureaus or Creditors → print from Ready to Print (below).
           </div>
         </div>
         <div className="ait-client">{selectedClientLabel || 'Pick a client at the top.'}</div>
@@ -229,7 +231,7 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
             Accounts from imported credit report
             <small>
               {tradelines.length
-                ? `${visibleTradelines.length} of ${groupedTradelines.length} shown · click an account to open it in the Dispute tab`
+                ? `${visibleTradelines.length} of ${groupedTradelines.length} shown · click an account to open it in Bureaus`
                 : 'No accounts parsed yet. Upload a credit report on the Import Report tab.'}
             </small>
           </div>
@@ -243,9 +245,14 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
                 ↻ Refresh
               </button>
             ) : null}
-            {onGoToDispute ? (
-              <button type="button" onClick={onGoToDispute} style={{ fontSize: 12, padding: '4px 10px', background: '#00c6fb', color: '#0f1929', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
-                Open Dispute tab →
+            {onGoToBureaus ? (
+              <button type="button" onClick={onGoToBureaus} style={{ fontSize: 12, padding: '4px 10px', background: '#00c6fb', color: '#0f1929', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
+                Open Bureaus tab →
+              </button>
+            ) : null}
+            {onGoToCreditors ? (
+              <button type="button" onClick={onGoToCreditors} style={{ fontSize: 12, padding: '4px 10px', background: '#a855f7', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
+                Open Creditors tab →
               </button>
             ) : null}
           </div>
@@ -259,9 +266,8 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
                 <div
                   key={g.key}
                   className="tradeline-row"
-                  onClick={() => { if (!used && onPickTradeline) onPickTradeline(g.key); }}
                   style={used ? { opacity: 0.5, cursor: 'default' } : undefined}
-                  title={used ? 'Already in dispute pipeline' : 'Click to open in Dispute tab'}
+                  title={used ? 'Already in dispute pipeline' : 'Send to Bureaus or Creditors'}
                 >
                   <span style={{ width: 16, height: 16, display: 'inline-block' }} />
                   <div>
@@ -281,6 +287,18 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
                     ))}
                   </div>
                   <span className="tradeline-row__balance">{g.sample.balance != null ? `$${Number(g.sample.balance).toLocaleString()}` : '—'}</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {!used && onPickTradeline ? (
+                      <button type="button" onClick={(ev) => { ev.stopPropagation(); onPickTradeline(g.key); }} style={{ fontSize: 11, padding: '3px 8px', background: '#00c6fb', color: '#0f1929', border: 'none', borderRadius: 4, fontWeight: 700, cursor: 'pointer' }}>
+                        → Bureaus
+                      </button>
+                    ) : null}
+                    {!used && onPickTradelineForCreditors ? (
+                      <button type="button" onClick={(ev) => { ev.stopPropagation(); onPickTradelineForCreditors(g.key); }} style={{ fontSize: 11, padding: '3px 8px', background: '#a855f7', color: '#fff', border: 'none', borderRadius: 4, fontWeight: 700, cursor: 'pointer' }}>
+                        → Creditors
+                      </button>
+                    ) : null}
+                  </div>
                   <span className={g.sample.isNegative ? 'tradeline-row__neg' : ''} aria-hidden={!g.sample.isNegative}>
                     {g.sample.isNegative ? 'Negative' : ''}
                   </span>
@@ -390,7 +408,13 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
         ) : (
           <div className="ait-empty">
             <strong>No items in the print list yet.</strong>
-            <div>Head to the <button type="button" onClick={onGoToDispute} style={{ background: 'transparent', border: 'none', color: '#00c6fb', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', padding: 0 }}>Dispute tab</button> to add an account from the imported report.</div>
+            <div>
+              Head to the{' '}
+              <button type="button" onClick={onGoToBureaus} style={{ background: 'transparent', border: 'none', color: '#00c6fb', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', padding: 0 }}>Bureaus tab</button>
+              {' '}or the{' '}
+              <button type="button" onClick={onGoToCreditors} style={{ background: 'transparent', border: 'none', color: '#a855f7', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', padding: 0 }}>Creditors tab</button>
+              {' '}to add an account from the imported report.
+            </div>
           </div>
         )}
       </div>
