@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ImportReportTab } from './ImportReportTab';
 import { AddItemTab } from './AddItemTab';
+import { DisputeTab } from './DisputeTab';
 import { BureausTab } from './BureausTab';
 import { TrackingTab } from './TrackingTab';
 import { ResultsTab } from './ResultsTab';
@@ -56,7 +57,7 @@ export type Furnisher = {
   isActive: boolean;
 };
 
-type Tab = 'import' | 'add' | 'bureaus' | 'tracking' | 'results';
+type Tab = 'import' | 'add' | 'dispute' | 'bureaus' | 'tracking' | 'results';
 
 interface DisputeManagerProps {
   token: string;
@@ -84,6 +85,7 @@ export function DisputeManager({ token }: DisputeManagerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tradelines, setTradelines] = useState<ImportedTradeline[]>([]);
+  const [disputeTabPrefillKey, setDisputeTabPrefillKey] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/clients`, {
@@ -175,7 +177,12 @@ export function DisputeManager({ token }: DisputeManagerProps) {
 
   const handleItemCreated = () => {
     fetchItems();
-    setActiveTab('tracking');
+    setActiveTab('add');
+  };
+
+  const handleTradelinePick = (key: string) => {
+    setDisputeTabPrefillKey(key);
+    setActiveTab('dispute');
   };
 
   const handleImportComplete = () => {
@@ -195,6 +202,7 @@ export function DisputeManager({ token }: DisputeManagerProps) {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'import', label: 'IMPORT REPORT' },
     { id: 'add', label: 'ADD ITEM' },
+    { id: 'dispute', label: 'DISPUTE' },
     { id: 'bureaus', label: 'BUREAUS' },
     { id: 'tracking', label: 'TRACKING' },
     { id: 'results', label: 'RESULTS' }
@@ -378,6 +386,21 @@ export function DisputeManager({ token }: DisputeManagerProps) {
                 onOpenBureaus={() => setActiveTab('bureaus')}
                 tradelines={tradelines}
                 onRefreshTradelines={fetchTradelines}
+                onPickTradeline={handleTradelinePick}
+                onGoToDispute={() => setActiveTab('dispute')}
+              />
+            )}
+
+            {activeTab === 'dispute' && (
+              <DisputeTab
+                token={token}
+                selectedClientId={selectedClientId}
+                selectedClientLabel={selectedClientLabel}
+                items={items}
+                tradelines={tradelines}
+                prefillKey={disputeTabPrefillKey}
+                onConsumePrefill={() => setDisputeTabPrefillKey(null)}
+                onItemCreated={handleItemCreated}
               />
             )}
 
