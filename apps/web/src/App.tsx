@@ -309,7 +309,8 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const statusFilter = searchParams.get('status');
-  
+  const hasActiveFilter = Boolean(statusFilter) || searchQuery.trim().length > 0;
+
   const filteredClients = useMemo(() => {
     let next = clients;
     if (statusFilter) {
@@ -317,7 +318,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
     }
     if (!searchQuery.trim()) return next;
     const query = searchQuery.toLowerCase();
-    return next.filter(client => 
+    return next.filter(client =>
       client.user.firstName.toLowerCase().includes(query) ||
       client.user.lastName.toLowerCase().includes(query) ||
       client.user.email.toLowerCase().includes(query) ||
@@ -325,13 +326,31 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
     );
   }, [clients, searchQuery, statusFilter]);
 
+  const clearFilters = () => {
+    setSearchQuery('');
+    navigate('/clients');
+  };
+
   return (
     <section className="panel">
       <div className="panel-header">
         <div>
           <p className="eyebrow">Client Management</p>
           <h2>Customers</h2>
-          {statusFilter ? <p className="helper-text">Filtered by {statusFilter.replace('_', ' ')}.</p> : null}
+          <p className="helper-text" style={{ marginTop: '0.25rem' }}>
+            Showing <strong>{filteredClients.length}</strong> of {clients.length} clients
+            {statusFilter ? <> · status: <strong>{statusFilter.replace('_', ' ')}</strong></> : null}
+            {searchQuery.trim() ? <> · search: <strong>"{searchQuery.trim()}"</strong></> : null}
+            {hasActiveFilter ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                style={{ marginLeft: '0.5rem', padding: '0.2rem 0.55rem', fontSize: '0.75rem', background: '#1e40af', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Show all ({clients.length})
+              </button>
+            ) : null}
+          </p>
         </div>
         <div className="search-box">
           <input
