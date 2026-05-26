@@ -41,7 +41,17 @@ type Progress = {
     signupAt?: string | null;
     completedAt?: string | null;
     portalReadyEmailSentAt?: string | null;
-    signature?: { dataUrl?: string; signedName?: string; signedAt?: string; agreementText?: string } | null;
+    signature?: {
+      dataUrl?: string;
+      signedName?: string;
+      signedAt?: string;
+      agreementText?: string;
+      disclosureStatement?: string;
+      cancellationNotice?: { heading?: string; text?: string } | null;
+      contractId?: string;
+      ipAddress?: string | null;
+      userAgent?: string | null;
+    } | null;
     [key: string]: unknown;
   };
   tasks?: Array<{ id: string; title: string; description?: string | null; completed: boolean; dueAt?: string | null }>;
@@ -1774,7 +1784,7 @@ function ResourcesSection({ progress }: { progress: Progress | null; }) {
   );
 }
 
-function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { token: string; user: User | null; client: Client | null; refreshAll: () => Promise<void>; onUserUpdated: (next: User) => void; }) {
+function ProfileSection({ token, user, client, progress, refreshAll, onUserUpdated }: { token: string; user: User | null; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; onUserUpdated: (next: User) => void; }) {
   const [profile, setProfile] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
@@ -1922,6 +1932,8 @@ function ProfileSection({ token, user, client, refreshAll, onUserUpdated }: { to
           </div>
         </div>
       </section>
+
+      <SignedContractCard progress={progress} variant="full" />
     </div>
   );
 }
@@ -2298,6 +2310,99 @@ function AnalysisUploadCard({ token, user, client, progress, refreshAll }: { tok
   );
 }
 
+function SignedContractCard({ progress, variant = 'compact' }: { progress: Progress | null; variant?: 'compact' | 'full' }) {
+  const signature = progress?.onboarding?.signature || null;
+  if (!signature || !signature.signedAt) {
+    if (variant === 'full') {
+      return (
+        <section className="panel">
+          <div className="panel-header"><div><p className="eyebrow">Signed Agreement</p><h2>Your contract on file</h2></div></div>
+          <div className="empty-state-card">Your signed CredX service agreement will appear here after you sign during onboarding.</div>
+        </section>
+      );
+    }
+    return null;
+  }
+
+  const signedAtLabel = formatDateTime(signature.signedAt);
+  const sigImg = signature.dataUrl;
+
+  if (variant === 'compact') {
+    return (
+      <section className="panel" style={{ borderColor: 'var(--cx-success)' }}>
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow" style={{ color: '#22c55e' }}>Signed agreement on file</p>
+            <h2>{signature.signedName || 'Signature'} · {signedAtLabel}</h2>
+          </div>
+          <span className="security-note-inline" aria-label="On file">📄 Stored</span>
+        </div>
+        {sigImg ? (
+          <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', display: 'flex', justifyContent: 'center' }}>
+            <img src={sigImg} alt={`Signature of ${signature.signedName || 'client'}`} style={{ maxHeight: '90px', maxWidth: '100%' }} />
+          </div>
+        ) : null}
+        <p className="helper-text" style={{ marginTop: '0.5rem' }}>
+          Full agreement text, disclosures, and cancellation notice are available in your Profile tab.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Signed Agreement</p>
+          <h2>Your CredX service agreement</h2>
+        </div>
+        <span className="security-note-inline" aria-label="Signed">✓ Signed</span>
+      </div>
+
+      <div className="plan-card"><strong>Signed by</strong><span>{signature.signedName || 'Client'}</span></div>
+      <div className="plan-card"><strong>Signed at</strong><span>{signedAtLabel}</span></div>
+      {signature.contractId ? <div className="plan-card"><strong>Contract ID</strong><span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{signature.contractId}</span></div> : null}
+      {signature.ipAddress ? <div className="plan-card"><strong>IP address</strong><span>{signature.ipAddress}</span></div> : null}
+
+      <div className="panel-header" style={{ marginTop: '1.25rem' }}><div><p className="eyebrow">Your signature</p></div></div>
+      {sigImg ? (
+        <div style={{ padding: '1rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', display: 'flex', justifyContent: 'center' }}>
+          <img src={sigImg} alt={`Signature of ${signature.signedName || 'client'}`} style={{ maxHeight: '160px', maxWidth: '100%' }} />
+        </div>
+      ) : <div className="empty-state-card">Signature image not stored.</div>}
+
+      {signature.agreementText ? (
+        <>
+          <div className="panel-header" style={{ marginTop: '1.25rem' }}><div><p className="eyebrow">Agreement text</p></div></div>
+          <div className="contract-body" tabIndex={0} style={{ maxHeight: '320px', overflowY: 'auto' }}>
+            {signature.agreementText.split(/\n{2,}/).map((paragraph, idx) => (
+              <p key={`agree-${idx}`} style={{ marginBottom: '0.75rem', whiteSpace: 'pre-wrap' }}>{paragraph}</p>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {signature.disclosureStatement ? (
+        <>
+          <div className="panel-header" style={{ marginTop: '1.25rem' }}><div><p className="eyebrow">Required disclosures</p></div></div>
+          <div className="contract-body" tabIndex={0} style={{ maxHeight: '240px', overflowY: 'auto' }}>
+            {signature.disclosureStatement.split(/\n{2,}/).map((paragraph, idx) => (
+              <p key={`disc-${idx}`} style={{ marginBottom: '0.75rem', whiteSpace: 'pre-wrap' }}>{paragraph}</p>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {signature.cancellationNotice?.text ? (
+        <>
+          <div className="panel-header" style={{ marginTop: '1.25rem' }}><div><p className="eyebrow">{signature.cancellationNotice.heading || 'Notice of cancellation'}</p></div></div>
+          <div className="plan-card"><span style={{ whiteSpace: 'pre-wrap' }}>{signature.cancellationNotice.text}</span></div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 function MonitoringConnectCard({ token, progress, refreshAll }: { token: string; progress: Progress | null; refreshAll: () => Promise<void>; }) {
   const onboarding = (progress?.onboarding || {}) as Record<string, unknown>;
   const provider = String(onboarding.monitoringProvider || '');
@@ -2384,6 +2489,7 @@ function AnalysisSection({ token, user, client, progress, refreshAll }: { token:
     return (
       <div className="page-grid">
         <AnalysisUploadCard token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} />
+        <SignedContractCard progress={progress} variant="compact" />
         <section className="panel">
           <div className="panel-header"><div><p className="eyebrow">Credit Analysis</p><h2>Your analysis report</h2></div></div>
           <div className="empty-state-card">
@@ -2402,6 +2508,7 @@ function AnalysisSection({ token, user, client, progress, refreshAll }: { token:
   return (
     <div className="page-grid">
       <AnalysisUploadCard token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} />
+      <SignedContractCard progress={progress} variant="compact" />
       <section className="hero-card hero-card--compact">
         <div>
           <p className="eyebrow">Credit Analysis</p>
@@ -2879,6 +2986,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         : [
             { key: 'overview', label: 'Overview' },
             ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
+            { key: 'analysis', label: 'Analysis & Reports' },
             { key: 'profile', label: 'Profile' }
           ];
 
@@ -3147,7 +3255,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             </>
           ) : null}
 
-          {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
+          {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
           {activeTab === 'disputes' ? <DisputesSection token={token} user={user} client={client} progress={progress} letters={generatedLetters} setLetters={persistLetters} filings={filings} setFilings={persistFilings} mailed={mailed} setMailed={persistMailed} responses={responses} setResponses={persistResponses} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
