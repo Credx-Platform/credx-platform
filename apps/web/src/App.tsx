@@ -304,12 +304,29 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
   );
 }
 
+const CLIENT_STATUS_FILTERS: Array<{ key: string; label: string }> = [
+  { key: 'LEAD', label: 'Leads' },
+  { key: 'INTAKE_RECEIVED', label: 'Intake' },
+  { key: 'ANALYSIS_READY', label: 'Analysis Ready' },
+  { key: 'UPGRADE_OFFERED', label: 'Upgrade' },
+  { key: 'ACTIVE', label: 'Active' },
+  { key: 'PAST_DUE', label: 'Past Due' },
+  { key: 'RESTRICTED', label: 'Restricted' },
+  { key: 'CANCELLED', label: 'Cancelled' }
+];
+
 function Clients({ clients }: { clients: ClientRecord[] }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const statusFilter = searchParams.get('status');
   const hasActiveFilter = Boolean(statusFilter) || searchQuery.trim().length > 0;
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of clients) counts[c.status] = (counts[c.status] || 0) + 1;
+    return counts;
+  }, [clients]);
 
   const filteredClients = useMemo(() => {
     let next = clients;
@@ -331,26 +348,27 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
     navigate('/clients');
   };
 
+  const setStatus = (status: string | null) => {
+    if (status) navigate(`/clients?status=${encodeURIComponent(status)}`);
+    else navigate('/clients');
+  };
+
   return (
     <section className="panel">
       <div className="panel-header">
         <div>
           <p className="eyebrow">Client Management</p>
           <h2>Customers</h2>
-          <p className="helper-text" style={{ marginTop: '0.25rem' }}>
-            Showing <strong>{filteredClients.length}</strong> of {clients.length} clients
-            {statusFilter ? <> · status: <strong>{statusFilter.replace('_', ' ')}</strong></> : null}
-            {searchQuery.trim() ? <> · search: <strong>"{searchQuery.trim()}"</strong></> : null}
+          <div className="filter-summary">
+            <span>Showing <strong>{filteredClients.length}</strong> of <strong>{clients.length}</strong></span>
+            {statusFilter ? <span>· <strong>{statusFilter.replace(/_/g, ' ')}</strong></span> : null}
+            {searchQuery.trim() ? <span>· search: <strong>"{searchQuery.trim()}"</strong></span> : null}
             {hasActiveFilter ? (
-              <button
-                type="button"
-                onClick={clearFilters}
-                style={{ marginLeft: '0.5rem', padding: '0.2rem 0.55rem', fontSize: '0.75rem', background: '#1e40af', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
-              >
-                Show all ({clients.length})
+              <button type="button" className="filter-summary__clear" onClick={clearFilters}>
+                Clear · show all ({clients.length})
               </button>
             ) : null}
-          </p>
+          </div>
         </div>
         <div className="search-box">
           <input
@@ -360,6 +378,30 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+      </div>
+
+      <div className="filter-bar" role="tablist" aria-label="Filter by status">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!statusFilter}
+          className={`filter-chip ${!statusFilter ? 'filter-chip--active' : ''}`}
+          onClick={() => setStatus(null)}
+        >
+          All <span className="filter-chip__count">{clients.length}</span>
+        </button>
+        {CLIENT_STATUS_FILTERS.filter((s) => (statusCounts[s.key] || 0) > 0 || s.key === statusFilter).map((s) => (
+          <button
+            key={s.key}
+            type="button"
+            role="tab"
+            aria-selected={statusFilter === s.key}
+            className={`filter-chip ${statusFilter === s.key ? 'filter-chip--active' : ''}`}
+            onClick={() => setStatus(s.key)}
+          >
+            {s.label} <span className="filter-chip__count">{statusCounts[s.key] || 0}</span>
+          </button>
+        ))}
       </div>
       <table className="data-table">
         <thead>
@@ -643,36 +685,35 @@ function ClientDetailRoute({ token }: { token: string }) {
                 );
               }
               return (
-                <div className="preview-card" style={{ gridColumn: '1 / -1' }}>
-                  <h3>Signed agreement</h3>
+                <div className="signed-agreement-card" style={{ gridColumn: '1 / -1' }}>
+                  <div className="signed-agreement-card__header">
+                    <div className="signed-agreement-card__title">
+                      Signed CredX service agreement
+                      <small>{sig.signedName || 'Client'} · {formatDate(sig.signedAt)}</small>
+                    </div>
+                    <span className="signed-agreement-card__badge">✓ Signed</span>
+                  </div>
                   <ul className="detail-list">
                     <li><strong>Signed by</strong><span>{sig.signedName || 'Client'}</span></li>
                     <li><strong>Signed at</strong><span>{formatDate(sig.signedAt)}</span></li>
-                    {sig.contractId ? <li><strong>Contract ID</strong><span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{sig.contractId}</span></li> : null}
+                    {sig.contractId ? <li><strong>Contract ID</strong><span style={{ fontFamily: 'var(--cx-font-mono)', fontSize: '12px' }}>{sig.contractId}</span></li> : null}
                     {sig.ipAddress ? <li><strong>IP address</strong><span>{sig.ipAddress}</span></li> : null}
                   </ul>
                   {sig.dataUrl ? (
-                    <div style={{ marginTop: '0.75rem' }}>
-                      <p className="helper-text" style={{ marginBottom: '0.25rem' }}>Signature</p>
-                      <div style={{ padding: '0.75rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', justifyContent: 'center' }}>
-                        <img src={sig.dataUrl} alt={`Signature of ${sig.signedName || 'client'}`} style={{ maxHeight: '120px', maxWidth: '100%' }} />
-                      </div>
+                    <div className="signature-display" aria-label="Client signature">
+                      <img src={sig.dataUrl} alt={`Signature of ${sig.signedName || 'client'}`} />
                     </div>
                   ) : null}
                   {sig.agreementText ? (
-                    <details style={{ marginTop: '0.75rem' }}>
-                      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>View agreement text</summary>
-                      <div style={{ marginTop: '0.5rem', maxHeight: '280px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.85rem', lineHeight: 1.5, padding: '0.75rem', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
-                        {sig.agreementText}
-                      </div>
+                    <details>
+                      <summary>View agreement text</summary>
+                      <div>{sig.agreementText}</div>
                     </details>
                   ) : null}
                   {sig.disclosureStatement ? (
-                    <details style={{ marginTop: '0.5rem' }}>
-                      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>View required disclosures</summary>
-                      <div style={{ marginTop: '0.5rem', maxHeight: '240px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.85rem', lineHeight: 1.5, padding: '0.75rem', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
-                        {sig.disclosureStatement}
-                      </div>
+                    <details>
+                      <summary>View required disclosures</summary>
+                      <div>{sig.disclosureStatement}</div>
                     </details>
                   ) : null}
                 </div>
@@ -683,11 +724,16 @@ function ClientDetailRoute({ token }: { token: string }) {
 
         {activeTab === 'documents' ? (
           <div className="two-col client-section-grid">
-            <div className="preview-card">
-              <h3>Upload on behalf of client</h3>
-              <p className="helper-text">
-                Upload a credit report or verification document for {fullName}. Credit reports automatically trigger the AI extraction + analysis pipeline.
-              </p>
+            <div className="upload-card">
+              <div className="upload-card__header">
+                <span className="upload-card__icon" aria-hidden="true">📄</span>
+                <div>
+                  <div className="upload-card__title">Upload on behalf of {client.user.firstName}</div>
+                  <div className="upload-card__hint">
+                    Credit reports trigger the same extraction + analysis pipeline as the client portal.
+                  </div>
+                </div>
+              </div>
               <form onSubmit={submitAdminUpload} className="field-grid">
                 <label>
                   <span>File</span>
@@ -698,7 +744,7 @@ function ClientDetailRoute({ token }: { token: string }) {
                   />
                 </label>
                 <label>
-                  <span>Type</span>
+                  <span>Document type</span>
                   <select value={uploadType} onChange={(e) => setUploadType(e.target.value as typeof uploadType)}>
                     <option value="credit_report">Credit report</option>
                     <option value="identity">Identity document</option>
@@ -707,11 +753,11 @@ function ClientDetailRoute({ token }: { token: string }) {
                   </select>
                 </label>
                 <button type="submit" disabled={uploading || !uploadFile}>
-                  {uploading ? 'Uploading…' : 'Upload'}
+                  {uploading ? 'Uploading…' : 'Upload securely'}
                 </button>
               </form>
-              {uploadMessage ? <p className="helper-text" style={{ color: '#22c55e', marginTop: '0.5rem' }}>{uploadMessage}</p> : null}
-              {uploadError ? <div className="error-banner" style={{ marginTop: '0.5rem' }}>{uploadError}</div> : null}
+              {uploadMessage ? <div className="upload-status upload-status--success">{uploadMessage}</div> : null}
+              {uploadError ? <div className="upload-status upload-status--error">{uploadError}</div> : null}
             </div>
             <div className="preview-card">
               <h3>Documents on file ({documents.length})</h3>
