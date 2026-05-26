@@ -36,24 +36,24 @@ export function ImportReportTab({ token, selectedClientId, selectedClientLabel, 
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('clientId', selectedClientId);
+      formData.append('type', 'credit_report');
 
-      const response = await fetch(`${API_BASE}/api/disputes/import/csv`, {
+      const response = await fetch(`${API_BASE}/api/progress/clients/${selectedClientId}/docs/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Import failed');
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `Upload failed: ${response.status}`);
       }
 
-      const result = await response.json();
-      setUploadResult(result);
+      await response.json();
+      setUploadResult({ success: true, count: 0 });
       onImportComplete();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed');
+      setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
     }
@@ -259,8 +259,8 @@ export function ImportReportTab({ token, selectedClientId, selectedClientLabel, 
       `}</style>
 
       <div className="import-header">
-        <h3>Import Credit Report</h3>
-        <p>Upload credit report data via CSV to quickly add dispute items.</p>
+        <h3>Upload Credit Report</h3>
+        <p>Upload the client's tri-merge report (PDF, HTML, or screenshot). Runs the same extraction + analysis pipeline used by the client portal — tradelines, findings, and dispute opportunities populate automatically.</p>
       </div>
 
       <div className="import-section">
@@ -282,42 +282,31 @@ export function ImportReportTab({ token, selectedClientId, selectedClientLabel, 
       </div>
 
       <div className="import-section">
-        <h4>2. Upload CSV File</h4>
-        <div 
+        <h4>2. Upload Credit Report File</h4>
+        <div
           className="upload-zone"
           onClick={() => fileInputRef.current?.click()}
         >
-          <div className="upload-icon">📁</div>
+          <div className="upload-icon">📄</div>
           <div className="upload-text">
-            {uploading ? 'Uploading...' : 'Click to upload CSV file'}
+            {uploading ? 'Uploading & analyzing…' : 'Click to upload credit report'}
           </div>
           <div className="upload-hint">
-            Supports: Furnisher, Account Number, Account Type, Balance, EFX, XPN, TU, Reason
+            Accepted: PDF, HTML, PNG, JPG, JPEG, WEBP. Extraction + analysis runs in the background; reload to see updated tradelines and dispute opportunities.
           </div>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv"
+            accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp"
             onChange={handleFileSelect}
             style={{ display: 'none' }}
             disabled={uploading}
           />
         </div>
 
-        <div className="csv-template">
-          <h5>CSV Template Format:</h5>
-          <code>
-            furnisher,accountNumber,accountType,balance,equifax,experian,transunion,reason,instructions
-            <br />
-            CREDITONEBNK,1234567890,COLLECTION,1500.00,true,true,false,"Not mine","Please investigate"
-            <br />
-            MIDLAND CREDIT,0987654321,CHARGE_OFF,2300.00,true,false,true,"Dispute balance",""
-          </code>
-        </div>
-
         {uploadResult && (
           <div className="import-result">
-            ✅ Successfully imported {uploadResult.count} dispute items!
+            ✅ Uploaded — extraction + analysis are running in the background. Refresh in a few seconds to see findings and dispute opportunities.
           </div>
         )}
 

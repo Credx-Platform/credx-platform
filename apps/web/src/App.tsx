@@ -56,6 +56,24 @@ type ClientDetail = ClientRecord & {
   progress?: {
     scores?: { equifax?: number | null; experian?: number | null; transunion?: number | null };
     workflow?: { stage?: string; next?: string[] };
+    uploadedDocs?: Array<{ name?: string; fileName?: string; type?: string; uploadedAt?: string; secure?: boolean; sizeBytes?: number }>;
+    onboarding?: {
+      status?: string;
+      signupAt?: string | null;
+      completedAt?: string | null;
+      signature?: {
+        dataUrl?: string;
+        signedName?: string;
+        signedAt?: string;
+        agreementText?: string;
+        disclosureStatement?: string;
+        cancellationNotice?: { heading?: string; text?: string } | null;
+        contractId?: string;
+        ipAddress?: string | null;
+        userAgent?: string | null;
+      } | null;
+      [key: string]: unknown;
+    } | null;
   } | null;
   creditReports?: Array<{ id: string; bureau: string; pulledAt: string; tradelines: Array<{ id: string }> }>;
   tasks?: Array<{ id: string; title?: string | null; status?: string | null }>;
@@ -108,6 +126,19 @@ async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Pr
     throw new Error(body?.error ?? `Request failed: ${response.status}`);
   }
 
+  return body as T;
+}
+
+async function apiUpload<T>(path: string, token: string, formData: FormData): Promise<T> {
+  if (!API_BASE) throw new Error('Missing VITE_API_URL for this deployment');
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` },
+    body: formData
+  });
+  const text = await response.text();
+  const body = text ? JSON.parse(text) : null;
+  if (!response.ok) throw new Error(body?.error ?? `Upload failed: ${response.status}`);
   return body as T;
 }
 
@@ -363,10 +394,51 @@ function ClientDetailRoute({ token }: { token: string }) {
   const requestedTab = searchParams.get('tab') as ClientWorkspaceTab | null;
   const [activeTab, setActiveTab] = useState<ClientWorkspaceTab>(requestedTab || 'overview');
   const [statusValue, setStatusValue] = useState('LEAD');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadType, setUploadType] = useState<'credit_report' | 'identity' | 'proof_of_address' | 'other'>('credit_report');
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (requestedTab) setActiveTab(requestedTab);
   }, [requestedTab]);
+
+  const refetchClient = async () => {
+    if (!id) return;
+    try {
+      const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${id}`, token);
+      setClient(updated.client);
+    } catch (err) {
+      console.error('Refetch failed', err);
+    }
+  };
+
+  const submitAdminUpload = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!uploadFile || !client) {
+      setUploadError('Choose a file first.');
+      return;
+    }
+    setUploading(true);
+    setUploadError(null);
+    setUploadMessage(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', uploadFile);
+      fd.append('type', uploadType);
+      await apiUpload(`/api/progress/clients/${client.id}/docs/upload`, token, fd);
+      setUploadFile(null);
+      setUploadMessage(uploadType === 'credit_report'
+        ? 'Uploaded — analysis is running in the background. Refresh in a few seconds to see findings.'
+        : 'Uploaded.');
+      await refetchClient();
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -541,26 +613,104 @@ function ClientDetailRoute({ token }: { token: string }) {
                 >🗑️ Reset / Start Fresh</button>
               </div>
             </div>
+            {(() => {
+              const sig = client.progress?.onboarding?.signature;
+              if (!sig || !sig.signedAt) {
+                return (
+                  <div className="preview-card" style={{ gridColumn: '1 / -1' }}>
+                    <h3>Signed agreement</h3>
+                    <p className="helper-text">No signed agreement on file yet. The client signs during onboarding at /portal.</p>
+                  </div>
+                );
+              }
+              return (
+                <div className="preview-card" style={{ gridColumn: '1 / -1' }}>
+                  <h3>Signed agreement</h3>
+                  <ul className="detail-list">
+                    <li><strong>Signed by</strong><span>{sig.signedName || 'Client'}</span></li>
+                    <li><strong>Signed at</strong><span>{formatDate(sig.signedAt)}</span></li>
+                    {sig.contractId ? <li><strong>Contract ID</strong><span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{sig.contractId}</span></li> : null}
+                    {sig.ipAddress ? <li><strong>IP address</strong><span>{sig.ipAddress}</span></li> : null}
+                  </ul>
+                  {sig.dataUrl ? (
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <p className="helper-text" style={{ marginBottom: '0.25rem' }}>Signature</p>
+                      <div style={{ padding: '0.75rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', justifyContent: 'center' }}>
+                        <img src={sig.dataUrl} alt={`Signature of ${sig.signedName || 'client'}`} style={{ maxHeight: '120px', maxWidth: '100%' }} />
+                      </div>
+                    </div>
+                  ) : null}
+                  {sig.agreementText ? (
+                    <details style={{ marginTop: '0.75rem' }}>
+                      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>View agreement text</summary>
+                      <div style={{ marginTop: '0.5rem', maxHeight: '280px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.85rem', lineHeight: 1.5, padding: '0.75rem', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
+                        {sig.agreementText}
+                      </div>
+                    </details>
+                  ) : null}
+                  {sig.disclosureStatement ? (
+                    <details style={{ marginTop: '0.5rem' }}>
+                      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>View required disclosures</summary>
+                      <div style={{ marginTop: '0.5rem', maxHeight: '240px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.85rem', lineHeight: 1.5, padding: '0.75rem', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
+                        {sig.disclosureStatement}
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+              );
+            })()}
           </div>
         ) : null}
 
         {activeTab === 'documents' ? (
-          <div className="preview-card">
-            <h3>Documents</h3>
-            {documents.length ? (
-              <table className="data-table">
-                <thead><tr><th>Document</th><th>Type</th><th>Uploaded</th></tr></thead>
-                <tbody>
-                  {documents.map((doc: any) => (
-                    <tr key={doc.id}>
-                      <td>{doc.fileName || doc.id}</td>
-                      <td>{doc.type || 'Unknown'}</td>
-                      <td>{formatDate(doc.createdAt || client.updatedAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : <p className="helper-text">No documents uploaded yet.</p>}
+          <div className="two-col client-section-grid">
+            <div className="preview-card">
+              <h3>Upload on behalf of client</h3>
+              <p className="helper-text">
+                Upload a credit report or verification document for {fullName}. Credit reports automatically trigger the AI extraction + analysis pipeline.
+              </p>
+              <form onSubmit={submitAdminUpload} className="field-grid">
+                <label>
+                  <span>File</span>
+                  <input
+                    type="file"
+                    accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp"
+                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+                <label>
+                  <span>Type</span>
+                  <select value={uploadType} onChange={(e) => setUploadType(e.target.value as typeof uploadType)}>
+                    <option value="credit_report">Credit report</option>
+                    <option value="identity">Identity document</option>
+                    <option value="proof_of_address">Proof of address</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <button type="submit" disabled={uploading || !uploadFile}>
+                  {uploading ? 'Uploading…' : 'Upload'}
+                </button>
+              </form>
+              {uploadMessage ? <p className="helper-text" style={{ color: '#22c55e', marginTop: '0.5rem' }}>{uploadMessage}</p> : null}
+              {uploadError ? <div className="error-banner" style={{ marginTop: '0.5rem' }}>{uploadError}</div> : null}
+            </div>
+            <div className="preview-card">
+              <h3>Documents on file ({documents.length})</h3>
+              {documents.length ? (
+                <table className="data-table">
+                  <thead><tr><th>Document</th><th>Type</th><th>Uploaded</th></tr></thead>
+                  <tbody>
+                    {documents.map((doc: any) => (
+                      <tr key={doc.id}>
+                        <td>{doc.fileName || doc.id}</td>
+                        <td>{doc.type || 'Unknown'}</td>
+                        <td>{formatDate(doc.createdAt || doc.uploadedAt || client.updatedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : <p className="helper-text">No documents uploaded yet.</p>}
+            </div>
           </div>
         ) : null}
 

@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { config } from '../config.js';
 import { CreditAnalysisService, deriveReportSubject } from '../lib/creditAnalysis.js';
@@ -396,20 +396,12 @@ async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
 progressRouter.post('/me/docs', requireAuth, handleDocUpload);
 progressRouter.post('/docs', requireAuth, handleDocUpload);
 
-progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async (req: AuthedRequest, res, next) => {
+async function handleSecureDocUpload(client: { id: string; progress: any }, file: Express.Multer.File, rawTypeRaw: string, res: any, next: any) {
   try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    if (!isAllowedUpload(req.file)) {
-      return res.status(400).json({ error: 'Unsupported file type. Upload PDF, HTML, JPG, PNG, or WEBP files.' });
-    }
-
-    const client = await prisma.client.findUnique({ where: { userId: req.auth!.sub }, include: { progress: true } });
-    if (!client || !client.progress) return res.status(404).json({ error: 'Client progress not found' });
-
-    const rawType = String(req.body?.type || req.file.originalname || '').trim();
+    const rawType = String(rawTypeRaw || file.originalname || '').trim();
     const docType = inferDocumentType(rawType);
     const uploadedAt = new Date().toISOString();
-    const safeName = req.file.originalname || `upload-${Date.now()}`;
+    const safeName = file.originalname || `upload-${Date.now()}`;
     const storageKey = `secure/${client.id}/${Date.now()}-${crypto.randomUUID()}-${safeName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     const secureDoc = {
       name: safeName,
@@ -418,8 +410,8 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
       fileName: safeName,
       uploadedAt,
       secure: true,
-      sizeBytes: req.file.size,
-      contentType: req.file.mimetype
+      sizeBytes: file.size,
+      contentType: file.mimetype
     };
 
     const progress = client.progress as any;
@@ -444,7 +436,7 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
       update: {
         type: toPrismaDocumentType(docType),
         s3Key: storageKey,
-        contentType: req.file.mimetype,
+        contentType: file.mimetype,
         uploadedAt: new Date(uploadedAt)
       },
       create: {
@@ -452,7 +444,7 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
         type: toPrismaDocumentType(docType),
         fileName: safeName,
         s3Key: storageKey,
-        contentType: req.file.mimetype,
+        contentType: file.mimetype,
         uploadedAt: new Date(uploadedAt)
       }
     });
@@ -462,7 +454,7 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
         clientId: client.id,
         type: 'secure_document_uploaded',
         message: `${docType === 'credit_report' ? 'Credit report' : 'Verification document'} uploaded securely.`,
-        metadata: { fileName: safeName, documentType: docType, sizeBytes: req.file.size }
+        metadata: { fileName: safeName, documentType: docType, sizeBytes: file.size }
       }
     });
 
@@ -476,16 +468,15 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
     // polls /api/progress/me, so the parsed report + analysis appear there.
     res.json({
       success: true,
-      document: { fileName: safeName, type: docType, uploadedAt, secure: true, sizeBytes: req.file.size },
+      document: { fileName: safeName, type: docType, uploadedAt, secure: true, sizeBytes: file.size },
       workflow: workflowResult,
       analysisPending: docType === 'credit_report'
     });
 
     if (docType !== 'credit_report') return;
 
-    // Capture the buffer/mime by closure — req.file may be GC'd after response.
-    const fileBuffer = req.file.buffer;
-    const fileMime = req.file.mimetype;
+    const fileBuffer = file.buffer;
+    const fileMime = file.mimetype;
     const clientId = client.id;
     const ts = uploadedAt;
     const baseWorkflow = workflow;
@@ -672,5 +663,35 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
     return;
   } catch (error) {
     next(error);
+  }
+}
+
+progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async (req: AuthedRequest, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (!isAllowedUpload(req.file)) {
+      return res.status(400).json({ error: 'Unsupported file type. Upload PDF, HTML, JPG, PNG, or WEBP files.' });
+    }
+    const client = await prisma.client.findUnique({ where: { userId: req.auth!.sub }, include: { progress: true } });
+    if (!client || !client.progress) return res.status(404).json({ error: 'Client progress not found' });
+    return handleSecureDocUpload(client, req.file, String(req.body?.type || ''), res, next);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Staff/admin: upload a credit report on behalf of a specific client.
+progressRouter.post('/clients/:id/docs/upload', requireAuth, requireRole(['STAFF', 'ADMIN']), upload.single('file'), async (req: AuthedRequest, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (!isAllowedUpload(req.file)) {
+      return res.status(400).json({ error: 'Unsupported file type. Upload PDF, HTML, JPG, PNG, or WEBP files.' });
+    }
+    const clientId = String(req.params.id);
+    const client = await prisma.client.findUnique({ where: { id: clientId }, include: { progress: true } });
+    if (!client || !client.progress) return res.status(404).json({ error: 'Client progress not found' });
+    return handleSecureDocUpload(client, req.file, String(req.body?.type || ''), res, next);
+  } catch (error) {
+    return next(error);
   }
 });
