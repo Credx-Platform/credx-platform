@@ -880,7 +880,18 @@ function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRe
   const active = disputes.filter((item) => !['COMPLETED', 'REJECTED'].includes(item.status));
   const completed = disputes.filter((item) => item.status === 'COMPLETED').length;
   const responseDue = disputes.filter((item) => item.status === 'RESPONSE_DUE').length;
-  const [subTab, setSubTab] = useState<'queue' | 'manager' | 'print'>('queue');
+  const [subTab, setSubTab] = useState<'manager' | 'print'>('manager');
+
+  const disputesByClient = useMemo(() => {
+    const groups = new Map<string, { client: DisputeRecord['client']; items: DisputeRecord[] }>();
+    for (const d of disputes) {
+      const key = d.client.id;
+      const existing = groups.get(key);
+      if (existing) existing.items.push(d);
+      else groups.set(key, { client: d.client, items: [d] });
+    }
+    return Array.from(groups.values()).sort((a, b) => b.items.length - a.items.length);
+  }, [disputes]);
 
   return (
     <div className="page-grid">
@@ -888,7 +899,7 @@ function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRe
         <div>
           <p className="eyebrow">Dispute Desk</p>
           <h1>Dispute Operations</h1>
-          <p>Run imports, add accounts, track bureau status, and monitor live dispute movement from one admin section.</p>
+          <p>Run imports, add accounts, track bureau status, and bulk-print letters from one place.</p>
         </div>
         <div className="hero-stats">
           <div className="stat-card"><span>Active</span><strong>{active.length}</strong></div>
@@ -901,100 +912,89 @@ function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRe
         <div className="panel-header">
           <div>
             <p className="eyebrow">Dispute Section</p>
-            <h2>{subTab === 'queue' ? 'Recent dispute queue' : subTab === 'manager' ? 'Client dispute operations' : 'Print queue'}</h2>
-            <p className="helper-text">{subTab === 'print' ? 'A clean, paper-ready view of every active dispute item, ready for printing or filing.' : 'A quick view of the newest dispute items before you jump into the full manager.'}</p>
+            <h2>{subTab === 'manager' ? 'Client dispute operations' : 'Bulk Print'}</h2>
+            <p className="helper-text">{subTab === 'print'
+              ? 'Every dispute item, grouped by client. Print one client at a time or run the full batch.'
+              : 'Import reports, add items, and track bureau status. Use Bulk Print to print every dispute letter at once.'}</p>
           </div>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
-            <button type="button" className={`tab ${subTab === 'queue' ? 'active' : ''}`} onClick={() => setSubTab('queue')}>Queue</button>
             <button type="button" className={`tab ${subTab === 'manager' ? 'active' : ''}`} onClick={() => setSubTab('manager')}>Manager</button>
-            <button type="button" className={`tab ${subTab === 'print' ? 'active' : ''}`} onClick={() => setSubTab('print')}>Print</button>
+            <button type="button" className={`tab ${subTab === 'print' ? 'active' : ''}`} onClick={() => setSubTab('print')}>Bulk Print ({disputes.length})</button>
           </div>
         </div>
 
-        {subTab === 'queue' ? (
-          <div className="dispute-route-table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Client</th>
-                  <th>Creditor</th>
-                  <th>Bureau</th>
-                  <th>Status</th>
-                  <th>Round</th>
-                  <th>Opened</th>
-                </tr>
-              </thead>
-              <tbody>
-                {disputes.length ? [...disputes]
-                  .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-                  .slice(0, 8)
-                  .map((dispute) => (
-                    <tr key={dispute.id}>
-                      <td>
-                        <strong>{dispute.client.user.firstName} {dispute.client.user.lastName}</strong>
-                        <div className="cell-subtext">{dispute.client.user.email}</div>
-                      </td>
-                      <td>{dispute.creditorName}</td>
-                      <td>{bureauLabel(dispute.bureau)}</td>
-                      <td><span className={statusClass(dispute.status)}>{dispute.status.replace('_', ' ')}</span></td>
-                      <td>Round {dispute.round}</td>
-                      <td>{formatDate(dispute.createdAt)}</td>
-                    </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan={6} className="empty-row">No dispute items yet.</td>
-                    </tr>
-                  )}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-
         {subTab === 'manager' ? (
-          <DisputeManager token={token} />
+          <>
+            <div className="filter-summary" style={{ marginBottom: '14px' }}>
+              <button type="button" onClick={() => setSubTab('print')} className="filter-summary__clear" style={{ height: 32, padding: '0 14px', fontSize: 12 }}>
+                🖨 Send to Bulk Print ({disputes.length})
+              </button>
+              <span>Jump straight to the bulk print view when you're ready to mail.</span>
+            </div>
+            <DisputeManager token={token} />
+          </>
         ) : null}
 
         {subTab === 'print' ? (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
-              <button type="button" className="ghost-button" onClick={() => printAdminDisputeQueue(disputes)} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>
-                🖨 Print full dispute queue
+            <div className="bulk-print-toolbar">
+              <button type="button" onClick={() => printAdminDisputeQueue(disputes)} disabled={!disputes.length}>
+                🖨 Print all dispute letters ({disputes.length})
               </button>
-              <span className="helper-text" style={{ margin: 0 }}>Opens a paper-formatted version of every dispute and triggers your browser's print dialog.</span>
+              <span className="helper-text" style={{ margin: 0 }}>
+                Opens a paper-ready, page-broken view grouped by client and triggers your browser's print dialog.
+              </span>
             </div>
-            <div className="dispute-route-table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Client</th>
-                    <th>Creditor</th>
-                    <th>Bureau</th>
-                    <th>Status</th>
-                    <th>Round</th>
-                    <th>Opened</th>
-                    <th>Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {disputes.length ? disputes.map((d) => (
-                    <tr key={d.id}>
-                      <td>
-                        <strong>{d.client.user.firstName} {d.client.user.lastName}</strong>
-                        <div className="cell-subtext">{d.client.user.email}</div>
-                      </td>
-                      <td>{d.creditorName}</td>
-                      <td>{bureauLabel(d.bureau)}</td>
-                      <td><span className={statusClass(d.status)}>{d.status.replace('_', ' ')}</span></td>
-                      <td>Round {d.round}</td>
-                      <td>{formatDate(d.createdAt)}</td>
-                      <td>{d.reason || '—'}</td>
-                    </tr>
-                  )) : (
-                    <tr><td colSpan={7} className="empty-row">No dispute items to print.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+
+            {disputesByClient.length ? (
+              <div className="bulk-print-stack">
+                {disputesByClient.map(({ client, items }) => (
+                  <div key={client.id} className="bulk-print-card">
+                    <div className="bulk-print-card__header">
+                      <div>
+                        <strong>{client.user.firstName} {client.user.lastName}</strong>
+                        <div className="cell-subtext">{client.user.email}</div>
+                      </div>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => printAdminDisputeQueue(items)}
+                      >
+                        🖨 Print {items.length} letter{items.length === 1 ? '' : 's'}
+                      </button>
+                    </div>
+                    <div className="dispute-route-table-wrap">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Creditor</th>
+                            <th>Bureau</th>
+                            <th>Status</th>
+                            <th>Round</th>
+                            <th>Opened</th>
+                            <th>Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.map((d) => (
+                            <tr key={d.id}>
+                              <td>{d.creditorName}</td>
+                              <td>{bureauLabel(d.bureau)}</td>
+                              <td><span className={statusClass(d.status)}>{d.status.replace('_', ' ')}</span></td>
+                              <td>Round {d.round}</td>
+                              <td>{formatDate(d.createdAt)}</td>
+                              <td>{d.reason || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state-card">No dispute items to print yet. Add items in the Manager tab.</div>
+            )}
           </div>
         ) : null}
       </section>

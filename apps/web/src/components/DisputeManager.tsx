@@ -64,6 +64,17 @@ interface DisputeManagerProps {
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
 
+export type ImportedTradeline = {
+  id: string;
+  creditorName: string;
+  accountNumber: string | null;
+  accountType: string | null;
+  status: string | null;
+  balance: number | null;
+  isNegative: boolean;
+  bureau: 'EXPERIAN' | 'EQUIFAX' | 'TRANSUNION';
+};
+
 export function DisputeManager({ token }: DisputeManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>('add');
   const [items, setItems] = useState<DisputeItem[]>([]);
@@ -72,6 +83,7 @@ export function DisputeManager({ token }: DisputeManagerProps) {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tradelines, setTradelines] = useState<ImportedTradeline[]>([]);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/clients`, {
@@ -124,6 +136,43 @@ export function DisputeManager({ token }: DisputeManagerProps) {
     setSelectedItemIds([]);
   }, [selectedClientId]);
 
+  const fetchTradelines = useCallback(async () => {
+    if (!selectedClientId) {
+      setTradelines([]);
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE}/api/clients/${selectedClientId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) { setTradelines([]); return; }
+      const data = await response.json();
+      const reports = data?.client?.creditReports || [];
+      const flat: ImportedTradeline[] = [];
+      for (const r of reports) {
+        for (const t of (r.tradelines || [])) {
+          flat.push({
+            id: t.id,
+            creditorName: t.creditorName,
+            accountNumber: t.accountNumber,
+            accountType: t.accountType,
+            status: t.status,
+            balance: t.balance == null ? null : Number(t.balance),
+            isNegative: !!t.isNegative,
+            bureau: r.bureau
+          });
+        }
+      }
+      setTradelines(flat);
+    } catch {
+      setTradelines([]);
+    }
+  }, [token, selectedClientId]);
+
+  useEffect(() => {
+    fetchTradelines();
+  }, [fetchTradelines]);
+
   const handleItemCreated = () => {
     fetchItems();
     setActiveTab('tracking');
@@ -132,6 +181,15 @@ export function DisputeManager({ token }: DisputeManagerProps) {
   const handleImportComplete = () => {
     fetchItems();
     setActiveTab('add');
+    // Tradelines populate via the background extract+analysis pipeline.
+    // Poll a few times so the Add Items tab fills in as the parse finishes.
+    let tries = 0;
+    const poll = async () => {
+      tries++;
+      await fetchTradelines();
+      if (tries < 15) setTimeout(poll, 4000);
+    };
+    setTimeout(poll, 3000);
   };
 
   const tabs: { id: Tab; label: string }[] = [
@@ -308,8 +366,8 @@ export function DisputeManager({ token }: DisputeManagerProps) {
             )}
             
             {activeTab === 'add' && (
-              <AddItemTab 
-                token={token} 
+              <AddItemTab
+                token={token}
                 items={items}
                 selectedClientId={selectedClientId}
                 selectedClientLabel={selectedClientLabel}
@@ -318,6 +376,8 @@ export function DisputeManager({ token }: DisputeManagerProps) {
                 selectedItemIds={selectedItemIds}
                 onSelectionChange={setSelectedItemIds}
                 onOpenBureaus={() => setActiveTab('bureaus')}
+                tradelines={tradelines}
+                onRefreshTradelines={fetchTradelines}
               />
             )}
 

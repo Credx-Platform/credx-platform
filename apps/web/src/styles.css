@@ -1271,3 +1271,73 @@ button:hover,
 }
 .upload-status--success { background: rgba(16,185,129,0.10); color: #0a5e44; border: 1px solid rgba(16,185,129,0.32); }
 .upload-status--error { background: rgba(220,38,38,0.10); color: #8a1313; border: 1px solid rgba(220,38,38,0.32); }
+
+/* Bulk print stack — one card per client, ready to mail */
+.bulk-print-toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 14px; margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(0, 198, 251, 0.10), rgba(0, 198, 251, 0.02));
+  border: 1px solid rgba(0, 198, 251, 0.32);
+  border-radius: 12px;
+}
+.bulk-print-stack { display: grid; gap: 14px; }
+.bulk-print-card {
+  background: var(--surface-2);
+  border: 1px solid var(--surface-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.bulk-print-card__header {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 14px 18px;
+  background: rgba(0, 198, 251, 0.04);
+  border-bottom: 1px solid rgba(0, 198, 251, 0.18);
+}
+.bulk-print-card__header strong { color: var(--surface-text); font-size: 15px; }
+.bulk-print-card .data-table { margin: 0; }
+
+/* Suggested tradelines (Add Items tab) */
+.tradeline-suggest {
+  background: var(--surface-2);
+  border: 1px solid rgba(0, 198, 251, 0.28);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.tradeline-suggest__header {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  margin-bottom: 12px; flex-wrap: wrap;
+}
+.tradeline-suggest__title { color: var(--surface-text); font-weight: 700; font-size: 14px; }
+.tradeline-suggest__title small { display: block; color: var(--surface-text-muted); font-size: 12px; font-weight: 500; margin-top: 2px; }
+.tradeline-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(20, 30, 50, 0.06);
+  cursor: pointer;
+  transition: background-color 0.15s var(--cx-ease);
+}
+.tradeline-row:last-child { border-bottom: none; }
+.tradeline-row:hover { background: rgba(0, 198, 251, 0.04); }
+.tradeline-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #00c6fb; }
+.tradeline-row__name { color: var(--surface-text); font-weight: 600; font-size: 13px; }
+.tradeline-row__sub { color: var(--surface-text-muted); font-size: 12px; }
+.tradeline-row__bureau { font-size: 11px; padding: 3px 8px; border-radius: 999px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.tradeline-row__bureau--EX { background: rgba(59,130,246,0.14); color: #1e40af; }
+.tradeline-row__bureau--EQ { background: rgba(34,197,94,0.14); color: #166534; }
+.tradeline-row__bureau--TU { background: rgba(168,85,247,0.14); color: #6b21a8; }
+.tradeline-row__balance { color: var(--surface-text); font-weight: 600; font-size: 13px; }
+.tradeline-row__neg {
+  font-size: 11px; padding: 3px 8px; border-radius: 999px; font-weight: 700;
+  background: rgba(220,38,38,0.14); color: #8a1313;
+}
+.tradeline-suggest__actions {
+  display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;
+}
+@media (max-width: 720px) {
+  .tradeline-row { grid-template-columns: auto 1fr auto; }
+  .tradeline-row__bureau, .tradeline-row__neg { grid-column: 2 / -1; justify-self: start; }
+}

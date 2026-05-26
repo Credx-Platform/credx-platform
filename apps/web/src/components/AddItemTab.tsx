@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { DisputeItem, Furnisher } from './DisputeManager';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { DisputeItem, Furnisher, ImportedTradeline } from './DisputeManager';
 
 interface AddItemTabProps {
   token: string;
@@ -11,6 +11,8 @@ interface AddItemTabProps {
   selectedItemIds: string[];
   onSelectionChange: (ids: string[]) => void;
   onOpenBureaus: () => void;
+  tradelines?: ImportedTradeline[];
+  onRefreshTradelines?: () => void;
 }
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
@@ -34,11 +36,129 @@ const disputeReasons = [
   'Other'
 ];
 
-export function AddItemTab({ token, items, selectedClientId, selectedClientLabel, onItemCreated, onItemsChange, selectedItemIds, onSelectionChange, onOpenBureaus }: AddItemTabProps) {
+export function AddItemTab({ token, items, selectedClientId, selectedClientLabel, onItemCreated, onItemsChange, selectedItemIds, onSelectionChange, onOpenBureaus, tradelines = [], onRefreshTradelines }: AddItemTabProps) {
   const [furnishers, setFurnishers] = useState<Furnisher[]>([]);
   const [editingItem, setEditingItem] = useState<DisputeItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(selectedItemIds));
+  const [selectedTradelines, setSelectedTradelines] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkInitiateDisputes, setBulkInitiateDisputes] = useState(false);
+  const [showOnlyNegative, setShowOnlyNegative] = useState(true);
+
+  // Group tradelines by furnisher+account to collapse the 3-bureau dupes;
+  // remember which bureaus each appears on so the bulk-dispute toggles fire
+  // for every bureau the account was reported to.
+  const groupedTradelines = useMemo(() => {
+    const map = new Map<string, { key: string; sample: ImportedTradeline; bureaus: Set<'EXPERIAN' | 'EQUIFAX' | 'TRANSUNION'> }>();
+    for (const t of tradelines) {
+      const key = `${(t.creditorName || '').trim().toLowerCase()}|${(t.accountNumber || '').trim()}`;
+      const entry = map.get(key);
+      if (entry) entry.bureaus.add(t.bureau);
+      else map.set(key, { key, sample: t, bureaus: new Set([t.bureau]) });
+    }
+    return Array.from(map.values());
+  }, [tradelines]);
+
+  const visibleTradelines = useMemo(() => {
+    if (!showOnlyNegative) return groupedTradelines;
+    return groupedTradelines.filter((g) => g.sample.isNegative);
+  }, [groupedTradelines, showOnlyNegative]);
+
+  const inferAccountType = (t: ImportedTradeline): 'LATE_PAYMENT' | 'COLLECTION' | 'CHARGE_OFF' | 'INQUIRY' | 'OTHER' => {
+    const v = `${t.accountType || ''} ${t.status || ''}`.toLowerCase();
+    if (v.includes('collection')) return 'COLLECTION';
+    if (v.includes('charge')) return 'CHARGE_OFF';
+    if (v.includes('inquir')) return 'INQUIRY';
+    if (v.includes('late') || v.includes('past due')) return 'LATE_PAYMENT';
+    return 'OTHER';
+  };
+
+  const prefillFromTradeline = (g: { sample: ImportedTradeline; bureaus: Set<'EXPERIAN' | 'EQUIFAX' | 'TRANSUNION'> }) => {
+    setEditingItem(null);
+    setFormData({
+      furnisher: g.sample.creditorName || '',
+      accountNumber: g.sample.accountNumber || '',
+      accountType: inferAccountType(g.sample),
+      balance: g.sample.balance != null ? String(g.sample.balance) : '',
+      dateAdded: '',
+      disputeEquifax: g.bureaus.has('EQUIFAX'),
+      disputeExperian: g.bureaus.has('EXPERIAN'),
+      disputeTransunion: g.bureaus.has('TRANSUNION'),
+      reason: g.sample.isNegative ? 'Not mine' : '',
+      customInstruction: ''
+    });
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const toggleTradelineSelect = (key: string) => {
+    setSelectedTradelines((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const selectAllVisibleTradelines = () => {
+    setSelectedTradelines(new Set(visibleTradelines.map((g) => g.key)));
+  };
+
+  const clearTradelineSelection = () => setSelectedTradelines(new Set());
+
+  const bulkDisputeSelectedTradelines = async () => {
+    if (!selectedClientId) { alert('Pick a client first.'); return; }
+    const picks = visibleTradelines.filter((g) => selectedTradelines.has(g.key));
+    if (!picks.length) { alert('Select at least one account first.'); return; }
+    setBulkBusy(true);
+    try {
+      for (const g of picks) {
+        const body = {
+          clientId: selectedClientId,
+          furnisher: g.sample.creditorName || 'Unknown',
+          accountNumber: g.sample.accountNumber || '',
+          accountType: inferAccountType(g.sample),
+          balance: g.sample.balance,
+          dateAdded: '',
+          disputeEquifax: g.bureaus.has('EQUIFAX'),
+          disputeExperian: g.bureaus.has('EXPERIAN'),
+          disputeTransunion: g.bureaus.has('TRANSUNION'),
+          reason: g.sample.isNegative ? 'Not mine' : 'Requesting verification',
+          customInstruction: ''
+        };
+        const saveRes = await fetch(`${API_BASE}/api/disputes/items`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!saveRes.ok) throw new Error(`Failed to add ${g.sample.creditorName}`);
+        if (bulkInitiateDisputes) {
+          const saved = await saveRes.json();
+          const itemId = saved?.id;
+          if (itemId) {
+            await fetch(`${API_BASE}/api/disputes/initiate`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                itemId,
+                clientId: selectedClientId,
+                bureaus: {
+                  equifax: body.disputeEquifax,
+                  experian: body.disputeExperian,
+                  transunion: body.disputeTransunion
+                }
+              })
+            });
+          }
+        }
+      }
+      clearTradelineSelection();
+      onItemCreated();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Bulk dispute failed');
+    } finally {
+      setBulkBusy(false);
+    }
+  };
   
   const [formData, setFormData] = useState({
     furnisher: '',
@@ -543,6 +663,86 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
           </div>
         </div>
       </div>
+
+      {tradelines.length > 0 ? (
+        <div className="tradeline-suggest">
+          <div className="tradeline-suggest__header">
+            <div className="tradeline-suggest__title">
+              Accounts from imported credit report
+              <small>
+                {visibleTradelines.length} of {groupedTradelines.length} grouped accounts shown · click an account to prefill the form, or select multiple and dispute in bulk
+              </small>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 12, color: '#475569' }}>
+                <input type="checkbox" checked={showOnlyNegative} onChange={(e) => setShowOnlyNegative(e.target.checked)} />
+                Negative only
+              </label>
+              {onRefreshTradelines ? (
+                <button type="button" onClick={onRefreshTradelines} style={{ fontSize: 12, padding: '4px 10px', background: 'transparent', border: '1px solid #cbd5e1', borderRadius: 6, color: '#475569', cursor: 'pointer' }}>
+                  ↻ Refresh
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div>
+            {visibleTradelines.length ? visibleTradelines.map((g) => (
+              <div key={g.key} className="tradeline-row" onClick={() => prefillFromTradeline(g)}>
+                <input
+                  type="checkbox"
+                  checked={selectedTradelines.has(g.key)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleTradelineSelect(g.key)}
+                  aria-label={`Select ${g.sample.creditorName}`}
+                />
+                <div>
+                  <div className="tradeline-row__name">{g.sample.creditorName || 'Unknown creditor'}</div>
+                  <div className="tradeline-row__sub">
+                    {g.sample.accountNumber ? `Acct ${g.sample.accountNumber} · ` : ''}{g.sample.accountType || 'Unknown type'}{g.sample.status ? ` · ${g.sample.status}` : ''}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {Array.from(g.bureaus).sort().map((b) => (
+                    <span key={b} className={`tradeline-row__bureau tradeline-row__bureau--${b === 'EXPERIAN' ? 'EX' : b === 'EQUIFAX' ? 'EQ' : 'TU'}`}>
+                      {b === 'EXPERIAN' ? 'EX' : b === 'EQUIFAX' ? 'EQ' : 'TU'}
+                    </span>
+                  ))}
+                </div>
+                <span className="tradeline-row__balance">{g.sample.balance != null ? `$${Number(g.sample.balance).toLocaleString()}` : '—'}</span>
+                <span className={g.sample.isNegative ? 'tradeline-row__neg' : ''} aria-hidden={!g.sample.isNegative}>
+                  {g.sample.isNegative ? 'Negative' : ''}
+                </span>
+              </div>
+            )) : (
+              <div style={{ padding: '14px', color: '#64748b', fontSize: 13, textAlign: 'center' }}>
+                {showOnlyNegative ? 'No negative accounts in this report. Uncheck "Negative only" to see all.' : 'No accounts parsed yet.'}
+              </div>
+            )}
+          </div>
+
+          {selectedTradelines.size > 0 ? (
+            <div className="tradeline-suggest__actions">
+              <button type="button" onClick={bulkDisputeSelectedTradelines} disabled={bulkBusy} style={{ background: '#00c6fb', color: '#0f1929', border: 'none', borderRadius: 6, padding: '8px 14px', fontWeight: 700, cursor: 'pointer' }}>
+                {bulkBusy ? 'Adding…' : `Add ${selectedTradelines.size} as dispute item${selectedTradelines.size === 1 ? '' : 's'}`}
+              </button>
+              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 12, color: '#475569' }}>
+                <input type="checkbox" checked={bulkInitiateDisputes} onChange={(e) => setBulkInitiateDisputes(e.target.checked)} />
+                Also initiate dispute immediately
+              </label>
+              <button type="button" onClick={clearTradelineSelection} style={{ background: 'transparent', border: '1px solid #cbd5e1', borderRadius: 6, padding: '8px 14px', color: '#475569', cursor: 'pointer' }}>
+                Clear selection
+              </button>
+            </div>
+          ) : visibleTradelines.length > 0 ? (
+            <div className="tradeline-suggest__actions">
+              <button type="button" onClick={selectAllVisibleTradelines} style={{ background: 'transparent', border: '1px solid #cbd5e1', borderRadius: 6, padding: '6px 12px', fontSize: 12, color: '#475569', cursor: 'pointer' }}>
+                Select all visible
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="dispute-form">
         <div className="form-row">
