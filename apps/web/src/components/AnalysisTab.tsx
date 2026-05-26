@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 
 interface AnalysisTabProps {
   token: string;
@@ -401,6 +401,56 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadReport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) e.target.value = '';
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+    setUploadMessage(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('type', 'credit_report');
+      const response = await fetch(`${API_BASE}/api/progress/clients/${clientId}/docs/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `Upload failed: ${response.status}`);
+      }
+      setUploadMessage('Uploaded — extraction and analysis are running. The report below will refresh when ready.');
+
+      const deadline = Date.now() + 90_000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const poll = await fetch(`${API_BASE}/api/clients/${clientId}/analysis`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (poll.ok) {
+          const data = await poll.json();
+          if (data?.analysis) {
+            setAnalysis(data.analysis as CreditAnalysis);
+            setUploadMessage('Analysis updated from the uploaded report.');
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const triggerFilePick = () => fileInputRef.current?.click();
 
   const fetchAnalysis = async () => {
     setLoading(true);
@@ -459,9 +509,23 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
           <h3>No analysis on file yet</h3>
           <p>Upload a 3-bureau credit report (PDF or HTML) and an analysis will be generated automatically. You can also generate one manually for {clientName}.</p>
           {error && <div className="analysis-error">{error}</div>}
-          <button className="btn-primary" onClick={generateAnalysis} disabled={generating}>
-            {generating ? 'Generating…' : 'Generate Credit Analysis'}
-          </button>
+          {uploadMessage && <div className="analysis-note" style={{ color: '#16a34a', marginBottom: '0.75rem' }}>{uploadMessage}</div>}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp"
+            onChange={handleUploadReport}
+            style={{ display: 'none' }}
+            disabled={uploading}
+          />
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button className="btn-primary" onClick={triggerFilePick} disabled={uploading}>
+              {uploading ? 'Uploading & analyzing…' : '📄 Upload Credit Report'}
+            </button>
+            <button className="btn-secondary" onClick={generateAnalysis} disabled={generating || uploading}>
+              {generating ? 'Generating…' : 'Generate from existing reports'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -481,13 +545,25 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
           <span className="muted"> · Generated {new Date(analysis.generatedAt).toLocaleString()}</span>
         </div>
         <div className="toolbar-actions">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp"
+            onChange={handleUploadReport}
+            style={{ display: 'none' }}
+            disabled={uploading}
+          />
+          <button className="btn-secondary" onClick={triggerFilePick} disabled={uploading}>
+            {uploading ? 'Uploading…' : '📄 Upload new report'}
+          </button>
           <button className="btn-secondary" onClick={() => window.print()}>Print / Save PDF</button>
-          <button className="btn-primary" onClick={generateAnalysis} disabled={generating}>
+          <button className="btn-primary" onClick={generateAnalysis} disabled={generating || uploading}>
             {generating ? 'Regenerating…' : 'Regenerate'}
           </button>
         </div>
       </div>
 
+      {uploadMessage && <div className="analysis-note" style={{ background: '#f0fdf4', color: '#166534', padding: '0.6rem 0.9rem', borderRadius: '6px', marginBottom: '0.75rem' }}>{uploadMessage}</div>}
       {error && <div className="analysis-error">{error}</div>}
 
       {/* COVER */}
