@@ -491,14 +491,20 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
             await prisma.tradeline.deleteMany({ where: { creditReportId: { in: ids } } });
             await prisma.creditReport.deleteMany({ where: { id: { in: ids } } });
           }
+          const scoreByBureau = new Map<string, number | null>();
+          for (const snap of extracted.richPayload?.scores || []) {
+            if (snap?.bureau) scoreByBureau.set(snap.bureau, snap.score ?? null);
+          }
           for (const bureauReport of extracted.bureauReports) {
             const pulledAt = bureauReport.pulledAt ? new Date(bureauReport.pulledAt) : new Date(ts);
+            const score = scoreByBureau.get(bureauReport.bureau) ?? null;
             await prisma.creditReport.create({
               data: {
                 clientId,
                 bureau: bureauReport.bureau,
                 source: extracted.source,
                 pulledAt: Number.isFinite(pulledAt.getTime()) ? pulledAt : new Date(ts),
+                score,
                 rawPayload: { rich: extracted.richPayload, raw: extracted.rawPayload } as any,
                 tradelines: {
                   create: bureauReport.tradelines.map(t => ({

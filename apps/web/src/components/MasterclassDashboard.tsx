@@ -105,9 +105,14 @@ export default function MasterclassDashboard({
           className={`mc-day-card${isIntro ? ' is-active' : ''}`}
           style={{ ['--card-accent' as string]: MASTERCLASS_INTRO.accent } as CSSProperties}
         >
-          <div className="mc-day-card-num">★</div>
-          <div className="mc-day-card-badge">Intro</div>
-          <div className="mc-day-card-title">Course Overview</div>
+          <div className="mc-day-card-row">
+            <div className="mc-day-card-num">★</div>
+            <div className="mc-day-card-body">
+              <div className="mc-day-card-badge">Intro</div>
+              <div className="mc-day-card-title">Course Overview</div>
+              <div className="mc-day-card-sub">Start here — what the masterclass covers and how to use it.</div>
+            </div>
+          </div>
         </button>
         {MASTERCLASS_DAYS.map((d) => {
           const done = completedDays.includes(d.slug);
@@ -121,10 +126,15 @@ export default function MasterclassDashboard({
               className={`mc-day-card${isActive ? ' is-active' : ''}${d.isBonus ? ' is-bonus' : ''}${done ? ' is-done' : ''}`}
               style={{ ['--card-accent' as string]: d.accent } as CSSProperties}
             >
-              <div className="mc-day-card-num">{d.isBonus ? '★' : `0${d.day}`}</div>
-              <div className="mc-day-card-badge">{d.isBonus ? 'Bonus' : `Day ${d.day}`}</div>
-              <div className="mc-day-card-title">{d.isBonus ? 'Bonus Day' : `Day ${d.day}`}</div>
-              {done ? <div className="mc-day-card-done">✓ Completed</div> : passed ? <div className="mc-day-card-done">Quiz passed</div> : null}
+              <div className="mc-day-card-row">
+                <div className="mc-day-card-num">{d.isBonus ? '★' : `0${d.day}`}</div>
+                <div className="mc-day-card-body">
+                  <div className="mc-day-card-badge">{d.isBonus ? 'Bonus' : `Day ${d.day}`}</div>
+                  <div className="mc-day-card-title">{d.title}</div>
+                  {d.tagline ? <div className="mc-day-card-sub">{d.tagline}</div> : null}
+                  {done ? <div className="mc-day-card-done">✓ Completed</div> : passed ? <div className="mc-day-card-done">Quiz passed</div> : null}
+                </div>
+              </div>
             </button>
           );
         })}

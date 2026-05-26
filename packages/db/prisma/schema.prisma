@@ -183,6 +183,7 @@ model CreditReport {
   bureau      Bureau
   source      String?
   pulledAt    DateTime    @default(now())
+  score       Int?
   rawPayload  Json?
   createdAt   DateTime    @default(now())
   tradelines  Tradeline[]
