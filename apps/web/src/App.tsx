@@ -79,6 +79,22 @@ type ClientDetail = ClientRecord & {
   tasks?: Array<{ id: string; title?: string | null; status?: string | null }>;
 };
 
+type LeadRecord = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  creditGoal?: string | null;
+  referralSource?: string | null;
+  referralName?: string | null;
+  referralOther?: string | null;
+  offerInterest?: string | null;
+  offerEligibleUntil?: string | null;
+  createdAt: string;
+  notes?: string | null;
+};
+
 type DisputeRecord = {
   id: string;
   creditorName: string;
@@ -216,7 +232,7 @@ function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
   );
 }
 
-function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; disputes: DisputeRecord[]; plans: Plan[] }) {
+function Overview({ clients, disputes, plans, leadsCount }: { clients: ClientRecord[]; disputes: DisputeRecord[]; plans: Plan[]; leadsCount: number }) {
   const navigate = useNavigate();
   const newLeads = clients.filter((client) => client.status === 'LEAD' || client.status === 'INTAKE_RECEIVED').length;
   const activeClients = clients.filter((client) => client.status === 'ACTIVE').length;
@@ -264,6 +280,7 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
       <section className="panel">
         <div className="panel-header"><div><p className="eyebrow">Quick Stats</p><h2>At a glance</h2></div></div>
         <div className="hero-stats">
+          <button className="stat-card stat-card--interactive" onClick={() => navigate('/leads')}><span>Marketing Leads</span><strong>{leadsCount}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=NEW')}><span>New Leads</span><strong>{newLeads}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ANALYSIS_READY')}><span>Analysis Ready</span><strong>{analysisReady}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ACTIVE')}><span>Active Clients</span><strong>{activeClients}</strong></button>
@@ -315,6 +332,99 @@ const CLIENT_STATUS_FILTERS: Array<{ key: string; label: string }> = [
   { key: 'RESTRICTED', label: 'Restricted' },
   { key: 'CANCELLED', label: 'Cancelled' }
 ];
+
+function Leads({ leads, clients }: { leads: LeadRecord[]; clients: ClientRecord[] }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const registeredEmails = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of clients) set.add(c.user.email.toLowerCase());
+    return set;
+  }, [clients]);
+
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return leads;
+    const q = searchQuery.toLowerCase();
+    return leads.filter((l) =>
+      l.firstName.toLowerCase().includes(q) ||
+      l.lastName.toLowerCase().includes(q) ||
+      l.email.toLowerCase().includes(q) ||
+      (l.phone || '').toLowerCase().includes(q) ||
+      (l.creditGoal || '').toLowerCase().includes(q)
+    );
+  }, [leads, searchQuery]);
+
+  const unconverted = filtered.filter((l) => !registeredEmails.has(l.email.toLowerCase())).length;
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Landing Page Submissions</p>
+          <h2>Marketing Leads</h2>
+          <div className="filter-summary">
+            <span>Showing <strong>{filtered.length}</strong> of <strong>{leads.length}</strong></span>
+            <span>· <strong>{unconverted}</strong> not yet registered</span>
+          </div>
+        </div>
+        <input
+          type="search"
+          className="search-input"
+          placeholder="Search name, email, phone…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="empty-state-card">
+          <strong>No leads yet</strong>
+          <p>Form submissions from the landing page will appear here.</p>
+        </div>
+      ) : (
+        <div className="table-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Goal</th>
+                <th>Source</th>
+                <th>Interest</th>
+                <th>Submitted</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((lead) => {
+                const isRegistered = registeredEmails.has(lead.email.toLowerCase());
+                const source = [lead.referralSource, lead.referralName, lead.referralOther].filter(Boolean).join(' · ');
+                return (
+                  <tr key={lead.id}>
+                    <td>{lead.firstName} {lead.lastName}</td>
+                    <td>{lead.email}</td>
+                    <td>{lead.phone || '—'}</td>
+                    <td>{lead.creditGoal || '—'}</td>
+                    <td>{source || '—'}</td>
+                    <td>{lead.offerInterest || '—'}</td>
+                    <td>{formatDate(lead.createdAt)}</td>
+                    <td>
+                      {isRegistered ? (
+                        <span className="status-pill status-pill--ok">Registered</span>
+                      ) : (
+                        <span className="status-pill">Awaiting signup</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
 function Clients({ clients }: { clients: ClientRecord[] }) {
   const navigate = useNavigate();
@@ -1071,6 +1181,7 @@ export default function App() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
@@ -1085,13 +1196,15 @@ export default function App() {
     Promise.all([
       apiFetch<{ clients: ClientRecord[] }>('/api/clients', token),
       apiFetch<{ disputes: DisputeRecord[] }>('/api/disputes', token),
-      apiFetch<{ plans: Plan[] }>('/api/billing/plans', token)
+      apiFetch<{ plans: Plan[] }>('/api/billing/plans', token),
+      apiFetch<{ leads: LeadRecord[] }>('/api/leads', token)
     ])
-      .then(([clientsResponse, disputesResponse, plansResponse]) => {
+      .then(([clientsResponse, disputesResponse, plansResponse, leadsResponse]) => {
         if (cancelled) return;
         setClients(clientsResponse.clients);
         setDisputes(disputesResponse.disputes);
         setPlans(plansResponse.plans);
+        setLeads(leadsResponse.leads);
       })
       .catch((fetchError) => {
         if (cancelled) return;
@@ -1142,6 +1255,7 @@ export default function App() {
     setUser(null);
     setClients([]);
     setDisputes([]);
+    setLeads([]);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   };
@@ -1168,6 +1282,7 @@ export default function App() {
         </div>
         <nav>
           <NavLink to="/" end>Overview</NavLink>
+          <NavLink to="/leads">Leads</NavLink>
           <NavLink to="/clients">Clients</NavLink>
           <NavLink to="/disputes">Disputes</NavLink>
         </nav>
@@ -1179,17 +1294,23 @@ export default function App() {
             ? '#f59e0b'
             : path.startsWith('/clients')
               ? '#a855f7'
-              : '#00c6fb';
+              : path.startsWith('/leads')
+                ? '#22c55e'
+                : '#00c6fb';
           const sectionLabel = path.startsWith('/disputes')
             ? 'Disputes operations'
             : path.startsWith('/clients')
               ? 'Client management'
-              : 'Operations dashboard';
+              : path.startsWith('/leads')
+                ? 'Marketing leads'
+                : 'Operations dashboard';
           const subtitle = path.startsWith('/disputes')
             ? 'Track every dispute round, bureau status, and outcome across the book.'
             : path.startsWith('/clients')
               ? 'Search, open, and update client files. Identity data is encrypted at rest.'
-              : 'Live snapshot of leads, active programs, dispute throughput, and revenue.';
+              : path.startsWith('/leads')
+                ? 'Landing-page submissions awaiting contract and onboarding.'
+                : 'Live snapshot of leads, active programs, dispute throughput, and revenue.';
           return (
             <header className="topbar topbar--themed" style={{ ['--section-accent' as string]: accent } as React.CSSProperties}>
               <div>
@@ -1212,7 +1333,7 @@ export default function App() {
 
         <select
           className="mobile-nav-select"
-          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/clients') ? '/clients' : '/'}
+          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : '/'}
           onChange={(e) => {
             const value = e.target.value;
             if (value === '__signup') { window.location.href = '/signup'; return; }
@@ -1221,6 +1342,7 @@ export default function App() {
           aria-label="Admin section"
         >
           <option value="/">Overview</option>
+          <option value="/leads">Leads</option>
           <option value="/clients">Clients</option>
           <option value="/disputes">Disputes</option>
           <option value="__signup">Sign up</option>
@@ -1228,7 +1350,8 @@ export default function App() {
 
         {error ? <div className="error-banner">{error}</div> : null}
         <Routes>
-          <Route path="/" element={<Overview clients={clients} disputes={disputes} plans={plans} />} />
+          <Route path="/" element={<Overview clients={clients} disputes={disputes} plans={plans} leadsCount={leads.length} />} />
+          <Route path="/leads" element={<Leads leads={leads} clients={clients} />} />
           <Route path="/clients" element={<Clients clients={clients} />} />
           <Route path="/clients/:id" element={<ClientDetailRoute token={token} />} />
           <Route path="/disputes" element={<DisputesRoute token={token} disputes={disputes} />} />

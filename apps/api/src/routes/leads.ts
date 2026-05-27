@@ -3,8 +3,18 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { config } from '../config.js';
 import { notifyNewLead, sendWelcomeLeadEmail } from '../lib/email.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 
 export const leadsRouter = Router();
+
+leadsRouter.get('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (_req, res, next) => {
+  try {
+    const leads = await prisma.lead.findMany({ orderBy: { createdAt: 'desc' } });
+    return res.json({ leads });
+  } catch (error) {
+    next(error);
+  }
+});
 
 const createLeadSchema = z.object({
   firstName: z.string().min(1),
