@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { maybeSendPortalReadyEmail } from '../lib/portalReady.js';
+import { encryptPII } from '../lib/encryption.js';
 
 export const monitoringRouter = Router();
 
@@ -38,7 +39,9 @@ monitoringRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) =>
           completedAt: submittedAt,
           monitoringSubmittedAt: submittedAt,
           monitoringProvider: provider || null,
-          monitoringHasCredentials: hasCredentials
+          monitoringHasCredentials: hasCredentials,
+          monitoringUsername: username || null,
+          monitoringPasswordEncrypted: password ? encryptPII(password) : null
         },
         workflow: {
           ...(progress.workflow || {}),
@@ -97,7 +100,10 @@ monitoringRouter.post('/skip', requireAuth, async (req: AuthedRequest, res, next
           ...(progress.onboarding || {}),
           status: 'completed',
           completedAt: submittedAt,
-          monitoringSkippedAt: submittedAt
+          monitoringSkippedAt: submittedAt,
+          monitoringHasCredentials: false,
+          monitoringUsername: null,
+          monitoringPasswordEncrypted: null
         },
         workflow: {
           ...(progress.workflow || {}),

@@ -545,6 +545,9 @@ button:hover,
   grid-template-columns: 260px 1fr;
   gap: 18px;
 }
+.client-workspace-single {
+  display: block;
+}
 .client-workspace-nav,
 .client-workspace-main {
   min-height: 100%;
@@ -553,6 +556,32 @@ button:hover,
   display: grid;
   gap: 18px;
   align-content: start;
+}
+.client-workspace-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.client-workspace-section-picker {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+}
+.client-workspace-section-picker select {
+  width: 100%;
+}
+.client-section-stack {
+  display: grid;
+  gap: 22px;
+}
+.client-section-stack > div + div {
+  padding-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 .client-mini-profile {
   display: flex;

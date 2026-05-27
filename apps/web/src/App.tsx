@@ -61,6 +61,12 @@ type ClientDetail = ClientRecord & {
       status?: string;
       signupAt?: string | null;
       completedAt?: string | null;
+      monitoringProvider?: string | null;
+      monitoringHasCredentials?: boolean;
+      monitoringUsername?: string | null;
+      monitoringPassword?: string | null;
+      monitoringSubmittedAt?: string | null;
+      monitoringSkippedAt?: string | null;
       signature?: {
         dataUrl?: string;
         signedName?: string;
@@ -680,272 +686,345 @@ function ClientDetailRoute({ token }: { token: string }) {
         </div>
       </section>
 
-      <section className="client-workspace-shell">
-        <aside className="panel client-workspace-nav">
-          <div className="client-mini-profile">
-            <div className="client-avatar">{client.user.firstName?.[0] || 'C'}{client.user.lastName?.[0] || ''}</div>
-            <div>
-              <strong>{fullName}</strong>
-              <div className="cell-subtext">{client.user.email}</div>
-            </div>
-          </div>
-          <div className="client-tab-stack">
-            {tabs.map((tab) => (
-              <button key={tab.key} className={`tab client-side-tab ${activeTab === tab.key ? 'active' : ''}`} onClick={() => setActiveTab(tab.key)}>
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </aside>
-
+      <section className="client-workspace-single">
         <div className="panel client-workspace-main">
-        {activeTab === 'overview' ? (
-          <div className="two-col client-section-grid">
-            <div className="preview-card">
-              <h3>Account summary</h3>
-              <ul className="detail-list">
-                <li><strong>Email</strong><span>{client.user.email}</span></li>
-                <li><strong>Tier</strong><span>{client.serviceTier}</span></li>
-                <li><strong>Timeline</strong><span>{client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} months` : 'Pending'}</span></li>
-                <li><strong>Workflow</strong><span>{client.progress?.workflow?.stage || 'Not started'}</span></li>
-              </ul>
+          <header className="client-workspace-header">
+            <div className="client-mini-profile">
+              <div className="client-avatar">{client.user.firstName?.[0] || 'C'}{client.user.lastName?.[0] || ''}</div>
+              <div>
+                <strong>{fullName}</strong>
+                <div className="cell-subtext">{client.user.email}</div>
+              </div>
             </div>
-            <div className="preview-card">
-              <h3>Latest score snapshot</h3>
-              <ul className="detail-list">
-                <li><strong>Equifax</strong><span>{scores.equifax ?? '—'}</span></li>
-                <li><strong>Experian</strong><span>{scores.experian ?? '—'}</span></li>
-                <li><strong>TransUnion</strong><span>{scores.transunion ?? '—'}</span></li>
-                <li><strong>Reports</strong><span>{client.creditReports?.length || 0}</span></li>
-              </ul>
-            </div>
-            <div className="preview-card">
-              <h3>Dispute progress</h3>
-              <ul className="detail-list">
-                <li><strong>Total items</strong><span>{disputeItems.length}</span></li>
-                <li><strong>Documents</strong><span>{documents.length}</span></li>
-                <li><strong>Last update</strong><span>{formatDate(client.updatedAt)}</span></li>
-                <li><strong>Portal status</strong><span>{client.portalRestricted ? 'Restricted' : 'Open'}</span></li>
-              </ul>
-            </div>
-            <div className="preview-card">
-              <h3>Next actions</h3>
-              <ul className="detail-list">
-                <li><strong>Workflow stage</strong><span>{client.progress?.workflow?.stage || 'Not started'}</span></li>
-                <li><strong>Next queue</strong><span>{client.progress?.workflow?.next?.join(', ') || 'Pending update'}</span></li>
-              </ul>
-            </div>
-          </div>
-        ) : null}
+            <label className="client-workspace-section-picker">
+              <span className="eyebrow">Section</span>
+              <select
+                value={activeTab}
+                onChange={(e) => setActiveTab(e.target.value as ClientWorkspaceTab)}
+              >
+                {tabs.map((tab) => (
+                  <option key={tab.key} value={tab.key}>{tab.label}</option>
+                ))}
+              </select>
+            </label>
+          </header>
 
-        {activeTab === 'profile' ? (
-          <div className="two-col client-section-grid">
-            <div className="preview-card">
-              <h3>Profile details</h3>
-              <ul className="detail-list">
-                <li><strong>Name</strong><span>{fullName}</span></li>
-                <li><strong>Email</strong><span>{client.user.email}</span></li>
-                <li><strong>Address</strong><span>{[client.currentAddressLine1, client.currentAddressLine2, client.currentCity, client.currentState, client.currentPostalCode].filter(Boolean).join(', ') || 'Not on file'}</span></li>
-                <li><strong>SSN last 4</strong><span>{client.ssnLast4 || 'Not on file'}</span></li>
-              </ul>
+          {activeTab === 'overview' ? (
+            <div className="client-section-stack">
+              <div>
+                <h3>Account summary</h3>
+                <ul className="detail-list">
+                  <li><strong>Email</strong><span>{client.user.email}</span></li>
+                  <li><strong>Tier</strong><span>{client.serviceTier}</span></li>
+                  <li><strong>Timeline</strong><span>{client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} months` : 'Pending'}</span></li>
+                  <li><strong>Workflow</strong><span>{client.progress?.workflow?.stage || 'Not started'}</span></li>
+                </ul>
+              </div>
+              <div>
+                <h3>Latest score snapshot</h3>
+                <ul className="detail-list">
+                  <li><strong>Equifax</strong><span>{scores.equifax ?? '—'}</span></li>
+                  <li><strong>Experian</strong><span>{scores.experian ?? '—'}</span></li>
+                  <li><strong>TransUnion</strong><span>{scores.transunion ?? '—'}</span></li>
+                  <li><strong>Reports</strong><span>{client.creditReports?.length || 0}</span></li>
+                </ul>
+              </div>
+              <div>
+                <h3>Dispute progress</h3>
+                <ul className="detail-list">
+                  <li><strong>Total items</strong><span>{disputeItems.length}</span></li>
+                  <li><strong>Documents</strong><span>{documents.length}</span></li>
+                  <li><strong>Last update</strong><span>{formatDate(client.updatedAt)}</span></li>
+                  <li><strong>Portal status</strong><span>{client.portalRestricted ? 'Restricted' : 'Open'}</span></li>
+                </ul>
+              </div>
+              <div>
+                <h3>Next actions</h3>
+                <ul className="detail-list">
+                  <li><strong>Workflow stage</strong><span>{client.progress?.workflow?.stage || 'Not started'}</span></li>
+                  <li><strong>Next queue</strong><span>{client.progress?.workflow?.next?.join(', ') || 'Pending update'}</span></li>
+                </ul>
+              </div>
             </div>
-            <div className="preview-card">
-              <h3>Admin controls</h3>
-              <div className="field-grid">
-                <label>
-                  <span>Status</span>
-                  <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>
-                    {['LEAD','CONTRACT_SENT','INTAKE_RECEIVED','ANALYSIS_READY','UPGRADE_OFFERED','ACTIVE','PAST_DUE','RESTRICTED','CANCELLED'].map((status) => (
-                      <option key={status} value={status}>{status.replace('_', ' ')}</option>
-                    ))}
-                  </select>
-                </label>
+          ) : null}
+
+          {activeTab === 'profile' ? (
+            <div className="client-section-stack">
+              <div>
+                <h3>Profile details</h3>
+                <ul className="detail-list">
+                  <li><strong>Name</strong><span>{fullName}</span></li>
+                  <li><strong>Email</strong><span>{client.user.email}</span></li>
+                  <li><strong>Address</strong><span>{[client.currentAddressLine1, client.currentAddressLine2, client.currentCity, client.currentState, client.currentPostalCode].filter(Boolean).join(', ') || 'Not on file'}</span></li>
+                  <li><strong>SSN last 4</strong><span>{client.ssnLast4 || 'Not on file'}</span></li>
+                </ul>
               </div>
-              <div className="client-workspace-actions">
-                <button onClick={saveStatus} disabled={saving}>{saving ? 'Saving...' : 'Save Status'}</button>
-              </div>
-              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                <p className="helper-text" style={{ color: '#f87171', marginBottom: '0.5rem' }}>⚠️ Staff action — use only when client needs a fresh start.</p>
-                <button
-                  style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #991b1b', padding: '0.5rem 0.75rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
-                  onClick={async () => {
-                    if (!confirm(`Reset ${fullName}'s file? This will wipe credit reports, uploaded documents, analysis JSON, and reset them to LEAD status. This cannot be undone.`)) return;
-                    setSaving(true);
-                    try {
-                      const res = await apiFetch<{ success: boolean }>(`/api/clients/${client.id}/reset`, token, { method: 'POST' });
-                      if (res.success) {
-                        // Reload the client detail so the UI refreshes
-                        const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
-                        setClient(updated.client);
-                        setStatusValue('LEAD');
+              <MonitoringCredentialsPanel onboarding={client.progress?.onboarding || null} />
+              <div>
+                <h3>Admin controls</h3>
+                <div className="field-grid">
+                  <label>
+                    <span>Status</span>
+                    <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>
+                      {['LEAD','CONTRACT_SENT','INTAKE_RECEIVED','ANALYSIS_READY','UPGRADE_OFFERED','ACTIVE','PAST_DUE','RESTRICTED','CANCELLED'].map((status) => (
+                        <option key={status} value={status}>{status.replace('_', ' ')}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="client-workspace-actions">
+                  <button onClick={saveStatus} disabled={saving}>{saving ? 'Saving...' : 'Save Status'}</button>
+                </div>
+                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <p className="helper-text" style={{ color: '#f87171', marginBottom: '0.5rem' }}>⚠️ Staff action — use only when client needs a fresh start.</p>
+                  <button
+                    style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #991b1b', padding: '0.5rem 0.75rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                    onClick={async () => {
+                      if (!confirm(`Reset ${fullName}'s file? This will wipe credit reports, uploaded documents, analysis JSON, and reset them to LEAD status. This cannot be undone.`)) return;
+                      setSaving(true);
+                      try {
+                        const res = await apiFetch<{ success: boolean }>(`/api/clients/${client.id}/reset`, token, { method: 'POST' });
+                        if (res.success) {
+                          const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
+                          setClient(updated.client);
+                          setStatusValue('LEAD');
+                        }
+                      } catch (err) {
+                        alert(`Reset failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                      } finally {
+                        setSaving(false);
                       }
-                    } catch (err) {
-                      alert(`Reset failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                >🗑️ Reset / Start Fresh</button>
+                    }}
+                  >🗑️ Reset / Start Fresh</button>
+                </div>
               </div>
-            </div>
-            {(() => {
-              const sig = client.progress?.onboarding?.signature;
-              if (!sig || !sig.signedAt) {
+              {(() => {
+                const sig = client.progress?.onboarding?.signature;
+                if (!sig || !sig.signedAt) {
+                  return (
+                    <div>
+                      <h3>Signed agreement</h3>
+                      <p className="helper-text">No signed agreement on file yet. The client signs during onboarding at /portal.</p>
+                    </div>
+                  );
+                }
                 return (
-                  <div className="preview-card" style={{ gridColumn: '1 / -1' }}>
-                    <h3>Signed agreement</h3>
-                    <p className="helper-text">No signed agreement on file yet. The client signs during onboarding at /portal.</p>
+                  <div className="signed-agreement-card">
+                    <div className="signed-agreement-card__header">
+                      <div className="signed-agreement-card__title">
+                        Signed CredX service agreement
+                        <small>{sig.signedName || 'Client'} · {formatDate(sig.signedAt)}</small>
+                      </div>
+                      <span className="signed-agreement-card__badge">✓ Signed</span>
+                    </div>
+                    <ul className="detail-list">
+                      <li><strong>Signed by</strong><span>{sig.signedName || 'Client'}</span></li>
+                      <li><strong>Signed at</strong><span>{formatDate(sig.signedAt)}</span></li>
+                      {sig.contractId ? <li><strong>Contract ID</strong><span style={{ fontFamily: 'var(--cx-font-mono)', fontSize: '12px' }}>{sig.contractId}</span></li> : null}
+                      {sig.ipAddress ? <li><strong>IP address</strong><span>{sig.ipAddress}</span></li> : null}
+                    </ul>
+                    {sig.dataUrl ? (
+                      <div className="signature-display" aria-label="Client signature">
+                        <img src={sig.dataUrl} alt={`Signature of ${sig.signedName || 'client'}`} />
+                      </div>
+                    ) : null}
+                    {sig.agreementText ? (
+                      <details>
+                        <summary>View agreement text</summary>
+                        <div>{sig.agreementText}</div>
+                      </details>
+                    ) : null}
+                    {sig.disclosureStatement ? (
+                      <details>
+                        <summary>View required disclosures</summary>
+                        <div>{sig.disclosureStatement}</div>
+                      </details>
+                    ) : null}
                   </div>
                 );
-              }
-              return (
-                <div className="signed-agreement-card" style={{ gridColumn: '1 / -1' }}>
-                  <div className="signed-agreement-card__header">
-                    <div className="signed-agreement-card__title">
-                      Signed CredX service agreement
-                      <small>{sig.signedName || 'Client'} · {formatDate(sig.signedAt)}</small>
-                    </div>
-                    <span className="signed-agreement-card__badge">✓ Signed</span>
-                  </div>
-                  <ul className="detail-list">
-                    <li><strong>Signed by</strong><span>{sig.signedName || 'Client'}</span></li>
-                    <li><strong>Signed at</strong><span>{formatDate(sig.signedAt)}</span></li>
-                    {sig.contractId ? <li><strong>Contract ID</strong><span style={{ fontFamily: 'var(--cx-font-mono)', fontSize: '12px' }}>{sig.contractId}</span></li> : null}
-                    {sig.ipAddress ? <li><strong>IP address</strong><span>{sig.ipAddress}</span></li> : null}
-                  </ul>
-                  {sig.dataUrl ? (
-                    <div className="signature-display" aria-label="Client signature">
-                      <img src={sig.dataUrl} alt={`Signature of ${sig.signedName || 'client'}`} />
-                    </div>
-                  ) : null}
-                  {sig.agreementText ? (
-                    <details>
-                      <summary>View agreement text</summary>
-                      <div>{sig.agreementText}</div>
-                    </details>
-                  ) : null}
-                  {sig.disclosureStatement ? (
-                    <details>
-                      <summary>View required disclosures</summary>
-                      <div>{sig.disclosureStatement}</div>
-                    </details>
-                  ) : null}
-                </div>
-              );
-            })()}
-          </div>
-        ) : null}
+              })()}
+            </div>
+          ) : null}
 
-        {activeTab === 'documents' ? (
-          <div className="two-col client-section-grid">
-            <div className="upload-card">
-              <div className="upload-card__header">
-                <span className="upload-card__icon" aria-hidden="true">📄</span>
-                <div>
-                  <div className="upload-card__title">Upload on behalf of {client.user.firstName}</div>
-                  <div className="upload-card__hint">
-                    Credit reports trigger the same extraction + analysis pipeline as the client portal.
+          {activeTab === 'documents' ? (
+            <div className="client-section-stack">
+              <div className="upload-card">
+                <div className="upload-card__header">
+                  <span className="upload-card__icon" aria-hidden="true">📄</span>
+                  <div>
+                    <div className="upload-card__title">Upload on behalf of {client.user.firstName}</div>
+                    <div className="upload-card__hint">
+                      Credit reports trigger the same extraction + analysis pipeline as the client portal.
+                    </div>
                   </div>
                 </div>
+                <form onSubmit={submitAdminUpload} className="field-grid">
+                  <label>
+                    <span>File</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp"
+                      onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                    />
+                  </label>
+                  <label>
+                    <span>Document type</span>
+                    <select value={uploadType} onChange={(e) => setUploadType(e.target.value as typeof uploadType)}>
+                      <option value="credit_report">Credit report</option>
+                      <option value="identity">Identity document</option>
+                      <option value="proof_of_address">Proof of address</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                  <button type="submit" disabled={uploading || !uploadFile}>
+                    {uploading ? 'Uploading…' : 'Upload securely'}
+                  </button>
+                </form>
+                {uploadMessage ? <div className="upload-status upload-status--success">{uploadMessage}</div> : null}
+                {uploadError ? <div className="upload-status upload-status--error">{uploadError}</div> : null}
               </div>
-              <form onSubmit={submitAdminUpload} className="field-grid">
-                <label>
-                  <span>File</span>
-                  <input
-                    type="file"
-                    accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp"
-                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                  />
-                </label>
-                <label>
-                  <span>Document type</span>
-                  <select value={uploadType} onChange={(e) => setUploadType(e.target.value as typeof uploadType)}>
-                    <option value="credit_report">Credit report</option>
-                    <option value="identity">Identity document</option>
-                    <option value="proof_of_address">Proof of address</option>
-                    <option value="other">Other</option>
-                  </select>
-                </label>
-                <button type="submit" disabled={uploading || !uploadFile}>
-                  {uploading ? 'Uploading…' : 'Upload securely'}
-                </button>
-              </form>
-              {uploadMessage ? <div className="upload-status upload-status--success">{uploadMessage}</div> : null}
-              {uploadError ? <div className="upload-status upload-status--error">{uploadError}</div> : null}
+              <div>
+                <h3>Documents on file ({documents.length})</h3>
+                {documents.length ? (
+                  <table className="data-table">
+                    <thead><tr><th>Document</th><th>Type</th><th>Uploaded</th></tr></thead>
+                    <tbody>
+                      {documents.map((doc: any) => (
+                        <tr key={doc.id}>
+                          <td>{doc.fileName || doc.id}</td>
+                          <td>{doc.type || 'Unknown'}</td>
+                          <td>{formatDate(doc.createdAt || doc.uploadedAt || client.updatedAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : <p className="helper-text">No documents uploaded yet.</p>}
+              </div>
             </div>
-            <div className="preview-card">
-              <h3>Documents on file ({documents.length})</h3>
-              {documents.length ? (
-                <table className="data-table">
-                  <thead><tr><th>Document</th><th>Type</th><th>Uploaded</th></tr></thead>
-                  <tbody>
-                    {documents.map((doc: any) => (
-                      <tr key={doc.id}>
-                        <td>{doc.fileName || doc.id}</td>
-                        <td>{doc.type || 'Unknown'}</td>
-                        <td>{formatDate(doc.createdAt || doc.uploadedAt || client.updatedAt)}</td>
-                      </tr>
+          ) : null}
+
+          {activeTab === 'disputes' ? (
+            <div className="client-section-stack">
+              <div>
+                <h3>Dispute items</h3>
+                {disputeItems.length ? (
+                  <table className="data-table">
+                    <thead><tr><th>Furnisher</th><th>Account</th><th>Status</th><th>Round</th><th>Reason</th></tr></thead>
+                    <tbody>
+                      {disputeItems.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.furnisher}</td>
+                          <td>{item.accountNumber || '—'}</td>
+                          <td><span className={statusClass(item.status)}>{item.status.replace('_', ' ')}</span></td>
+                          <td>{item.currentRound}</td>
+                          <td>{item.reason || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : <p className="helper-text">No dispute items for this client yet.</p>}
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === 'activity' ? (
+            <div className="client-section-stack">
+              <div>
+                <h3>Activity</h3>
+                {activities.length ? (
+                  <ul className="activity-list">
+                    {activities.map((item) => (
+                      <li key={item.id}>
+                        <strong>{formatDate(item.createdAt)}</strong>
+                        <span>{item.message}</span>
+                      </li>
                     ))}
-                  </tbody>
-                </table>
-              ) : <p className="helper-text">No documents uploaded yet.</p>}
+                  </ul>
+                ) : <p className="helper-text">No activity yet.</p>}
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {activeTab === 'disputes' ? (
-          <div className="preview-card">
-            <h3>Dispute items</h3>
-            {disputeItems.length ? (
-              <table className="data-table">
-                <thead><tr><th>Furnisher</th><th>Account</th><th>Status</th><th>Round</th><th>Reason</th></tr></thead>
-                <tbody>
-                  {disputeItems.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.furnisher}</td>
-                      <td>{item.accountNumber || '—'}</td>
-                      <td><span className={statusClass(item.status)}>{item.status.replace('_', ' ')}</span></td>
-                      <td>{item.currentRound}</td>
-                      <td>{item.reason || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : <p className="helper-text">No dispute items for this client yet.</p>}
-          </div>
-        ) : null}
-
-        {activeTab === 'activity' ? (
-          <div className="preview-card">
-            <h3>Activity</h3>
-            {activities.length ? (
-              <ul className="activity-list">
-                {activities.map((item) => (
-                  <li key={item.id}>
-                    <strong>{formatDate(item.createdAt)}</strong>
-                    <span>{item.message}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="helper-text">No activity yet.</p>}
-          </div>
-        ) : null}
-
-        {activeTab === 'analysis' ? (
-          <AnalysisTab
-            token={token}
-            clientId={client.id}
-            clientName={fullName}
-            clientAddress={[
-              client.currentAddressLine1,
-              client.currentCity,
-              client.currentState,
-              client.currentPostalCode
-            ].filter(Boolean).join(', ') || undefined}
-          />
-        ) : null}
+          {activeTab === 'analysis' ? (
+            <AnalysisTab
+              token={token}
+              clientId={client.id}
+              clientName={fullName}
+              clientAddress={[
+                client.currentAddressLine1,
+                client.currentCity,
+                client.currentState,
+                client.currentPostalCode
+              ].filter(Boolean).join(', ') || undefined}
+            />
+          ) : null}
         </div>
       </section>
+    </div>
+  );
+}
+
+type OnboardingData = NonNullable<NonNullable<ClientDetail['progress']>['onboarding']>;
+
+function MonitoringCredentialsPanel({ onboarding }: { onboarding: OnboardingData | null }) {
+  const provider = onboarding?.monitoringProvider || null;
+  const username = onboarding?.monitoringUsername || null;
+  const password = onboarding?.monitoringPassword || null;
+  const hasCredentials = Boolean(onboarding?.monitoringHasCredentials && username && password);
+  const submittedAt = onboarding?.monitoringSubmittedAt || null;
+  const skippedAt = onboarding?.monitoringSkippedAt || null;
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+
+  const copyPassword = async () => {
+    if (!password) return;
+    try {
+      await navigator.clipboard.writeText(password);
+      setCopyState('copied');
+      setTimeout(() => setCopyState('idle'), 1800);
+    } catch {
+      setCopyState('failed');
+      setTimeout(() => setCopyState('idle'), 1800);
+    }
+  };
+
+  if (!hasCredentials) {
+    return (
+      <div>
+        <h3>Credit report login credentials</h3>
+        <p className="helper-text">
+          {skippedAt
+            ? `Client skipped the monitoring step on ${formatDate(skippedAt)}. Ask them to add credentials from the portal to enable staff pulls.`
+            : 'Not on file yet. Once the client submits monitoring credentials from the portal, the username and password show here.'}
+        </p>
+        {provider ? <p className="helper-text"><strong>Provider on file:</strong> {provider}</p> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3>Credit report login credentials</h3>
+      <ul className="detail-list">
+        <li><strong>Provider</strong><span>{provider}</span></li>
+        <li><strong>Username</strong><span style={{ fontFamily: 'var(--cx-font-mono)' }}>{username}</span></li>
+        <li>
+          <strong>Password</strong>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span aria-hidden="true">••••••••</span>
+            <button
+              type="button"
+              onClick={copyPassword}
+              style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
+            >
+              {copyState === 'copied' ? '✓ Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy password'}
+            </button>
+          </span>
+        </li>
+        {submittedAt ? <li><strong>Submitted</strong><span>{formatDate(submittedAt)}</span></li> : null}
+      </ul>
+      <p className="helper-text" style={{ marginTop: '8px' }}>
+        Password is decrypted server-side for staff only and never rendered on screen. Use Copy password to log in on the client's behalf.
+      </p>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { CreditAnalysisService } from '../lib/creditAnalysis.js';
+import { decryptPII } from '../lib/encryption.js';
 
 export const clientsRouter = Router();
 
@@ -67,6 +68,22 @@ clientsRouter.get('/:id', requireAuth, requireRole(['STAFF', 'ADMIN']), async (r
     });
 
     if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    if (client.progress?.onboarding && typeof client.progress.onboarding === 'object') {
+      const onboarding = client.progress.onboarding as Record<string, unknown>;
+      const encrypted = onboarding.monitoringPasswordEncrypted;
+      if (typeof encrypted === 'string' && encrypted) {
+        try {
+          onboarding.monitoringPassword = decryptPII(encrypted);
+        } catch {
+          onboarding.monitoringPassword = null;
+        }
+      } else {
+        onboarding.monitoringPassword = null;
+      }
+      delete onboarding.monitoringPasswordEncrypted;
+    }
+
     return res.json({ client });
   } catch (error) {
     next(error);
