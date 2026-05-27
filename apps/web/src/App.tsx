@@ -218,7 +218,7 @@ function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
 
 function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; disputes: DisputeRecord[]; plans: Plan[] }) {
   const navigate = useNavigate();
-  const newLeads = clients.filter((client) => client.status === 'LEAD').length;
+  const newLeads = clients.filter((client) => client.status === 'LEAD' || client.status === 'INTAKE_RECEIVED').length;
   const activeClients = clients.filter((client) => client.status === 'ACTIVE').length;
   const analysisReady = clients.filter((client) => ['ANALYSIS_READY', 'UPGRADE_OFFERED'].includes(client.status)).length;
   const pendingDisputes = disputes.filter((dispute) => !['COMPLETED', 'REJECTED'].includes(dispute.status)).length;
@@ -264,7 +264,7 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
       <section className="panel">
         <div className="panel-header"><div><p className="eyebrow">Quick Stats</p><h2>At a glance</h2></div></div>
         <div className="hero-stats">
-          <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=LEAD')}><span>New Leads</span><strong>{newLeads}</strong></button>
+          <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=NEW')}><span>New Leads</span><strong>{newLeads}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ANALYSIS_READY')}><span>Analysis Ready</span><strong>{analysisReady}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ACTIVE')}><span>Active Clients</span><strong>{activeClients}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/disputes')}><span>Pending Disputes</span><strong>{pendingDisputes}</strong></button>
@@ -305,6 +305,7 @@ function Overview({ clients, disputes, plans }: { clients: ClientRecord[]; dispu
 }
 
 const CLIENT_STATUS_FILTERS: Array<{ key: string; label: string }> = [
+  { key: 'NEW', label: 'New Arrivals' },
   { key: 'LEAD', label: 'Leads' },
   { key: 'INTAKE_RECEIVED', label: 'Intake' },
   { key: 'ANALYSIS_READY', label: 'Analysis Ready' },
@@ -325,12 +326,15 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const c of clients) counts[c.status] = (counts[c.status] || 0) + 1;
+    counts.NEW = (counts.LEAD || 0) + (counts.INTAKE_RECEIVED || 0);
     return counts;
   }, [clients]);
 
   const filteredClients = useMemo(() => {
     let next = clients;
-    if (statusFilter) {
+    if (statusFilter === 'NEW') {
+      next = next.filter((client) => client.status === 'LEAD' || client.status === 'INTAKE_RECEIVED');
+    } else if (statusFilter) {
       next = next.filter((client) => client.status === statusFilter);
     }
     if (!searchQuery.trim()) return next;
