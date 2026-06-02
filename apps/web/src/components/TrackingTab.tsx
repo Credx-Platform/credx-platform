@@ -13,9 +13,10 @@ export function TrackingTab({ token, items, onItemsChange }: TrackingTabProps) {
   const [viewMode, setViewMode] = useState<'current' | 'archive'>('current');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [updating, setUpdating] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const currentItems = items.filter(i => i.status === 'IN_DISPUTE' || i.status === 'PENDING');
-  const archiveItems = items.filter(i => i.status === 'DELETED' || i.status === 'VERIFIED');
+  const archiveItems = items.filter(i => i.status === 'DELETED' || i.status === 'UPDATED' || i.status === 'VERIFIED');
   const displayItems = viewMode === 'current' ? currentItems : archiveItems;
 
   const handleCheckAll = (checked: boolean) => {
@@ -49,10 +50,23 @@ export function TrackingTab({ token, items, onItemsChange }: TrackingTabProps) {
   const handleArchiveRound = async () => {
     if (selectedItems.size === 0) return;
     setUpdating(true);
+    setNotice(null);
     try {
-      // Archive logic here
+      const response = await fetch(`${API_BASE}/api/disputes/bulk/update-status`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ids: Array.from(selectedItems), status: 'VERIFIED' })
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.error || 'Failed to archive selected items');
       onItemsChange();
+      setNotice(`Archived ${body?.updated ?? selectedItems.size} item${selectedItems.size === 1 ? '' : 's'} into verified history.`);
       setSelectedItems(new Set());
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Archive failed');
     } finally {
       setUpdating(false);
     }
@@ -61,9 +75,36 @@ export function TrackingTab({ token, items, onItemsChange }: TrackingTabProps) {
   const handleResend = async () => {
     if (selectedItems.size === 0) return;
     setUpdating(true);
+    setNotice(null);
     try {
-      // Resend logic here
-      alert(`Resending ${selectedItems.size} items`);
+      const selected = items.filter((item) => selectedItems.has(item.id));
+      let sent = 0;
+      for (const item of selected) {
+        const response = await fetch(`${API_BASE}/api/disputes/initiate`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            itemId: item.id,
+            clientId: item.clientId,
+            bureaus: {
+              equifax: item.disputeEquifax,
+              experian: item.disputeExperian,
+              transunion: item.disputeTransunion
+            }
+          })
+        });
+        const body = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(body?.error || `Failed to resend ${item.furnisher}`);
+        sent += 1;
+      }
+      onItemsChange();
+      setNotice(`Started the next dispute round for ${sent} item${sent === 1 ? '' : 's'}.`);
+      setSelectedItems(new Set());
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Re-send failed');
     } finally {
       setUpdating(false);
     }
@@ -254,6 +295,16 @@ export function TrackingTab({ token, items, onItemsChange }: TrackingTabProps) {
           border-bottom: 1px solid #e2e8f0;
         }
 
+        .workflow-notice {
+          margin-bottom: 1rem;
+          padding: 0.75rem 1rem;
+          border-radius: 8px;
+          border: 1px solid #bae6fd;
+          background: #f0f9ff;
+          color: #075985;
+          font-size: 0.875rem;
+        }
+
         .quick-actions button {
           padding: 0.375rem 0.75rem;
           font-size: 0.75rem;
@@ -338,6 +389,8 @@ export function TrackingTab({ token, items, onItemsChange }: TrackingTabProps) {
           <div className="label">Archived</div>
         </div>
       </div>
+
+      {notice && <div className="workflow-notice">{notice}</div>}
 
       <div className="tracking-table-container">
         {selectedItems.size > 0 && (

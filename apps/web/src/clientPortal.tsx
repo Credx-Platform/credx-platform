@@ -170,8 +170,6 @@ class ApiError extends Error {
 }
 
 async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
-  if (!API_BASE) throw new Error('Missing VITE_API_URL for this deployment');
-
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has('content-type') && init?.body) headers.set('content-type', 'application/json');
   if (token) headers.set('authorization', `Bearer ${token}`);
@@ -184,7 +182,6 @@ async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Pr
 }
 
 async function apiUpload<T>(path: string, token: string, formData: FormData): Promise<T> {
-  if (!API_BASE) throw new Error('Missing VITE_API_URL for this deployment');
   const response = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}` },

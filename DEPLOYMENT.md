@@ -50,14 +50,16 @@ Optional and safe to leave blank for now:
 - DocuSign vars
 - credit score API vars
 
-## Minimum web env required now
-Create `apps/web/.env` with:
+## Web API routing
+Production web builds should use same-origin API calls:
 
 ```env
-VITE_API_URL=https://api.credxme.com
+VITE_API_URL=
 ```
 
-In production, `VITE_API_URL` must be set. The admin portal now fails fast instead of silently calling `localhost`.
+On Vercel, `/api/:path*` is rewritten to the live Railway API in `apps/web/vercel.json`.
+This prevents the frontend bundle from depending on either the raw Railway URL or
+the not-yet-resolved `api.credxme.com` DNS record.
 
 For local dev:
 
@@ -123,10 +125,11 @@ Health check path:
 ### Service 2: Admin web
 Recommended root directory: `credx-platform`
 
-Set this Railway variable:
+Set this Railway variable only if the web service is not behind the Vercel `/api`
+rewrite:
 
 ```env
-VITE_API_URL=https://api.credxme.com
+VITE_API_URL=https://credxapi-production.up.railway.app
 ```
 
 Build command:
@@ -144,9 +147,9 @@ npm run start:web
 The web app now uses a Node static server in `apps/web/server.mjs`, which works with Railway's `PORT` environment variable.
 
 ## Domain recommendation
-Best practical setup on Railway:
-- API service → `api.credxme.com`
-- Admin web service → either `admin.credxme.com` or reverse-proxied to `credxme.com/adminportal/`
+Best practical setup:
+- Current first fix → Vercel site proxies `/api/*` to Railway
+- Later clean domain → point `api.credxme.com` to Railway and set `VITE_API_URL=https://api.credxme.com` if you want direct API calls
 
 Important note:
 - the web build currently uses base path `/adminportal/`

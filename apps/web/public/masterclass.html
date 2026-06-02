@@ -327,7 +327,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   var submit = form.querySelector('.enroll-submit');
   var apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:3000'
-    : 'https://credxapi-production.up.railway.app';
+    : '';
 
   function showError(msg){
     errorBox.textContent = msg;

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const rootDir = fileURLToPath(new URL('./dist', import.meta.url));
 const port = Number(process.env.PORT ?? 4173);
+const apiProxyTarget = (process.env.API_PROXY_TARGET ?? 'https://credxapi-production.up.railway.app').replace(/\/+$/, '');
 
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -33,6 +34,39 @@ function serveFile(res, path) {
 
 const server = createServer(async (req, res) => {
   const requestPath = new URL(req.url ?? '/', 'http://localhost').pathname;
+
+  if (requestPath.startsWith('/api/')) {
+    try {
+      const targetUrl = `${apiProxyTarget}${req.url ?? requestPath}`;
+      const headers = new Headers(req.headers);
+      headers.delete('host');
+      const response = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body: ['GET', 'HEAD'].includes(req.method ?? 'GET') ? undefined : req,
+        duplex: 'half',
+        redirect: 'manual'
+      });
+      res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
+      if (response.body) {
+        return response.body.pipeTo(new WritableStream({
+          write(chunk) {
+            res.write(Buffer.from(chunk));
+          },
+          close() {
+            res.end();
+          },
+          abort(error) {
+            res.destroy(error);
+          }
+        }));
+      }
+      return res.end();
+    } catch (error) {
+      res.writeHead(502, { 'content-type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ error: 'API proxy failed' }));
+    }
+  }
 
   if (requestPath === '/' || requestPath === '/index.html') {
     const landingPath = join(rootDir, 'index.html');

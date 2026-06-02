@@ -33,8 +33,16 @@ const registerSchema = z.object({
   phone: z.string().optional(),
   offerInterest: z.enum(['program', 'masterclass']).optional(),
   referralSource: z.string().max(80).optional(),
-  referralDetail: z.string().max(160).optional()
+  referralDetail: z.string().max(160).optional(),
+  signupIntake: z.record(z.unknown()).optional()
 });
+
+function serviceTierFromSignupIntake(intake?: Record<string, unknown>) {
+  if (!intake || intake.planPath !== 'ai_assistance') return 'ESSENTIAL' as const;
+  if (intake.aiPlanScope === 'family') return 'FAMILY' as const;
+  if (intake.singleTier === 'aggressive') return 'AGGRESSIVE' as const;
+  return 'ESSENTIAL' as const;
+}
 
 authRouter.post('/register', async (req, res, next) => {
   try {
@@ -53,6 +61,7 @@ authRouter.post('/register', async (req, res, next) => {
         client: {
           create: {
             status: 'LEAD',
+            serviceTier: serviceTierFromSignupIntake(data.signupIntake),
             progress: {
               create: {
                 onboarding: {
@@ -61,7 +70,8 @@ authRouter.post('/register', async (req, res, next) => {
                   completedAt: null,
                   referralSource: data.referralSource || null,
                   referralDetail: data.referralDetail || null,
-                  initialOfferInterest: data.offerInterest || null
+                  initialOfferInterest: data.offerInterest || null,
+                  signupIntake: (data.signupIntake || null) as any
                 },
                 education: {
                   masterclassEnrolled: data.offerInterest === 'masterclass',
@@ -224,7 +234,8 @@ const upgradeSchema = z.object({
   offerInterest: z.enum(['program', 'masterclass']),
   phone: z.string().optional(),
   firstName: z.string().min(1).optional(),
-  lastName: z.string().min(1).optional()
+  lastName: z.string().min(1).optional(),
+  signupIntake: z.record(z.unknown()).optional()
 });
 
 authRouter.post('/upgrade', requireAuth, async (req: AuthedRequest, res, next) => {
@@ -245,6 +256,13 @@ authRouter.post('/upgrade', requireAuth, async (req: AuthedRequest, res, next) =
       await prisma.user.update({ where: { id: user.id }, data: userPatch });
     }
 
+    if (data.signupIntake) {
+      await prisma.client.update({
+        where: { id: user.client.id },
+        data: { serviceTier: serviceTierFromSignupIntake(data.signupIntake) }
+      });
+    }
+
     const education = (user.client.progress.education as Record<string, unknown>) || {};
     const onboarding = (user.client.progress.onboarding as Record<string, unknown>) || {};
     const upgradeHistory = Array.isArray((onboarding as any).upgradeHistory) ? [...(onboarding as any).upgradeHistory as any[]] : [];
@@ -262,7 +280,13 @@ authRouter.post('/upgrade', requireAuth, async (req: AuthedRequest, res, next) =
       where: { clientId: user.client.id },
       data: {
         education: nextEducation as any,
-        onboarding: { ...onboarding, upgradeHistory, lastUpgradeAt: new Date().toISOString(), lastOfferInterest: data.offerInterest } as any
+        onboarding: {
+          ...onboarding,
+          upgradeHistory,
+          lastUpgradeAt: new Date().toISOString(),
+          lastOfferInterest: data.offerInterest,
+          lastSignupIntake: (data.signupIntake || null) as any
+        } as any
       }
     });
 

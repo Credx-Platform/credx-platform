@@ -523,8 +523,10 @@ disputesRouter.post('/initiate', requireAuth, requireRole(['STAFF', 'ADMIN']), a
       return res.status(404).json({ error: 'Dispute item not found' });
     }
     
-    // Calculate next round number
-    const nextRound = item.currentRound + 1;
+    // First send should create round 1 for newly added items; subsequent
+    // sends advance from the latest persisted round.
+    const latestRound = item.rounds.reduce((max, round) => Math.max(max, round.roundNumber), 0);
+    const nextRound = latestRound > 0 ? latestRound + 1 : Math.max(item.currentRound, 1);
     
     // Calculate due date (35 days from now)
     const dueDate = new Date();
@@ -783,7 +785,7 @@ disputesRouter.put('/items/:id/status', requireAuth, requireRole(['STAFF', 'ADMI
       
       await prisma.disputeRound.update({
         where: { id: latestRound.id },
-        data: { [bureauField]: status === 'DELETED' ? 'RESPONSE_RECEIVED' : status }
+        data: { [bureauField]: status }
       });
       
       // Also update the main item status based on bureau results

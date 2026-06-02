@@ -51,11 +51,6 @@ export default function SetPassword() {
       setStatus({ kind: 'invalid', message: 'This link is missing its security token. Request a new email and try again.' });
       return;
     }
-    if (!API_BASE) {
-      setStatus({ kind: 'invalid', message: 'Portal is not configured for this environment. Please contact support.' });
-      return;
-    }
-
     let cancelled = false;
     (async () => {
       try {
