@@ -114,6 +114,13 @@ h1 {
 }
 .progress span.active { background: linear-gradient(90deg, var(--cyan), var(--blue)); }
 .question { min-height: 260px; }
+.question.fade-in {
+  animation: questionFadeIn 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes questionFadeIn {
+  from { opacity: 0; transform: translateY(14px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
 .question-label {
   margin: 0 0 8px;
   color: var(--cyan);
@@ -360,7 +367,7 @@ h1 {
   <form class="card" id="signupForm" novalidate>
     <div class="eyebrow" id="eyebrow">CredX Sign Up</div>
     <h1 id="formHeading">Let us get you signed up.</h1>
-    <p class="subhead" id="formSubhead">Answer a few quick questions. You will create your login before the account is submitted.</p>
+    <p class="subhead" id="formSubhead">Answer a few quick questions. We will email your secure portal setup link after your intake is received.</p>
 
     <div class="upgrade-banner" id="upgradeBanner">
       <strong id="upgradeBannerName">Welcome back.</strong>
@@ -382,10 +389,10 @@ h1 {
     <div class="success-panel" id="successPanel">
       <div class="success-icon">✓</div>
       <div class="success-title" id="successTitle">Sign-up received</div>
-      <p class="success-msg" id="successMsg">Thanks. Your details are in the CredX pipeline.</p>
+      <p class="success-msg" id="successMsg">Thank you for signing up. Please check your email to verify your account and set up your password.</p>
       <div class="success-links">
         <a href="/">Back to homepage</a>
-        <a href="/portal">Open portal</a>
+        <a href="/portal">Portal login</a>
       </div>
     </div>
   </form>
@@ -428,8 +435,6 @@ const state = {
   offerInterest: requestedOffer,
   referralSource: '',
   referralDetail: '',
-  password: '',
-  confirmPassword: '',
   contactAuthConfirmed: false,
   masterclassTimeline: '',
   specialistInterest: '',
@@ -581,19 +586,11 @@ function getSteps() {
     {
       key: 'auth',
       label: 'Step 4',
-      title: mode === 'upgrade' ? 'Confirm your account.' : 'Authenticate your signup.',
+      title: mode === 'upgrade' ? 'Confirm your account.' : 'Confirm your contact details.',
       render: () => mode === 'upgrade'
         ? `<p class="subhead">You are already authenticated through your portal session. Press Next to choose the path you want.</p>`
         : `
-          <div class="auth-note">Text verification is skipped for now. Phone number is still required, and the portal account is protected with the email and password below.</div>
-          <label class="field" for="password">
-            <span>Create portal password</span>
-            <input id="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" value="${escapeHtml(state.password)}">
-          </label>
-          <label class="field" for="confirmPassword">
-            <span>Confirm password</span>
-            <input id="confirmPassword" type="password" autocomplete="new-password" placeholder="Type it again" value="${escapeHtml(state.confirmPassword)}">
-          </label>
+          <div class="auth-note">Text verification is skipped for now. Your phone number is required for onboarding, and your secure password setup link will be sent to your email after this form is submitted.</div>
           <label class="consent">
             <input id="contactAuthConfirmed" type="checkbox" ${state.contactAuthConfirmed ? 'checked' : ''}>
             <span>I confirm this phone number and email address are accurate for my CredX account.</span>
@@ -601,18 +598,12 @@ function getSteps() {
         `,
       bind: () => {
         if (mode === 'upgrade') return;
-        const password = document.getElementById('password');
-        const confirm = document.getElementById('confirmPassword');
         const contactAuth = document.getElementById('contactAuthConfirmed');
-        password.addEventListener('input', (event) => setStateValue('password', event.target.value));
-        confirm.addEventListener('input', (event) => setStateValue('confirmPassword', event.target.value));
         contactAuth.addEventListener('change', (event) => setStateValue('contactAuthConfirmed', event.target.checked));
-        password.focus();
+        contactAuth.focus();
       },
       validate: () => {
         if (mode === 'upgrade') return null;
-        if (state.password.length < 8) return 'Your password must be at least 8 characters.';
-        if (state.password !== state.confirmPassword) return 'Your passwords do not match.';
         if (!state.contactAuthConfirmed) return 'Confirm the phone number and email address are accurate.';
         return null;
       }
@@ -862,11 +853,14 @@ function renderStep() {
     <h2>${escapeHtml(step.title)}</h2>
     ${step.render()}
   `;
+  els.questionStage.classList.remove('fade-in');
+  void els.questionStage.offsetWidth;
+  els.questionStage.classList.add('fade-in');
   step.bind();
   els.backBtn.disabled = stepIndex === 0 || submitting;
   els.nextBtn.disabled = submitting;
   els.nextBtn.textContent = stepIndex === steps.length - 1
-    ? (mode === 'upgrade' ? 'Confirm upgrade' : 'Create my account')
+    ? (mode === 'upgrade' ? 'Confirm upgrade' : 'Submit signup')
     : 'Next';
   els.actions.classList.toggle('single', stepIndex === 0);
 }
@@ -904,7 +898,7 @@ function setSubmitting(value) {
   submitting = value;
   els.nextBtn.disabled = value;
   els.backBtn.disabled = value || stepIndex === 0;
-  els.nextBtn.textContent = value ? (mode === 'upgrade' ? 'Updating...' : 'Creating...') : (stepIndex === getSteps().length - 1 ? (mode === 'upgrade' ? 'Confirm upgrade' : 'Create my account') : 'Next');
+  els.nextBtn.textContent = value ? (mode === 'upgrade' ? 'Updating...' : 'Submitting...') : (stepIndex === getSteps().length - 1 ? (mode === 'upgrade' ? 'Confirm upgrade' : 'Submit signup') : 'Next');
 }
 
 function showSuccess(title, message) {
@@ -949,7 +943,6 @@ async function submitSignup() {
         lastName,
         email,
         phone,
-        password: state.password,
         offerInterest,
         signupIntake: signupIntake(),
         referralSource: state.referralSource || undefined,
@@ -961,10 +954,11 @@ async function submitSignup() {
       throw new Error("This email is already in our system. If it is yours, sign in to the portal or use reset password.");
     }
     if (!res.ok) throw new Error(body && body.error || 'Submission failed');
-    if (body && body.token) localStorage.setItem(TOKEN_KEY, body.token);
-    showToast('Welcome to CredX. Opening your contract...');
-    const nextUrl = `/start?token=${encodeURIComponent(body.token)}#onboarding`;
-    setTimeout(() => { window.location.assign(nextUrl); }, 600);
+    showToast('Signup received. Check your email.');
+    showSuccess(
+      'Thank you for signing up',
+      'Please check your email to verify your account and set up your password. After that, your agreement and next onboarding step will appear in your portal.'
+    );
   } catch (error) {
     showError(error.message || 'Submission failed.');
     setSubmitting(false);
@@ -977,8 +971,6 @@ function setUpgradeMode(user) {
   state.lastName = user.lastName || '';
   state.email = user.email || '';
   state.phone = user.phone || '';
-  state.password = '';
-  state.confirmPassword = '';
   els.eyebrow.textContent = 'CredX Account Upgrade';
   els.heading.textContent = 'Add this path to your account.';
   els.subhead.textContent = 'You are already signed in. We will walk through the same guided questions and update your account.';

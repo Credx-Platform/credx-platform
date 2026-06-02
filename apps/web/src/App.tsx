@@ -754,6 +754,7 @@ function ClientDetailRoute({ token }: { token: string }) {
                   <li><strong>SSN last 4</strong><span>{client.ssnLast4 || 'Not on file'}</span></li>
                 </ul>
               </div>
+              <SignupIntakePanel onboarding={client.progress?.onboarding || null} />
               <MonitoringCredentialsPanel onboarding={client.progress?.onboarding || null} />
               <div>
                 <h3>Admin controls</h3>
@@ -960,6 +961,51 @@ function ClientDetailRoute({ token }: { token: string }) {
 }
 
 type OnboardingData = NonNullable<NonNullable<ClientDetail['progress']>['onboarding']>;
+
+function formatSignupIntakeValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return 'Not provided';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return String(value);
+  return String(value)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function SignupIntakePanel({ onboarding }: { onboarding: OnboardingData | null }) {
+  const intake = (onboarding?.signupIntake || null) as Record<string, unknown> | null;
+  if (!intake) {
+    return (
+      <div>
+        <h3>Signup intake</h3>
+        <p className="helper-text">No guided signup answers are stored yet.</p>
+      </div>
+    );
+  }
+
+  const rows = [
+    ['Path', intake.planPath],
+    ['Contact confirmed', intake.contactAuthConfirmed],
+    ['Masterclass timeline', intake.masterclassTimeline],
+    ['Specialist interest', intake.specialistInterest],
+    ['AI scope', intake.aiPlanScope],
+    ['Single tier', intake.singleTier],
+    ['Family members', intake.familyMembers],
+    ['Quoted deposit', intake.quotedDeposit],
+    ['Quoted monthly', intake.quotedMonthly]
+  ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+
+  return (
+    <div>
+      <h3>Signup intake</h3>
+      <ul className="detail-list">
+        {rows.map(([label, value]) => (
+          <li key={label as string}><strong>{label as string}</strong><span>{formatSignupIntakeValue(value)}</span></li>
+        ))}
+      </ul>
+      {onboarding?.signupAt ? <p className="helper-text" style={{ marginTop: 8 }}>Submitted {formatDate(onboarding.signupAt)}</p> : null}
+    </div>
+  );
+}
 
 function MonitoringCredentialsPanel({ onboarding }: { onboarding: OnboardingData | null }) {
   const provider = onboarding?.monitoringProvider || null;

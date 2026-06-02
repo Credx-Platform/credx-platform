@@ -87,6 +87,7 @@ type SessionResponse = User & {
 type ContractTextResponse = {
   agreement: string;
   disclosure: string;
+  contractType?: 'masterclass' | 'ai_assistance';
   company?: { name?: string; address?: string };
 };
 
@@ -634,7 +635,9 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
               </div>
               <label className="contract-agree">
                 <input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} />
-                <span>I have read and agree to the CredX service agreement and federal disclosures above. I understand I can cancel within 3 business days without penalty.</span>
+                <span>{contractText.contractType === 'masterclass'
+                  ? 'I have read and agree to the CredX 5-Day Masterclass agreement and disclosures above. I understand the 3-day return policy is based on performance and maintenance standards, not guaranteed results or credit-report changes.'
+                  : 'I have read and agree to the CredX service agreement and federal disclosures above. I understand I can cancel within 3 business days without penalty.'}</span>
               </label>
               <button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim() || !signatureData} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, padding: '12px 18px' }}>
                 {busyStep === 'contract' ? 'Signing...' : '✍ Sign and submit contract'}
