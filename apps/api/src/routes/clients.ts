@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { CreditAnalysisService } from '../lib/creditAnalysis.js';
+import { dispatchAnalysisEmail } from '../lib/analysisEmailDispatch.js';
 import { decryptPII } from '../lib/encryption.js';
 
 export const clientsRouter = Router();
@@ -218,6 +219,38 @@ clientsRouter.patch('/:id/status', requireAuth, requireRole(['STAFF', 'ADMIN']),
   }
 });
 
+// ========== CLIENT ACTIVATION & DISPUTE AUTOMATION ==========
+
+clientsRouter.post('/:id/activate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const client = await prisma.client.findUnique({
+      where: { id },
+      include: { user: true, progress: true }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.progress?.analysis) return res.status(400).json({ error: 'No credit analysis found. Upload credit report and generate analysis first.' });
+    if (client.status === 'ACTIVE') return res.status(400).json({ error: 'Client is already active.' });
+
+    const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
+    const result = await activateClientDisputeCampaign(id);
+
+    return res.json({
+      success: result.success,
+      lettersGenerated: result.lettersGenerated,
+      emailSent: result.emailSent,
+      errors: result.errors,
+      client: await prisma.client.findUnique({
+        where: { id },
+        include: { user: true, documents: true, disputeItems: true, tasks: true }
+      })
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ========== CREDIT ANALYSIS ENDPOINTS ==========
 
 clientsRouter.post('/:id/analysis/generate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
@@ -295,7 +328,17 @@ clientsRouter.post('/:id/analysis/generate', requireAuth, requireRole(['STAFF', 
       }
     });
 
-    return res.status(201).json({ analysis });
+    const emailResult = await dispatchAnalysisEmail({
+      clientId: id,
+      analysis,
+      trigger: 'admin_generate'
+    });
+
+    return res.status(201).json({
+      analysis,
+      emailed: emailResult.sent,
+      ...(emailResult.sent ? { emailMessageId: emailResult.messageId } : { emailSkippedReason: emailResult.reason })
+    });
   } catch (error) {
     next(error);
   }
@@ -425,7 +468,17 @@ clientsRouter.post('/:id/analysis/auto', requireAuth, async (req: AuthedRequest,
       }
     });
 
-    return res.status(201).json({ analysis });
+    const emailResult = await dispatchAnalysisEmail({
+      clientId: id,
+      analysis,
+      trigger: 'auto_endpoint'
+    });
+
+    return res.status(201).json({
+      analysis,
+      emailed: emailResult.sent,
+      ...(emailResult.sent ? { emailMessageId: emailResult.messageId } : { emailSkippedReason: emailResult.reason })
+    });
   } catch (error) {
     next(error);
   }

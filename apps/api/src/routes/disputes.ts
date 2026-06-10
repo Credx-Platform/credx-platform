@@ -830,3 +830,60 @@ disputesRouter.put('/items/:id/status', requireAuth, requireRole(['STAFF', 'ADMI
     next(error);
   }
 });
+
+// ========== DISPUTE AUTO-GENERATION ==========
+
+// Auto-generate dispute letters from credit analysis
+disputesRouter.post('/auto-generate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const { clientId } = z.object({ clientId: z.string().uuid() }).parse(req.body);
+    
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      include: { user: true, progress: true }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.progress?.analysis) return res.status(400).json({ error: 'No credit analysis found for this client.' });
+
+    const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
+    const result = await activateClientDisputeCampaign(clientId);
+
+    return res.json({
+      success: result.success,
+      lettersGenerated: result.lettersGenerated,
+      emailSent: result.emailSent,
+      errors: result.errors
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get all generated dispute letters for a client
+disputesRouter.get('/letters/:clientId', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const clientId = String(req.params.clientId);
+    
+    // Check authorization
+    if (req.auth?.role === 'CLIENT') {
+      const client = await prisma.client.findUnique({ where: { userId: req.auth.sub } });
+      if (!client || client.id !== clientId) return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const documents = await prisma.document.findMany({
+      where: { 
+        clientId,
+        type: 'DISPUTE_LETTER'
+      },
+      include: {
+        disputeItem: true
+      },
+      orderBy: { uploadedAt: 'desc' }
+    });
+
+    return res.json({ documents });
+  } catch (error) {
+    next(error);
+  }
+});

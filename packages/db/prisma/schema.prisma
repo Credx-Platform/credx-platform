@@ -70,6 +70,9 @@ enum DocumentType {
   PROOF_OF_ADDRESS
   CREDIT_REPORT
   CONTRACT
+  DISPUTE_LETTER
+  DISPUTE_RESPONSE
+  DISPUTE_EVIDENCE
   OTHER
 }
 
@@ -281,6 +284,18 @@ model DisputeItem {
   
   // Relations
   rounds            DisputeRound[]
+  documents         Document[]
+  
+  // Dispute letter tracking
+  letterGenerated   Boolean          @default(false)
+  letterSent        Boolean          @default(false)
+  letterDocumentId  String?          @db.Uuid
+  generatedAt       DateTime?        // When letter was auto-generated
+  sentAt            DateTime?        // When letter was sent
+  
+  // Analysis linkage
+  analysisId        String?          // Reference to the analysis that generated this dispute
+  priority          String?          @default("MEDIUM") // HIGH, MEDIUM, LOW
 }
 
 // New: Track each round of disputes
@@ -349,6 +364,16 @@ model Document {
   s3Key       String
   contentType String?
   uploadedAt  DateTime     @default(now())
+  
+  // Dispute letter tracking fields
+  disputeItemId String?
+  roundNumber   Int?    // R-1, R-2, etc.
+  letterType    String? // DISPUTE, VALIDATION, PAY_FOR_DELETE, GOODWILL, CEASE_DESIST
+  bureau        String? // EFX, XPN, TU, or ALL
+  letterStatus  String? @default("DRAFTED") // DRAFTED, APPROVED, SENT, RESPONSE_RECEIVED, RESOLVED
+  
+  // Relations
+  disputeItem   DisputeItem? @relation(fields: [disputeItemId], references: [id])
 
   @@unique([clientId, fileName], name: "clientId_fileName")
 }
