@@ -19,8 +19,8 @@ import { writeAuditLog } from '../lib/audit.js';
 export const authRouter = Router();
 
 const defaultAffiliateLinks = [
-  { label: 'IdentityIQ Credit Monitoring', url: 'https://www.identityiq.com/', category: 'monitoring' },
-  { label: 'MyFreeScoreNow Credit Monitoring', url: 'https://www.myfreescorenow.com/', category: 'monitoring' },
+  { label: 'IdentityIQ Credit Monitoring', url: 'https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4', category: 'monitoring' },
+  { label: 'MyFreeScoreNow Credit Monitoring', url: 'https://app.myfreescorenow.com/enroll/B02B3064', category: 'monitoring' },
   { label: 'Self Credit Builder', url: 'https://www.self.inc/', category: 'credit_builder' },
   { label: 'Kikoff Credit Builder', url: 'https://kikoff.com/', category: 'credit_builder' },
   { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }

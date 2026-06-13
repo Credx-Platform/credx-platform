@@ -7,6 +7,7 @@ import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { config } from '../config.js';
 import { CreditAnalysisService, deriveReportSubject } from '../lib/creditAnalysis.js';
+import { dispatchAnalysisEmail } from '../lib/analysisEmailDispatch.js';
 import { extractReport } from '../lib/reportExtractor.js';
 import type { DocumentType } from '@prisma/client';
 
@@ -379,6 +380,14 @@ async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
 
             (workflowResult as any).analysisGenerated = true;
             (workflowResult as any).analysisFindings = analysis.keyFindings.length;
+
+            const emailResult = await dispatchAnalysisEmail({
+              clientId: client.id,
+              analysis,
+              trigger: 'auto_doc_upload'
+            });
+            (workflowResult as any).analysisEmailed = emailResult.sent;
+            if (!emailResult.sent) (workflowResult as any).analysisEmailSkippedReason = emailResult.reason;
           }
         }
       } catch (analysisErr) {
@@ -653,6 +662,12 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
               }
             });
           }
+
+          await dispatchAnalysisEmail({
+            clientId,
+            analysis,
+            trigger: 'auto_secure_upload'
+          });
         }
       } catch (analysisErr) {
         const e = analysisErr instanceof Error ? analysisErr : new Error(String(analysisErr));

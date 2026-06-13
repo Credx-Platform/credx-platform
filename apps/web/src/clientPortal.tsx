@@ -131,8 +131,8 @@ const TOKEN_KEY = 'credx-client-token';
 const USER_KEY = 'credx-client-user';
 const BRAND_LOGO = '/images/credx-logo-1.jpg';
 const DEFAULT_AFFILIATE_LINKS = [
-  { label: 'IdentityIQ Credit Monitoring', url: 'https://www.identityiq.com/', category: 'monitoring' },
-  { label: 'MyFreeScoreNow Credit Monitoring', url: 'https://www.myfreescorenow.com/', category: 'monitoring' },
+  { label: 'IdentityIQ Credit Monitoring', url: 'https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4', category: 'monitoring' },
+  { label: 'MyFreeScoreNow Credit Monitoring', url: 'https://app.myfreescorenow.com/enroll/B02B3064', category: 'monitoring' },
   { label: 'Self — Credit Builder Account', url: 'https://self.inc/refer/16452347', category: 'credit_builder' },
   { label: 'Credit Strong', url: 'https://tracking.creditstrong.com/aff_c?aff_id=1491&offer_id=2&source=MGFinstagram', category: 'credit_builder' },
   { label: 'Rent Reporters', url: 'https://prf.hn/click/camref:1101l52pUS', category: 'credit_builder' },
@@ -143,6 +143,20 @@ const DEFAULT_AFFILIATE_LINKS = [
   { label: 'Kikoff Credit Builder', url: 'https://kikoff.com/', category: 'credit_builder' },
   { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }
 ] as const;
+
+function currentAffiliateLinks(links?: Array<{ label: string; url: string; category?: string }>) {
+  const selected = links?.length ? links : [...DEFAULT_AFFILIATE_LINKS];
+  return selected.map((item) => {
+    const normalizedLabel = item.label.toLowerCase();
+    if (normalizedLabel.includes('myfreescorenow')) {
+      return { ...item, url: 'https://app.myfreescorenow.com/enroll/B02B3064' };
+    }
+    if (normalizedLabel.includes('identityiq')) {
+      return { ...item, url: 'https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4' };
+    }
+    return item;
+  });
+}
 
 const defaultWizardState: WizardState = {
   fullName: '',
@@ -481,7 +495,7 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
   const [contractAgreed, setContractAgreed] = useState(false);
   const [docUpload, setDocUpload] = useState<SecureUploadState>({ file: null, type: 'credit_report' });
   const [wizardState, setWizardState] = useState<WizardState>({ ...defaultWizardState, fullName: `${user.firstName} ${user.lastName}`.trim(), email: user.email, phone: user.phone || '' });
-  const affiliateLinks = (progress?.education?.affiliateLinks?.length ? progress.education.affiliateLinks : DEFAULT_AFFILIATE_LINKS).filter((item) => ['monitoring', 'credit_builder'].includes(String(item.category || '').toLowerCase()));
+  const affiliateLinks = currentAffiliateLinks(progress?.education?.affiliateLinks).filter((item) => ['monitoring', 'credit_builder'].includes(String(item.category || '').toLowerCase()));
 
   useEffect(() => {
     let cancelled = false;
@@ -662,7 +676,7 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
             <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}</button>
             <button className="ghost-button" type="button" onClick={skipMonitoring} disabled={busyStep === 'monitoring'} style={{ background: 'transparent' }}>{busyStep === 'monitoring' ? 'Saving...' : 'Skip for now'}</button>
           </div>
-          <div className="helper-link-grid">{affiliateLinks.map((item, index) => <a key={`${item.url}-${index}`} className="resource-link-card" href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>{String(item.category || '').replace(/_/g, ' ')}</span></a>)}</div>
+          <div className="helper-link-grid">{affiliateLinks.map((item, index) => <a key={`${item.url}-${index}`} className="resource-link-card" href={item.url} target="_blank" rel="noopener noreferrer sponsored"><strong>{item.label}</strong><span>{String(item.category || '').replace(/_/g, ' ')}</span></a>)}</div>
           <p className="helper-text">Pick a provider and submit credentials, or skip for now and add them later. Either way, your portal is unlocked once this step is acknowledged.</p>
         </form> : null}
         {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Step 4, upload your credit report</strong></div><div className="field-grid"><input className="chat-input" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => setDocUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} /><select className="chat-input" value={docUpload.type} onChange={(e) => setDocUpload((current) => ({ ...current, type: e.target.value }))}><option value="credit_report">Credit report</option><option value="identity">Driver's license or ID</option><option value="proof_of_address">Proof of address</option><option value="other">Other</option></select><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docUpload.file}>{busyStep === 'upload' ? 'Uploading...' : 'Upload securely'}</button></div><p className="helper-text">Upload credit reports as PDF or HTML files. JPG, PNG, and WEBP are also accepted for screenshots and supporting images.</p></form> : null}
@@ -791,7 +805,7 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
                 Most providers allow you to save as PDF or print to PDF.
               </p>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-                <a href="https://www.identityiq.com" target="_blank" rel="noopener noreferrer" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>IdentityIQ ↗</a>
+                <a href="https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4" target="_blank" rel="noopener noreferrer sponsored" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>IdentityIQ ↗</a>
                 <a href="https://www.smartcredit.com" target="_blank" rel="noopener noreferrer" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>SmartCredit ↗</a>
                 <a href="https://www.privacyguard.com" target="_blank" rel="noopener noreferrer" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>PrivacyGuard ↗</a>
               </div>
@@ -1728,7 +1742,7 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
 }
 
 function ResourcesSection({ progress }: { progress: Progress | null; }) {
-  const affiliateLinks = (progress?.education?.affiliateLinks?.length ? progress.education.affiliateLinks : DEFAULT_AFFILIATE_LINKS);
+  const affiliateLinks = currentAffiliateLinks(progress?.education?.affiliateLinks);
   const monitoringLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'monitoring');
   const creditBuilderLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'credit_builder');
   const reportLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'reports');
@@ -1753,16 +1767,18 @@ function ResourcesSection({ progress }: { progress: Progress | null; }) {
         <div>
           <div className="panel-header"><div><p className="eyebrow">Monitoring</p><h2>Credit monitoring signup links</h2></div></div>
           <div className="dispute-list">
-            {monitoringLinks.map((item, index) => <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>Use this during onboarding when choosing your provider.</span><small>Open partner link</small></a>)}
+            {monitoringLinks.map((item, index) => <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noopener noreferrer sponsored"><strong>{item.label}</strong><span>Use this during onboarding when choosing your provider.</span><small>Open partner link</small></a>)}
           </div>
         </div>
         <div>
           <div className="panel-header"><div><p className="eyebrow">Credit Building</p><h2>Recommended builder accounts</h2></div></div>
           <div className="dispute-list">
-            {creditBuilderLinks.map((item, index) => <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>Helpful for rebuilding after cleanup and utilization work.</span><small>Open partner link</small></a>)}
+            {creditBuilderLinks.map((item, index) => <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noopener noreferrer sponsored"><strong>{item.label}</strong><span>Helpful for rebuilding after cleanup and utilization work.</span><small>Open partner link</small></a>)}
           </div>
         </div>
       </section>
+
+      <p className="helper-text">CredX may earn compensation if you use a partner link. This does not change your price. Approval, rates, and terms depend on the provider and your qualifications.</p>
 
       <section className="panel two-col">
         <div>
@@ -2633,6 +2649,249 @@ function AnalysisSection({ token, user, client, progress, refreshAll }: { token:
   );
 }
 
+// Client Tasks Section — Hybrid SaaS Workflow
+// Auto-advances digital steps, submits manual steps for admin review
+function ClientTasksSection({ token, user, client, progress, refreshAll, onTabChange }: { token: string; user: User | null; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; onTabChange: (tab: PortalTab) => void; }) {
+  const [completing, setCompleting] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  // Store submitted-for-review tasks in localStorage
+  const [submittedTasks, setSubmittedTasks] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('credx_submitted_tasks');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const saveSubmitted = (set: Set<string>) => {
+    setSubmittedTasks(set);
+    localStorage.setItem('credx_submitted_tasks', JSON.stringify([...set]));
+  };
+
+  // Generate workflow tasks based on client status
+  const workflowTasks = useMemo(() => {
+    if (!client || !user) return [];
+    const tasks = [];
+
+    // Determine current stage
+    const signed = progress?.onboarding?.signature?.signedAt;
+    const intakeComplete = client.status !== 'LEAD' && client.status !== 'CONTRACT_SENT' && client.status !== 'INTAKE_RECEIVED';
+    const hasMonitoring = progress?.onboarding?.monitoringProvider || progress?.onboarding?.monitoringHasCredentials;
+    const monitoringSkipped = progress?.onboarding?.monitoringSkippedAt;
+    const creditDocs = (progress?.uploadedDocs || []).filter(d => (d.type || '').toLowerCase().includes('credit'));
+    const hasAnalysis = client?.analysisSummary || progress?.analysis;
+
+    // 1. Contract
+    if (!signed) {
+      tasks.push({ id: 'contract', title: '✍️ Sign your CredX service agreement', desc: 'Review and electronically sign your contract to proceed.', action: 'Sign contract', actionTab: 'overview' as PortalTab, priority: 'high', auto: true, currentStatus: 'LEAD' });
+    }
+
+    // 2. Intake
+    if (signed && !intakeComplete) {
+      tasks.push({ id: 'intake', title: '📝 Complete your intake application', desc: 'Provide your full name, address, SSN, and DOB so we can prepare your file.', action: 'Complete intake', actionTab: 'profile' as PortalTab, priority: 'high', auto: true, currentStatus: 'INTAKE_RECEIVED' });
+    }
+
+    // 3. Monitoring (optional, but shows)
+    if (intakeComplete && !hasMonitoring && !monitoringSkipped) {
+      tasks.push({ id: 'monitoring', title: '🔍 Connect your credit monitoring', desc: 'Link IdentityIQ or MyFreeScoreNow so we can pull reports on your behalf.', action: 'Connect monitoring', actionTab: 'analysis' as PortalTab, priority: 'medium', auto: true, currentStatus: null });
+    }
+
+    // 4. Upload credit report
+    if (intakeComplete && creditDocs.length === 0) {
+      tasks.push({ id: 'report', title: '📄 Upload your credit report', desc: 'Upload a PDF or HTML from your monitoring provider for free analysis.', action: 'Upload report', actionTab: 'analysis' as PortalTab, priority: 'high', auto: true, currentStatus: 'INTAKE_RECEIVED' });
+    }
+
+    // 5. Analysis in progress
+    if (creditDocs.length > 0 && !hasAnalysis) {
+      tasks.push({ id: 'analysis_wait', title: '⏳ Analysis in progress', desc: 'Your credit report is being reviewed. Check back shortly.', action: 'Check status', actionTab: 'analysis' as PortalTab, priority: 'medium', auto: true, currentStatus: 'ANALYSIS_READY' });
+    }
+
+    // 6. Analysis ready — schedule interview (manual, needs admin verify)
+    if (hasAnalysis && (client.status === 'ANALYSIS_READY' || submittedTasks.has('interview'))) {
+      const isSubmitted = submittedTasks.has('interview');
+      tasks.push({ id: 'interview', title: '📊 Schedule your analysis interview', desc: isSubmitted ? 'Waiting for CredX team to confirm your interview.' : 'Your analysis is complete. Schedule a call with your CredX specialist to review findings.', action: isSubmitted ? 'Submitted for review' : 'Schedule interview', actionTab: 'overview' as PortalTab, priority: 'high', auto: false, currentStatus: 'UPGRADE_OFFERED', submitted: isSubmitted });
+    }
+
+    // 7. Confirm plan (auto if payment detected, manual if upgrade offered)
+    if (client.status === 'UPGRADE_OFFERED') {
+      tasks.push({ id: 'upgrade', title: '💳 Confirm your service plan', desc: `Your recommended plan: ${client.serviceTier || 'ESSENTIAL'}. Confirm to activate your dispute strategy.`, action: 'Confirm plan', actionTab: 'overview' as PortalTab, priority: 'high', auto: true, currentStatus: 'ACTIVE' });
+    }
+
+    // 8. Active disputes
+    if (client.status === 'ACTIVE') {
+      const disputes = client.disputes || [];
+      const pending = disputes.filter(d => d.status === 'PENDING').length;
+      const sent = disputes.filter(d => d.status === 'LETTER_SENT').length;
+      const responseDue = disputes.filter(d => d.status === 'RESPONSE_DUE').length;
+
+      if (pending > 0) {
+        const isSubmitted = submittedTasks.has('review_disputes');
+        tasks.push({ id: 'review_disputes', title: `📨 Review and approve dispute letters (${pending} items)`, desc: isSubmitted ? 'Waiting for CredX team to mail your certified letters.' : 'Your Round 1 dispute letters are ready. Review and approve them for certified mailing.', action: isSubmitted ? 'Submitted for review' : 'Review & approve', actionTab: 'disputes' as PortalTab, priority: 'high', auto: false, currentStatus: 'ACTIVE', submitted: isSubmitted });
+      } else if (sent > 0 && responseDue === 0) {
+        tasks.push({ id: 'track_delivery', title: `📍 Track delivery — ${sent} letters sent`, desc: 'Your certified letters are in transit. Delivery confirmation typically arrives within 3–5 days.', action: 'Check tracking', actionTab: 'disputes' as PortalTab, priority: 'medium', auto: true, currentStatus: 'ACTIVE' });
+      } else if (responseDue > 0) {
+        tasks.push({ id: 'review_responses', title: `📋 Review bureau responses (${responseDue} due)`, desc: 'Bureau responses have been received. Review outcomes and plan Round 2 if needed.', action: 'Review responses', actionTab: 'disputes' as PortalTab, priority: 'high', auto: true, currentStatus: 'ACTIVE' });
+      } else if (disputes.length === 0) {
+        tasks.push({ id: 'wait_disputes', title: '🔧 Disputes being prepared', desc: 'Your dispute strategy is being generated. You will receive an email when letters are ready.', action: 'Check status', actionTab: 'disputes' as PortalTab, priority: 'low', auto: true, currentStatus: 'ACTIVE' });
+      }
+    }
+
+    // 9. Past due
+    if (client.status === 'PAST_DUE') {
+      tasks.push({ id: 'payment', title: '⚠️ Payment past due', desc: 'Your subscription payment failed. Update your billing info to keep your disputes active.', action: 'Fix payment', actionTab: 'profile' as PortalTab, priority: 'high', auto: true, currentStatus: 'ACTIVE' });
+    }
+
+    // 10. Restricted
+    if (client.status === 'RESTRICTED') {
+      tasks.push({ id: 'restricted', title: '🔒 Portal access restricted', desc: 'Contact CredX support to resolve your account restriction.', action: 'Contact support', actionTab: 'overview' as PortalTab, priority: 'high', auto: true, currentStatus: 'RESTRICTED' });
+    }
+
+    return tasks;
+  }, [client, user, progress, submittedTasks]);
+
+  const pendingTasks = workflowTasks.filter(t => !t.submitted && !t.auto);
+  const submittedForReview = workflowTasks.filter(t => t.submitted);
+  const completedTasks = workflowTasks.filter(t => t.auto && (t.id === 'contract' ? progress?.onboarding?.signature?.signedAt : t.id === 'intake' ? client.status !== 'LEAD' && client.status !== 'CONTRACT_SENT' && client.status !== 'INTAKE_RECEIVED' : t.id === 'report' ? (progress?.uploadedDocs || []).filter(d => (d.type || '').toLowerCase().includes('credit')).length > 0 : t.id === 'analysis_wait' ? !!(client?.analysisSummary || progress?.analysis) : false));
+
+  const handleSubmitForReview = (taskId: string) => {
+    setCompleting(taskId);
+    // In production, this would POST to API to notify admin
+    const newSet = new Set(submittedTasks);
+    newSet.add(taskId);
+    saveSubmitted(newSet);
+    setMessage('✅ Submitted for admin review. You will receive an email when confirmed.');
+    setTimeout(() => setMessage(null), 5000);
+    setCompleting(null);
+  };
+
+  const handleComplete = (taskId: string) => {
+    const task = workflowTasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (task.auto) {
+      // Auto-advanceable — just navigate to the right tab
+      onTabChange(task.actionTab);
+    } else {
+      // Manual step — submit for review
+      handleSubmitForReview(taskId);
+    }
+  };
+
+  return (
+    <div className="page-grid">
+      <section className="hero-card hero-card--compact">
+        <div>
+          <p className="eyebrow">Your Progress</p>
+          <h1>Next Steps</h1>
+          <p>Complete each step below to move your credit repair forward. We will email you when new tasks are ready.</p>
+        </div>
+        <div className="hero-stats">
+          <div className="stat-card"><span>Pending</span><strong style={{ color: '#d97706' }}>{pendingTasks.length}</strong></div>
+          <div className="stat-card"><span>In Review</span><strong style={{ color: '#00c6fb' }}>{submittedForReview.length}</strong></div>
+          <div className="stat-card"><span>Completed</span><strong style={{ color: '#16a34a' }}>{completedTasks.length}</strong></div>
+          <div className="stat-card"><span>Stage</span><strong>{client?.status?.replace(/_/g, ' ') || 'Unknown'}</strong></div>
+        </div>
+      </section>
+
+      {message ? (
+        <div className="card" style={{ marginBottom: '14px', border: '2px solid #22c55e', background: 'rgba(34,197,94,0.04)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '20px' }}>✅</span>
+            <span className="font-medium">{message}</span>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Pending Tasks */}
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Action Items</p>
+            <h2>What you need to do now</h2>
+          </div>
+        </div>
+
+        {pendingTasks.length === 0 && submittedForReview.length === 0 ? (
+          <div className="empty-state-card" style={{ textAlign: 'center', padding: '40px' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🎉</div>
+            <strong>All caught up!</strong>
+            <p className="helper-text">You have no pending tasks. We will email you when the next step is ready.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {pendingTasks.map((task, index) => (
+              <div key={task.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '16px', background: '#0f172a', border: `1px solid ${index === 0 ? '#00c6fb' : '#1e293b'}`, borderRadius: '10px' }}>
+                <div style={{ flexShrink: 0, marginTop: '2px' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: `2px solid ${index === 0 ? '#00c6fb' : '#334155'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: index === 0 ? '#00c6fb' : '#64748b' }}>
+                    {index + 1}
+                  </div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 700, fontSize: '14px', color: '#f8fafc' }}>{task.title}</span>
+                    <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', padding: '2px 8px', borderRadius: '4px', background: 'rgba(0,198,251,0.15)', color: '#00c6fb', border: '1px solid rgba(0,198,251,0.3)' }}>Next Step</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5, marginBottom: '10px' }}>{task.desc}</div>
+                  <button
+                    onClick={() => handleComplete(task.id)}
+                    disabled={completing === task.id}
+                    style={{ padding: '8px 16px', background: '#00c6fb', color: '#060a12', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: completing === task.id ? 0.6 : 1 }}
+                  >
+                    {completing === task.id ? 'Submitting...' : `${task.action} →`}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Submitted for Review */}
+      {submittedForReview.length > 0 && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">In Review</p>
+              <h2>Waiting for CredX team confirmation</h2>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {submittedForReview.map(task => (
+              <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: '#0f172a', border: '1px solid #f59e0b', borderRadius: '8px' }}>
+                <span style={{ fontSize: '18px' }}>⏳</span>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontWeight: 600, fontSize: '13px', color: '#f8fafc' }}>{task.title}</span>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{task.desc}</div>
+                </div>
+                <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', padding: '2px 8px', borderRadius: '4px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', whiteSpace: 'nowrap' }}>Pending Review</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Completed */}
+      {completedTasks.length > 0 && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Completed</p>
+              <h2>Steps you have finished</h2>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {completedTasks.map(task => (
+              <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', opacity: 0.6 }}>
+                <span style={{ fontSize: '18px' }}>✅</span>
+                <span style={{ fontWeight: 600, fontSize: '13px', color: '#64748b', textDecoration: 'line-through' }}>{task.title}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
 export default function ClientPortalApp({ onboardingOnly = false }: { onboardingOnly?: boolean }) {
   const [token, setToken] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -3133,18 +3392,18 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', margin: '1rem 0 0.75rem' }}>
                       <a
-                        href="https://www.identityiq.com/"
+                        href="https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4"
                         target="_blank"
-                        rel="noopener noreferrer"
+                        rel="noopener noreferrer sponsored"
                         className="ghost-button"
                         style={{ background: '#00c6fb', color: '#060a12', border: 'none', fontWeight: 700, justifyContent: 'center', textDecoration: 'none' }}
                       >
                         Pull report at IdentityIQ ↗
                       </a>
                       <a
-                        href="https://www.myfreescorenow.com/"
+                        href="https://app.myfreescorenow.com/enroll/B02B3064"
                         target="_blank"
-                        rel="noopener noreferrer"
+                        rel="noopener noreferrer sponsored"
                         className="ghost-button"
                         style={{ background: '#22c55e', color: '#060a12', border: 'none', fontWeight: 700, justifyContent: 'center', textDecoration: 'none' }}
                       >
@@ -3273,14 +3532,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             />
           ) : null}
 
-          {activeTab === 'tasks' ? (
-            <section className="panel">
-              <div className="panel-header"><div><p className="eyebrow">Tasks</p><h2>Your action items</h2></div></div>
-              <div className="dispute-list">
-                {tasks.length ? tasks.map((task) => <div key={task.id} className="dispute-card-live"><div className="dispute-card-top"><strong>{task.title}</strong><span className={task.completed ? 'status-badge status-active' : 'status-badge status-pending'}>{task.completed ? 'Completed' : 'Open'}</span></div><div className="dispute-meta"><span>{task.description || 'No extra details yet.'}</span><span>{task.dueAt ? `Due ${formatDate(task.dueAt)}` : 'No due date set'}</span></div></div>) : <div className="empty-state-card">No active tasks right now.</div>}
-              </div>
-            </section>
-          ) : null}
+          {activeTab === 'tasks' ? <ClientTasksSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} onTabChange={setActiveTab} /> : null}
 
           <CrossPromoFooter
             isPaid={tier2}

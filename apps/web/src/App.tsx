@@ -1288,6 +1288,371 @@ function LoginScreen({
   );
 }
 
+function TasksRoute() {
+  const [tasks, setTasks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('credx_admin_tasks') || '[]'); }
+    catch { return []; }
+  });
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // all, pending, today, overdue
+
+  const TOKEN_KEY = '***';
+  const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
+
+  // Auto-fetch clients and sync tasks
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) { setLoading(false); return; }
+
+    fetch(`${API_BASE}/api/clients`, { headers: { authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => {
+        const clientsList = data?.clients || [];
+        setClients(clientsList);
+        // Sync tasks to match current client states
+        syncTasksFromClients(clientsList);
+        setLoading(false);
+      })
+      .catch(() => {
+        // Demo mode if API fails
+        const demo = [
+          { id: 'c1', user: { firstName: 'James', lastName: 'Malloy', email: 'james@example.com' }, status: 'ANALYSIS_READY', serviceTier: 'ESSENTIAL', estimatedTimelineMonths: 4, disputes: [{id:'d1',status:'PENDING'}], documents: [{id:'doc1'}], currentAddressLine1: '123 Main St', currentCity: 'Newark', currentState: 'NJ' },
+          { id: 'c2', user: { firstName: 'Darnell', lastName: 'Robinson', email: 'darnell@example.com' }, status: 'ACTIVE', serviceTier: 'AGGRESSIVE', estimatedTimelineMonths: 6, disputes: [{id:'d2',status:'LETTER_SENT'},{id:'d3',status:'PENDING'}], documents: [{id:'doc2'},{id:'doc3'}], currentAddressLine1: '456 Oak Ave', currentCity: 'Jersey City', currentState: 'NJ' },
+          { id: 'c3', user: { firstName: 'Yvonne', lastName: 'Thompson', email: 'yvonne@example.com' }, status: 'UPGRADE_OFFERED', serviceTier: 'FAMILY', estimatedTimelineMonths: 3, disputes: [], documents: [{id:'doc4'}], currentAddressLine1: '789 Pine Rd', currentCity: 'Paterson', currentState: 'NJ' },
+          { id: 'c4', user: { firstName: 'Anthony', lastName: 'Reyes', email: 'anthony@example.com' }, status: 'INTAKE_RECEIVED', serviceTier: 'ESSENTIAL', estimatedTimelineMonths: null, disputes: [], documents: [], currentAddressLine1: '321 Elm St', currentCity: 'Trenton', currentState: 'NJ' },
+        ];
+        setClients(demo);
+        syncTasksFromClients(demo);
+        setLoading(false);
+      });
+  }, []);
+
+  const syncTasksFromClients = (clientList) => {
+    const existing = JSON.parse(localStorage.getItem('credx_admin_tasks') || '[]');
+    const now = new Date().toISOString();
+    const today = new Date().toISOString().split('T')[0];
+
+    // Map each client to ONE task based on their current status
+    const generated = clientList.map(client => {
+      const fullName = `${client.user?.firstName || ''} ${client.user?.lastName || ''}`.trim() || 'Client';
+      const existingTask = existing.find(t => t.clientId === client.id && !t.completed);
+
+      // Determine task based on status
+      let task = null;
+      switch (client.status) {
+        case 'LEAD':
+          task = {
+            id: `task_${client.id}_lead`,
+            clientId: client.id,
+            title: `📞 Contact ${fullName} — schedule onboarding call`,
+            priority: 'medium',
+            due: today,
+            category: 'Client Follow-up',
+            notes: `Lead: ${client.user?.email || ''}. Goal: get them to submit intake docs.`,
+            action: 'Send onboarding link',
+            nextStatus: 'INTAKE_RECEIVED'
+          };
+          break;
+
+        case 'INTAKE_RECEIVED':
+          const missingDocs = 3 - (client.documents?.length || 0);
+          task = {
+            id: `task_${client.id}_intake`,
+            clientId: client.id,
+            title: `📄 Collect documents from ${fullName} (${missingDocs > 0 ? missingDocs + ' missing' : 'complete'})`,
+            priority: missingDocs > 0 ? 'high' : 'medium',
+            due: today,
+            category: 'Admin',
+            notes: `Address: ${[client.currentAddressLine1, client.currentCity, client.currentState].filter(Boolean).join(', ') || 'Not on file'}. Need ID, proof of address, credit reports.`,
+            action: missingDocs > 0 ? 'Send reminder' : 'Run analysis',
+            nextStatus: 'ANALYSIS_READY'
+          };
+          break;
+
+        case 'ANALYSIS_READY':
+          task = {
+            id: `task_${client.id}_analysis`,
+            clientId: client.id,
+            title: `📊 Schedule analysis interview with ${fullName}`,
+            priority: 'high',
+            due: today,
+            category: 'Client Follow-up',
+            notes: `Analysis complete. Timeline: ${client.estimatedTimelineMonths || '?'} months. Dispute plan ready. Email analysis and schedule call.`,
+            action: 'Email analysis + schedule call',
+            nextStatus: 'UPGRADE_OFFERED'
+          };
+          break;
+
+        case 'UPGRADE_OFFERED':
+          task = {
+            id: `task_${client.id}_upgrade`,
+            clientId: client.id,
+            title: `💳 Follow up with ${fullName} — plan upgrade decision`,
+            priority: 'high',
+            due: today,
+            category: 'Billing',
+            notes: `${client.serviceTier} tier selected. Awaiting payment confirmation or upgrade to full service.`,
+            action: 'Send payment link / follow up',
+            nextStatus: 'ACTIVE'
+          };
+          break;
+
+        case 'ACTIVE':
+          const pendingDisputes = client.disputes?.filter(d => d.status === 'PENDING').length || 0;
+          const sentDisputes = client.disputes?.filter(d => d.status === 'LETTER_SENT').length || 0;
+          const responseDue = client.disputes?.filter(d => d.status === 'RESPONSE_DUE').length || 0;
+
+          if (pendingDisputes > 0) {
+            task = {
+              id: `task_${client.id}_disputes`,
+              clientId: client.id,
+              title: `📨 Send Round 1 disputes — ${fullName} (${pendingDisputes} items ready)`,
+              priority: 'high',
+              due: today,
+              category: 'Dispute',
+              notes: `${pendingDisputes} dispute items generated and ready to mail. Verify address, print, send certified mail.`,
+              action: 'Send certified mail',
+              nextStatus: null // stays ACTIVE, updates dispute status
+            };
+          } else if (responseDue > 0) {
+            task = {
+              id: `task_${client.id}_response`,
+              clientId: client.id,
+              title: `📋 Review bureau responses — ${fullName} (${responseDue} due)`,
+              priority: 'high',
+              due: today,
+              category: 'Dispute',
+              notes: 'Bureau responses received. Review outcomes, plan Round 2 if needed.',
+              action: 'Review responses',
+              nextStatus: null
+            };
+          } else if (sentDisputes > 0) {
+            task = {
+              id: `task_${client.id}_track`,
+              clientId: client.id,
+              title: `📍 Track delivery — ${fullName} (${sentDisputes} letters sent)`,
+              priority: 'medium',
+              due: today,
+              category: 'Dispute',
+              notes: 'Letters sent. Confirm delivery within 3-5 days. Update status when received.',
+              action: 'Check tracking',
+              nextStatus: null
+            };
+          } else {
+            task = {
+              id: `task_${client.id}_active`,
+              clientId: client.id,
+              title: `✅ Check in with ${fullName} — active client status`,
+              priority: 'low',
+              due: today,
+              category: 'Client Follow-up',
+              notes: 'Client is active. No pending disputes. Good time for monthly check-in.',
+              action: 'Monthly check-in',
+              nextStatus: null
+            };
+          }
+          break;
+
+        case 'PAST_DUE':
+          task = {
+            id: `task_${client.id}_pastdue`,
+            clientId: client.id,
+            title: `⚠️ Payment past due — ${fullName}`,
+            priority: 'high',
+            due: today,
+            category: 'Billing',
+            notes: 'Payment failed or overdue. Contact client to resolve billing issue.',
+            action: 'Call client about payment',
+            nextStatus: 'ACTIVE'
+          };
+          break;
+
+        case 'RESTRICTED':
+          task = {
+            id: `task_${client.id}_restricted`,
+            clientId: client.id,
+            title: `🔒 Portal restricted — ${fullName} (needs resolution)`,
+            priority: 'medium',
+            due: today,
+            category: 'Admin',
+            notes: 'Client portal is restricted. Determine reason and reactivate or close account.',
+            action: 'Review restriction',
+            nextStatus: 'ACTIVE'
+          };
+          break;
+
+        default:
+          task = {
+            id: `task_${client.id}_general`,
+            clientId: client.id,
+            title: `📋 Review ${fullName} — status: ${client.status}`,
+            priority: 'medium',
+            due: today,
+            category: 'Admin',
+            notes: `Client status: ${client.status}. Review and update as needed.`,
+            action: 'Review client',
+            nextStatus: null
+          };
+      }
+
+      return {
+        ...task,
+        completed: existingTask?.completed || false,
+        completedAt: existingTask?.completedAt || null,
+        createdAt: existingTask?.createdAt || now,
+      };
+    });
+
+    // Merge: keep existing completed tasks, replace current ones
+    const completedTasks = existing.filter(t => t.completed && !generated.find(g => g.id === t.id));
+    const merged = [...generated, ...completedTasks];
+    setTasks(merged);
+    localStorage.setItem('credx_admin_tasks', JSON.stringify(merged));
+  };
+
+  const completeTask = (taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const updated = tasks.map(t => t.id === taskId ? { ...t, completed: true, completedAt: new Date().toISOString() } : t);
+    setTasks(updated);
+    localStorage.setItem('credx_admin_tasks', JSON.stringify(updated));
+
+    // In production, this would also update the client status via API
+    // For now, we show a confirmation
+    const client = clients.find(c => c.id === task.clientId);
+    if (client && task.nextStatus) {
+      alert(`✅ Task complete for ${client.user?.firstName || 'Client'}!\n\nNext step: ${task.nextStatus.replace('_', ' ')}\n\n(Connect API to auto-update client status)`);
+    }
+  };
+
+  const deleteTask = (id) => {
+    if (!confirm('Remove this task from your list?')) return;
+    const updated = tasks.filter(t => t.id !== id);
+    setTasks(updated);
+    localStorage.setItem('credx_admin_tasks', JSON.stringify(updated));
+  };
+
+  const clearCompleted = () => {
+    if (!confirm('Clear all completed tasks?')) return;
+    const updated = tasks.filter(t => !t.completed);
+    setTasks(updated);
+    localStorage.setItem('credx_admin_tasks', JSON.stringify(updated));
+  };
+
+  // Filter tasks
+  let filtered = tasks.filter(t => !t.completed);
+  if (filter === 'all') filtered = tasks;
+  else if (filter === 'completed') filtered = tasks.filter(t => t.completed);
+  else if (filter === 'today') filtered = tasks.filter(t => !t.completed && t.due === new Date().toISOString().split('T')[0]);
+  else if (filter === 'overdue') filtered = tasks.filter(t => !t.completed && t.due < new Date().toISOString().split('T')[0]);
+
+  // Sort by priority then due date
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  filtered.sort((a, b) => (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1));
+
+  const total = tasks.length;
+  const pending = tasks.filter(t => !t.completed).length;
+  const completed = tasks.filter(t => t.completed).length;
+  const highPriority = tasks.filter(t => !t.completed && t.priority === 'high').length;
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const priorityDot = (p) => {
+    const colors = { high: '#dc2626', medium: '#d97706', low: '#16a34a' };
+    return <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: colors[p] || '#9ca3af', marginRight: '6px' }} />;
+  };
+
+  if (loading) return (
+    <div className="page-grid">
+      <div className="panel"><p className="helper-text">Loading tasks from your client book...</p></div>
+    </div>
+  );
+
+  return (
+    <div className="page-grid">
+      {/* Stats */}
+      <div className="hero-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+        <div className="stat-card" style={{ borderLeft: '3px solid #00c6fb' }}><span>Total</span><strong>{total}</strong></div>
+        <div className="stat-card" style={{ borderLeft: '3px solid #d97706' }}><span>Pending</span><strong style={{ color: '#d97706' }}>{pending}</strong></div>
+        <div className="stat-card" style={{ borderLeft: '3px solid #16a34a' }}><span>Done</span><strong style={{ color: '#16a34a' }}>{completed}</strong></div>
+        <div className="stat-card" style={{ borderLeft: '3px solid #dc2626' }}><span>High Priority</span><strong style={{ color: '#dc2626' }}>{highPriority}</strong></div>
+      </div>
+
+      {/* Filters */}
+      <div className="filter-bar" style={{ marginBottom: '16px' }}>
+        {[
+          { key: 'pending', label: 'Pending' },
+          { key: 'today', label: 'Due Today' },
+          { key: 'overdue', label: 'Overdue' },
+          { key: 'all', label: 'All Tasks' },
+          { key: 'completed', label: 'Completed' },
+        ].map(f => (
+          <button key={f.key} className={`filter-chip ${filter === f.key ? 'filter-chip--active' : ''}`} onClick={() => setFilter(f.key)}>
+            {f.label} <span className="filter-chip__count">{f.key === 'pending' ? pending : f.key === 'today' ? tasks.filter(t => !t.completed && t.due === todayStr).length : f.key === 'overdue' ? tasks.filter(t => !t.completed && t.due < todayStr).length : f.key === 'completed' ? completed : total}</span>
+          </button>
+        ))}
+        <div style={{ marginLeft: 'auto' }}>
+          <button className="btn btn-outline" onClick={clearCompleted}>Clear Completed</button>
+        </div>
+      </div>
+
+      {/* Task List */}
+      <section className="panel">
+        {filtered.length === 0 ? (
+          <div className="empty-state-card" style={{ textAlign: 'center', padding: '40px' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>✅</div>
+            <strong>No tasks here</strong>
+            <p className="helper-text">All caught up! Tasks will appear when clients need action.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {filtered.map(task => {
+              const isOverdue = task.due && !task.completed && task.due < todayStr;
+              const client = clients.find(c => c.id === task.clientId);
+              return (
+                <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#0f172a', border: `1px solid ${isOverdue ? '#dc2626' : '#1e293b'}`, borderRadius: '8px', transition: 'all 0.15s' }}>
+                  {/* Priority dot */}
+                  <div style={{ flexShrink: 0 }}>{priorityDot(task.priority)}</div>
+
+                  {/* Task content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, fontSize: '14px', color: '#f8fafc' }}>{task.title}</span>
+                      <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', padding: '2px 8px', borderRadius: '4px', background: task.category === 'Dispute' ? 'rgba(245,158,11,0.15)' : task.category === 'Billing' ? 'rgba(220,38,38,0.15)' : task.category === 'Client Follow-up' ? 'rgba(0,198,251,0.15)' : 'rgba(34,197,94,0.15)', color: task.category === 'Dispute' ? '#f59e0b' : task.category === 'Billing' ? '#dc2626' : task.category === 'Client Follow-up' ? '#00c6fb' : '#22c55e', border: `1px solid ${task.category === 'Dispute' ? 'rgba(245,158,11,0.3)' : task.category === 'Billing' ? 'rgba(220,38,38,0.3)' : task.category === 'Client Follow-up' ? 'rgba(0,198,251,0.3)' : 'rgba(34,197,94,0.3)'}` }}>
+                        {task.category}
+                      </span>
+                      {isOverdue && <span style={{ fontSize: '10px', fontWeight: 700, color: '#dc2626', background: 'rgba(220,38,38,0.15)', padding: '2px 8px', borderRadius: '4px' }}>OVERDUE</span>}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px', lineHeight: 1.5 }}>
+                      {task.notes}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                      📅 {task.due ? new Date(task.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'} · Action: <strong>{task.action}</strong>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    {!task.completed && (
+                      <button onClick={() => completeTask(task.id)} style={{ padding: '8px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        ✅ Complete
+                      </button>
+                    )}
+                    <button onClick={() => deleteTask(task.id)} style={{ padding: '8px 12px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1405,6 +1770,7 @@ export default function App() {
           <NavLink to="/leads">Leads</NavLink>
           <NavLink to="/clients">Clients</NavLink>
           <NavLink to="/disputes">Disputes</NavLink>
+          <NavLink to="/tasks">Tasks</NavLink>
         </nav>
       </aside>
       <main className="main">
@@ -1416,21 +1782,27 @@ export default function App() {
               ? '#a855f7'
               : path.startsWith('/leads')
                 ? '#22c55e'
-                : '#00c6fb';
+                : path.startsWith('/tasks')
+                  ? '#22d3ee'
+                  : '#00c6fb';
           const sectionLabel = path.startsWith('/disputes')
             ? 'Disputes operations'
             : path.startsWith('/clients')
               ? 'Client management'
               : path.startsWith('/leads')
                 ? 'Marketing leads'
-                : 'Operations dashboard';
+                : path.startsWith('/tasks')
+                  ? 'Task checklist'
+                  : 'Operations dashboard';
           const subtitle = path.startsWith('/disputes')
             ? 'Track every dispute round, bureau status, and outcome across the book.'
             : path.startsWith('/clients')
               ? 'Search, open, and update client files. Identity data is encrypted at rest.'
               : path.startsWith('/leads')
                 ? 'Landing-page submissions awaiting contract and onboarding.'
-                : 'Live snapshot of leads, active programs, dispute throughput, and revenue.';
+                : path.startsWith('/tasks')
+                  ? 'Track internal tasks, deadlines, and priorities across the team.'
+                  : 'Live snapshot of leads, active programs, dispute throughput, and revenue.';
           return (
             <header className="topbar topbar--themed" style={{ ['--section-accent' as string]: accent } as React.CSSProperties}>
               <div>
@@ -1453,7 +1825,7 @@ export default function App() {
 
         <select
           className="mobile-nav-select"
-          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : '/'}
+          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : '/'}
           onChange={(e) => {
             const value = e.target.value;
             if (value === '__signup') { window.location.href = '/signup'; return; }
@@ -1465,6 +1837,7 @@ export default function App() {
           <option value="/leads">Leads</option>
           <option value="/clients">Clients</option>
           <option value="/disputes">Disputes</option>
+          <option value="/tasks">Tasks</option>
           <option value="__signup">Sign up</option>
         </select>
 
@@ -1475,6 +1848,7 @@ export default function App() {
           <Route path="/clients" element={<Clients clients={clients} />} />
           <Route path="/clients/:id" element={<ClientDetailRoute token={token} />} />
           <Route path="/disputes" element={<DisputesRoute token={token} disputes={disputes} />} />
+          <Route path="/tasks" element={<TasksRoute />} />
         </Routes>
       </main>
     </div>

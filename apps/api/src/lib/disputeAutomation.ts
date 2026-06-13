@@ -6,27 +6,30 @@ import fs from 'fs/promises';
 import path from 'path';
 
 // ============================================================
-// Dispute Letter Templates
+// Consolidated Dispute Letter Template
 // ============================================================
 
-const LETTER_TEMPLATES: Record<string, (data: LetterTemplateData) => string> = {
-  DISPUTE_INACCURATE: (data) => `Dear ${data.bureau}:
+const CONSOLIDATED_DISPUTE_TEMPLATE = (data: ConsolidatedLetterData) => `Dear ${data.bureau}:
 
-I am writing to dispute the following information on my credit report. I believe this information is inaccurate and request that you investigate and correct it immediately.
+I am writing to dispute the following accounts on my credit report. I believe the information listed is inaccurate, incomplete, or unverifiable and request that you investigate and correct these items immediately.
 
-Account: ${data.accountName}
-Account Number: ${data.accountNumber || 'Not provided'}
-Reason for Dispute: ${data.reason}
+${data.accounts.map((account, index) => `
+ACCOUNT #${index + 1}:
+- Account Name: ${account.accountName}
+- Account Number: ${account.accountNumber || 'Not provided'}
+- Reason for Dispute: ${account.reason}
+- Issue: ${account.issue}
+`).join('\n')}
 
-Under the Fair Credit Reporting Act (FCRA), I have the right to dispute any information on my credit report that I believe is inaccurate, incomplete, or unverifiable. I request that you:
+Under the Fair Credit Reporting Act (FCRA), I have the right to dispute any information on my credit report that I believe is inaccurate, incomplete, or unverifiable. For each account listed above, I request that you:
 
 1. Verify this information with the furnisher
 2. Provide me with the method of verification
-3. Remove this item if it cannot be verified
+3. Remove the item if it cannot be verified
 
-Please investigate this matter and report the results to me within 30 days of receipt of this letter, as required by the FCRA.
+Please investigate these matters and report the results to me within 30 days of receipt of this letter, as required by the FCRA.
 
-Thank you for your prompt attention to this matter.
+Thank you for your prompt attention to these matters.
 
 Sincerely,
 ${data.clientName}
@@ -34,98 +37,24 @@ ${data.clientAddress || ''}
 ${data.clientCity || ''}, ${data.clientState || ''} ${data.clientPostalCode || ''}
 SSN: ${data.ssnLast4 || '•••••••••'}
 
-Date: ${data.date}`,
+Date: ${data.date}`;
 
-  VALIDATION_REQUEST: (data) => `Dear ${data.furnisher}:
-
-I am writing to request validation of the debt referenced below. Under the Fair Debt Collection Practices Act (FDCPA), I have the right to request validation of any debt that a collection agency is attempting to collect.
-
-Account: ${data.accountName}
-Account Number: ${data.accountNumber || 'Not provided'}
-
-I respectfully request that you provide the following documentation:
-
-1. The original signed contract or agreement
-2. A complete payment history showing all charges and payments
-3. Proof that you are authorized to collect this debt
-4. The calculation of the current balance
-5. Verification of the statute of limitations in my state
-
-Please note that until you provide the requested validation, I dispute your right to collect this debt and your right to report it to the credit bureaus.
-
-This is not a refusal to pay. I am exercising my legal rights under the FDCPA.
-
-Sincerely,
-${data.clientName}
-${data.clientAddress || ''}
-${data.clientCity || ''}, ${data.clientState || ''} ${data.clientPostalCode || ''}
-
-Date: ${data.date}`,
-
-  PAY_FOR_DELETE: (data) => `Dear ${data.furnisher}:
-
-I am writing regarding the account referenced below. I am willing to settle this account in exchange for the complete removal of this tradeline from my credit report with all three credit bureaus.
-
-Account: ${data.accountName}
-Account Number: ${data.accountNumber || 'Not provided'}
-Proposed Settlement Amount: ${data.settlementAmount || 'Full balance'}
-
-Please confirm in writing that:
-
-1. You will accept the proposed settlement amount as payment in full
-2. You will delete this tradeline from all three credit bureaus (Experian, Equifax, and TransUnion) within 30 days of payment
-3. You will not sell the remaining balance to another collection agency
-4. This settlement will be reported as "paid in full" or deleted entirely
-
-Please respond with your agreement in writing before any payment is made. I will not make any payment until I receive written confirmation of these terms.
-
-Sincerely,
-${data.clientName}
-
-Date: ${data.date}`,
-
-  GOODWILL_ADJUSTMENT: (data) => `Dear ${data.furnisher}:
-
-I am writing to request a goodwill adjustment to my credit report regarding the account referenced below. I recognize that I was late on my payment, but I have since brought the account current and have maintained on-time payments.
-
-Account: ${data.accountName}
-Account Number: ${data.accountNumber || 'Not provided'}
-
-I am requesting that you remove the late payment notation from my credit report as a goodwill gesture. Since bringing the account current, I have:
-
-1. Made all payments on time for the past [X] months
-2. Maintained the account in good standing
-3. Demonstrated responsible credit management
-
-I am working to improve my credit score and this goodwill adjustment would be instrumental in my efforts. I value my relationship with your company and hope to continue it for years to come.
-
-Thank you for your consideration.
-
-Sincerely,
-${data.clientName}
-
-Date: ${data.date}`,
-
-  CEASE_DESIST: (data) => `Dear ${data.furnisher}:
-
-Pursuant to my rights under the Fair Debt Collection Practices Act (FDCPA), I am formally requesting that you cease all communication with me regarding the debt referenced below.
-
-Account: ${data.accountName}
-Account Number: ${data.accountNumber || 'Not provided'}
-
-Under 15 U.S.C. § 1692c(c), you are required to cease all communication with me except to:
-
-1. Advise me that your debt collection efforts are being terminated
-2. Notify me that you may invoke specified remedies
-3. Notify me that you intend to invoke a specified remedy
-
-Please be advised that any further communication not in compliance with the FDCPA will be considered a violation of federal law and will be reported to the Consumer Financial Protection Bureau (CFPB) and my state attorney general.
-
-Sincerely,
-${data.clientName}
-
-Date: ${data.date}`
-};
+interface ConsolidatedLetterData {
+  clientName: string;
+  clientAddress?: string | null;
+  clientCity?: string | null;
+  clientState?: string | null;
+  clientPostalCode?: string | null;
+  ssnLast4?: string | null;
+  bureau: string;
+  date: string;
+  accounts: Array<{
+    accountName: string;
+    accountNumber?: string | null;
+    reason: string;
+    issue: string;
+  }>;
+}
 
 interface LetterTemplateData {
   clientName: string;
@@ -208,103 +137,141 @@ export async function generateDisputeLetters(
 
   if (!client) throw new Error('Client not found');
 
-  const opportunities = analysis.disputeOpportunities || [];
-  const generatedLetters: Array<{
-    disputeItem: any;
-    document: any;
-    letterPath: string;
-  }> = [];
+  // Check if dispute items already exist for this client
+  const existingDisputes = await prisma.disputeItem.findMany({
+    where: { clientId }
+  });
+  
+  if (existingDisputes.length > 0) {
+    console.log(`Client ${clientId} already has ${existingDisputes.length} dispute items. Skipping generation.`);
+    return {
+      generated: 0,
+      letters: []
+    };
+  }
 
+  const opportunities = analysis.disputeOpportunities || [];
+  
+  // Create output directory for letters
+  const lettersDir = path.join('/tmp', 'credx-letters', clientId);
+  await fs.mkdir(lettersDir, { recursive: true });
+  
   const date = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
   });
-
-  // Create output directory for letters
-  const lettersDir = path.join('/tmp', 'credx-letters', clientId);
-  await fs.mkdir(lettersDir, { recursive: true });
-
-  for (const opportunity of opportunities) {
-    const letterType = determineLetterType(opportunity);
-    const template = LETTER_TEMPLATES[letterType];
-    
-    if (!template) {
-      console.warn(`No template found for letter type: ${letterType}`);
-      continue;
+  
+  // Group opportunities by bureau
+  const bureauGroups: Record<string, typeof opportunities> = {
+    'Experian': [],
+    'Equifax': [],
+    'TransUnion': []
+  };
+  
+  for (const opp of opportunities) {
+    for (const bureau of opp.bureaus) {
+      const bureauLabel = getBureauLabel(bureau);
+      if (!bureauGroups[bureauLabel]) bureauGroups[bureauLabel] = [];
+      bureauGroups[bureauLabel].push(opp);
     }
-
-    // Create dispute item in database
+  }
+  
+  const generatedLetters: Array<{
+    disputeItem: any;
+    document: any;
+    letterPath: string;
+  }> = [];
+  
+  // Create one consolidated letter per bureau
+  for (const [bureauLabel, bureauOpportunities] of Object.entries(bureauGroups)) {
+    if (bureauOpportunities.length === 0) continue;
+    
+    // Create a single dispute item for this bureau
     const disputeItem = await prisma.disputeItem.create({
       data: {
         clientId,
-        furnisher: opportunity.accountName,
-        accountNumber: opportunity.accountNumber || null,
+        furnisher: 'Multiple Accounts',
+        accountNumber: 'See attached letter',
         accountType: 'OTHER',
-        reason: opportunity.reason,
-        disputeEquifax: opportunity.bureaus.some((b: string) => b.toLowerCase().includes('equifax') || b.toLowerCase().includes('efx')),
-        disputeExperian: opportunity.bureaus.some((b: string) => b.toLowerCase().includes('experian') || b.toLowerCase().includes('xpn')),
-        disputeTransunion: opportunity.bureaus.some((b: string) => b.toLowerCase().includes('transunion') || b.toLowerCase().includes('tu')),
+        reason: 'Multiple disputes consolidated per bureau',
+        disputeEquifax: bureauLabel === 'Equifax',
+        disputeExperian: bureauLabel === 'Experian',
+        disputeTransunion: bureauLabel === 'TransUnion',
         currentRound: 1,
         status: 'PENDING',
-        priority: opportunity.priority.toUpperCase(),
+        priority: 'MEDIUM',
         analysisId: analysis.generatedAt || null,
         letterGenerated: true,
         generatedAt: new Date()
       }
     });
-
-    // Generate letter for each bureau
-    for (const bureau of opportunity.bureaus) {
-      const bureauLabel = getBureauLabel(bureau);
-      
-      const letterData: LetterTemplateData = {
-        clientName: `${client.user.firstName} ${client.user.lastName}`,
-        clientAddress: client.currentAddressLine1,
-        clientCity: client.currentCity,
-        clientState: client.currentState,
-        clientPostalCode: client.currentPostalCode,
-        ssnLast4: client.ssnLast4,
-        bureau: bureauLabel,
-        accountName: opportunity.accountName,
-        accountNumber: opportunity.accountNumber,
-        reason: opportunity.reason,
-        furnisher: opportunity.accountName,
-        date
-      };
-
-      // Generate letter content
-      const letterContent = template(letterData);
-      
-      // Save to file
-      const fileName = `dispute-${client.user.lastName}-${opportunity.accountName.replace(/[^a-zA-Z0-9]/g, '_')}-${bureauLabel.toLowerCase()}-r1.txt`;
-      const filePath = path.join(lettersDir, fileName);
-      await fs.writeFile(filePath, letterContent, 'utf-8');
-
-      // Create document record
-      const document = await prisma.document.create({
-        data: {
+    
+    // Build consolidated letter data
+    const letterData: ConsolidatedLetterData = {
+      clientName: `${client.user.firstName} ${client.user.lastName}`,
+      clientAddress: client.currentAddressLine1,
+      clientCity: client.currentCity,
+      clientState: client.currentState,
+      clientPostalCode: client.currentPostalCode,
+      ssnLast4: client.ssnLast4,
+      bureau: bureauLabel,
+      date,
+      accounts: bureauOpportunities.map(opp => ({
+        accountName: opp.accountName,
+        accountNumber: opp.accountNumber,
+        reason: opp.reason,
+        issue: opp.issue
+      }))
+    };
+    
+    // Generate consolidated letter
+    const letterContent = CONSOLIDATED_DISPUTE_TEMPLATE(letterData);
+    
+    // Save to file
+    const fileName = `dispute-${client.user.lastName}-consolidated-${bureauLabel.toLowerCase()}-r1-${Date.now()}.txt`;
+    const filePath = path.join(lettersDir, fileName);
+    await fs.writeFile(filePath, letterContent, 'utf-8');
+    
+    // Create document record
+    const document = await prisma.document.upsert({
+      where: {
+        clientId_fileName: {
           clientId,
-          type: 'DISPUTE_LETTER',
-          fileName: fileName.replace('.txt', '.pdf'),
-          s3Key: filePath, // Will be updated to S3 after upload
-          contentType: 'text/plain',
-          disputeItemId: disputeItem.id,
-          roundNumber: 1,
-          letterType: letterType,
-          bureau: bureauLabel,
-          letterStatus: 'DRAFTED'
+          fileName: fileName.replace('.txt', '.pdf')
         }
-      });
-
-      generatedLetters.push({
-        disputeItem,
-        document,
-        letterPath: filePath
-      });
-    }
+      },
+      update: {
+        type: 'DISPUTE_LETTER',
+        s3Key: filePath,
+        contentType: 'text/plain',
+        disputeItemId: disputeItem.id,
+        roundNumber: 1,
+        letterType: 'CONSOLIDATED_DISPUTE',
+        bureau: bureauLabel,
+        letterStatus: 'DRAFTED'
+      },
+      create: {
+        clientId,
+        type: 'DISPUTE_LETTER',
+        fileName: fileName.replace('.txt', '.pdf'),
+        s3Key: filePath,
+        contentType: 'text/plain',
+        disputeItemId: disputeItem.id,
+        roundNumber: 1,
+        letterType: 'CONSOLIDATED_DISPUTE',
+        bureau: bureauLabel,
+        letterStatus: 'DRAFTED'
+      }
+    });
+    
+    generatedLetters.push({
+      disputeItem,
+      document,
+      letterPath: filePath
+    });
   }
-
+  
   return {
     generated: generatedLetters.length,
     letters: generatedLetters
@@ -659,7 +626,6 @@ export async function activateClientDisputeCampaign(
 // ============================================================
 
 export {
-  LETTER_TEMPLATES,
   determineLetterType,
   getBureauLabel
 };

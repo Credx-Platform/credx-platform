@@ -337,7 +337,13 @@ export async function sendWelcomeLeadEmail(params: { firstName: string; email: s
   return { ...email, delivery: result };
 }
 
-export async function sendEmail(params: { to: string; subject: string; html?: string; text?: string }): Promise<{ id?: string; provider?: string; skipped?: boolean; reason?: string }> {
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
+export async function sendEmail(params: { to: string; subject: string; html?: string; text?: string; attachments?: EmailAttachment[] }): Promise<{ id?: string; provider?: string; skipped?: boolean; reason?: string }> {
   const resendApiKey = process.env.RESEND_API_KEY;
   const resendFrom = process.env.RESEND_FROM_EMAIL || process.env.FROM_EMAIL || 'CredX <onboarding@updates.credxme.com>';
   const sendgridApiKey = process.env.SENDGRID_API_KEY;
@@ -360,7 +366,16 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
         to: [params.to],
         subject: params.subject,
         ...(params.html ? { html: params.html } : {}),
-        ...(params.text ? { text: params.text } : { text: '' })
+        ...(params.text ? { text: params.text } : { text: '' }),
+        ...(params.attachments?.length
+          ? {
+              attachments: params.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                contentType: a.contentType
+              }))
+            }
+          : {})
       });
 
       if (!result.error) {
@@ -397,7 +412,17 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
         content: [
           ...(params.text ? [{ type: 'text/plain', value: params.text }] : []),
           ...(params.html ? [{ type: 'text/html', value: params.html }] : [])
-        ]
+        ],
+        ...(params.attachments?.length
+          ? {
+              attachments: params.attachments.map((a) => ({
+                filename: a.filename,
+                type: a.contentType || 'application/octet-stream',
+                disposition: 'attachment',
+                content: a.content.toString('base64')
+              }))
+            }
+          : {})
       })
     });
 
@@ -558,6 +583,120 @@ export async function sendPortalReadyEmail(params: {
   console.log('PORTAL_READY_EMAIL_SEND_RESULT', {
     to: params.to,
     loginLink: params.loginLink,
+    result
+  });
+
+  return { ...email, delivery: result };
+}
+
+function renderCreditAnalysisEmail(params: {
+  firstName: string;
+  summary: string;
+  findingCount: number;
+  disputeCount: number;
+  bureauScores: Array<{ bureau: string; score: number | null }>;
+  portalLink: string;
+}) {
+  const subject = 'Your CredX credit analysis is ready';
+  const scoreCells = params.bureauScores.length
+    ? params.bureauScores.map((s) => `
+        <td style="padding:14px 10px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;text-align:center;font-family:${EMAIL_FONT};">
+          <div style="color:${EMAIL_TEXT_DIM};font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;">${s.bureau}</div>
+          <div style="margin-top:6px;color:${EMAIL_TEXT};font-size:28px;font-weight:700;">${s.score == null ? '—' : s.score}</div>
+        </td>`).join('<td style="width:8px;">&nbsp;</td>')
+    : '';
+  const scoresHtml = scoreCells
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:18px 0 8px;"><tr>${scoreCells}</tr></table>`
+    : '';
+  const bodyHtml = `
+    <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">Your credit analysis is ready, ${params.firstName || 'there'}.</h1>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Your full report is attached to this email as a PDF. Here's a snapshot:</p>
+    ${scoresHtml}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 18px;">
+      <tr>
+        <td style="padding:12px 14px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;width:50%;">
+          <div style="color:${EMAIL_TEXT_DIM};font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;">Key Findings</div>
+          <div style="margin-top:4px;color:${EMAIL_TEXT};font-size:22px;font-weight:700;font-family:${EMAIL_FONT};">${params.findingCount}</div>
+        </td>
+        <td style="width:8px;">&nbsp;</td>
+        <td style="padding:12px 14px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;width:50%;">
+          <div style="color:${EMAIL_TEXT_DIM};font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;">Dispute Opportunities</div>
+          <div style="margin-top:4px;color:${EMAIL_TEXT};font-size:22px;font-weight:700;font-family:${EMAIL_FONT};">${params.disputeCount}</div>
+        </td>
+      </tr>
+    </table>
+    <div style="margin:0 0 18px;padding:16px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;color:${EMAIL_TEXT_SOFT};font-size:14px;line-height:1.65;white-space:pre-wrap;">${escapeHtml(params.summary).slice(0, 1400)}</div>
+    ${emailButton(params.portalLink, 'Open the full report in your portal')}
+    <p style="margin:18px 0 0;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">The attached PDF is a complete copy of the analysis we generated today. Keep it for your records — and reply to this email if you'd like a coach to walk you through it.</p>
+  `;
+  const html = renderEmailShell({
+    preheader: 'Your CredX credit analysis is attached. Open the portal to take action.',
+    eyebrow: 'Analysis · Ready',
+    bodyHtml
+  });
+  const text = `Your credit analysis is ready, ${params.firstName || 'there'}.
+
+Your full report is attached to this email as a PDF.
+
+Snapshot:
+${params.bureauScores.map((s) => `  ${s.bureau}: ${s.score ?? '—'}`).join('\n')}
+  Key findings: ${params.findingCount}
+  Dispute opportunities: ${params.disputeCount}
+
+${params.summary.slice(0, 1400)}
+
+Open the full report in your portal:
+${params.portalLink}
+
+— CredX`;
+  return { subject, html, text };
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '"' ? '&quot;' : '&#39;'
+  );
+}
+
+export async function sendCreditAnalysisEmail(params: {
+  to: string;
+  firstName: string;
+  summary: string;
+  findingCount: number;
+  disputeCount: number;
+  bureauScores: Array<{ bureau: string; score: number | null }>;
+  portalLink: string;
+  pdf: Buffer;
+  pdfFilename?: string;
+}) {
+  const email = renderCreditAnalysisEmail({
+    firstName: params.firstName,
+    summary: params.summary,
+    findingCount: params.findingCount,
+    disputeCount: params.disputeCount,
+    bureauScores: params.bureauScores,
+    portalLink: params.portalLink
+  });
+
+  const result = await sendEmail({
+    to: params.to,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
+    attachments: [
+      {
+        filename: params.pdfFilename || 'credx-credit-analysis.pdf',
+        content: params.pdf,
+        contentType: 'application/pdf'
+      }
+    ]
+  });
+
+  console.log('CREDIT_ANALYSIS_EMAIL_SEND_RESULT', {
+    to: params.to,
+    pdfBytes: params.pdf.length,
+    findingCount: params.findingCount,
+    disputeCount: params.disputeCount,
     result
   });
 
