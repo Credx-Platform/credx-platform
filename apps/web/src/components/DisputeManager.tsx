@@ -243,9 +243,13 @@ export function DisputeManager({ token }: DisputeManagerProps) {
           background: var(--bg-secondary);
           padding: 0.5rem 0.5rem 0;
           border-radius: 8px 8px 0 0;
+          max-width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
         .dm-tab {
+          flex: 0 0 auto;
           padding: 0.75rem 1.25rem;
           border: none;
           background: transparent;
@@ -312,9 +316,11 @@ export function DisputeManager({ token }: DisputeManagerProps) {
 
         .dm-client-copy strong { display:block; color:#0f172a; font-size:1rem; }
         .dm-client-copy span { color:#64748b; font-size:.875rem; }
+        .dm-client-copy { min-width:0; }
 
         .dm-client-picker {
           min-width:320px;
+          max-width:100%;
           padding:0.75rem 1rem;
           border:1px solid #d1d5db;
           border-radius:10px;
@@ -329,6 +335,12 @@ export function DisputeManager({ token }: DisputeManagerProps) {
           background:#fff;
           border:1px dashed #cbd5e1;
           border-radius:12px;
+        }
+        @media (max-width: 720px) {
+          .dm-tabs { padding-bottom:0.5rem; border-radius:8px; }
+          .dm-tab { padding:0.65rem 1rem; }
+          .dm-client-bar { align-items:stretch; }
+          .dm-client-picker { width:100%; min-width:0; }
         }
       `}</style>
 

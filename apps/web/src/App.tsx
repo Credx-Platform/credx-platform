@@ -563,7 +563,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
+        <div className="view-switcher">
           <button
             type="button"
             className={`tab ${activeView === 'paid' ? 'active' : ''}`}
@@ -603,56 +603,58 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
             </button>
           ))}
         </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Client</th>
-              <th>Status</th>
-              <th>Tier</th>
-              <th>Reports / Uploads</th>
-              <th>Analysis</th>
-              <th>Disputes</th>
-              <th>Last Activity</th>
-              {activeView === 'students' ? <th>Lesson Progress</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredClients.length ? filteredClients.map((client) => (
-              <tr key={client.id} className="clickable-row" onClick={() => navigate(`/clients/${client.id}`)}>
-                <td>
-                  <strong>{client.user.firstName} {client.user.lastName}</strong>
-                  <div className="cell-subtext">{client.user.email}</div>
-                </td>
-                <td><span className={statusClass(client.status)}>{client.status.replace('_', ' ')}</span></td>
-                <td>{client.serviceTier}</td>
-                <td>{client.documents.length} uploads</td>
-                <td>{client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} mo` : 'Pending'}</td>
-                <td>{client.disputes.length} items</td>
-                <td>{formatDate(client.updatedAt)}</td>
-                {activeView === 'students' ? (
-                  <td>
-                    {(() => {
-                      const edu = client.progress?.education;
-                      const completed = edu?.masterclassProgress?.length || 0;
-                      const passed = edu?.masterclassPassedQuizzes?.length || 0;
-                      return (
-                        <span style={{ fontSize: '0.85rem' }}>
-                          {completed}/6 days - {passed} quizzes passed
-                        </span>
-                      );
-                    })()}
-                  </td>
-                ) : null}
-              </tr>
-            )) : (
+        <div className="table-wrapper">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={activeView === 'students' ? 8 : 7} className="empty-row">
-                  {searchQuery ? 'No clients match your search.' : activeView === 'students' ? 'No masterclass students yet.' : 'No paid clients yet.'}
-                </td>
+                <th>Client</th>
+                <th>Status</th>
+                <th>Tier</th>
+                <th>Reports / Uploads</th>
+                <th>Analysis</th>
+                <th>Disputes</th>
+                <th>Last Activity</th>
+                {activeView === 'students' ? <th>Lesson Progress</th> : null}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredClients.length ? filteredClients.map((client) => (
+                <tr key={client.id} className="clickable-row" onClick={() => navigate(`/clients/${client.id}`)}>
+                  <td>
+                    <strong>{client.user.firstName} {client.user.lastName}</strong>
+                    <div className="cell-subtext">{client.user.email}</div>
+                  </td>
+                  <td><span className={statusClass(client.status)}>{client.status.replace('_', ' ')}</span></td>
+                  <td>{client.serviceTier}</td>
+                  <td>{client.documents.length} uploads</td>
+                  <td>{client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} mo` : 'Pending'}</td>
+                  <td>{client.disputes.length} items</td>
+                  <td>{formatDate(client.updatedAt)}</td>
+                  {activeView === 'students' ? (
+                    <td>
+                      {(() => {
+                        const edu = client.progress?.education;
+                        const completed = edu?.masterclassProgress?.length || 0;
+                        const passed = edu?.masterclassPassedQuizzes?.length || 0;
+                        return (
+                          <span style={{ fontSize: '0.85rem' }}>
+                            {completed}/6 days - {passed} quizzes passed
+                          </span>
+                        );
+                      })()}
+                    </td>
+                  ) : null}
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={activeView === 'students' ? 8 : 7} className="empty-row">
+                    {searchQuery ? 'No clients match your search.' : activeView === 'students' ? 'No masterclass students yet.' : 'No paid clients yet.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );
@@ -1732,7 +1734,7 @@ function TasksRoute() {
   return (
     <div className="page-grid">
       {/* Stats */}
-      <div className="hero-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+      <div className="task-metrics">
         <div className="stat-card" style={{ borderLeft: '3px solid #00c6fb' }}><span>Total</span><strong>{total}</strong></div>
         <div className="stat-card" style={{ borderLeft: '3px solid #d97706' }}><span>Pending</span><strong style={{ color: '#d97706' }}>{pending}</strong></div>
         <div className="stat-card" style={{ borderLeft: '3px solid #16a34a' }}><span>Done</span><strong style={{ color: '#16a34a' }}>{completed}</strong></div>
@@ -1740,7 +1742,7 @@ function TasksRoute() {
       </div>
 
       {/* Filters */}
-      <div className="filter-bar" style={{ marginBottom: '16px' }}>
+      <div className="filter-bar task-filter-bar">
         {[
           { key: 'pending', label: 'Pending' },
           { key: 'today', label: 'Due Today' },
@@ -1752,7 +1754,7 @@ function TasksRoute() {
             {f.label} <span className="filter-chip__count">{f.key === 'pending' ? pending : f.key === 'today' ? tasks.filter(t => !t.completed && t.due === todayStr).length : f.key === 'overdue' ? tasks.filter(t => !t.completed && t.due < todayStr).length : f.key === 'completed' ? completed : total}</span>
           </button>
         ))}
-        <div style={{ marginLeft: 'auto' }}>
+        <div className="task-filter-spacer">
           <button className="btn btn-outline" onClick={clearCompleted}>Clear Completed</button>
         </div>
       </div>
@@ -1766,41 +1768,33 @@ function TasksRoute() {
             <p className="helper-text">All caught up! Tasks will appear when clients need action.</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="task-list">
             {filtered.map(task => {
               const isOverdue = task.due && !task.completed && task.due < todayStr;
               const client = clients.find(c => c.id === task.clientId);
               return (
-                <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: '#0f172a', border: `1px solid ${isOverdue ? '#dc2626' : '#1e293b'}`, borderRadius: '8px', transition: 'all 0.15s' }}>
-                  {/* Priority dot */}
-                  <div style={{ flexShrink: 0 }}>{priorityDot(task.priority)}</div>
-
-                  {/* Task content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 600, fontSize: '14px', color: '#f8fafc' }}>{task.title}</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', padding: '2px 8px', borderRadius: '4px', background: task.category === 'Dispute' ? 'rgba(245,158,11,0.15)' : task.category === 'Billing' ? 'rgba(220,38,38,0.15)' : task.category === 'Client Follow-up' ? 'rgba(0,198,251,0.15)' : 'rgba(34,197,94,0.15)', color: task.category === 'Dispute' ? '#f59e0b' : task.category === 'Billing' ? '#dc2626' : task.category === 'Client Follow-up' ? '#00c6fb' : '#22c55e', border: `1px solid ${task.category === 'Dispute' ? 'rgba(245,158,11,0.3)' : task.category === 'Billing' ? 'rgba(220,38,38,0.3)' : task.category === 'Client Follow-up' ? 'rgba(0,198,251,0.3)' : 'rgba(34,197,94,0.3)'}` }}>
+                <div key={task.id} className={`task-row ${isOverdue ? 'task-row--overdue' : ''}`}>
+                  <div className="task-row__dot">{priorityDot(task.priority)}</div>
+                  <div className="task-row__body">
+                    <div className="task-row__titleline">
+                      <span className="task-row__title">{task.title}</span>
+                      <span className={`task-row__tag task-row__tag--${String(task.category || 'admin').toLowerCase().replace(/\s+/g, '-')}`}>
                         {task.category}
                       </span>
-                      {isOverdue && <span style={{ fontSize: '10px', fontWeight: 700, color: '#dc2626', background: 'rgba(220,38,38,0.15)', padding: '2px 8px', borderRadius: '4px' }}>OVERDUE</span>}
+                      {isOverdue && <span className="task-row__overdue">OVERDUE</span>}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px', lineHeight: 1.5 }}>
-                      {task.notes}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                      📅 {task.due ? new Date(task.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'} · Action: <strong>{task.action}</strong>
+                    <div className="task-row__meta">
+                      {task.due ? new Date(task.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'} · {client?.user ? `${client.user.firstName} ${client.user.lastName}` : 'Client'} · <strong>{task.action}</strong>
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                  <div className="task-row__actions">
                     {!task.completed && (
-                      <button onClick={() => completeTask(task.id)} style={{ padding: '8px 16px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        ✅ Complete
+                      <button className="task-row__button" onClick={() => completeTask(task.id)}>
+                        Complete
                       </button>
                     )}
-                    <button onClick={() => deleteTask(task.id)} style={{ padding: '8px 12px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                      🗑️
+                    <button className="task-row__delete" onClick={() => deleteTask(task.id)} aria-label="Delete task">
+                      Delete
                     </button>
                   </div>
                 </div>

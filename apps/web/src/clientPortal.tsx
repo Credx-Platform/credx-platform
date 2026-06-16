@@ -1785,8 +1785,16 @@ function ResourcesSection({ progress }: { progress: Progress | null; }) {
           <div className="panel-header"><div><p className="eyebrow">Masterclass</p><h2>5-Day Masterclass offer</h2></div></div>
           <div className="dispute-card-live">
             <div className="dispute-card-top"><strong>DIY education + affiliate stack</strong><span className={progress?.education?.masterclassEnrolled ? 'status-badge status-active' : 'status-badge status-pending'}>{progress?.education?.masterclassEnrolled ? 'Enrolled' : 'Available'}</span></div>
-            <div className="cell-subtext">Position the masterclass as the self-serve path: five days of guided education, bonus content, and recommended partner tools inside the same CredX ecosystem.</div>
-            <div style={{ marginTop: '12px' }}><a className="ghost-button" href="/signup?offer=masterclass">Open masterclass offer</a></div>
+            <div className="cell-subtext">
+              {progress?.education?.masterclassEnrolled
+                ? 'You are already enrolled. Upgrade adds the paid CredX service path to this account instead of starting over.'
+                : 'Position the masterclass as the self-serve path: five days of guided education, bonus content, and recommended partner tools inside the same CredX ecosystem.'}
+            </div>
+            <div style={{ marginTop: '12px' }}>
+              <a className="ghost-button" href={progress?.education?.masterclassEnrolled ? '/signup?offer=program&upgrade=masterclass' : '/signup?offer=masterclass'}>
+                {progress?.education?.masterclassEnrolled ? 'Upgrade to paid service' : 'Open masterclass offer'}
+              </a>
+            </div>
           </div>
         </div>
         <div>
@@ -2817,24 +2825,20 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
             <p className="helper-text">You have no pending tasks. We will email you when the next step is ready.</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="portal-task-list">
             {pendingTasks.map((task, index) => (
-              <div key={task.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '16px', background: '#0f172a', border: `1px solid ${index === 0 ? '#00c6fb' : '#1e293b'}`, borderRadius: '10px' }}>
-                <div style={{ flexShrink: 0, marginTop: '2px' }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: `2px solid ${index === 0 ? '#00c6fb' : '#334155'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: index === 0 ? '#00c6fb' : '#64748b' }}>
-                    {index + 1}
+              <div key={task.id} className={`portal-task-row ${index === 0 ? 'portal-task-row--next' : ''}`}>
+                <div className="portal-task-row__index">{index + 1}</div>
+                <div className="portal-task-row__body">
+                  <div className="portal-task-row__top">
+                    <span className="portal-task-row__title">{task.title}</span>
+                    <span className="portal-task-row__badge">Next Step</span>
                   </div>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '14px', color: '#f8fafc' }}>{task.title}</span>
-                    <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', padding: '2px 8px', borderRadius: '4px', background: 'rgba(0,198,251,0.15)', color: '#00c6fb', border: '1px solid rgba(0,198,251,0.3)' }}>Next Step</span>
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.5, marginBottom: '10px' }}>{task.desc}</div>
+                  <div className="portal-task-row__desc">{task.desc}</div>
                   <button
                     onClick={() => handleComplete(task.id)}
                     disabled={completing === task.id}
-                    style={{ padding: '8px 16px', background: '#00c6fb', color: '#060a12', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: completing === task.id ? 0.6 : 1 }}
+                    className="portal-task-row__button"
                   >
                     {completing === task.id ? 'Submitting...' : `${task.action} →`}
                   </button>
@@ -3566,7 +3570,7 @@ function CrossPromoFooter({ isPaid, isMasterclassEnrolled, isMasterclassOnly }: 
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginTop: '0.85rem' }}>
         {showPaidUpgrade ? (
           <>
-            <a className="ghost-button" href="/signup?offer=program" style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, textDecoration: 'none' }}>Upgrade to paid subscription →</a>
+            <a className="ghost-button" href="/signup?offer=program&upgrade=masterclass" style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, textDecoration: 'none' }}>Upgrade to paid service →</a>
             <a className="ghost-button" href="/#pricing" style={{ background: '#101a2b', color: '#f8fafc', border: '1px solid rgba(34,197,94,0.45)', fontWeight: 600, textDecoration: 'none' }}>Compare service tiers</a>
           </>
         ) : (
