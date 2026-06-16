@@ -46,7 +46,7 @@ masterclassRouter.post('/enroll', async (req, res, next) => {
           lastName: data.lastName,
           client: {
             create: {
-              status: 'LEAD',
+              status: 'STUDENT',
               progress: {
                 create: {
                   onboarding: {
@@ -84,6 +84,12 @@ masterclassRouter.post('/enroll', async (req, res, next) => {
       });
       if (client?.progress) {
         const education = (client.progress.education as any) || {};
+        if (client.status === 'LEAD') {
+          await prisma.client.update({
+            where: { id: client.id },
+            data: { status: 'STUDENT' }
+          });
+        }
         await prisma.clientProgress.update({
           where: { clientId: client.id },
           data: {

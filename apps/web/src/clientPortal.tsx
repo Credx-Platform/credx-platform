@@ -2675,7 +2675,7 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
 
     // Determine current stage
     const signed = progress?.onboarding?.signature?.signedAt;
-    const intakeComplete = client.status !== 'LEAD' && client.status !== 'CONTRACT_SENT' && client.status !== 'INTAKE_RECEIVED';
+    const intakeComplete = !['LEAD', 'STUDENT', 'CONTRACT_SENT', 'INTAKE_RECEIVED'].includes(client.status);
     const hasMonitoring = progress?.onboarding?.monitoringProvider || progress?.onboarding?.monitoringHasCredentials;
     const monitoringSkipped = progress?.onboarding?.monitoringSkippedAt;
     const creditDocs = (progress?.uploadedDocs || []).filter(d => (d.type || '').toLowerCase().includes('credit'));
@@ -2751,7 +2751,7 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
 
   const pendingTasks = workflowTasks.filter(t => !t.submitted && !t.auto);
   const submittedForReview = workflowTasks.filter(t => t.submitted);
-  const completedTasks = workflowTasks.filter(t => t.auto && (t.id === 'contract' ? progress?.onboarding?.signature?.signedAt : t.id === 'intake' ? client.status !== 'LEAD' && client.status !== 'CONTRACT_SENT' && client.status !== 'INTAKE_RECEIVED' : t.id === 'report' ? (progress?.uploadedDocs || []).filter(d => (d.type || '').toLowerCase().includes('credit')).length > 0 : t.id === 'analysis_wait' ? !!(client?.analysisSummary || progress?.analysis) : false));
+  const completedTasks = workflowTasks.filter(t => t.auto && (t.id === 'contract' ? progress?.onboarding?.signature?.signedAt : t.id === 'intake' ? !['LEAD', 'STUDENT', 'CONTRACT_SENT', 'INTAKE_RECEIVED'].includes(client.status) : t.id === 'report' ? (progress?.uploadedDocs || []).filter(d => (d.type || '').toLowerCase().includes('credit')).length > 0 : t.id === 'analysis_wait' ? !!(client?.analysisSummary || progress?.analysis) : false));
 
   const handleSubmitForReview = (taskId: string) => {
     setCompleting(taskId);
@@ -3153,7 +3153,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
   const [activeMcDay, setActiveMcDay] = useState<LessonDay | null>(null);
   const masterclassEnrolled = !!progress?.education?.masterclassEnrolled;
-  const masterclassOnly = masterclassEnrolled && (client?.status || '').toUpperCase() === 'LEAD';
+  const masterclassOnly = masterclassEnrolled && ['LEAD', 'STUDENT'].includes((client?.status || '').toUpperCase());
   const completedMasterclassDays = useMemo(
     () => (progress?.education?.masterclassProgress || []).filter((s): s is string => typeof s === 'string'),
     [progress?.education?.masterclassProgress]

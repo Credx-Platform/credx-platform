@@ -650,6 +650,7 @@ button:hover,
   border: 1px solid transparent;
 }
 .status-lead, .status-pending, .status-response_due { background: rgba(214,176,74,.22); color: #6b4f0f; border-color: rgba(214,176,74,.45); }
+.status-student { background: rgba(14,165,233,.18); color: #075985; border-color: rgba(14,165,233,.42); }
 .status-active, .status-completed { background: rgba(16,185,129,.18); color: #0a5e44; border-color: rgba(16,185,129,.42); }
 .status-contract_sent, .status-letter_sent, .status-intake_received, .status-analysis_ready, .status-upgrade_offered { background: rgba(0,140,220,.18); color: #0a4f7a; border-color: rgba(0,140,220,.42); }
 .status-past_due, .status-restricted, .status-rejected, .status-cancelled { background: rgba(220,38,38,.16); color: #8a1313; border-color: rgba(220,38,38,.42); }

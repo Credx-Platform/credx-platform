@@ -63,7 +63,7 @@ authRouter.post('/register', async (req, res, next) => {
         phone: data.phone,
         client: {
           create: {
-            status: 'LEAD',
+            status: data.offerInterest === 'masterclass' ? 'STUDENT' : 'LEAD',
             serviceTier: serviceTierFromSignupIntake(data.signupIntake),
             progress: {
               create: {

@@ -59,7 +59,7 @@ type ClientProgress = {
 
 type ClientRecord = {
   id: string;
-  status: 'LEAD' | 'CONTRACT_SENT' | 'INTAKE_RECEIVED' | 'ANALYSIS_READY' | 'UPGRADE_OFFERED' | 'ACTIVE' | 'PAST_DUE' | 'RESTRICTED' | 'CANCELLED';
+  status: 'LEAD' | 'STUDENT' | 'CONTRACT_SENT' | 'INTAKE_RECEIVED' | 'ANALYSIS_READY' | 'UPGRADE_OFFERED' | 'ACTIVE' | 'PAST_DUE' | 'RESTRICTED' | 'CANCELLED';
   serviceTier: 'ESSENTIAL' | 'AGGRESSIVE' | 'FAMILY';
   analysisSummary?: string | null;
   disputePlanSummary?: string | null;
@@ -213,6 +213,10 @@ function isMasterclassStudent(progress?: ClientProgress | null) {
   );
 }
 
+function isStudentClient(client: ClientRecord) {
+  return client.status === 'STUDENT' || isMasterclassStudent(client.progress);
+}
+
 function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
   const navigate = useNavigate();
   const active = disputes.filter((item) => !['COMPLETED', 'REJECTED'].includes(item.status));
@@ -277,7 +281,7 @@ function Overview({ clients, disputes, plans, leadsCount }: { clients: ClientRec
   const analysisReady = clients.filter((client) => ['ANALYSIS_READY', 'UPGRADE_OFFERED'].includes(client.status)).length;
   const pendingDisputes = disputes.filter((dispute) => !['COMPLETED', 'REJECTED'].includes(dispute.status)).length;
   const uploadsAwaitingReview = clients.reduce((sum, client) => sum + client.documents.length, 0);
-  const masterclassStudents = clients.filter((client) => isMasterclassStudent(client.progress)).length;
+  const masterclassStudents = clients.filter(isStudentClient).length;
 
   const recentActivity = clients
     .flatMap((client) => {
@@ -364,6 +368,7 @@ function Overview({ clients, disputes, plans, leadsCount }: { clients: ClientRec
 const CLIENT_STATUS_FILTERS: Array<{ key: string; label: string }> = [
   { key: 'NEW', label: 'New Arrivals' },
   { key: 'LEAD', label: 'Leads' },
+  { key: 'STUDENT', label: 'Students' },
   { key: 'INTAKE_RECEIVED', label: 'Intake' },
   { key: 'ANALYSIS_READY', label: 'Analysis Ready' },
   { key: 'UPGRADE_OFFERED', label: 'Upgrade' },
@@ -477,8 +482,8 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
 
   // A "paid" client has moved beyond just being a masterclass lead
   const isPaidClient = (c: ClientRecord) =>
-    c.status !== 'LEAD' || c.payments.length > 0 || c.disputes.length > 0;
-  const isStudent = (c: ClientRecord) => isMasterclassStudent(c.progress);
+    !['LEAD', 'STUDENT'].includes(c.status) || c.payments.length > 0 || c.disputes.length > 0;
+  const isStudent = (c: ClientRecord) => isStudentClient(c);
 
   const paidClients = clients.filter(isPaidClient);
   const studentClients = clients.filter(isStudent);
@@ -859,7 +864,7 @@ function ClientDetailRoute({ token }: { token: string }) {
                   <label>
                     <span>Status</span>
                     <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>
-                      {['LEAD','CONTRACT_SENT','INTAKE_RECEIVED','ANALYSIS_READY','UPGRADE_OFFERED','ACTIVE','PAST_DUE','RESTRICTED','CANCELLED'].map((status) => (
+                      {['LEAD','STUDENT','CONTRACT_SENT','INTAKE_RECEIVED','ANALYSIS_READY','UPGRADE_OFFERED','ACTIVE','PAST_DUE','RESTRICTED','CANCELLED'].map((status) => (
                         <option key={status} value={status}>{status.replace('_', ' ')}</option>
                       ))}
                     </select>

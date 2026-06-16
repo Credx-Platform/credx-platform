@@ -15,6 +15,7 @@ enum Role {
 
 enum ClientStatus {
   LEAD
+  STUDENT
   CONTRACT_SENT
   INTAKE_RECEIVED
   ANALYSIS_READY

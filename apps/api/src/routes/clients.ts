@@ -122,7 +122,7 @@ const clientProfileSchema = z.object({
 });
 
 const statusUpdateSchema = z.object({
-  status: z.enum(['LEAD', 'CONTRACT_SENT', 'INTAKE_RECEIVED', 'ANALYSIS_READY', 'UPGRADE_OFFERED', 'ACTIVE', 'PAST_DUE', 'RESTRICTED', 'CANCELLED'])
+  status: z.enum(['LEAD', 'STUDENT', 'CONTRACT_SENT', 'INTAKE_RECEIVED', 'ANALYSIS_READY', 'UPGRADE_OFFERED', 'ACTIVE', 'PAST_DUE', 'RESTRICTED', 'CANCELLED'])
 });
 
 clientsRouter.post('/onboarding', requireAuth, async (req: AuthedRequest, res, next) => {
