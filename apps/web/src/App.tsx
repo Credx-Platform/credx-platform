@@ -189,6 +189,30 @@ function bureauLabel(bureau: DisputeRecord['bureau']) {
   return bureau === 'TRANSUNION' ? 'TransUnion' : bureau === 'EQUIFAX' ? 'Equifax' : 'Experian';
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isMasterclassStudent(progress?: ClientProgress | null) {
+  const education = progress?.education;
+  if (education?.masterclassEnrolled === true) return true;
+
+  const onboarding = progress?.onboarding;
+  if (!onboarding) return false;
+
+  const signupIntake = onboarding.signupIntake;
+  const lastSignupIntake = onboarding.lastSignupIntake;
+
+  return (
+    onboarding.initialOfferInterest === 'masterclass' ||
+    onboarding.lastOfferInterest === 'masterclass' ||
+    onboarding.status === 'masterclass' ||
+    onboarding.track === 'masterclass' ||
+    (isObjectRecord(signupIntake) && signupIntake.planPath === 'masterclass') ||
+    (isObjectRecord(lastSignupIntake) && lastSignupIntake.planPath === 'masterclass')
+  );
+}
+
 function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
   const navigate = useNavigate();
   const active = disputes.filter((item) => !['COMPLETED', 'REJECTED'].includes(item.status));
@@ -253,7 +277,7 @@ function Overview({ clients, disputes, plans, leadsCount }: { clients: ClientRec
   const analysisReady = clients.filter((client) => ['ANALYSIS_READY', 'UPGRADE_OFFERED'].includes(client.status)).length;
   const pendingDisputes = disputes.filter((dispute) => !['COMPLETED', 'REJECTED'].includes(dispute.status)).length;
   const uploadsAwaitingReview = clients.reduce((sum, client) => sum + client.documents.length, 0);
-  const masterclassStudents = clients.filter((client) => client.progress?.education?.masterclassEnrolled === true).length;
+  const masterclassStudents = clients.filter((client) => isMasterclassStudent(client.progress)).length;
 
   const recentActivity = clients
     .flatMap((client) => {
@@ -454,8 +478,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
   // A "paid" client has moved beyond just being a masterclass lead
   const isPaidClient = (c: ClientRecord) =>
     c.status !== 'LEAD' || c.payments.length > 0 || c.disputes.length > 0;
-  const isStudent = (c: ClientRecord) =>
-    c.progress?.education?.masterclassEnrolled === true;
+  const isStudent = (c: ClientRecord) => isMasterclassStudent(c.progress);
 
   const paidClients = clients.filter(isPaidClient);
   const studentClients = clients.filter(isStudent);
@@ -1145,8 +1168,8 @@ function MonitoringCredentialsPanel({ onboarding }: { onboarding: OnboardingData
 }
 
 function MasterclassProgressPanel({ progress }: { progress: ClientDetail['progress'] }) {
-  const education = progress?.education;
-  if (!education?.masterclassEnrolled) return null;
+  const education = progress?.education || {};
+  if (!isMasterclassStudent(progress)) return null;
 
   const completedDays = education.masterclassProgress || [];
   const passedQuizzes = education.masterclassPassedQuizzes || [];
