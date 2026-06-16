@@ -16,7 +16,8 @@ clientsRouter.get('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (_req
         payments: true,
         disputes: true,
         documents: true,
-        activities: true
+        activities: true,
+        progress: true
       },
       orderBy: { createdAt: 'desc' }
     });

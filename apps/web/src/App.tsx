@@ -18,6 +18,45 @@ type User = {
   role: 'CLIENT' | 'STAFF' | 'ADMIN';
 };
 
+type ClientEducationProgress = {
+  masterclassEnrolled?: boolean;
+  masterclassAccess?: boolean;
+  masterclassProgress?: string[];
+  masterclassPassedQuizzes?: string[];
+  masterclassQuizAttempts?: Record<string, { count: number; lastAttemptAt: string; cooldownUntil?: string | null }>;
+  enrolledAt?: string;
+};
+
+type ClientProgress = {
+  education?: ClientEducationProgress;
+  scores?: { equifax?: number | null; experian?: number | null; transunion?: number | null };
+  workflow?: { stage?: string; next?: string[] };
+  uploadedDocs?: Array<{ name?: string; fileName?: string; type?: string; uploadedAt?: string; secure?: boolean; sizeBytes?: number }>;
+  onboarding?: {
+    status?: string;
+    signupAt?: string | null;
+    completedAt?: string | null;
+    monitoringProvider?: string | null;
+    monitoringHasCredentials?: boolean;
+    monitoringUsername?: string | null;
+    monitoringPassword?: string | null;
+    monitoringSubmittedAt?: string | null;
+    monitoringSkippedAt?: string | null;
+    signature?: {
+      dataUrl?: string;
+      signedName?: string;
+      signedAt?: string;
+      agreementText?: string;
+      disclosureStatement?: string;
+      cancellationNotice?: { heading?: string; text?: string } | null;
+      contractId?: string;
+      ipAddress?: string | null;
+      userAgent?: string | null;
+    } | null;
+    [key: string]: unknown;
+  } | null;
+};
+
 type ClientRecord = {
   id: string;
   status: 'LEAD' | 'CONTRACT_SENT' | 'INTAKE_RECEIVED' | 'ANALYSIS_READY' | 'UPGRADE_OFFERED' | 'ACTIVE' | 'PAST_DUE' | 'RESTRICTED' | 'CANCELLED';
@@ -39,6 +78,7 @@ type ClientRecord = {
   payments: Array<{ id: string; status: string }>;
   documents: Array<{ id: string }>;
   activities: Array<{ id: string; message: string; createdAt: string }>;
+  progress?: ClientProgress | null;
 };
 
 type ClientDetail = ClientRecord & {
@@ -53,34 +93,7 @@ type ClientDetail = ClientRecord & {
     dueDate?: string | null;
     createdAt: string;
   }>;
-  progress?: {
-    scores?: { equifax?: number | null; experian?: number | null; transunion?: number | null };
-    workflow?: { stage?: string; next?: string[] };
-    uploadedDocs?: Array<{ name?: string; fileName?: string; type?: string; uploadedAt?: string; secure?: boolean; sizeBytes?: number }>;
-    onboarding?: {
-      status?: string;
-      signupAt?: string | null;
-      completedAt?: string | null;
-      monitoringProvider?: string | null;
-      monitoringHasCredentials?: boolean;
-      monitoringUsername?: string | null;
-      monitoringPassword?: string | null;
-      monitoringSubmittedAt?: string | null;
-      monitoringSkippedAt?: string | null;
-      signature?: {
-        dataUrl?: string;
-        signedName?: string;
-        signedAt?: string;
-        agreementText?: string;
-        disclosureStatement?: string;
-        cancellationNotice?: { heading?: string; text?: string } | null;
-        contractId?: string;
-        ipAddress?: string | null;
-        userAgent?: string | null;
-      } | null;
-      [key: string]: unknown;
-    } | null;
-  } | null;
+  progress?: ClientProgress | null;
   creditReports?: Array<{ id: string; bureau: string; pulledAt: string; tradelines: Array<{ id: string }> }>;
   tasks?: Array<{ id: string; title?: string | null; status?: string | null }>;
 };
@@ -240,6 +253,7 @@ function Overview({ clients, disputes, plans, leadsCount }: { clients: ClientRec
   const analysisReady = clients.filter((client) => ['ANALYSIS_READY', 'UPGRADE_OFFERED'].includes(client.status)).length;
   const pendingDisputes = disputes.filter((dispute) => !['COMPLETED', 'REJECTED'].includes(dispute.status)).length;
   const uploadsAwaitingReview = clients.reduce((sum, client) => sum + client.documents.length, 0);
+  const masterclassStudents = clients.filter((client) => client.progress?.education?.masterclassEnrolled === true).length;
 
   const recentActivity = clients
     .flatMap((client) => {
@@ -283,6 +297,7 @@ function Overview({ clients, disputes, plans, leadsCount }: { clients: ClientRec
         <div className="hero-stats">
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/leads')}><span>Marketing Leads</span><strong>{leadsCount}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=NEW')}><span>New Leads</span><strong>{newLeads}</strong></button>
+          <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?view=students')}><span>Masterclass Students</span><strong>{masterclassStudents}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ANALYSIS_READY')}><span>Analysis Ready</span><strong>{analysisReady}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ACTIVE')}><span>Active Clients</span><strong>{activeClients}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/disputes')}><span>Pending Disputes</span><strong>{pendingDisputes}</strong></button>
@@ -429,20 +444,33 @@ function Leads({ leads, clients }: { leads: LeadRecord[]; clients: ClientRecord[
 
 function Clients({ clients }: { clients: ClientRecord[] }) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const statusFilter = searchParams.get('status');
+  const viewParam = searchParams.get('view');
+  const activeView: 'paid' | 'students' = viewParam === 'students' ? 'students' : 'paid';
   const hasActiveFilter = Boolean(statusFilter) || searchQuery.trim().length > 0;
+
+  // A "paid" client has moved beyond just being a masterclass lead
+  const isPaidClient = (c: ClientRecord) =>
+    c.status !== 'LEAD' || c.payments.length > 0 || c.disputes.length > 0;
+  const isStudent = (c: ClientRecord) =>
+    c.progress?.education?.masterclassEnrolled === true;
+
+  const paidClients = clients.filter(isPaidClient);
+  const studentClients = clients.filter(isStudent);
+
+  const displayedClients = activeView === 'students' ? studentClients : paidClients;
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const c of clients) counts[c.status] = (counts[c.status] || 0) + 1;
+    for (const c of displayedClients) counts[c.status] = (counts[c.status] || 0) + 1;
     counts.NEW = (counts.LEAD || 0) + (counts.INTAKE_RECEIVED || 0);
     return counts;
-  }, [clients]);
+  }, [displayedClients]);
 
   const filteredClients = useMemo(() => {
-    let next = clients;
+    let next = displayedClients;
     if (statusFilter === 'NEW') {
       next = next.filter((client) => client.status === 'LEAD' || client.status === 'INTAKE_RECEIVED');
     } else if (statusFilter) {
@@ -456,104 +484,149 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
       client.user.email.toLowerCase().includes(query) ||
       client.status.toLowerCase().includes(query)
     );
-  }, [clients, searchQuery, statusFilter]);
+  }, [displayedClients, searchQuery, statusFilter]);
 
   const clearFilters = () => {
     setSearchQuery('');
-    navigate('/clients');
+    const next = new URLSearchParams(searchParams);
+    next.delete('status');
+    setSearchParams(next);
   };
 
   const setStatus = (status: string | null) => {
-    if (status) navigate(`/clients?status=${encodeURIComponent(status)}`);
-    else navigate('/clients');
+    const next = new URLSearchParams(searchParams);
+    if (status) next.set('status', status);
+    else next.delete('status');
+    setSearchParams(next);
+  };
+
+  const switchView = (view: 'paid' | 'students') => {
+    setSearchQuery('');
+    const next = new URLSearchParams();
+    if (view === 'students') next.set('view', 'students');
+    setSearchParams(next);
   };
 
   return (
-    <section className="panel">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Client Management</p>
-          <h2>Customers</h2>
-          <div className="filter-summary">
-            <span>Showing <strong>{filteredClients.length}</strong> of <strong>{clients.length}</strong></span>
-            {statusFilter ? <span>· <strong>{statusFilter.replace(/_/g, ' ')}</strong></span> : null}
-            {searchQuery.trim() ? <span>· search: <strong>"{searchQuery.trim()}"</strong></span> : null}
-            {hasActiveFilter ? (
-              <button type="button" className="filter-summary__clear" onClick={clearFilters}>
-                Clear · show all ({clients.length})
-              </button>
-            ) : null}
+    <div className="page-grid">
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Client Management</p>
+            <h2>Customers</h2>
+            <div className="filter-summary">
+              <span>Showing <strong>{filteredClients.length}</strong> of <strong>{activeView === 'students' ? studentClients.length : paidClients.length}</strong> {activeView === 'students' ? 'students' : 'paid clients'}</span>
+              {statusFilter ? <span>· <strong>{statusFilter.replace(/_/g, ' ')}</strong></span> : null}
+              {searchQuery.trim() ? <span>· search: <strong>"{searchQuery.trim()}"</strong></span> : null}
+              {hasActiveFilter ? (
+                <button type="button" className="filter-summary__clear" onClick={clearFilters}>
+                  Clear · show all ({activeView === 'students' ? studentClients.length : paidClients.length})
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="Search clients..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         </div>
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder="Search clients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
 
-      <div className="filter-bar" role="tablist" aria-label="Filter by status">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={!statusFilter}
-          className={`filter-chip ${!statusFilter ? 'filter-chip--active' : ''}`}
-          onClick={() => setStatus(null)}
-        >
-          All <span className="filter-chip__count">{clients.length}</span>
-        </button>
-        {CLIENT_STATUS_FILTERS.filter((s) => (statusCounts[s.key] || 0) > 0 || s.key === statusFilter).map((s) => (
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
           <button
-            key={s.key}
+            type="button"
+            className={`tab ${activeView === 'paid' ? 'active' : ''}`}
+            onClick={() => switchView('paid')}
+          >
+            Paid Clients ({paidClients.length})
+          </button>
+          <button
+            type="button"
+            className={`tab ${activeView === 'students' ? 'active' : ''}`}
+            onClick={() => switchView('students')}
+          >
+            Masterclass Students ({studentClients.length})
+          </button>
+        </div>
+
+        <div className="filter-bar" role="tablist" aria-label="Filter by status">
+          <button
             type="button"
             role="tab"
-            aria-selected={statusFilter === s.key}
-            className={`filter-chip ${statusFilter === s.key ? 'filter-chip--active' : ''}`}
-            onClick={() => setStatus(s.key)}
+            aria-selected={!statusFilter}
+            className={`filter-chip ${!statusFilter ? 'filter-chip--active' : ''}`}
+            onClick={() => setStatus(null)}
           >
-            {s.label} <span className="filter-chip__count">{statusCounts[s.key] || 0}</span>
+            All <span className="filter-chip__count">{displayedClients.length}</span>
           </button>
-        ))}
-      </div>
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Client</th>
-            <th>Status</th>
-            <th>Tier</th>
-            <th>Reports / Uploads</th>
-            <th>Analysis</th>
-            <th>Disputes</th>
-            <th>Last Activity</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredClients.length ? filteredClients.map((client) => (
-            <tr key={client.id} className="clickable-row" onClick={() => navigate(`/clients/${client.id}`)}>
-              <td>
-                <strong>{client.user.firstName} {client.user.lastName}</strong>
-                <div className="cell-subtext">{client.user.email}</div>
-              </td>
-              <td><span className={statusClass(client.status)}>{client.status.replace('_', ' ')}</span></td>
-              <td>{client.serviceTier}</td>
-              <td>{client.documents.length} uploads</td>
-              <td>{client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} mo` : 'Pending'}</td>
-              <td>{client.disputes.length} items</td>
-              <td>{formatDate(client.updatedAt)}</td>
-            </tr>
-          )) : (
+          {CLIENT_STATUS_FILTERS.filter((s) => (statusCounts[s.key] || 0) > 0 || s.key === statusFilter).map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              role="tab"
+              aria-selected={statusFilter === s.key}
+              className={`filter-chip ${statusFilter === s.key ? 'filter-chip--active' : ''}`}
+              onClick={() => setStatus(s.key)}
+            >
+              {s.label} <span className="filter-chip__count">{statusCounts[s.key] || 0}</span>
+            </button>
+          ))}
+        </div>
+        <table className="data-table">
+          <thead>
             <tr>
-              <td colSpan={7} className="empty-row">
-                {searchQuery ? 'No clients match your search.' : 'No clients yet.'}
-              </td>
+              <th>Client</th>
+              <th>Status</th>
+              <th>Tier</th>
+              <th>Reports / Uploads</th>
+              <th>Analysis</th>
+              <th>Disputes</th>
+              <th>Last Activity</th>
+              {activeView === 'students' ? <th>Lesson Progress</th> : null}
             </tr>
-          )}
-        </tbody>
-      </table>
-    </section>
+          </thead>
+          <tbody>
+            {filteredClients.length ? filteredClients.map((client) => (
+              <tr key={client.id} className="clickable-row" onClick={() => navigate(`/clients/${client.id}`)}>
+                <td>
+                  <strong>{client.user.firstName} {client.user.lastName}</strong>
+                  <div className="cell-subtext">{client.user.email}</div>
+                </td>
+                <td><span className={statusClass(client.status)}>{client.status.replace('_', ' ')}</span></td>
+                <td>{client.serviceTier}</td>
+                <td>{client.documents.length} uploads</td>
+                <td>{client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} mo` : 'Pending'}</td>
+                <td>{client.disputes.length} items</td>
+                <td>{formatDate(client.updatedAt)}</td>
+                {activeView === 'students' ? (
+                  <td>
+                    {(() => {
+                      const edu = client.progress?.education;
+                      const completed = edu?.masterclassProgress?.length || 0;
+                      const passed = edu?.masterclassPassedQuizzes?.length || 0;
+                      return (
+                        <span style={{ fontSize: '0.85rem' }}>
+                          {completed}/6 days - {passed} quizzes passed
+                        </span>
+                      );
+                    })()}
+                  </td>
+                ) : null}
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={activeView === 'students' ? 8 : 7} className="empty-row">
+                  {searchQuery ? 'No clients match your search.' : activeView === 'students' ? 'No masterclass students yet.' : 'No paid clients yet.'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+    </div>
   );
 }
 
@@ -740,6 +813,7 @@ function ClientDetailRoute({ token }: { token: string }) {
                   <li><strong>Next queue</strong><span>{client.progress?.workflow?.next?.join(', ') || 'Pending update'}</span></li>
                 </ul>
               </div>
+              <MasterclassProgressPanel progress={client.progress || null} />
             </div>
           ) : null}
 
@@ -1066,6 +1140,64 @@ function MonitoringCredentialsPanel({ onboarding }: { onboarding: OnboardingData
       <p className="helper-text" style={{ marginTop: '8px' }}>
         Password is decrypted server-side for staff only and never rendered on screen. Use Copy password to log in on the client's behalf.
       </p>
+    </div>
+  );
+}
+
+function MasterclassProgressPanel({ progress }: { progress: ClientDetail['progress'] }) {
+  const education = progress?.education;
+  if (!education?.masterclassEnrolled) return null;
+
+  const completedDays = education.masterclassProgress || [];
+  const passedQuizzes = education.masterclassPassedQuizzes || [];
+  const attempts = education.masterclassQuizAttempts || {};
+  const totalDays = 6;
+  const progressPct = Math.round((completedDays.length / totalDays) * 100);
+
+  const dayLabels: Record<string, string> = {
+    'day-1-credit-fundamentals': 'Day 1 - Credit Fundamentals',
+    'day-2-disputes-decoded': 'Day 2 - Disputes Decoded',
+    'day-3-advanced-tactics': 'Day 3 - Advanced Tactics',
+    'day-4-building-positive-credit': 'Day 4 - Building Positive Credit',
+    'day-5-business-credit': 'Day 5 - Business Credit',
+    'bonus-generational-wealth': 'Bonus - Generational Wealth'
+  };
+
+  return (
+    <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+        <h3 style={{ margin: 0 }}>Masterclass Progress</h3>
+      </div>
+      <ul className="detail-list">
+        <li><strong>Enrolled</strong><span>{education.enrolledAt ? formatDate(education.enrolledAt) : 'Yes'}</span></li>
+        <li><strong>Days completed</strong><span>{completedDays.length} / {totalDays} ({progressPct}%)</span></li>
+        <li><strong>Quizzes passed</strong><span>{passedQuizzes.length} / {totalDays}</span></li>
+      </ul>
+      {completedDays.length > 0 ? (
+        <div style={{ marginTop: '0.75rem' }}>
+          <p style={{ margin: '0 0 0.4rem', fontSize: '0.85rem', opacity: 0.8 }}><strong>Completed lessons:</strong></p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+            {completedDays.map((slug) => (
+              <span key={slug} style={{ background: 'rgba(34,197,94,0.18)', color: '#86efac', border: '1px solid rgba(34,197,94,0.4)', borderRadius: 6, padding: '2px 8px', fontSize: '0.78rem' }}>
+                Completed: {dayLabels[slug] || slug}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {Object.keys(attempts).length > 0 ? (
+        <div style={{ marginTop: '0.75rem' }}>
+          <p style={{ margin: '0 0 0.4rem', fontSize: '0.85rem', opacity: 0.8 }}><strong>Quiz attempts:</strong></p>
+          <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.82rem', opacity: 0.85 }}>
+            {Object.entries(attempts).map(([slug, log]) => (
+              <li key={slug}>
+                {dayLabels[slug] || slug}: {log.count} attempt{log.count === 1 ? '' : 's'}
+                {log.cooldownUntil && new Date(log.cooldownUntil).getTime() > Date.now() ? ` (cooldown until ${formatDate(log.cooldownUntil)})` : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
