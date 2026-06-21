@@ -75,6 +75,8 @@ app.get('/', (_req, res) => {
 });
 
 app.use('/health', healthRouter);
+app.use('/api/health', healthRouter);
+app.use('/api/v1/health', healthRouter);
 
 // Stricter limits on unauthenticated, abuse-prone endpoints. These are mounted
 // before the routers so they apply on top of the global limiter.

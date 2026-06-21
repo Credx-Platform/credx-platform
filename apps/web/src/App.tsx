@@ -2201,8 +2201,8 @@ export default function App() {
     const raw = localStorage.getItem(USER_KEY);
     return raw ? JSON.parse(raw) : null;
   });
-  const [email, setEmail] = useState('admin@credxme.com');
-  const [password, setPassword] = useState('StrongPass123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);

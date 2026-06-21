@@ -11,6 +11,7 @@
     { "source": "/masterclass/", "destination": "/masterclass", "permanent": true }
   ],
   "rewrites": [
+    { "source": "/health", "destination": "https://credxapi-production.up.railway.app/health" },
     { "source": "/api/:path*", "destination": "https://credxapi-production.up.railway.app/api/:path*" },
     { "source": "/signup", "destination": "/signup.html" },
     { "source": "/signup/:path*", "destination": "/signup.html" },
