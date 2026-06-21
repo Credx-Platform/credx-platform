@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { config } from '../config.js';
 import { notifyNewLead, sendWelcomeLeadEmail } from '../lib/email.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { verifyTurnstileFromBody } from '../lib/turnstile.js';
 
 export const leadsRouter = Router();
 
@@ -30,6 +31,8 @@ const createLeadSchema = z.object({
 
 leadsRouter.post('/', async (req, res, next) => {
   try {
+    const captcha = await verifyTurnstileFromBody(req.body, req.ip);
+    if (!captcha.ok) return res.status(400).json({ error: captcha.reason || 'CAPTCHA verification failed' });
     const data = createLeadSchema.parse(req.body);
     const offerEligibleUntil = new Date(Date.now() + 48 * 60 * 60 * 1000);
     const affiliateLinks = [

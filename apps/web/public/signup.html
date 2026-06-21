@@ -826,9 +826,11 @@ function getSteps() {
           <input id="consent" type="checkbox" ${state.consent ? 'checked' : ''}>
           <span>I confirm the information I am submitting is accurate, and I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span>
         </label>
+        <div class="cf-turnstile-slot" style="margin:12px 0 0;"></div>
       `,
       bind: () => {
         document.getElementById('consent').addEventListener('change', (event) => setStateValue('consent', event.target.checked));
+        if (window.onCredXTurnstileLoad) window.onCredXTurnstileLoad();
       },
       validate: () => {
         if (!state.consent) return 'Confirm your information is accurate and agree to the terms.';
@@ -946,7 +948,8 @@ async function submitSignup() {
         offerInterest,
         signupIntake: signupIntake(),
         referralSource: state.referralSource || undefined,
-        referralDetail: state.referralDetail.trim() || undefined
+        referralDetail: state.referralDetail.trim() || undefined,
+        turnstileToken: (window.CredXTurnstile && window.CredXTurnstile.getToken()) || undefined
       })
     });
     const body = await res.json().catch(() => null);
@@ -962,6 +965,7 @@ async function submitSignup() {
   } catch (error) {
     showError(error.message || 'Submission failed.');
     setSubmitting(false);
+    window.CredXTurnstile && window.CredXTurnstile.reset();
   }
 }
 
@@ -1007,5 +1011,7 @@ els.form.addEventListener('submit', (event) => {
 renderStep();
 tryAttachExistingSession();
 </script>
+<script src="/turnstile-widget.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onCredXTurnstileLoad" async defer></script>
 </body>
 </html>

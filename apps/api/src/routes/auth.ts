@@ -15,6 +15,7 @@ import {
 import { config } from '../config.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { writeAuditLog } from '../lib/audit.js';
+import { verifyTurnstileFromBody } from '../lib/turnstile.js';
 
 export const authRouter = Router();
 
@@ -47,6 +48,8 @@ function serviceTierFromSignupIntake(intake?: Record<string, unknown>) {
 
 authRouter.post('/register', async (req, res, next) => {
   try {
+    const captcha = await verifyTurnstileFromBody(req.body, req.ip);
+    if (!captcha.ok) return res.status(400).json({ error: captcha.reason || 'CAPTCHA verification failed' });
     const data = registerSchema.parse(req.body);
     const existing = await prisma.user.findUnique({ where: { email: data.email.toLowerCase() } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });

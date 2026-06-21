@@ -395,7 +395,7 @@ const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
   resources: { title: 'Credit Builders', desc: 'Partner tools and accounts to rebuild your credit profile.', accent: '#84cc16' },
   tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' },
   analysis: { title: 'Analysis & Reports', desc: 'Upload your credit report, run analysis, and connect monitoring — all in one place.', accent: '#2563eb' },
-  masterclass: { title: '5-Day Masterclass', desc: 'Your complete credit repair curriculum — videos, slides, key terms, and action steps.', accent: '#00c6fb' }
+  masterclass: { title: '5-Day Masterclass', desc: 'Your complete credit education curriculum — videos, slides, key terms, and action steps.', accent: '#00c6fb' }
 };
 
 function SectionHeader({ section }: { section: Exclude<PortalTab, 'overview'> }) {
@@ -2911,7 +2911,7 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
         <div>
           <p className="eyebrow">Your Progress</p>
           <h1>Next Steps</h1>
-          <p>Complete each step below to move your credit repair forward. We will email you when new tasks are ready.</p>
+          <p>Complete each step below to move your credit journey forward. We will email you when new tasks are ready.</p>
         </div>
         <div className="hero-stats">
           <div className="stat-card"><span>Pending</span><strong style={{ color: '#d97706' }}>{pendingTasks.length}</strong></div>
@@ -3680,7 +3680,7 @@ function CrossPromoFooter({ isPaid, isMasterclassEnrolled, isMasterclassOnly }: 
       <div className="panel-header">
         <div>
           <p className="eyebrow" style={{ color: showPaidUpgrade ? '#22c55e' : '#00c6fb' }}>{showPaidUpgrade ? 'Upgrade Path' : 'Add-On Education'}</p>
-          <h2 style={{ color: '#fff' }}>{showPaidUpgrade ? 'Move from masterclass to full credit repair' : 'Add the 5-Day Masterclass'}</h2>
+          <h2 style={{ color: '#fff' }}>{showPaidUpgrade ? 'Move from masterclass to the full done-for-you program' : 'Add the 5-Day Masterclass'}</h2>
         </div>
       </div>
       <p className="helper-text" style={{ color: '#cbd5e1', marginTop: 0, fontSize: '0.95rem', lineHeight: 1.6 }}>

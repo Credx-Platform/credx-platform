@@ -446,6 +446,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
      <input id="consent" type="checkbox">
      <label for="consent">I confirm the information submitted is accurate to the best of my knowledge.</label>
     </div>
+    <div class="cf-turnstile-slot" style="margin:4px 0 6px;"></div>
     <div class="action-row">
      <button class="form-submit" id="submitBtn" type="button">Confirm & Submit</button>
     </div>
@@ -575,7 +576,8 @@ async function submitForm(){
   creditGoal:document.getElementById('creditGoal').value||undefined,
   referralSource:heardAbout||undefined,
   referralName:document.getElementById('referralName').value.trim()||undefined,
-  referralOther:document.getElementById('heardAboutOther').value.trim()||undefined
+  referralOther:document.getElementById('heardAboutOther').value.trim()||undefined,
+  turnstileToken:(window.CredXTurnstile&&window.CredXTurnstile.getToken())||undefined
  };
  if(!payload.firstName||!payload.lastName||!payload.email){showToast('Please complete first name, last name, and email.','error');return;}
  if(!/\S+@\S+\.\S+/.test(payload.email)){showToast('Please enter a valid email.','error');return;}
@@ -598,6 +600,7 @@ async function submitForm(){
 }catch(err){
  showToast(err.message||'Submission failed','error');
   btn.disabled=false;btn.textContent='Confirm & Submit';
+  window.CredXTurnstile&&window.CredXTurnstile.reset();
  }
 }
 document.getElementById('submitBtn').addEventListener('click',submitForm);
@@ -691,5 +694,7 @@ function initScrollMotion(){
 
 initScrollMotion();
 </script>
+<script src="/turnstile-widget.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onCredXTurnstileLoad" async defer></script>
 </body>
 </html>

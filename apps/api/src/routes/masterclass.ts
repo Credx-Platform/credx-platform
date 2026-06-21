@@ -9,6 +9,7 @@ import { buildPasswordSetupLink, issuePasswordSetupToken } from '../lib/password
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { gradeSubmission, QUIZ_MAX_ATTEMPTS_BEFORE_COOLDOWN, QUIZ_COOLDOWN_MS, QUIZ_ANSWER_KEYS } from '../lib/masterclassQuizAnswers.js';
+import { verifyTurnstileFromBody } from '../lib/turnstile.js';
 
 export const masterclassRouter = Router();
 
@@ -29,6 +30,8 @@ const enrollSchema = z.object({
 
 masterclassRouter.post('/enroll', async (req, res, next) => {
   try {
+    const captcha = await verifyTurnstileFromBody(req.body, req.ip);
+    if (!captcha.ok) return res.status(400).json({ error: captcha.reason || 'CAPTCHA verification failed' });
     const data = enrollSchema.parse(req.body);
     const email = data.email.toLowerCase();
 

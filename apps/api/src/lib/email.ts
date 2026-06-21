@@ -18,6 +18,28 @@ const EMAIL_CYAN = '#00c6fb';
 const EMAIL_SUCCESS = '#22c55e';
 const EMAIL_FONT = "'IBM Plex Sans',Helvetica,Arial,sans-serif";
 
+/* CAN-SPAM (15 U.S.C. § 7704): every commercial email must carry a valid
+   physical postal address and a working opt-out. Set COMPANY_MAILING_ADDRESS on
+   the API env to your real mailing address before launch. */
+const COMPANY_MAILING_ADDRESS = (process.env.COMPANY_MAILING_ADDRESS || '[MAILING ADDRESS NOT SET — set COMPANY_MAILING_ADDRESS]').trim();
+const UNSUBSCRIBE_EMAIL = (process.env.UNSUBSCRIBE_EMAIL || 'unsubscribe@credxme.com').trim();
+const UNSUBSCRIBE_URL = (process.env.UNSUBSCRIBE_URL || '').trim();
+
+function unsubscribeMailto(): string {
+  return `mailto:${UNSUBSCRIBE_EMAIL}?subject=unsubscribe`;
+}
+
+/** RFC 2369 / RFC 8058 unsubscribe headers for transactional/commercial mail. */
+function listUnsubscribeHeaders(): Record<string, string> {
+  const targets: string[] = [];
+  if (UNSUBSCRIBE_URL) targets.push(`<${UNSUBSCRIBE_URL}>`);
+  targets.push(`<${unsubscribeMailto()}>`);
+  const headers: Record<string, string> = { 'List-Unsubscribe': targets.join(', ') };
+  // One-Click POST is only valid with an HTTPS endpoint.
+  if (UNSUBSCRIBE_URL) headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+  return headers;
+}
+
 function emailButton(href: string, label: string, accent: string = EMAIL_CYAN): string {
   return `<div style="text-align:center;padding:18px 0 6px;">
     <a href="${href}" style="display:inline-block;background:${accent};color:#0d1420;text-decoration:none;padding:15px 32px;border-radius:12px;font-weight:700;font-size:16px;font-family:${EMAIL_FONT};letter-spacing:0.2px;">${label}</a>
@@ -65,12 +87,16 @@ function renderEmailShell(opts: {
         </td></tr>
         <tr><td style="padding:22px 32px 30px;color:${EMAIL_TEXT_DIM};font-size:12px;line-height:1.6;border-top:1px solid ${EMAIL_BORDER};">
           <strong style="color:${EMAIL_TEXT};font-size:14px;">CredX</strong><br />
-          Credit Repair &amp; Financial Strategy Support<br />
+          Credit Education &amp; Financial Strategy<br />
           <a href="https://credxme.com" style="color:${accent};text-decoration:none;">credxme.com</a> ·
           <a href="mailto:contact@credxme.com" style="color:${accent};text-decoration:none;">contact@credxme.com</a> ·
           <a href="tel:+18662733963" style="color:${accent};text-decoration:none;">866-CREDX-ME</a>
-          <div style="margin-top:14px;color:${EMAIL_TEXT_DIM};font-size:11px;">
+          <div style="margin-top:12px;color:${EMAIL_TEXT_DIM};font-size:11px;">
+            ${COMPANY_MAILING_ADDRESS}
+          </div>
+          <div style="margin-top:10px;color:${EMAIL_TEXT_DIM};font-size:11px;">
             You're receiving this because you started with CredX. If this wasn't you, ignore this email — no account changes are made until you act.
+            To stop receiving these emails, <a href="${unsubscribeMailto()}" style="color:${accent};text-decoration:underline;">unsubscribe here</a>.
           </div>
         </td></tr>
       </table>
@@ -86,7 +112,7 @@ function renderWelcomeLeadEmail(params: { firstName: string; contractLink: strin
   const headline = isMasterclass ? 'Welcome to the CredX 5-Day Masterclass' : 'Welcome to CredX';
   const tagline = isMasterclass
     ? 'Five days. Six lessons. The same playbook our coaches use internally.'
-    : 'A guided, end-to-end credit-repair workflow with AI coaching and human support.';
+    : 'A guided, end-to-end credit education and dispute workflow with AI coaching and human support.';
   const intro = isMasterclass
     ? "You're in. Your next step is to open your secure onboarding link so you can review the agreement, complete your intake, and unlock the masterclass inside CredX."
     : 'Your inquiry has been received. Your next step is to open your secure onboarding link so you can review the agreement and complete your intake.';
@@ -171,7 +197,7 @@ ${params.contractLink}
 If the button doesn’t open, copy and paste the link into your browser.
 
 CredX
-Credit Repair & Financial Strategy Support`;
+Credit Education & Financial Strategy`;
 
   return { subject, html, text };
 }
@@ -181,7 +207,7 @@ function renderMasterclassWelcomeEmail(params: { firstName: string; setupLink: s
   const expiresHours = Math.max(1, Math.round((params.expiresAt.getTime() - Date.now()) / 3_600_000));
   const bodyHtml = `
     <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">You're enrolled, ${params.firstName || 'there'}.</h1>
-    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Welcome to the CredX 5-Day Credit Repair Masterclass. No contracts, no intake forms — just set your password and you're in.</p>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Welcome to the CredX 5-Day Credit Education Masterclass. No contracts, no intake forms — just set your password and you're in.</p>
     <p style="margin:0 0 4px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;"><strong style="color:${EMAIL_TEXT};">Day 1: Credit Fundamentals</strong> is waiting for you the moment you log in.</p>
     ${emailButton(params.setupLink, 'Set my password')}
     <p style="margin:18px 0 6px;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">This link expires in about ${expiresHours} hours and can only be used once.</p>
@@ -365,6 +391,7 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
         from: from.name ? `${from.name} <${from.email}>` : from.email,
         to: [params.to],
         subject: params.subject,
+        headers: listUnsubscribeHeaders(),
         ...(params.html ? { html: params.html } : {}),
         ...(params.text ? { text: params.text } : { text: '' }),
         ...(params.attachments?.length
@@ -409,6 +436,7 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
         personalizations: [{ to: [{ email: params.to }] }],
         from: { email: from.email, name: from.name },
         subject: params.subject,
+        headers: listUnsubscribeHeaders(),
         content: [
           ...(params.text ? [{ type: 'text/plain', value: params.text }] : []),
           ...(params.html ? [{ type: 'text/html', value: params.html }] : [])
@@ -487,7 +515,7 @@ This link expires on ${expiresLabel}. For your security, it can only be used onc
 If you didn't request this, you can safely ignore the email.
 
 CredX
-Credit Repair & Financial Strategy Support`;
+Credit Education & Financial Strategy`;
 
   return { subject, html, text };
 }
@@ -556,7 +584,7 @@ After your password is set, sign in here:
 ${params.loginLink}
 
 CredX
-Credit Repair & Financial Strategy Support`;
+Credit Education & Financial Strategy`;
 
   return { subject, html, text };
 }

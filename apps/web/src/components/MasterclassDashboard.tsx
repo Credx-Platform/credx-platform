@@ -88,7 +88,7 @@ export default function MasterclassDashboard({
       <section className="mc-hero">
         <div>
           <p className="eyebrow" style={{ color: accent }}>{firstName ? `Welcome, ${firstName}` : 'Welcome'}</p>
-          <p className="mc-hero-sub">Your 5-day credit repair masterclass plus bonus day. Each day pairs short videos, glossary terms, the slide follow-along, and real-life Q&amp;A.</p>
+          <p className="mc-hero-sub">Your 5-day credit education masterclass plus bonus day. Each day pairs short videos, glossary terms, the slide follow-along, and real-life Q&amp;A.</p>
         </div>
         <div className="mc-progress">
           <div className="mc-progress-label" style={{ color: accent }}>Progress</div>

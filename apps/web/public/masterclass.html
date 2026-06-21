@@ -284,6 +284,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
         <label class="enroll-field"><span>Last name</span><input type="text" name="lastName" required autocomplete="family-name"></label>
       </div>
       <label class="enroll-field"><span>Email</span><input type="email" name="email" required autocomplete="email"></label>
+      <div class="cf-turnstile-slot" style="margin:4px 0;"></div>
       <button type="submit" class="btn btn-primary enroll-submit">Send my access link</button>
       <p class="enroll-fineprint">We'll email you a one-time setup link. By enrolling you agree to receive course-related email from CredX. You can unsubscribe anytime.</p>
     </form>
@@ -341,7 +342,8 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
     var payload = {
       firstName: String(fd.get('firstName') || '').trim(),
       lastName: String(fd.get('lastName') || '').trim(),
-      email: String(fd.get('email') || '').trim()
+      email: String(fd.get('email') || '').trim(),
+      turnstileToken: (window.CredXTurnstile && window.CredXTurnstile.getToken()) || undefined
     };
     if(!payload.firstName || !payload.lastName || !payload.email){
       showError('Please fill in all three fields.');
@@ -370,9 +372,12 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
       submit.disabled = false;
       submit.textContent = 'Send my access link';
     }
+    window.CredXTurnstile && window.CredXTurnstile.reset();
   });
 })();
 </script>
+<script src="/turnstile-widget.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onCredXTurnstileLoad" async defer></script>
 
 <footer>
   <div class="footer-inner">
