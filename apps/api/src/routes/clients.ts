@@ -260,6 +260,16 @@ clientsRouter.post('/:id/analysis', requireAuth, requireRole(['STAFF', 'ADMIN'])
       },
       include: { user: true, payments: true, disputes: true, documents: true, activities: true }
     });
+
+    // Analysis is now sent — raise the pending bill so payment can trigger disputes.
+    // Non-fatal: a billing hiccup must not block publishing the analysis.
+    try {
+      const { createPendingSetupBill } = await import('../lib/billingActivation.js');
+      await createPendingSetupBill(client.id, client.serviceTier);
+    } catch (billErr) {
+      console.error('[analysis] could not create pending setup bill:', billErr);
+    }
+
     return res.status(201).json({ client });
   } catch (error) {
     next(error);
@@ -398,58 +408,17 @@ clientsRouter.post('/:id/regenerate-letters', requireAuth, requireRole(['STAFF',
 
 // ========== MARK PAID & ACTIVATE (Admin one-click payment + activation + letter generation) ==========
 
+// Manual "Mark Paid" path (cash / off-platform payment). Settles the pending bill
+// and triggers disputes via the same helper the online webhook uses. Amount comes
+// from the pending bill / service tier unless explicitly overridden in the body.
 clientsRouter.post('/:id/mark-paid-and-activate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
   try {
     const id = String(req.params.id);
-    const client = await prisma.client.findUnique({
-      where: { id },
-      include: { user: true, progress: true }
-    });
+    const amount = typeof req.body.amount === 'number' ? req.body.amount : undefined;
+    const currency = typeof req.body.currency === 'string' ? req.body.currency : undefined;
 
-    if (!client) return res.status(404).json({ error: 'Client not found' });
-    if (!client.progress?.analysis) return res.status(400).json({ error: 'No credit analysis found. Upload credit report and generate analysis first.' });
-
-    const amount = typeof req.body.amount === 'number' ? req.body.amount : 150;
-    const currency = typeof req.body.currency === 'string' ? req.body.currency : 'USD';
-    const type = typeof req.body.type === 'string' ? req.body.type : 'SETUP_FEE';
-
-    // Step 1: Record payment
-    await prisma.payment.create({
-      data: {
-        clientId: id,
-        amount,
-        currency,
-        type: type as any,
-        status: 'PAID',
-        paidAt: new Date()
-      }
-    });
-
-    // Step 2: Clear old dispute items if any exist (fresh start)
-    const existingItems = await prisma.disputeItem.findMany({
-      where: { clientId: id },
-      select: { id: true }
-    });
-    if (existingItems.length > 0) {
-      const ids = existingItems.map(d => d.id);
-      await prisma.disputeRound.deleteMany({ where: { disputeItemId: { in: ids } } });
-      await prisma.disputeItem.deleteMany({ where: { clientId: id } });
-      await prisma.document.deleteMany({ where: { clientId: id, type: 'DISPUTE_LETTER' } });
-    }
-
-    // Step 3: Activate and generate dispute letters
-    const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
-    const result = await activateClientDisputeCampaign(id);
-
-    // Step 4: Log activity
-    await prisma.activityEvent.create({
-      data: {
-        clientId: id,
-        type: 'PAYMENT_RECEIVED',
-        message: `Payment of $${amount} ${currency} received. Client activated and ${result.lettersGenerated} dispute letter(s) generated.`,
-        metadata: { amount, currency, type, lettersGenerated: result.lettersGenerated, autoActivated: true }
-      }
-    });
+    const { settlePaymentAndActivate } = await import('../lib/billingActivation.js');
+    const result = await settlePaymentAndActivate(id, { amount, currency, method: 'manual' });
 
     return res.json({
       success: true,
@@ -457,13 +426,16 @@ clientsRouter.post('/:id/mark-paid-and-activate', requireAuth, requireRole(['STA
       lettersGenerated: result.lettersGenerated,
       emailSent: result.emailSent,
       errors: result.errors,
-      payment: { amount, currency, type, status: 'PAID' },
+      payment: result.payment,
       client: await prisma.client.findUnique({
         where: { id },
         include: { user: true, documents: true, disputeItems: true, tasks: true, payments: true }
       })
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message === 'Client not found') return res.status(404).json({ error: message });
+    if (message.startsWith('No credit analysis')) return res.status(400).json({ error: message });
     next(error);
   }
 });

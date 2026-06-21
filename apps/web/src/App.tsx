@@ -893,13 +893,14 @@ function ClientDetailRoute({ token }: { token: string }) {
                       className="ghost-button"
                       style={{ borderColor: '#22c55e', color: '#22c55e', fontWeight: 600 }}
                       onClick={async () => {
-                        if (!confirm(`Mark ${fullName} as paid and activate? This will record a payment, set status to ACTIVE, and auto-generate dispute letters from the current analysis.`)) return;
+                        if (!confirm(`Mark ${fullName} as paid and activate? This settles the pending bill, sets status to ACTIVE, and auto-generates dispute letters from the current analysis.`)) return;
                         setSaving(true);
                         try {
+                          // No amount sent — the API settles the pending bill at the client's tier amount.
                           const res = await apiFetch<{ success: boolean; activated: boolean; lettersGenerated: number; payment: any }>(`/api/clients/${client.id}/mark-paid-and-activate`, token, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ amount: 150, currency: 'USD', type: 'SETUP_FEE' })
+                            body: JSON.stringify({})
                           });
                           if (res.success && res.activated) {
                             alert(`✅ ${fullName} is now ACTIVE. ${res.lettersGenerated} dispute letter(s) generated. Payment: $${res.payment.amount} ${res.payment.currency}.`);

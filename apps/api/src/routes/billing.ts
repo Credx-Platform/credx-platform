@@ -11,10 +11,43 @@ billingRouter.get('/plans', (_req, res) => {
     plans: [
       { code: 'MASTERCLASS', oneTime: 47, monthly: null, note: '+ applicable taxes & processing fees.' },
       { code: 'ESSENTIAL', setupFee: 150, monthly: 75 },
-      { code: 'PREMIUM', oneTime: 447, monthly: null, guarantee: '+50 point score-increase guarantee within 90 days, or full refund' },
+      { code: 'PREMIUM', oneTime: 447, monthly: null, billing: 'Billed after first full dispute round is delivered. No guaranteed outcome.' },
       { code: 'FAMILY', setupFee: 300, monthly: 95 }
     ]
   });
+});
+
+// Online payment confirmation — processor-agnostic (Authorize.Net / PaymentCloud).
+// Your processor's webhook (or a relay) POSTs here once a payment clears, and this
+// triggers the SAME settle-and-activate path as the manual "Mark Paid" button.
+// Secured with a shared secret (BILLING_CONFIRM_SECRET) sent as x-billing-secret
+// or in the body. The caller must include the clientId (e.g. mapped from the
+// Authorize.Net invoice/refId you set at checkout).
+billingRouter.post('/confirm', async (req, res, next) => {
+  try {
+    const secret = process.env.BILLING_CONFIRM_SECRET || '';
+    const provided = (req.headers['x-billing-secret'] as string | undefined) || req.body?.secret;
+    if (!secret || provided !== secret) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const clientId = String(req.body?.clientId || '');
+    if (!clientId) return res.status(400).json({ error: 'clientId is required' });
+
+    const amount = typeof req.body?.amount === 'number' ? req.body.amount : undefined;
+    const currency = typeof req.body?.currency === 'string' ? req.body.currency : undefined;
+    const reference = typeof req.body?.reference === 'string' ? req.body.reference : undefined;
+
+    const { settlePaymentAndActivate } = await import('../lib/billingActivation.js');
+    const result = await settlePaymentAndActivate(clientId, { amount, currency, reference, method: 'online' });
+
+    return res.json({ success: true, activated: true, ...result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message === 'Client not found') return res.status(404).json({ error: message });
+    if (message.startsWith('No credit analysis')) return res.status(400).json({ error: message });
+    next(error);
+  }
 });
 
 billingRouter.get('/admin/aging', requireAuth, requireRole(['STAFF', 'ADMIN']), (_req, res) => {
