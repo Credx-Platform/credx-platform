@@ -24,6 +24,7 @@
     { "source": "/adminportal/:path*", "destination": "/adminportal.html" },
     { "source": "/masterclass", "destination": "/masterclass.html" },
     { "source": "/masterclass-terms", "destination": "/masterclass-terms.html" },
+    { "source": "/pricing", "destination": "/pricing.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" }
   ],
