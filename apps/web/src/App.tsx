@@ -1803,6 +1803,8 @@ function LoginScreen({
   loading: boolean;
   error: string | null;
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <div className="auth-shell">
       <form className="auth-card" onSubmit={onSubmit}>
@@ -1818,10 +1820,15 @@ function LoginScreen({
           <span>Email</span>
           <input value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="admin@credxme.com" />
         </label>
-        <label>
+        <label htmlFor="admin-login-password">
           <span>Password</span>
-          <input type="password" value={password} onChange={(event) => onPasswordChange(event.target.value)} placeholder="Password" />
         </label>
+        <div className="password-field-row">
+          <input id="admin-login-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => onPasswordChange(event.target.value)} placeholder="Password" />
+          <button type="button" className="ghost-button password-toggle" onClick={() => setShowPassword((current) => !current)} aria-controls="admin-login-password" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+            {showPassword ? 'Hide' : 'View'}
+          </button>
+        </div>
         {error ? <div className="error-banner">{error}</div> : null}
         <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</button>
         <div className="security-note" role="note" aria-label="Security details">
