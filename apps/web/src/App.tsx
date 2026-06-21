@@ -1384,17 +1384,31 @@ Sincerely,
 ${clientName}`;
 }
 
+// Print via a hidden iframe rather than window.open. window.open is silently
+// blocked when called after an `await` (the user-gesture has expired), which is
+// exactly how every print button here is wired — so popups never appeared.
 function openPrintDocument(title: string, body: string) {
-  const w = window.open('', '_blank', 'width=900,height=700');
-  if (!w) return;
-  w.document.open();
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeAdmin(title)}</title><style>
-    body{font-family:Arial,sans-serif;color:#111827;line-height:1.35;padding:0.55in;max-width:8.5in;margin:0 auto;}
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeAdmin(title)}</title><style>
+    body{font-family:Arial,sans-serif;color:#111827;line-height:1.35;padding:0.55in;max-width:8.5in;margin:0 auto;background:#fff;}
     pre{white-space:pre-wrap;font:13px/1.35 Arial,sans-serif;margin:0;}
     @page{margin:0.55in;} @media print{body{padding:0;max-width:none;}}
-  </style></head><body><pre>${escapeAdmin(body)}</pre><script>window.onload=function(){window.print();}</script></body></html>`);
-  w.document.close();
-  w.focus();
+  </style></head><body><pre>${escapeAdmin(body)}</pre></body></html>`;
+  const existing = document.getElementById('credx-admin-print-frame');
+  if (existing) existing.remove();
+  const iframe = document.createElement('iframe');
+  iframe.id = 'credx-admin-print-frame';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  iframe.srcdoc = html;
+  iframe.onload = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch {
+      // ignore
+    }
+  };
+  document.body.appendChild(iframe);
 }
 
 function printAdminDisputeQueue(disputes: DisputeRecord[], clients: ClientRecord[] = []) {
