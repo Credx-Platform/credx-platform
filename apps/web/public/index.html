@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>CredX — Credit Repair & Financial Strategy | The Malloy Group Financial</title>
+<title>CredX — Credit Education & Financial Strategy | The Malloy Group Financial</title>
 <meta name="description" content="CredX is a software-powered credit improvement platform with full program support, AI coaching, and a 5-Day Masterclass for DIY financial freedom.">
 <link rel="canonical" href="https://credxme.com/">
 <meta name="robots" content="index, follow">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="CredX">
-<meta property="og:title" content="CredX — Credit Repair & Financial Strategy">
+<meta property="og:title" content="CredX — Credit Education & Financial Strategy">
 <meta property="og:description" content="Software-powered credit improvement with full program support, AI coaching, and a 5-Day Masterclass.">
 <meta property="og:url" content="https://credxme.com/">
 <meta property="og:image" content="https://credxme.com/images/credx-hero-bg.jpg">
 
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="CredX — Credit Repair & Financial Strategy">
+<meta name="twitter:title" content="CredX — Credit Education & Financial Strategy">
 <meta name="twitter:description" content="Software-powered credit improvement with full program support, AI coaching, and a 5-Day Masterclass.">
 <meta name="twitter:image" content="https://credxme.com/images/credx-hero-bg.jpg">
 
@@ -315,7 +315,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
  <div class="hero-overlay"></div>
  <div class="hero-inner">
   <div class="hero-tag">Full-Service Credit & Wealth Platform</div>
-  <h1>CredX helps you <span class="accent">repair, rebuild, and rise.</span></h1>
+  <h1>CredX helps you <span class="accent">learn, rebuild, and rise.</span></h1>
   <p class="hero-sub">Free credit analysis, dispute support, score tracking, and strategy designed to move you toward approvals and stronger financial positioning.</p>
   <div class="hero-btns">
    <a href="/signup?offer=program" class="btn btn-primary">Sign Up for the Program</a>
@@ -339,7 +339,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   <div>
    <div class="about-tag">About CredX</div>
    <h2>Meet J. Malloy, CEO and creator of CredX.</h2>
-   <p>J. Malloy built CredX to be more than a credit repair brand. The vision is a structured credit and financial positioning platform that helps people repair, rebuild, and rise with more clarity, stronger systems, and practical next steps.</p>
+   <p>J. Malloy built CredX to be more than a credit brand. The vision is a structured credit education and financial positioning platform that helps people learn, rebuild, and rise with more clarity, stronger systems, and practical next steps.</p>
    <p>Cesar serves as the CredX specialist, guiding clients through review, onboarding, and practical file strategy. CredX is designed to combine leadership, education, specialist support, and client visibility in one place.</p>
    <p>The mission is simple, combine clean strategy, real communication, and disciplined execution so every client knows where they stand and what comes next.</p>
    <div class="about-name">J. Malloy</div>
@@ -394,16 +394,16 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
     <a href="/signup?offer=program" class="plan-cta">Start with Essential</a>
    </div>
    <div class="plan">
-    <div class="plan-badge">+50 Points or Money Back</div>
+    <div class="plan-badge">White-Glove Service</div>
     <div class="plan-name">Premium</div>
     <div class="plan-price">$447 <span>one-time</span></div>
-    <div class="plan-detail">Full white-glove credit coaching engagement — disputes, escalation, FTC + CFPB filings, and direct coach access. Backed by our +50 point score-increase guarantee.</div>
+    <div class="plan-detail">Full white-glove credit coaching engagement — guidance on disputing inaccurate items, escalation support, help preparing FTC + CFPB filings, and direct coach access.</div>
     <ul class="plan-features">
      <li>Everything in Essential, fully managed</li>
      <li>Priority sequencing for higher-impact negatives</li>
-     <li>FTC + CFPB filings prepared and tracked for you</li>
+     <li>Help preparing and tracking FTC + CFPB filings</li>
      <li>Direct coach access plus Cesar AI agent</li>
-     <li><strong>+50 point score-increase guarantee</strong> — if your tri-bureau score doesn't rise by at least 50 points within 90 days of activation, you get a full refund.</li>
+     <li><strong>Transparent progress tracking</strong> — clear status updates at every step, with education on your rights under the FCRA. We do not guarantee specific score changes or deletions.</li>
     </ul>
     <a href="/signup?offer=program&amp;tier=premium" class="plan-cta">Start Premium</a>
    </div>
@@ -459,7 +459,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
       <label for="creditGoal">Primary Goal</label>
       <select id="creditGoal">
        <option value="">Select one</option>
-       <option value="Remove negative items">Remove negative items</option>
+       <option value="Dispute inaccurate items">Dispute inaccurate items</option>
        <option value="Prepare for financing">Prepare for financing</option>
        <option value="Rebuild after collections or charge-offs">Rebuild after collections or charge-offs</option>
        <option value="General credit improvement">General credit improvement</option>
@@ -674,7 +674,7 @@ function getCesarReply(message){
  if(!text.trim()) return 'Ask me anything about the CredX program, the 5-Day Masterclass, disputes, financing readiness, or rebuilding your credit.';
  if(text.includes('portal')||text.includes('sign in')||text.includes('login')||text.includes('log in')) return 'If you already have portal access, sign in here: <a href="/portal">CredX Client Portal</a>.<br><br>If you are new and want to get started first, use the direct sign-up page here: <a href="/signup?offer=program">Program Sign Up</a>.';
  if(text.includes('how do i get started')||text.includes('get started')||text.includes('how to start')||text.includes('sign up')||text.includes('signup')||text.includes('apply')) return 'Here\'s the fastest path:<br><br>• <a href="/signup?offer=program">Sign up for the CredX Program</a><br>• <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>• <a href="/portal">Portal login</a> if you already have an account.<br><br>If you want, tell me whether you want DIY education or guided support and I\'ll point you to the best option.';
- if(text.includes('help me')||text==='help'||text.includes('what can you help')||text.includes('how can you help')) return 'I can help you do one of three things right now:<br><br>1. <a href="/signup?offer=program">Start the guided CredX Program</a><br>2. <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>3. <a href="/portal">Open your portal login</a><br><br>If you tell me your goal—remove negatives, prepare for financing, or rebuild after collections—I\'ll recommend the best path.';
+ if(text.includes('help me')||text==='help'||text.includes('what can you help')||text.includes('how can you help')) return 'I can help you do one of three things right now:<br><br>1. <a href="/signup?offer=program">Start the guided CredX Program</a><br>2. <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>3. <a href="/portal">Open your portal login</a><br><br>If you tell me your goal—dispute inaccurate items, prepare for financing, or rebuild after collections—I\'ll recommend the best path.';
  if(text.includes('masterclass')||text.includes('diy')) return 'The 5-Day Masterclass is the DIY path inside CredX. It walks you through credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. If that sounds right, start here: <a href="/signup?offer=masterclass">Masterclass Sign Up</a>.';
  if(text.includes('program')||text.includes('coaching')||text.includes('service')) return 'The CredX Program is the guided path with software, AI support, and coaching. If you want hands-on structure and follow-through, start here: <a href="/signup?offer=program">Program Sign Up</a>.';
  if(text.includes('financing')||text.includes('mortgage')||text.includes('car')||text.includes('approval')) return 'If your goal is financing readiness, the best move is the guided program so your file can be reviewed in context. You can start here: <a href="/signup?offer=program">Program Sign Up</a>.';
