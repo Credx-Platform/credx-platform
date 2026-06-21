@@ -488,8 +488,8 @@ function selectedPlanLabel() {
 
 function selectedAiPriceLabel() {
   if (state.offerInterest !== 'program') return 'Not applicable';
-  if (state.aiPlanScope === 'family') return `$300 deposit + $${familyMonthlyAmount()}/mo`;
-  return state.singleTier === 'aggressive' ? '$447 payment' : '$150 deposit';
+  if (state.aiPlanScope === 'family') return `$300 after first round + $${familyMonthlyAmount()}/mo`;
+  return state.singleTier === 'aggressive' ? '$447 after delivery' : '$150 after first round';
 }
 
 function familyMonthlyAmount() {
@@ -507,7 +507,7 @@ function signupIntake() {
     aiPlanScope: state.offerInterest === 'program' ? state.aiPlanScope : null,
     singleTier: state.offerInterest === 'program' && state.aiPlanScope === 'single' ? state.singleTier : null,
     familyMembers: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? Number(state.familyMembers || 2) : null,
-    quotedDeposit: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? '$300 flat family deposit' : selectedAiPriceLabel(),
+    quotedDeposit: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? '$300 family first-work fee (billed after first round)' : selectedAiPriceLabel(),
     quotedMonthly: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? `$${familyMonthlyAmount()}/mo` : null
   };
 }
@@ -726,11 +726,11 @@ function getSteps() {
         <div class="choice-stack">
           <label class="choice ${state.singleTier === 'standard' ? 'active' : ''}">
             <input type="radio" name="singleTier" value="standard" ${state.singleTier === 'standard' ? 'checked' : ''}>
-            <span><strong>Standard</strong><small>$150 deposit to start the guided AI assistance path.</small></span>
+            <span><strong>Standard</strong><small>$150 first work fee, billed after your first round of disputes is sent — nothing due today.</small></span>
           </label>
           <label class="choice ${state.singleTier === 'aggressive' ? 'active' : ''}">
             <input type="radio" name="singleTier" value="aggressive" ${state.singleTier === 'aggressive' ? 'checked' : ''}>
-            <span><strong>Aggressive</strong><small>$447 payment for the higher-touch path.</small></span>
+            <span><strong>Aggressive</strong><small>$447 for the higher-touch path, billed after your first full dispute round is delivered — nothing due today.</small></span>
           </label>
         </div>
         <div class="price-note"><strong>Selected:</strong> ${escapeHtml(selectedAiPriceLabel())}</div>
@@ -755,7 +755,7 @@ function getSteps() {
           <span>Family members</span>
           <input id="familyMembers" type="number" min="2" max="5" inputmode="numeric" value="${escapeHtml(state.familyMembers)}">
         </label>
-        <div class="price-note"><strong>Family pricing:</strong> $300 flat deposit, then $${familyMonthlyAmount()}/mo. That is $75/mo base plus $20/mo for each additional family member.</div>
+        <div class="price-note"><strong>Family pricing:</strong> $300 first work fee billed after your first round, then $${familyMonthlyAmount()}/mo billed after each month's work — nothing due today. That is $75/mo base plus $20/mo for each additional family member.</div>
       `,
       bind: () => {
         const input = document.getElementById('familyMembers');
