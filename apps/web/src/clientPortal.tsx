@@ -30,7 +30,18 @@ type Client = {
   tasks?: Array<{ id: string; title: string; description?: string | null; completed: boolean; dueAt?: string | null }>;
   activities?: Array<{ id: string; message: string; createdAt: string; type?: string }>;
   disputes?: Array<{ id: string; creditorName: string; bureau: string; status: string; round: number; reason?: string | null; accountNumber?: string | null }>;
-  documents?: Array<{ id: string; fileName: string; type: string; uploadedAt: string }>;
+  documents?: Array<{
+    id: string;
+    fileName: string;
+    type: string;
+    uploadedAt: string;
+    contentType?: string | null;
+    s3Key?: string | null;
+    roundNumber?: number | null;
+    letterType?: string | null;
+    bureau?: string | null;
+    letterStatus?: string | null;
+  }>;
 };
 
 type Progress = {
@@ -900,6 +911,7 @@ const BUREAU_ADDRESSES: Record<string, BureauAddr> = {
 };
 
 type DisputeLetter = { bureau: string; bureauLabel: string; filename: string; html: string; items: any[] };
+type ClientDocument = NonNullable<Client['documents']>[number];
 
 type MailedRecord = {
   bureau: string;
@@ -1175,6 +1187,28 @@ function printLetter(letter: DisputeLetter) {
   document.body.appendChild(iframe);
 }
 
+function printableTextHtml(title: string, content: string): string {
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+<style>
+  body{font-family:Arial,sans-serif;color:#111827;background:#fff;margin:0;padding:0.55in;font-size:13px;line-height:1.35;}
+  pre{white-space:pre-wrap;font:13px/1.35 Arial,sans-serif;margin:0;}
+  @page{margin:0.55in;}
+  @media print{body{padding:0;}}
+</style></head><body><pre>${escapeHtml(content)}</pre></body></html>`;
+}
+
+function printHtmlDocument(title: string, html: string) {
+  const letter: DisputeLetter = {
+    bureau: title,
+    bureauLabel: title,
+    filename: `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'document'}.html`,
+    html,
+    items: []
+  };
+  printLetter(letter);
+}
+
 function buildFtcReportHtml(user: User | null, client: Client | null, allItems: any[], progress: Progress | null = null): string {
   const subject = resolveLetterSubject(progress, user, client);
   const name = subject.name;
@@ -1359,11 +1393,16 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
   const disputes = normalizeDisputes(client, progress);
   const status = (client?.status || '').toUpperCase();
   const isActive = ['ACTIVE', 'PAST_DUE'].includes(status);
+  const accountDocuments = (client?.documents || []).filter((doc) => {
+    const haystack = `${doc.type || ''} ${doc.letterType || ''} ${doc.fileName || ''}`.toLowerCase();
+    return haystack.includes('dispute');
+  });
 
   const [subTab, setSubTab] = useState<'active' | 'letters' | 'print' | 'ftc' | 'cfpb' | 'mail' | 'responses'>('active');
   const [genMessage, setGenMessage] = useState<string | null>(null);
   const [mailingBureau, setMailingBureau] = useState<string | null>(null);
   const [mailError, setMailError] = useState<string | null>(null);
+  const [docPrintBusy, setDocPrintBusy] = useState<string | null>(null);
   const [respBusy, setRespBusy] = useState(false);
   const [respError, setRespError] = useState<string | null>(null);
 
@@ -1446,6 +1485,31 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
       setRespError(err instanceof Error ? err.message : 'Could not classify the response.');
     } finally {
       setRespBusy(false);
+    }
+  };
+
+  const printSavedDocument = async (document: ClientDocument) => {
+    setMailError(null);
+    setDocPrintBusy(document.id);
+    try {
+      const result = await apiFetch<{ document: ClientDocument; content?: string; url?: string }>(
+        `/api/clients/me/documents/${document.id}/print`,
+        token
+      );
+      const title = result.document?.fileName || document.fileName || 'Dispute letter';
+      if (result.content) {
+        printHtmlDocument(title, printableTextHtml(title, result.content));
+        return;
+      }
+      if (result.url && /^https?:\/\//i.test(result.url)) {
+        window.open(result.url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      setMailError('This saved document cannot be printed yet. Ask CredX support to regenerate the letter or re-upload the document.');
+    } catch (err) {
+      setMailError(err instanceof Error ? err.message : 'Could not open this saved letter for printing.');
+    } finally {
+      setDocPrintBusy(null);
     }
   };
 
@@ -1545,7 +1609,7 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
         <button type="button" className="ghost-button" onClick={generate} style={{ background: '#a855f7', color: '#fff', border: 'none', fontWeight: 700 }}>
           ✉ Generate Dispute Letters from Analysis
         </button>
-        <span className="helper-text" style={{ margin: 0, color: '#475569' }}>{genMessage || 'Pulls all negative items from your CredX analysis and groups them per bureau. Generated letters populate every dispute view across your portal.'}</span>
+        <span className="helper-text" style={{ margin: 0, color: '#475569' }}>{genMessage || 'Pulls all negative items from your CredX analysis and groups them per bureau. Any letters CredX already generated for your account can be printed below.'}</span>
       </div>
 
       {subTab === 'active' ? (
@@ -1573,6 +1637,36 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
 
       {subTab === 'letters' ? (
         <div className="dispute-list">
+          {accountDocuments.length ? (
+            <div className="dispute-card-live">
+              <div className="dispute-card-top">
+                <strong style={{ color: '#0f172a' }}>Customized letters saved by CredX</strong>
+                <span className="status-badge status-pending">{accountDocuments.length} ready</span>
+              </div>
+              <div className="dispute-meta" style={{ color: '#334155' }}>
+                <span>These are the account-specific letters already stored on your file. You can print them directly from your client portal.</span>
+              </div>
+              <div className="print-center-list" style={{ marginTop: '0.6rem' }}>
+                {accountDocuments.map((document) => (
+                  <div className="print-center-row" key={document.id}>
+                    <div>
+                      <strong>{document.bureau || document.fileName || 'Dispute letter'}</strong>
+                      <span>{document.fileName || 'Saved letter'}{document.roundNumber ? ` · Round ${document.roundNumber}` : ''}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => printSavedDocument(document)}
+                      disabled={docPrintBusy === document.id}
+                      style={{ color: '#0f172a', fontWeight: 600 }}
+                    >
+                      {docPrintBusy === document.id ? 'Opening...' : 'Print'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {letters.length ? letters.map((letter) => (
             <div key={letter.bureau} className="dispute-card-live">
               <div className="dispute-card-top">
@@ -1597,20 +1691,47 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
                 </div>
               ) : null}
             </div>
-          )) : <div className="empty-state-card">No letters generated yet — hit the purple button above to build them from your analysis.</div>}
+          )) : !accountDocuments.length ? <div className="empty-state-card">No letters generated yet — hit the purple button above to build them from your analysis.</div> : null}
           {mailError ? <div className="error-banner" style={{ marginTop: '0.5rem' }}>{mailError}</div> : null}
         </div>
       ) : null}
 
       {subTab === 'print' ? (
         <div>
-          {letters.length ? (
+          {letters.length || accountDocuments.length ? (
             <>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
-                <button type="button" className="ghost-button" onClick={() => letters.forEach(printLetter)} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>🖨 Print all bureau letters</button>
-                <span className="helper-text" style={{ margin: 0, color: '#475569' }}>Opens each letter in a new tab and triggers the print dialog.</span>
+                <button type="button" className="ghost-button" onClick={() => letters.forEach(printLetter)} disabled={!letters.length} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>🖨 Print all generated bureau letters</button>
+                <span className="helper-text" style={{ margin: 0, color: '#475569' }}>Clients can print their own saved CredX letters or any letters they generate from the analysis.</span>
               </div>
               <div className="dispute-list">
+                {accountDocuments.length ? (
+                  <div className="dispute-card-live">
+                    <div className="dispute-card-top">
+                      <strong style={{ color: '#0f172a' }}>Saved customized dispute letters</strong>
+                      <span className="status-badge status-pending">{accountDocuments.length} document{accountDocuments.length === 1 ? '' : 's'}</span>
+                    </div>
+                    <div className="print-center-list" style={{ marginTop: '0.6rem' }}>
+                      {accountDocuments.map((document) => (
+                        <div className="print-center-row" key={document.id}>
+                          <div>
+                            <strong>{document.bureau || document.fileName || 'Dispute letter'}</strong>
+                            <span>{document.fileName || 'Saved letter'}{document.letterStatus ? ` · ${prettyStatus(document.letterStatus)}` : ''}</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="ghost-button"
+                            onClick={() => printSavedDocument(document)}
+                            disabled={docPrintBusy === document.id}
+                            style={{ color: '#0f172a', fontWeight: 600 }}
+                          >
+                            {docPrintBusy === document.id ? 'Opening...' : 'Print'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {letters.map((letter) => (
                   <div key={letter.bureau} className="dispute-card-live">
                     <div className="dispute-card-top"><strong style={{ color: '#0f172a' }}>{letter.bureauLabel}</strong><button type="button" className="ghost-button" onClick={() => printLetter(letter)} style={{ color: '#0f172a', fontWeight: 600 }}>🖨 Print</button></div>

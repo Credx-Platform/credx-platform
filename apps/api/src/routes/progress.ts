@@ -9,6 +9,7 @@ import { config } from '../config.js';
 import { CreditAnalysisService, deriveReportSubject } from '../lib/creditAnalysis.js';
 import { dispatchAnalysisEmail } from '../lib/analysisEmailDispatch.js';
 import { extractReport } from '../lib/reportExtractor.js';
+import { uploadDocument } from '../lib/blob-storage.js';
 import type { DocumentType } from '@prisma/client';
 
 export const progressRouter = Router();
@@ -411,11 +412,20 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
     const docType = inferDocumentType(rawType);
     const uploadedAt = new Date().toISOString();
     const safeName = file.originalname || `upload-${Date.now()}`;
-    const storageKey = `secure/${client.id}/${Date.now()}-${crypto.randomUUID()}-${safeName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const fallbackStorageKey = `secure/${client.id}/${Date.now()}-${crypto.randomUUID()}-${safeName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    let storageKey = fallbackStorageKey;
+    let storedUrl: string | null = null;
+    try {
+      const stored = await uploadDocument(file.buffer, safeName, file.mimetype || 'application/octet-stream', client.id);
+      storageKey = stored.url;
+      storedUrl = stored.url;
+    } catch (storageError) {
+      console.warn('Document blob storage unavailable; saving metadata only', storageError);
+    }
     const secureDoc = {
       name: safeName,
       type: docType,
-      url: null,
+      url: storedUrl,
       fileName: safeName,
       uploadedAt,
       secure: true,

@@ -57,6 +57,20 @@ type ClientProgress = {
   } | null;
 };
 
+type DocumentRecord = {
+  id: string;
+  type?: string | null;
+  fileName?: string | null;
+  s3Key?: string | null;
+  contentType?: string | null;
+  uploadedAt?: string | null;
+  createdAt?: string | null;
+  roundNumber?: number | null;
+  letterType?: string | null;
+  bureau?: string | null;
+  letterStatus?: string | null;
+};
+
 type ClientRecord = {
   id: string;
   status: 'LEAD' | 'STUDENT' | 'CONTRACT_SENT' | 'INTAKE_RECEIVED' | 'ANALYSIS_READY' | 'UPGRADE_OFFERED' | 'ACTIVE' | 'PAST_DUE' | 'RESTRICTED' | 'CANCELLED';
@@ -76,7 +90,7 @@ type ClientRecord = {
   user: User;
   disputes: Array<{ id: string; status: string }>;
   payments: Array<{ id: string; status: string }>;
-  documents: Array<{ id: string }>;
+  documents: DocumentRecord[];
   activities: Array<{ id: string; message: string; createdAt: string }>;
   progress?: ClientProgress | null;
 };
@@ -874,6 +888,88 @@ function ClientDetailRoute({ token }: { token: string }) {
                 </div>
                 <div className="client-workspace-actions">
                   <button onClick={saveStatus} disabled={saving}>{saving ? 'Saving...' : 'Save Status'}</button>
+                  {client.progress?.analysis && client.status !== 'ACTIVE' ? (
+                    <button
+                      className="ghost-button"
+                      style={{ borderColor: '#22c55e', color: '#22c55e', fontWeight: 600 }}
+                      onClick={async () => {
+                        if (!confirm(`Mark ${fullName} as paid and activate? This will record a payment, set status to ACTIVE, and auto-generate dispute letters from the current analysis.`)) return;
+                        setSaving(true);
+                        try {
+                          const res = await apiFetch<{ success: boolean; activated: boolean; lettersGenerated: number; payment: any }>(`/api/clients/${client.id}/mark-paid-and-activate`, token, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ amount: 150, currency: 'USD', type: 'SETUP_FEE' })
+                          });
+                          if (res.success && res.activated) {
+                            alert(`✅ ${fullName} is now ACTIVE. ${res.lettersGenerated} dispute letter(s) generated. Payment: $${res.payment.amount} ${res.payment.currency}.`);
+                          } else {
+                            alert('Activation completed but no letters were generated. Check analysis data.');
+                          }
+                          const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
+                          setClient(updated.client);
+                          setStatusValue('ACTIVE');
+                        } catch (err) {
+                          alert(`Activation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving}
+                    >
+                      💳 Mark Paid & Activate
+                    </button>
+                  ) : null}
+                  {client.status === 'ACTIVE' && client.progress?.analysis ? (
+                    <button
+                      className="ghost-button"
+                      style={{ borderColor: '#00c6fb', color: '#00c6fb' }}
+                      onClick={async () => {
+                        if (!confirm(`Regenerate dispute letters for ${fullName}? This will delete old dispute items and letters, then create fresh ones from the current analysis.`)) return;
+                        setSaving(true);
+                        try {
+                          const res = await apiFetch<{ success: boolean; lettersGenerated: number; documents: any[] }>(`/api/clients/${client.id}/regenerate-letters`, token, { method: 'POST' });
+                          if (res.success) {
+                            alert(`✅ Regenerated ${res.lettersGenerated} dispute letter(s) for ${fullName}.`);
+                            const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
+                            setClient(updated.client);
+                          } else {
+                            alert('Regeneration completed but no letters were generated. Check analysis data.');
+                          }
+                        } catch (err) {
+                          alert(`Regeneration failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving}
+                    >
+                      🔄 Regenerate Letters
+                    </button>
+                  ) : null}
+                  {client.disputeItems && client.disputeItems.length > 0 ? (
+                    <button
+                      className="ghost-button"
+                      style={{ borderColor: '#ef4444', color: '#ef4444' }}
+                      onClick={async () => {
+                        if (!confirm(`Clear all dispute items and letters for ${fullName}? This cannot be undone.`)) return;
+                        setSaving(true);
+                        try {
+                          await apiFetch<{ success: boolean }>(`/api/clients/${client.id}/clear-disputes`, token, { method: 'POST' });
+                          alert(`✅ Cleared all dispute items for ${fullName}.`);
+                          const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
+                          setClient(updated.client);
+                        } catch (err) {
+                          alert(`Clear failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving}
+                    >
+                      🗑️ Clear Disputes
+                    </button>
+                  ) : null}
                 </div>
                 <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                   <p className="helper-text" style={{ color: '#f87171', marginBottom: '0.5rem' }}>⚠️ Staff action — use only when client needs a fresh start.</p>
@@ -1232,32 +1328,95 @@ function MasterclassProgressPanel({ progress }: { progress: ClientDetail['progre
   );
 }
 
-function printAdminDisputeQueue(disputes: DisputeRecord[]) {
+function formatClientAddress(client?: Pick<ClientRecord, 'currentAddressLine1' | 'currentAddressLine2' | 'currentCity' | 'currentState' | 'currentPostalCode'> | null) {
+  if (!client) return '[Client Address]';
+  const street = [client.currentAddressLine1, client.currentAddressLine2].filter(Boolean).join(', ');
+  const cityLine = [client.currentCity, client.currentState, client.currentPostalCode].filter(Boolean).join(', ');
+  return [street, cityLine].filter(Boolean).join('\n') || '[Client Address]';
+}
+
+function bureauMailingAddress(bureau: DisputeRecord['bureau']) {
+  if (bureau === 'EQUIFAX') return 'P.O. Box 740256\nAtlanta, GA 30374-0256';
+  if (bureau === 'EXPERIAN') return 'P.O. Box 4500\nAllen, TX 75013';
+  return 'P.O. Box 2000\nChester, PA 19016';
+}
+
+function buildAdminDisputeLetter(dispute: DisputeRecord, client?: ClientRecord) {
+  const clientName = `${dispute.client.user.firstName} ${dispute.client.user.lastName}`;
+  const bureau = bureauLabel(dispute.bureau);
+  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const identityLine = client?.ssnLast4 ? `SSN: ***-**-${client.ssnLast4}` : 'SSN: [last four only]';
+  const disputeReason = dispute.reason || 'Account type is incorrect and not correctly displayed. Please delete.';
+  return `${clientName}
+${formatClientAddress(client)}
+${identityLine}
+
+${bureau}
+${bureauMailingAddress(dispute.bureau)}
+
+${today}
+
+${dispute.creditorName}: Account number: [last four or partial account number only], ${disputeReason}
+
+I am writing to formally dispute the accuracy and validity of certain items appearing on my credit report in accordance with my rights under the Fair Credit Reporting Act (FCRA) (15 U.S.C. § 1681 et seq.) and the Fair Debt Collection Practices Act (FDCPA) (15 U.S.C. § 1692 et seq.). I demand the immediate removal of the following item due to its unlawful, inaccurate, incomplete, or unverifiable presence on my credit report.
+
+1. Unauthorized Third-Party Collections
+According to 15 U.S.C. § 1692e, it is illegal for a debt collector to report false or misleading information to the credit bureaus. I am requesting verification of the alleged debt, including:
+• A copy of the original signed contract proving my consent and liability for this debt.
+• A chain of custody showing how the debt was acquired.
+• Proof that this debt was lawfully assigned in compliance with 15 U.S.C. § 1692g (Validation of Debts).
+
+Failure to provide the above documentation within 30 days will constitute a violation of 15 U.S.C. § 1692k, making the reporting party liable for damages.
+
+2. Unauthorized Inquiries
+Per 15 U.S.C. § 1681b, a company must have permissible purpose to conduct a hard inquiry on my credit report. I demand the immediate removal of any inquiry connected to this disputed item if it was not authorized by me.
+
+Under 15 U.S.C. § 1681n, any entity that unlawfully accesses my credit file without proper authorization is subject to statutory damages, attorney's fees, and punitive damages.
+
+Final Demand
+As required under 15 U.S.C. § 1681i (Procedure in Case of Disputed Accuracy), you have 30 days to conduct a thorough investigation and remove the inaccurate information. Failure to do so will result in a complaint being filed with the Consumer Financial Protection Bureau (CFPB), the Federal Trade Commission (FTC), and the Attorney General's Office.
+
+I expect a written response confirming the removal of this disputed account and any related inquiry. Any further attempt to report unverifiable or unauthorized information will be considered a willful violation of federal law.
+
+Please send all correspondence to my mailing address listed above.
+
+Sincerely,
+${clientName}`;
+}
+
+function openPrintDocument(title: string, body: string) {
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) return;
+  w.document.open();
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeAdmin(title)}</title><style>
+    body{font-family:Arial,sans-serif;color:#111827;line-height:1.35;padding:0.55in;max-width:8.5in;margin:0 auto;}
+    pre{white-space:pre-wrap;font:13px/1.35 Arial,sans-serif;margin:0;}
+    @page{margin:0.55in;} @media print{body{padding:0;max-width:none;}}
+  </style></head><body><pre>${escapeAdmin(body)}</pre><script>window.onload=function(){window.print();}</script></body></html>`);
+  w.document.close();
+  w.focus();
+}
+
+function printAdminDisputeQueue(disputes: DisputeRecord[], clients: ClientRecord[] = []) {
   const today = new Date().toLocaleString();
-  const rows = disputes.map((d) => `<tr>
-    <td>${escapeAdmin(`${d.client.user.firstName} ${d.client.user.lastName}`)}<br><span style="color:#64748b;font-size:11px;">${escapeAdmin(d.client.user.email)}</span></td>
-    <td>${escapeAdmin(d.creditorName)}</td>
-    <td>${escapeAdmin(bureauLabel(d.bureau))}</td>
-    <td>${escapeAdmin(d.status.replace('_', ' '))}</td>
-    <td>Round ${d.round}</td>
-    <td>${escapeAdmin(formatDate(d.createdAt))}</td>
-    <td>${escapeAdmin(d.reason || '')}</td>
-  </tr>`).join('');
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>CredX Dispute Queue — ${today}</title>
+  const clientById = new Map(clients.map((client) => [client.id, client]));
+  const letters = disputes.map((d, index) => {
+    const client = clientById.get(d.client.id);
+    const body = buildAdminDisputeLetter(d, client);
+    return `<section class="letter${index > 0 ? ' page-break' : ''}">
+      <pre>${escapeAdmin(body)}</pre>
+    </section>`;
+  }).join('');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>CredX Dispute Letters — ${today}</title>
 <style>
-  body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;}
-  h1{margin:0 0 4px;font-size:20px;} .muted{color:#64748b;font-size:12px;margin-bottom:14px;}
-  table{width:100%;border-collapse:collapse;font-size:12px;}
-  th,td{border:1px solid #94a3b8;padding:6px 8px;text-align:left;vertical-align:top;}
-  th{background:#e2e8f0;}
-  @media print{ body{padding:0.4in;} }
+  body{font-family:Arial,sans-serif;padding:0.55in;color:#111827;line-height:1.35;}
+  pre{white-space:pre-wrap;font:13px/1.35 Arial,sans-serif;margin:0;}
+  .page-break{page-break-before:always;}
+  .empty{color:#64748b;font-size:13px;}
+  @page{margin:0.55in;}
+  @media print{ body{padding:0;} }
 </style></head><body>
-  <h1>CredX Dispute Queue</h1>
-  <div class="muted">Printed ${today} · ${disputes.length} item${disputes.length === 1 ? '' : 's'}</div>
-  <table>
-    <thead><tr><th>Client</th><th>Creditor</th><th>Bureau</th><th>Status</th><th>Round</th><th>Opened</th><th>Reason</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="7">No dispute items.</td></tr>'}</tbody>
-  </table>
+  ${letters || '<div class="empty">No dispute letters ready to print.</div>'}
 </body></html>`;
   const w = window.open('', '_blank', 'noopener,noreferrer');
   if (!w) return;
@@ -1272,7 +1431,7 @@ function escapeAdmin(s: unknown): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
 }
 
-function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRecord[] }) {
+function DisputesRoute({ token, disputes, clients }: { token: string; disputes: DisputeRecord[]; clients: ClientRecord[] }) {
   const active = disputes.filter((item) => !['COMPLETED', 'REJECTED'].includes(item.status));
   const completed = disputes.filter((item) => item.status === 'COMPLETED').length;
   const responseDue = disputes.filter((item) => item.status === 'RESPONSE_DUE').length;
@@ -1310,7 +1469,7 @@ function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRe
             <p className="eyebrow">Dispute Section</p>
             <h2>{subTab === 'manager' ? 'Client dispute operations' : 'Bulk Print'}</h2>
             <p className="helper-text">{subTab === 'print'
-              ? 'Every dispute item, grouped by client. Print one client at a time or run the full batch.'
+              ? 'Every dispute item, grouped by client. Print one client at a time or run the full batch from the paper-ready template.'
               : 'Import reports, add items, and track bureau status. Use Bulk Print to print every dispute letter at once.'}</p>
           </div>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -1334,11 +1493,14 @@ function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRe
         {subTab === 'print' ? (
           <div>
             <div className="bulk-print-toolbar">
-              <button type="button" onClick={() => printAdminDisputeQueue(disputes)} disabled={!disputes.length}>
+              <button type="button" onClick={() => printAdminDisputeQueue(disputes, clients)} disabled={!disputes.length}>
                 🖨 Print all dispute letters ({disputes.length})
               </button>
+              <button type="button" className="ghost-button" onClick={() => window.location.assign('/adminportal/print')}>
+                Open Print Center
+              </button>
               <span className="helper-text" style={{ margin: 0 }}>
-                Opens a paper-ready, page-broken view grouped by client and triggers your browser's print dialog.
+                Opens completed letter pages and triggers your browser's print dialog.
               </span>
             </div>
 
@@ -1354,7 +1516,7 @@ function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRe
                       <button
                         type="button"
                         className="ghost-button"
-                        onClick={() => printAdminDisputeQueue(items)}
+                        onClick={() => printAdminDisputeQueue(items, clients)}
                       >
                         🖨 Print {items.length} letter{items.length === 1 ? '' : 's'}
                       </button>
@@ -1393,6 +1555,215 @@ function DisputesRoute({ token, disputes }: { token: string; disputes: DisputeRe
             )}
           </div>
         ) : null}
+      </section>
+    </div>
+  );
+}
+
+function PrintCenterRoute({ token, clients, disputes }: { token: string; clients: ClientRecord[]; disputes: DisputeRecord[] }) {
+  const [clientFilter, setClientFilter] = useState('');
+  const visibleClients = useMemo(() => (
+    clientFilter ? clients.filter((client) => client.id === clientFilter) : clients
+  ), [clientFilter, clients]);
+  const visibleDisputes = useMemo(() => (
+    clientFilter ? disputes.filter((dispute) => dispute.client.id === clientFilter) : disputes
+  ), [clientFilter, disputes]);
+  const visibleDocuments = visibleClients.flatMap((client) => (client.documents || []).map((document) => ({ client, document })));
+  const signedAgreements = visibleClients
+    .map((client) => ({ client, signature: client.progress?.onboarding?.signature }))
+    .filter((entry) => entry.signature?.signedAt);
+  const analysisDocs = visibleClients.filter((client) => client.analysisSummary || client.disputePlanSummary);
+  const canPrintUploadedDocument = (document: DocumentRecord) => {
+    const storage = document.s3Key || '';
+    const name = document.fileName || '';
+    return /^https?:\/\//i.test(storage) || document.contentType?.startsWith('text/') || name.toLowerCase().endsWith('.txt');
+  };
+
+  const printUploadedDocument = async (client: ClientRecord, document: DocumentRecord) => {
+    if (!canPrintUploadedDocument(document)) {
+      alert('This older upload only has secure metadata on file, not a printable file URL. Re-upload it from the client Documents tab and it will print from here.');
+      return;
+    }
+    try {
+      const result = await apiFetch<{ document: DocumentRecord; content?: string; url?: string }>(
+        `/api/clients/${client.id}/documents/${document.id}/print`,
+        token
+      );
+      const title = result.document.fileName || document.fileName || 'CredX document';
+      if (result.content) {
+        openPrintDocument(title, result.content);
+        return;
+      }
+      if (result.url && /^https?:\/\//i.test(result.url)) {
+        const w = window.open('', '_blank', 'width=900,height=700');
+        if (!w) return;
+        const isImage = (result.document.contentType || '').startsWith('image/');
+        w.document.open();
+        w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeAdmin(title)}</title><style>
+          body{margin:0;padding:18px;font-family:Arial,sans-serif;color:#0f172a;}
+          iframe{width:100%;height:calc(100vh - 40px);border:0;} img{max-width:100%;height:auto;display:block;margin:0 auto;}
+          @media print{body{padding:0;} iframe{height:100vh;}}
+        </style></head><body>${isImage ? `<img src="${escapeAdmin(result.url)}" alt="${escapeAdmin(title)}">` : `<iframe src="${escapeAdmin(result.url)}"></iframe>`}<script>window.onload=function(){setTimeout(function(){window.print();},500);}</script></body></html>`);
+        w.document.close();
+        w.focus();
+        return;
+      }
+      alert('This document is on file, but it does not have a browser-printable file URL yet.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Unable to print document');
+    }
+  };
+
+  const printAgreement = (client: ClientRecord) => {
+    const sig = client.progress?.onboarding?.signature;
+    if (!sig) return;
+    const fullName = `${client.user.firstName} ${client.user.lastName}`;
+    const body = `Signed CredX Service Agreement
+
+Client: ${fullName}
+Email: ${client.user.email}
+Signed by: ${sig.signedName || fullName}
+Signed at: ${sig.signedAt ? formatDate(sig.signedAt) : 'Not recorded'}
+Contract ID: ${sig.contractId || 'Not recorded'}
+
+AGREEMENT
+${sig.agreementText || 'Agreement text not stored on this record.'}
+
+REQUIRED DISCLOSURES
+${sig.disclosureStatement || 'Disclosure statement not stored on this record.'}
+
+${sig.cancellationNotice?.heading ? `${sig.cancellationNotice.heading}\n${sig.cancellationNotice.text || ''}` : ''}`;
+    openPrintDocument(`${fullName} - Signed Agreement`, body);
+  };
+
+  const printAnalysis = (client: ClientRecord) => {
+    const fullName = `${client.user.firstName} ${client.user.lastName}`;
+    const body = `CredX Client Analysis Summary
+
+Client: ${fullName}
+Email: ${client.user.email}
+Status: ${client.status.replace('_', ' ')}
+Tier: ${client.serviceTier}
+Estimated timeline: ${client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} months` : 'Pending'}
+
+ANALYSIS SUMMARY
+${client.analysisSummary || 'No analysis summary stored.'}
+
+DISPUTE PLAN
+${client.disputePlanSummary || 'No dispute plan summary stored.'}`;
+    openPrintDocument(`${fullName} - Analysis Summary`, body);
+  };
+
+  return (
+    <div className="page-grid">
+      <section className="hero-card hero-card--compact">
+        <div>
+          <p className="eyebrow">Admin Print Center</p>
+          <h1>Print packets, letters, and client documents</h1>
+          <p>Use this section for dispute letters, uploaded documents, signed agreements, and analysis summaries before mailing or saving to PDF.</p>
+        </div>
+        <div className="hero-stats">
+          <div className="stat-card"><span>Letters</span><strong>{visibleDisputes.length}</strong></div>
+          <div className="stat-card"><span>Uploads</span><strong>{visibleDocuments.length}</strong></div>
+          <div className="stat-card"><span>Agreements</span><strong>{signedAgreements.length}</strong></div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Print Queue</p>
+            <h2>All printable documents</h2>
+            <p className="helper-text">Filter to one client or print the full dispute batch from the CredX letter format.</p>
+          </div>
+          <label className="print-center-filter">
+            <span>Client</span>
+            <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)}>
+              <option value="">All clients</option>
+              {clients.map((client) => <option key={client.id} value={client.id}>{client.user.firstName} {client.user.lastName}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <div className="bulk-print-toolbar">
+          <button type="button" onClick={() => printAdminDisputeQueue(visibleDisputes, clients)} disabled={!visibleDisputes.length}>
+            🖨 Bulk print dispute letters ({visibleDisputes.length})
+          </button>
+          <span className="helper-text" style={{ margin: 0 }}>Prints one formatted letter page per dispute item.</span>
+        </div>
+
+        <div className="print-center-grid">
+          <section className="print-center-section">
+            <h3>Dispute letters</h3>
+            {visibleDisputes.length ? (
+              <div className="print-center-list">
+                {visibleDisputes.map((dispute) => {
+                  const client = clients.find((item) => item.id === dispute.client.id);
+                  return (
+                    <div className="print-center-row" key={dispute.id}>
+                      <div>
+                        <strong>{dispute.creditorName}</strong>
+                        <span>{dispute.client.user.firstName} {dispute.client.user.lastName} · {bureauLabel(dispute.bureau)} · Round {dispute.round}</span>
+                      </div>
+                      <button type="button" className="ghost-button" onClick={() => openPrintDocument(`${dispute.creditorName} - ${bureauLabel(dispute.bureau)}`, buildAdminDisputeLetter(dispute, client))}>Print</button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <p className="helper-text">No dispute letters in this print queue.</p>}
+          </section>
+
+          <section className="print-center-section">
+            <h3>Uploaded and generated documents</h3>
+            {visibleDocuments.length ? (
+              <div className="print-center-list">
+                {visibleDocuments.map(({ client, document }) => (
+                  <div className="print-center-row" key={document.id}>
+                    <div>
+                      <strong>{document.fileName || document.id}</strong>
+                      <span>{client.user.firstName} {client.user.lastName} · {(document.type || 'Document').replace(/_/g, ' ')}{document.bureau ? ` · ${document.bureau}` : ''}{canPrintUploadedDocument(document) ? '' : ' · Re-upload needed'}</span>
+                    </div>
+                    <button type="button" className="ghost-button" onClick={() => printUploadedDocument(client, document)} disabled={!canPrintUploadedDocument(document)}>Print</button>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="helper-text">No uploaded documents found for this filter.</p>}
+          </section>
+
+          <section className="print-center-section">
+            <h3>Signed agreements</h3>
+            {signedAgreements.length ? (
+              <div className="print-center-list">
+                {signedAgreements.map(({ client, signature }) => (
+                  <div className="print-center-row" key={client.id}>
+                    <div>
+                      <strong>{client.user.firstName} {client.user.lastName}</strong>
+                      <span>Signed {signature?.signedAt ? formatDate(signature.signedAt) : 'date pending'}</span>
+                    </div>
+                    <button type="button" className="ghost-button" onClick={() => printAgreement(client)}>Print</button>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="helper-text">No signed agreements found for this filter.</p>}
+          </section>
+
+          <section className="print-center-section">
+            <h3>Analysis summaries</h3>
+            {analysisDocs.length ? (
+              <div className="print-center-list">
+                {analysisDocs.map((client) => (
+                  <div className="print-center-row" key={client.id}>
+                    <div>
+                      <strong>{client.user.firstName} {client.user.lastName}</strong>
+                      <span>{client.status.replace('_', ' ')} · {client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} month timeline` : 'Timeline pending'}</span>
+                    </div>
+                    <button type="button" className="ghost-button" onClick={() => printAnalysis(client)}>Print</button>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="helper-text">No analysis summaries found for this filter.</p>}
+          </section>
+        </div>
       </section>
     </div>
   );
@@ -1924,6 +2295,7 @@ export default function App() {
           <NavLink to="/leads">Leads</NavLink>
           <NavLink to="/clients">Clients</NavLink>
           <NavLink to="/disputes">Disputes</NavLink>
+          <NavLink to="/print">Print Center</NavLink>
           <NavLink to="/tasks">Tasks</NavLink>
         </nav>
       </aside>
@@ -1932,6 +2304,8 @@ export default function App() {
           const path = location.pathname;
           const accent = path.startsWith('/disputes')
             ? '#f59e0b'
+            : path.startsWith('/print')
+              ? '#14b8a6'
             : path.startsWith('/clients')
               ? '#a855f7'
               : path.startsWith('/leads')
@@ -1941,6 +2315,8 @@ export default function App() {
                   : '#00c6fb';
           const sectionLabel = path.startsWith('/disputes')
             ? 'Disputes operations'
+            : path.startsWith('/print')
+              ? 'Print center'
             : path.startsWith('/clients')
               ? 'Client management'
               : path.startsWith('/leads')
@@ -1950,6 +2326,8 @@ export default function App() {
                   : 'Operations dashboard';
           const subtitle = path.startsWith('/disputes')
             ? 'Track every dispute round, bureau status, and outcome across the book.'
+            : path.startsWith('/print')
+              ? 'Print dispute packets, signed agreements, uploads, and client analysis documents.'
             : path.startsWith('/clients')
               ? 'Search, open, and update client files. Identity data is encrypted at rest.'
               : path.startsWith('/leads')
@@ -1979,7 +2357,7 @@ export default function App() {
 
         <select
           className="mobile-nav-select"
-          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : '/'}
+          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/print') ? '/print' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : '/'}
           onChange={(e) => {
             const value = e.target.value;
             if (value === '__signup') { window.location.href = '/signup'; return; }
@@ -1991,6 +2369,7 @@ export default function App() {
           <option value="/leads">Leads</option>
           <option value="/clients">Clients</option>
           <option value="/disputes">Disputes</option>
+          <option value="/print">Print Center</option>
           <option value="/tasks">Tasks</option>
           <option value="__signup">Sign up</option>
         </select>
@@ -2001,7 +2380,8 @@ export default function App() {
           <Route path="/leads" element={<Leads leads={leads} clients={clients} />} />
           <Route path="/clients" element={<Clients clients={clients} />} />
           <Route path="/clients/:id" element={<ClientDetailRoute token={token} />} />
-          <Route path="/disputes" element={<DisputesRoute token={token} disputes={disputes} />} />
+          <Route path="/disputes" element={<DisputesRoute token={token} disputes={disputes} clients={clients} />} />
+          <Route path="/print" element={<PrintCenterRoute token={token} clients={clients} disputes={disputes} />} />
           <Route path="/tasks" element={<TasksRoute />} />
         </Routes>
       </main>

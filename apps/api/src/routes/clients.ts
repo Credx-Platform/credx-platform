@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import fs from 'node:fs/promises';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { CreditAnalysisService } from '../lib/creditAnalysis.js';
@@ -7,6 +8,35 @@ import { dispatchAnalysisEmail } from '../lib/analysisEmailDispatch.js';
 import { decryptPII } from '../lib/encryption.js';
 
 export const clientsRouter = Router();
+
+async function sendPrintableDocument(res: any, document: { s3Key?: string | null; content?: string | null; contentType?: string | null; fileName?: string | null; [key: string]: unknown }) {
+  // Prefer the DB-stored body: reliable across redeploys/replicas. Generated
+  // dispute letters store their content here.
+  if (document.content) {
+    return res.json({ document, content: document.content });
+  }
+
+  const s3Key = document.s3Key || '';
+  if (/^https?:\/\//i.test(s3Key)) {
+    return res.json({ document, url: s3Key });
+  }
+
+  const name = (document.fileName || '').toLowerCase();
+  const key = s3Key.toLowerCase();
+  if (document.contentType?.startsWith('text/') || name.endsWith('.txt') || name.endsWith('.md') || key.endsWith('.txt') || key.endsWith('.md')) {
+    try {
+      const content = await fs.readFile(s3Key, 'utf-8');
+      return res.json({ document, content });
+    } catch {
+      // Legacy letter written only to ephemeral /tmp and since wiped. Don't crash —
+      // tell the operator to regenerate it (which now persists content to the DB).
+      return res.status(410).json({ error: 'This letter is no longer on file (it predates persistent storage). Click "Regenerate Letters" on the client to recreate it.' });
+    }
+  }
+
+  if (s3Key) return res.json({ document, url: s3Key });
+  return res.status(410).json({ error: 'This document has no printable content on file.' });
+}
 
 clientsRouter.get('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (_req, res, next) => {
   try {
@@ -34,6 +64,28 @@ clientsRouter.get('/me', requireAuth, async (req: AuthedRequest, res, next) => {
       include: { payments: true, disputes: true, tasks: true, documents: true, activities: true }
     });
     return res.json({ client });
+  } catch (error) {
+    next(error);
+  }
+});
+
+clientsRouter.get('/me/documents/:documentId/print', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const documentId = String(req.params.documentId);
+    const client = await prisma.client.findUnique({
+      where: { userId: req.auth!.sub },
+      select: { id: true }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const document = await prisma.document.findFirst({
+      where: { id: documentId, clientId: client.id }
+    });
+
+    if (!document) return res.status(404).json({ error: 'Document not found' });
+
+    return await sendPrintableDocument(res, document);
   } catch (error) {
     next(error);
   }
@@ -87,6 +139,22 @@ clientsRouter.get('/:id', requireAuth, requireRole(['STAFF', 'ADMIN']), async (r
     }
 
     return res.json({ client });
+  } catch (error) {
+    next(error);
+  }
+});
+
+clientsRouter.get('/:id/documents/:documentId/print', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const documentId = String(req.params.documentId);
+    const document = await prisma.document.findFirst({
+      where: { id: documentId, clientId: id }
+    });
+
+    if (!document) return res.status(404).json({ error: 'Document not found' });
+
+    return await sendPrintableDocument(res, document);
   } catch (error) {
     next(error);
   }
@@ -221,6 +289,184 @@ clientsRouter.patch('/:id/status', requireAuth, requireRole(['STAFF', 'ADMIN']),
 });
 
 // ========== CLIENT ACTIVATION & DISPUTE AUTOMATION ==========
+
+clientsRouter.post('/:id/clear-disputes', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const client = await prisma.client.findUnique({ where: { id } });
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    // 1. Find all dispute items for this client so we can also clear their documents
+    const disputeItems = await prisma.disputeItem.findMany({
+      where: { clientId: id },
+      select: { id: true }
+    });
+    const disputeItemIds = disputeItems.map(d => d.id);
+
+    // 2. Delete dispute rounds (cascades from dispute items, but let's be explicit)
+    if (disputeItemIds.length) {
+      await prisma.disputeRound.deleteMany({
+        where: { disputeItemId: { in: disputeItemIds } }
+      });
+    }
+
+    // 3. Delete dispute items
+    await prisma.disputeItem.deleteMany({ where: { clientId: id } });
+
+    // 4. Delete dispute letter documents
+    await prisma.document.deleteMany({
+      where: {
+        clientId: id,
+        type: 'DISPUTE_LETTER'
+      }
+    });
+
+    // 5. Log the clear
+    await prisma.activityEvent.create({
+      data: {
+        clientId: id,
+        type: 'DISPUTES_CLEARED',
+        message: `Staff cleared all dispute items, rounds, and dispute letter documents for fresh generation.`,
+        metadata: { clearedDisputeItems: disputeItemIds.length }
+      }
+    });
+
+    return res.json({
+      success: true,
+      clearedDisputeItems: disputeItemIds.length,
+      message: `Cleared ${disputeItemIds.length} dispute item(s) and all associated dispute letter documents.`
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+clientsRouter.post('/:id/regenerate-letters', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const client = await prisma.client.findUnique({
+      where: { id },
+      include: { user: true, progress: true }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.progress?.analysis) return res.status(400).json({ error: 'No credit analysis found. Upload credit report and generate analysis first.' });
+
+    // Step 1: Clear old dispute items and letters
+    const disputeItems = await prisma.disputeItem.findMany({
+      where: { clientId: id },
+      select: { id: true }
+    });
+    const disputeItemIds = disputeItems.map(d => d.id);
+
+    if (disputeItemIds.length) {
+      await prisma.disputeRound.deleteMany({
+        where: { disputeItemId: { in: disputeItemIds } }
+      });
+      await prisma.disputeItem.deleteMany({ where: { clientId: id } });
+    }
+
+    await prisma.document.deleteMany({
+      where: { clientId: id, type: 'DISPUTE_LETTER' }
+    });
+
+    // Step 2: Activate / regenerate
+    const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
+    const result = await activateClientDisputeCampaign(id);
+
+    // Step 3: Fetch the newly created documents
+    const newDocuments = await prisma.document.findMany({
+      where: { clientId: id, type: 'DISPUTE_LETTER' },
+      orderBy: { uploadedAt: 'desc' }
+    });
+
+    return res.json({
+      success: result.success,
+      lettersGenerated: result.lettersGenerated,
+      emailSent: result.emailSent,
+      errors: result.errors,
+      documents: newDocuments,
+      client: await prisma.client.findUnique({
+        where: { id },
+        include: { user: true, documents: true, disputeItems: true, tasks: true }
+      })
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== MARK PAID & ACTIVATE (Admin one-click payment + activation + letter generation) ==========
+
+clientsRouter.post('/:id/mark-paid-and-activate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const client = await prisma.client.findUnique({
+      where: { id },
+      include: { user: true, progress: true }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.progress?.analysis) return res.status(400).json({ error: 'No credit analysis found. Upload credit report and generate analysis first.' });
+
+    const amount = typeof req.body.amount === 'number' ? req.body.amount : 150;
+    const currency = typeof req.body.currency === 'string' ? req.body.currency : 'USD';
+    const type = typeof req.body.type === 'string' ? req.body.type : 'SETUP_FEE';
+
+    // Step 1: Record payment
+    await prisma.payment.create({
+      data: {
+        clientId: id,
+        amount,
+        currency,
+        type: type as any,
+        status: 'PAID',
+        paidAt: new Date()
+      }
+    });
+
+    // Step 2: Clear old dispute items if any exist (fresh start)
+    const existingItems = await prisma.disputeItem.findMany({
+      where: { clientId: id },
+      select: { id: true }
+    });
+    if (existingItems.length > 0) {
+      const ids = existingItems.map(d => d.id);
+      await prisma.disputeRound.deleteMany({ where: { disputeItemId: { in: ids } } });
+      await prisma.disputeItem.deleteMany({ where: { clientId: id } });
+      await prisma.document.deleteMany({ where: { clientId: id, type: 'DISPUTE_LETTER' } });
+    }
+
+    // Step 3: Activate and generate dispute letters
+    const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
+    const result = await activateClientDisputeCampaign(id);
+
+    // Step 4: Log activity
+    await prisma.activityEvent.create({
+      data: {
+        clientId: id,
+        type: 'PAYMENT_RECEIVED',
+        message: `Payment of $${amount} ${currency} received. Client activated and ${result.lettersGenerated} dispute letter(s) generated.`,
+        metadata: { amount, currency, type, lettersGenerated: result.lettersGenerated, autoActivated: true }
+      }
+    });
+
+    return res.json({
+      success: true,
+      activated: true,
+      lettersGenerated: result.lettersGenerated,
+      emailSent: result.emailSent,
+      errors: result.errors,
+      payment: { amount, currency, type, status: 'PAID' },
+      client: await prisma.client.findUnique({
+        where: { id },
+        include: { user: true, documents: true, disputeItems: true, tasks: true, payments: true }
+      })
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 clientsRouter.post('/:id/activate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
   try {

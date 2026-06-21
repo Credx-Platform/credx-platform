@@ -364,6 +364,7 @@ model Document {
   fileName    String
   s3Key       String
   contentType String?
+  content     String?      @db.Text // Inline letter/document body — reliable on ephemeral hosts (Railway /tmp is wiped on redeploy)
   uploadedAt  DateTime     @default(now())
   
   // Dispute letter tracking fields

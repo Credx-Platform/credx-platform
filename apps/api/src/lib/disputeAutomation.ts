@@ -9,35 +9,52 @@ import path from 'path';
 // Consolidated Dispute Letter Template
 // ============================================================
 
-const CONSOLIDATED_DISPUTE_TEMPLATE = (data: ConsolidatedLetterData) => `Dear ${data.bureau}:
+const bureauAddress = (bureau: string) => {
+  if (bureau === 'Equifax') return 'P.O. Box 740256\nAtlanta, GA 30374-0256';
+  if (bureau === 'Experian') return 'P.O. Box 4500\nAllen, TX 75013';
+  return 'P.O. Box 2000\nChester, PA 19016';
+};
 
-I am writing to dispute the following accounts on my credit report. I believe the information listed is inaccurate, incomplete, or unverifiable and request that you investigate and correct these items immediately.
+const clientMailingBlock = (data: ConsolidatedLetterData) => {
+  const cityLine = `${data.clientCity || ''}${data.clientCity || data.clientState || data.clientPostalCode ? ', ' : ''}${data.clientState || ''} ${data.clientPostalCode || ''}`.trim();
+  return [data.clientName, data.clientAddress, cityLine, data.ssnLast4 ? `SSN: ***-**-${data.ssnLast4}` : 'SSN: [last four only]']
+    .filter(Boolean)
+    .join('\n');
+};
 
-${data.accounts.map((account, index) => `
-ACCOUNT #${index + 1}:
-- Account Name: ${account.accountName}
-- Account Number: ${account.accountNumber || 'Not provided'}
-- Reason for Dispute: ${account.reason}
-- Issue: ${account.issue}
-`).join('\n')}
+const CONSOLIDATED_DISPUTE_TEMPLATE = (data: ConsolidatedLetterData) => `${clientMailingBlock(data)}
 
-Under the Fair Credit Reporting Act (FCRA), I have the right to dispute any information on my credit report that I believe is inaccurate, incomplete, or unverifiable. For each account listed above, I request that you:
+${data.bureau}
+${bureauAddress(data.bureau)}
 
-1. Verify this information with the furnisher
-2. Provide me with the method of verification
-3. Remove the item if it cannot be verified
+${data.date}
 
-Please investigate these matters and report the results to me within 30 days of receipt of this letter, as required by the FCRA.
+${data.accounts.map((account) => `${account.accountName}: Account number: ${account.accountNumber || '[last four or partial account number only]'}, ${account.reason || account.issue || 'Account type is incorrect and not correctly displayed. Please delete.'}`).join('\n')}
 
-Thank you for your prompt attention to these matters.
+I am writing to formally dispute the accuracy and validity of certain items appearing on my credit report in accordance with my rights under the Fair Credit Reporting Act (FCRA) (15 U.S.C. § 1681 et seq.) and the Fair Debt Collection Practices Act (FDCPA) (15 U.S.C. § 1692 et seq.). I demand the immediate removal of the following items due to their unlawful, inaccurate, incomplete, or unverifiable presence on my credit report.
+
+1. Unauthorized Third-Party Collections
+According to 15 U.S.C. § 1692e, it is illegal for a debt collector to report false or misleading information to the credit bureaus. I am requesting verification of the following alleged debt(s), including:
+• A copy of the original signed contract proving my consent and liability for this debt.
+• A chain of custody showing how the debt was acquired.
+• Proof that this debt was lawfully assigned in compliance with 15 U.S.C. § 1692g (Validation of Debts).
+
+Failure to provide the above documentation within 30 days will constitute a violation of 15 U.S.C. § 1692k, making the reporting party liable for damages.
+
+2. Unauthorized Inquiries
+Per 15 U.S.C. § 1681b, a company must have permissible purpose to conduct a hard inquiry on my credit report. I demand the immediate removal of any inquiry connected to these disputed items if it was not authorized by me.
+
+Under 15 U.S.C. § 1681n, any entity that unlawfully accesses my credit file without proper authorization is subject to statutory damages, attorney's fees, and punitive damages.
+
+Final Demand
+As required under 15 U.S.C. § 1681i (Procedure in Case of Disputed Accuracy), you have 30 days to conduct a thorough investigation and remove the inaccurate information. Failure to do so will result in a complaint being filed with the Consumer Financial Protection Bureau (CFPB), the Federal Trade Commission (FTC), and the Attorney General's Office.
+
+I expect a written response confirming the removal of these disputed accounts and any related inquiries. Any further attempt to report unverifiable or unauthorized information will be considered a willful violation of federal law.
+
+Please send all correspondence to my mailing address listed above.
 
 Sincerely,
-${data.clientName}
-${data.clientAddress || ''}
-${data.clientCity || ''}, ${data.clientState || ''} ${data.clientPostalCode || ''}
-SSN: ${data.ssnLast4 || '•••••••••'}
-
-Date: ${data.date}`;
+${data.clientName}`;
 
 interface ConsolidatedLetterData {
   clientName: string;
@@ -228,23 +245,30 @@ export async function generateDisputeLetters(
     // Generate consolidated letter
     const letterContent = CONSOLIDATED_DISPUTE_TEMPLATE(letterData);
     
-    // Save to file
-    const fileName = `dispute-${client.user.lastName}-consolidated-${bureauLabel.toLowerCase()}-r1-${Date.now()}.txt`;
+    // Persist the letter. The body is stored in the DB (`content`) so it survives
+    // redeploys/restarts; the file write is a best-effort convenience only — /tmp is
+    // ephemeral on Railway, so it must never be the source of truth for printing.
+    const fileName = `dispute-${client.user.lastName}-consolidated-${bureauLabel.toLowerCase()}-r1-${Date.now()}.md`;
     const filePath = path.join(lettersDir, fileName);
-    await fs.writeFile(filePath, letterContent, 'utf-8');
-    
+    try {
+      await fs.writeFile(filePath, letterContent, 'utf-8');
+    } catch (writeErr) {
+      console.warn(`[disputeAutomation] could not write letter to ${filePath}:`, writeErr);
+    }
+
     // Create document record
     const document = await prisma.document.upsert({
       where: {
         clientId_fileName: {
           clientId,
-          fileName: fileName.replace('.txt', '.pdf')
+          fileName
         }
       },
       update: {
         type: 'DISPUTE_LETTER',
         s3Key: filePath,
-        contentType: 'text/plain',
+        content: letterContent,
+        contentType: 'text/markdown',
         disputeItemId: disputeItem.id,
         roundNumber: 1,
         letterType: 'CONSOLIDATED_DISPUTE',
@@ -254,9 +278,10 @@ export async function generateDisputeLetters(
       create: {
         clientId,
         type: 'DISPUTE_LETTER',
-        fileName: fileName.replace('.txt', '.pdf'),
+        fileName,
         s3Key: filePath,
-        contentType: 'text/plain',
+        content: letterContent,
+        contentType: 'text/markdown',
         disputeItemId: disputeItem.id,
         roundNumber: 1,
         letterType: 'CONSOLIDATED_DISPUTE',
