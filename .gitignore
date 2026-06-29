@@ -7,3 +7,19 @@ coverage
 *.log
 .vercel
 vercel.json.bak.haunted
+
+# Local audit/ops artifacts
+AFFILIATE_LINK_INVENTORY.md
+LAUNCH_READINESS_REPORT_*.md
+SMACC_SETUP.md
+SOCIAL_CONNECTION_AUTOMATION.md
+VISUAL_CONTENT_AUTOMATION.md
+
+# Local debug scripts
+apps/api/check_users.mjs
+apps/api/test_clients.js
+apps/api/test_clients.mjs
+
+# Generated working files
+social-drafts/
+tmp/
