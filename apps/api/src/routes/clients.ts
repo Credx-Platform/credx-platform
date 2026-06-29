@@ -6,6 +6,7 @@ import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth
 import { CreditAnalysisService } from '../lib/creditAnalysis.js';
 import { dispatchAnalysisEmail } from '../lib/analysisEmailDispatch.js';
 import { decryptPII } from '../lib/encryption.js';
+import { getSignedUrlForStoredDocument } from '../lib/blob-storage.js';
 
 export const clientsRouter = Router();
 
@@ -62,6 +63,17 @@ async function sendPrintableDocument(res: any, document: PrintableDocument) {
   }
 
   const s3Key = document.s3Key || '';
+
+  // Private Vercel Blob objects are never returned directly. Generate a
+  // short-lived signed URL that expires in 15 minutes.
+  if (s3Key) {
+    const signedUrl = await getSignedUrlForStoredDocument(s3Key);
+    if (signedUrl) {
+      return res.json({ document, url: signedUrl });
+    }
+  }
+
+  // Legacy public HTTPS URLs (non-blob) pass through unchanged.
   if (/^https?:\/\//i.test(s3Key)) {
     return res.json({ document, url: s3Key });
   }

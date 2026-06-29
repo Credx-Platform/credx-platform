@@ -414,23 +414,20 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
     const safeName = file.originalname || `upload-${Date.now()}`;
     const fallbackStorageKey = `secure/${client.id}/${Date.now()}-${crypto.randomUUID()}-${safeName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     let storageKey = fallbackStorageKey;
-    let storedUrl: string | null = null;
     try {
       const stored = await uploadDocument(file.buffer, safeName, file.mimetype || 'application/octet-stream', client.id);
-      storageKey = stored.url;
-      storedUrl = stored.url;
+      storageKey = stored.pathname;
     } catch (storageError) {
       console.warn('Document blob storage unavailable; saving metadata only', storageError);
     }
     const secureDoc = {
       name: safeName,
       type: docType,
-      url: storedUrl,
-      fileName: safeName,
+      storageKey,
       uploadedAt,
-      secure: true,
+      contentType: file.mimetype,
       sizeBytes: file.size,
-      contentType: file.mimetype
+      secure: true
     };
 
     const progress = client.progress as any;
