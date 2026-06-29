@@ -133,6 +133,67 @@ function getBureauLabel(bureau: string): string {
 }
 
 // ============================================================
+// Consolidated Letter Body Builder (shared by generation + print self-heal)
+// ============================================================
+
+interface LetterClientFields {
+  user: { firstName: string | null; lastName: string | null };
+  currentAddressLine1?: string | null;
+  currentCity?: string | null;
+  currentState?: string | null;
+  currentPostalCode?: string | null;
+  ssnLast4?: string | null;
+}
+
+/**
+ * Rebuilds the consolidated dispute-letter body for a single bureau from the
+ * client's stored analysis. Pure/deterministic so it can both (a) generate the
+ * letter the first time and (b) re-create the exact body when a legacy letter
+ * lost its persisted `content` (e.g. it only ever lived on Railway's /tmp).
+ * Returns null if the analysis has no disputes for the requested bureau.
+ */
+export function buildConsolidatedLetterContent(
+  client: LetterClientFields,
+  analysis: CreditAnalysis,
+  bureauLabel: string
+): string | null {
+  // Normalize so a document storing either a label ("Equifax") or a code ("EFX")
+  // both resolve to the same canonical bureau as the analysis opportunities.
+  const targetBureau = getBureauLabel(bureauLabel);
+  const opportunities = analysis.disputeOpportunities || [];
+  const bureauOpportunities = opportunities.filter((opp) =>
+    (opp.bureaus || []).some((b) => getBureauLabel(b) === targetBureau)
+  );
+
+  if (bureauOpportunities.length === 0) return null;
+
+  const date = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const letterData: ConsolidatedLetterData = {
+    clientName: `${client.user.firstName} ${client.user.lastName}`,
+    clientAddress: client.currentAddressLine1,
+    clientCity: client.currentCity,
+    clientState: client.currentState,
+    clientPostalCode: client.currentPostalCode,
+    ssnLast4: client.ssnLast4,
+    bureau: targetBureau,
+    date,
+    accounts: bureauOpportunities.map((opp) => ({
+      accountName: opp.accountName,
+      accountNumber: opp.accountNumber,
+      reason: opp.reason,
+      issue: opp.issue
+    }))
+  };
+
+  return CONSOLIDATED_DISPUTE_TEMPLATE(letterData);
+}
+
+// ============================================================
 // Dispute Letter Generator
 // ============================================================
 
@@ -172,13 +233,7 @@ export async function generateDisputeLetters(
   // Create output directory for letters
   const lettersDir = path.join('/tmp', 'credx-letters', clientId);
   await fs.mkdir(lettersDir, { recursive: true });
-  
-  const date = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-  
+
   // Group opportunities by bureau
   const bureauGroups: Record<string, typeof opportunities> = {
     'Experian': [],
@@ -224,26 +279,8 @@ export async function generateDisputeLetters(
       }
     });
     
-    // Build consolidated letter data
-    const letterData: ConsolidatedLetterData = {
-      clientName: `${client.user.firstName} ${client.user.lastName}`,
-      clientAddress: client.currentAddressLine1,
-      clientCity: client.currentCity,
-      clientState: client.currentState,
-      clientPostalCode: client.currentPostalCode,
-      ssnLast4: client.ssnLast4,
-      bureau: bureauLabel,
-      date,
-      accounts: bureauOpportunities.map(opp => ({
-        accountName: opp.accountName,
-        accountNumber: opp.accountNumber,
-        reason: opp.reason,
-        issue: opp.issue
-      }))
-    };
-    
-    // Generate consolidated letter
-    const letterContent = CONSOLIDATED_DISPUTE_TEMPLATE(letterData);
+    // Generate consolidated letter (same builder used by the print self-heal path)
+    const letterContent = buildConsolidatedLetterContent(client, analysis, bureauLabel) || '';
     
     // Persist the letter. The body is stored in the DB (`content`) so it survives
     // redeploys/restarts; the file write is a best-effort convenience only — /tmp is

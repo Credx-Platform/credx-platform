@@ -9,7 +9,52 @@ import { decryptPII } from '../lib/encryption.js';
 
 export const clientsRouter = Router();
 
-async function sendPrintableDocument(res: any, document: { s3Key?: string | null; content?: string | null; contentType?: string | null; fileName?: string | null; [key: string]: unknown }) {
+type PrintableDocument = {
+  id?: string;
+  clientId?: string | null;
+  type?: string | null;
+  bureau?: string | null;
+  s3Key?: string | null;
+  content?: string | null;
+  contentType?: string | null;
+  fileName?: string | null;
+  [key: string]: unknown;
+};
+
+/**
+ * Self-heals a legacy dispute letter whose body was lost (it only ever lived on
+ * Railway's ephemeral /tmp, wiped on redeploy). Rebuilds the consolidated letter
+ * from the client's stored analysis and persists it to `document.content`, so the
+ * operator can print without the destructive "Regenerate Letters" flow (which
+ * deletes dispute items + round history). Returns the recovered body, or null if
+ * it cannot be rebuilt (not a dispute letter, no bureau, or no analysis on file).
+ */
+async function recoverDisputeLetterContent(document: PrintableDocument): Promise<string | null> {
+  if (document.type !== 'DISPUTE_LETTER' || !document.bureau || !document.clientId || !document.id) {
+    return null;
+  }
+
+  const client = await prisma.client.findUnique({
+    where: { id: document.clientId },
+    include: { user: true, progress: true }
+  });
+
+  if (!client?.progress?.analysis) return null;
+
+  const { buildConsolidatedLetterContent } = await import('../lib/disputeAutomation.js');
+  const content = buildConsolidatedLetterContent(
+    client,
+    client.progress.analysis as unknown as Parameters<typeof buildConsolidatedLetterContent>[1],
+    document.bureau
+  );
+
+  if (!content) return null;
+
+  await prisma.document.update({ where: { id: document.id }, data: { content } });
+  return content;
+}
+
+async function sendPrintableDocument(res: any, document: PrintableDocument) {
   // Prefer the DB-stored body: reliable across redeploys/replicas. Generated
   // dispute letters store their content here.
   if (document.content) {
@@ -28,9 +73,14 @@ async function sendPrintableDocument(res: any, document: { s3Key?: string | null
       const content = await fs.readFile(s3Key, 'utf-8');
       return res.json({ document, content });
     } catch {
-      // Legacy letter written only to ephemeral /tmp and since wiped. Don't crash —
-      // tell the operator to regenerate it (which now persists content to the DB).
-      return res.status(410).json({ error: 'This letter is no longer on file (it predates persistent storage). Click "Regenerate Letters" on the client to recreate it.' });
+      // Legacy letter written only to ephemeral /tmp and since wiped. Rebuild it
+      // from the client's analysis and persist it — no destructive regenerate,
+      // no loss of dispute-round history.
+      const recovered = await recoverDisputeLetterContent(document);
+      if (recovered) {
+        return res.json({ document: { ...document, content: recovered }, content: recovered });
+      }
+      return res.status(410).json({ error: 'This letter could not be recovered automatically (no saved analysis for this client). Use "Regenerate Letters" on the client to recreate it.' });
     }
   }
 
