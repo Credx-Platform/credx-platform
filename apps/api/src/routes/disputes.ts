@@ -391,7 +391,7 @@ import multer from 'multer';
 import csv from 'csv-parser';
 import { Readable } from 'stream';
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
 
 disputesRouter.post('/import/csv', requireAuth, requireRole(['STAFF', 'ADMIN']), upload.single('file'), async (req, res, next) => {
   try {

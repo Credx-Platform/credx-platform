@@ -27,7 +27,10 @@
     { "source": "/masterclass-terms", "destination": "/masterclass-terms.html" },
     { "source": "/pricing", "destination": "/pricing.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
-    { "source": "/terms", "destination": "/terms.html" }
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/croa-disclosure", "destination": "/croa-disclosure.html" },
+    { "source": "/refund-policy", "destination": "/refund-policy.html" },
+    { "source": "/cancellation-policy", "destination": "/cancellation-policy.html" }
   ],
   "headers": [
     {
