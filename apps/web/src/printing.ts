@@ -16,6 +16,19 @@ type ParsedDisputeAccount = {
   issue: string;
 };
 
+type ParsedDisputeLetter = {
+  profileLines: string[];
+  addressLines: string[];
+  dateLine: string | null;
+  recipient: string;
+  preAccountLabel: string | null;
+  intro: string[];
+  accounts: ParsedDisputeAccount[];
+  requests: string[];
+  closing: string[];
+  checklist: string[];
+};
+
 function normalizeParagraphs(text: string): string[] {
   return text
     .split(/\n{2,}/)
@@ -23,24 +36,30 @@ function normalizeParagraphs(text: string): string[] {
     .filter(Boolean);
 }
 
-function parseDisputeLetterText(content: string): {
-  recipient: string;
-  intro: string[];
-  accounts: ParsedDisputeAccount[];
-  requests: string[];
-  closing: string[];
-} | null {
-  const trimmed = content.trim();
-  const dearMatch = trimmed.match(/^Dear\s+([^:\n]+):?/i);
-  const accountMatches = [...trimmed.matchAll(/ACCOUNT #(\d+):\n([\s\S]*?)(?=\n\nACCOUNT #\d+:|\n\nUnder the Fair Credit Reporting Act|$)/g)];
-  if (!dearMatch || !accountMatches.length) return null;
+function compactBlankLines(text: string): string {
+  return text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
 
-  const recipient = dearMatch[1].trim();
-  const underMarker = '\n\nUnder the Fair Credit Reporting Act';
-  const firstAccountIndex = trimmed.indexOf('ACCOUNT #1:');
-  const requestIndex = trimmed.indexOf(underMarker);
-  const introBlock = firstAccountIndex >= 0 ? trimmed.slice(dearMatch[0].length, firstAccountIndex).trim() : '';
-  const requestBlock = requestIndex >= 0 ? trimmed.slice(requestIndex).trim() : '';
+function parseDisputeLetterText(content: string): ParsedDisputeLetter | null {
+  const trimmed = compactBlankLines(content);
+  const lines = trimmed.split('\n');
+  const dearIndex = lines.findIndex((line) => /^Dear\s+.+:?$/i.test(line.trim()));
+  const firstAccountIndex = lines.findIndex((line) => /^ACCOUNT #\d+:/i.test(line.trim()));
+  if (dearIndex === -1 || firstAccountIndex === -1) return null;
+
+  const recipient = lines[dearIndex].replace(/^Dear\s+/i, '').replace(/:$/, '').trim();
+  const headerLines = lines.slice(0, dearIndex).map((line) => line.trim()).filter(Boolean);
+  const profileLines = headerLines.filter((line) => /^(Full name|Current address|SSN|Date of birth):/i.test(line));
+  const dateLine = headerLines.find((line) => /^Date:/i.test(line)) || null;
+  const addressLines = headerLines.filter((line) => !profileLines.includes(line) && line !== dateLine);
+
+  const preAccountLines = lines.slice(dearIndex + 1, firstAccountIndex).map((line) => line.trim()).filter(Boolean);
+  const preAccountLabel = preAccountLines[0]?.endsWith(':') ? preAccountLines[0] : null;
+  const intro = preAccountLabel ? preAccountLines.slice(1) : preAccountLines;
+
+  const accountSection = lines.slice(firstAccountIndex).join('\n');
+  const accountMatches = [...accountSection.matchAll(/ACCOUNT #(\d+):\n([\s\S]*?)(?=\n\nACCOUNT #\d+:|\n(?:I am writing to formally dispute|Under the Fair Credit Reporting Act|Please send all reinvestigation results|Mailing enclosure checklist:|Sincerely,)|$)/g)];
+  if (!accountMatches.length) return null;
 
   const accounts = accountMatches.map((match) => {
     const block = match[2];
@@ -57,16 +76,32 @@ function parseDisputeLetterText(content: string): {
     };
   });
 
-  const requestParagraphs = normalizeParagraphs(requestBlock);
-  const requestItems = [...requestBlock.matchAll(/^\d+\.\s+(.+)$/gm)].map((match) => match[1].trim());
-  const closing = requestParagraphs.length >= 2 ? requestParagraphs.slice(-2) : [];
+  const afterAccountsIndex = accountSection.lastIndexOf(accountMatches[accountMatches.length - 1][0]) + accountMatches[accountMatches.length - 1][0].length;
+  const trailingBlock = compactBlankLines(accountSection.slice(afterAccountsIndex));
+  const trailingParagraphs = normalizeParagraphs(trailingBlock);
+  const checklistIndex = trailingParagraphs.findIndex((paragraph) => /^Mailing enclosure checklist:/i.test(paragraph));
+  const signatureIndex = trailingParagraphs.findIndex((paragraph) => /^Sincerely,/i.test(paragraph));
+
+  const closingEnd = signatureIndex >= 0 ? signatureIndex : (checklistIndex >= 0 ? checklistIndex : trailingParagraphs.length);
+  const closing = trailingParagraphs.slice(0, closingEnd);
+
+  const requestItems = [...trailingBlock.matchAll(/^\d+\.\s+(.+)$/gm)].map((match) => match[1].trim());
+  const checklistSource = checklistIndex >= 0 ? trailingParagraphs.slice(checklistIndex).join('\n') : '';
+  const checklist = checklistSource
+    ? checklistSource.split('\n').map((line) => line.trim()).filter(Boolean)
+    : [];
 
   return {
+    profileLines,
+    addressLines,
+    dateLine,
     recipient,
-    intro: normalizeParagraphs(introBlock),
+    preAccountLabel,
+    intro,
     accounts,
     requests: requestItems,
-    closing
+    closing,
+    checklist
   };
 }
 
@@ -86,85 +121,62 @@ export function renderDisputeLetterPrintHtml(title: string, content: string): st
   if (!parsed) return renderPlainTextPrintHtml(title, content);
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const profileHtml = parsed.profileLines.length
+    ? `<div class="profile-block">${parsed.profileLines.map((line) => `<div>${escapePrintHtml(line)}</div>`).join('')}</div>`
+    : '';
+  const addressHtml = parsed.addressLines.length
+    ? `<div class="address-block">${parsed.addressLines.map((line) => `<div>${escapePrintHtml(line)}</div>`).join('')}</div>`
+    : '';
+  const dateHtml = parsed.dateLine || `Date: ${today}`;
   const introHtml = parsed.intro.map((paragraph) => `<p>${escapePrintHtml(paragraph)}</p>`).join('');
   const requestsHtml = parsed.requests.length
-    ? `<ol>${parsed.requests.map((item) => `<li>${escapePrintHtml(item)}</li>`).join('')}</ol>`
+    ? `<ol class="request-list">${parsed.requests.map((item) => `<li>${escapePrintHtml(item)}</li>`).join('')}</ol>`
     : '';
   const closingHtml = parsed.closing.map((paragraph) => `<p>${escapePrintHtml(paragraph)}</p>`).join('');
+  const checklistHtml = parsed.checklist.length
+    ? `<div class="checklist">${parsed.checklist.map((line) => `<div>${escapePrintHtml(line)}</div>`).join('')}</div>`
+    : '';
 
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${escapePrintHtml(title)}</title>
 <style>
-  :root{--ink:#0f172a;--muted:#475569;--line:#cbd5e1;--soft:#f8fafc;--brand:#00c6fb;}
-  body{font-family:Georgia,"Times New Roman",serif;color:var(--ink);background:#fff;margin:0;padding:0.65in;font-size:13.5px;line-height:1.58;}
-  .letter{max-width:7.4in;margin:0 auto;}
-  .brand{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid var(--line);}
-  .brand-name{font:700 22px/1.1 Arial,sans-serif;letter-spacing:.04em;color:var(--ink);}
-  .brand-sub{font:600 11px/1.2 Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#0369a1;margin-top:4px;}
-  .meta{text-align:right;font:12px/1.45 Arial,sans-serif;color:var(--muted);}
-  .recipient{margin:16px 0 20px;font-size:14px;}
+  body{font-family:Arial,sans-serif;color:#111;background:#fff;margin:0;padding:0.62in;font-size:13px;line-height:1.48;}
+  .letter{max-width:7.35in;margin:0 auto;}
+  .profile-block,.address-block,.date-line,.salutation,.label-line,.closing,.checklist{margin-bottom:12px;}
+  .profile-block div,.address-block div,.date-line,.label-line div,.checklist div{margin:0 0 2px;}
   p{margin:0 0 12px;}
-  .section-title{margin:22px 0 10px;font:700 14px/1.2 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);}
-  .account-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 12px;background:var(--soft);break-inside:avoid;}
-  .account-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px;}
-  .account-num{font:700 11px/1.1 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#0369a1;}
-  .account-name{font:700 15px/1.2 Arial,sans-serif;color:var(--ink);}
-  .account-meta{font:12px/1.45 Arial,sans-serif;color:var(--muted);}
-  .label{display:block;font:700 10px/1.1 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
-  .field{margin-top:8px;}
-  ol{margin:0 0 14px 18px;padding:0;}
-  li{margin-bottom:6px;}
-  .signature{margin-top:28px;padding-top:18px;border-top:1px solid var(--line);}
-  .signature .line{margin-top:22px;border-top:1px solid var(--ink);width:260px;max-width:100%;padding-top:6px;font:12px/1.4 Arial,sans-serif;color:var(--muted);}
+  .account-block{margin:0 0 16px;break-inside:avoid;page-break-inside:avoid;}
+  .account-block .line{margin:0 0 3px;}
+  .line strong{font-weight:700;}
+  .request-list{margin:0 0 14px 18px;padding:0;}
+  .request-list li{margin:0 0 6px;}
+  .signature-space{height:34px;}
   @page{margin:0.6in;}
-  @media print{body{padding:0;} .account-card{box-shadow:none;}}
+  @media print{body{padding:0;}}
 </style></head><body>
   <div class="letter">
-    <div class="brand">
-      <div>
-        <div class="brand-name">CredX</div>
-        <div class="brand-sub">Dispute Letter Format</div>
-      </div>
-      <div class="meta">
-        <div>${escapePrintHtml(today)}</div>
-        <div>${escapePrintHtml(title)}</div>
-      </div>
-    </div>
-
-    <div class="recipient">
-      <p><strong>Dear ${escapePrintHtml(parsed.recipient)}:</strong></p>
-    </div>
-
+    ${profileHtml}
+    ${addressHtml}
+    <div class="date-line">${escapePrintHtml(dateHtml)}</div>
+    <div class="salutation">Dear ${escapePrintHtml(parsed.recipient)}:</div>
+    ${parsed.preAccountLabel ? `<div class="label-line">${escapePrintHtml(parsed.preAccountLabel)}</div>` : ''}
     ${introHtml}
 
-    <div class="section-title">Accounts in dispute</div>
     ${parsed.accounts.map((account) => `
-      <section class="account-card">
-        <div class="account-head">
-          <div>
-            <div class="account-num">Account #${escapePrintHtml(account.number)}</div>
-            <div class="account-name">${escapePrintHtml(account.accountName || 'Account name pending')}</div>
-          </div>
-          <div class="account-meta">${escapePrintHtml(account.accountNumber || 'Account number pending')}</div>
-        </div>
-        <div class="field">
-          <span class="label">Reason for dispute</span>
-          <div>${escapePrintHtml(account.reason || 'Reason pending')}</div>
-        </div>
-        <div class="field">
-          <span class="label">Issue reported</span>
-          <div>${escapePrintHtml(account.issue || 'Issue pending')}</div>
-        </div>
-      </section>
+      <div class="account-block">
+        <div class="line"><strong>ACCOUNT #${escapePrintHtml(account.number)}:</strong></div>
+        <div class="line">- <strong>Account Name:</strong> ${escapePrintHtml(account.accountName || 'Account name pending')}</div>
+        <div class="line">- <strong>Account Number:</strong> ${escapePrintHtml(account.accountNumber || 'Account number pending')}</div>
+        <div class="line">- <strong>Reason for Dispute:</strong> ${escapePrintHtml(account.reason || 'Reason pending')}</div>
+        <div class="line">- <strong>Issue:</strong> ${escapePrintHtml(account.issue || 'Issue pending')}</div>
+      </div>
     `).join('')}
 
-    ${requestsHtml ? `<div class="section-title">Requested action</div>${requestsHtml}` : ''}
-    ${closingHtml}
-
-    <div class="signature">
-      <p>Sincerely,</p>
-      <div class="line">Consumer signature</div>
-    </div>
+    ${requestsHtml}
+    <div class="closing">${closingHtml}</div>
+    <div>Sincerely,</div>
+    <div class="signature-space"></div>
+    ${checklistHtml}
   </div>
 </body></html>`;
 }
