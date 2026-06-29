@@ -2,6 +2,7 @@ import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DisputeManager } from './components/DisputeManager';
 import { AnalysisTab } from './components/AnalysisTab';
+import { SiteFooter } from './components/SiteFooter.js';
 
 type Plan = {
   code: string;
@@ -2434,6 +2435,7 @@ export default function App() {
           <Route path="/print" element={<PrintCenterRoute token={token} clients={clients} disputes={disputes} />} />
           <Route path="/tasks" element={<TasksRoute />} />
         </Routes>
+        <SiteFooter />
       </main>
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSS
 import MasterclassDashboard from './components/MasterclassDashboard';
 import type { LessonDay } from './masterclassCurriculum';
 import { FILING_WORKFLOWS, type FilingWorkflow } from './filingWorkflows';
+import { SiteFooter } from './components/SiteFooter.js';
 
 type User = {
   id: string;
@@ -3665,6 +3666,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             isMasterclassOnly={masterclassOnly}
           />
         </div>
+        <SiteFooter />
       </main>
     </div>
   );
