@@ -2,6 +2,7 @@ import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DisputeManager } from './components/DisputeManager';
 import { AnalysisTab } from './components/AnalysisTab';
+import { renderBestPrintHtml } from './printing';
 import { SiteFooter } from './components/SiteFooter.js';
 
 type Plan = {
@@ -1389,14 +1390,11 @@ ${clientName}`;
 // Print via a hidden iframe rather than window.open. window.open is silently
 // blocked when called after an `await` (the user-gesture has expired), which is
 // exactly how every print button here is wired — so popups never appeared.
-function openPrintDocument(title: string, body: string) {
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeAdmin(title)}</title><style>
-    body{font-family:Arial,sans-serif;color:#111827;line-height:1.35;padding:0.55in;max-width:8.5in;margin:0 auto;background:#fff;}
-    pre{white-space:pre-wrap;font:13px/1.35 Arial,sans-serif;margin:0;}
-    @page{margin:0.55in;} @media print{body{padding:0;max-width:none;}}
-  </style></head><body><pre>${escapeAdmin(body)}</pre></body></html>`;
+function openPrintDocument(title: string, body: string, options?: { preferDisputeLetter?: boolean }) {
+  const html = renderBestPrintHtml(title, body, options);
   const existing = document.getElementById('credx-admin-print-frame');
   if (existing) existing.remove();
+
   const iframe = document.createElement('iframe');
   iframe.id = 'credx-admin-print-frame';
   iframe.setAttribute('aria-hidden', 'true');
@@ -1635,7 +1633,10 @@ function PrintCenterRoute({ token, clients, disputes }: { token: string; clients
       );
       const title = result.document.fileName || document.fileName || 'CredX document';
       if (result.content) {
-        openPrintDocument(title, result.content);
+        const prefersDisputeLayout = result.document?.letterType === 'CONSOLIDATED_DISPUTE'
+          || result.document?.type === 'DISPUTE_LETTER'
+          || /dispute/i.test(result.document?.fileName || title);
+        openPrintDocument(title, result.content, { preferDisputeLetter: prefersDisputeLayout });
         return;
       }
       if (result.url && /^https?:\/\//i.test(result.url)) {

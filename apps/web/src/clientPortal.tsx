@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSS
 import MasterclassDashboard from './components/MasterclassDashboard';
 import type { LessonDay } from './masterclassCurriculum';
 import { FILING_WORKFLOWS, type FilingWorkflow } from './filingWorkflows';
+import { renderBestPrintHtml } from './printing';
 import { SiteFooter } from './components/SiteFooter.js';
 
 type User = {
@@ -1499,7 +1500,10 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
       );
       const title = result.document?.fileName || document.fileName || 'Dispute letter';
       if (result.content) {
-        printHtmlDocument(title, printableTextHtml(title, result.content));
+        const prefersDisputeLayout = result.document?.letterType === 'CONSOLIDATED_DISPUTE'
+          || result.document?.type === 'DISPUTE_LETTER'
+          || /dispute/i.test(result.document?.fileName || title);
+        printHtmlDocument(title, renderBestPrintHtml(title, result.content, { preferDisputeLetter: prefersDisputeLayout }));
         return;
       }
       if (result.url && /^https?:\/\//i.test(result.url)) {
@@ -1701,9 +1705,18 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
         <div>
           {letters.length || accountDocuments.length ? (
             <>
+              <div className="dispute-card-live" style={{ marginBottom: '0.85rem' }}>
+                <div className="dispute-card-top">
+                  <strong style={{ color: '#0f172a' }}>Ready to Print</strong>
+                  <span className="status-badge status-pending">{accountDocuments.length + letters.length} item{accountDocuments.length + letters.length === 1 ? '' : 's'}</span>
+                </div>
+                <div className="dispute-meta" style={{ color: '#334155' }}>
+                  <span>Saved CredX dispute documents and your currently generated bureau letters live together here so the print queue behaves like the dispute manager workflow.</span>
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
                 <button type="button" className="ghost-button" onClick={() => letters.forEach(printLetter)} disabled={!letters.length} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>🖨 Print all generated bureau letters</button>
-                <span className="helper-text" style={{ margin: 0, color: '#475569' }}>Clients can print their own saved CredX letters or any letters they generate from the analysis.</span>
+                <span className="helper-text" style={{ margin: 0, color: '#475569' }}>Clients can print saved CredX letters or any new bureau letters generated from the analysis.</span>
               </div>
               <div className="dispute-list">
                 {accountDocuments.length ? (
