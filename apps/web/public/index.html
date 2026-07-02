@@ -74,8 +74,8 @@ a{text-decoration:none;color:inherit}
 .nav-cta{height:34px;padding:0 18px;display:inline-flex;align-items:center;background:var(--cyan);color:var(--bg);font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:.4px;border-radius:6px;border:none;cursor:pointer;transition:all .2s}
 .nav-cta:hover{box-shadow:0 0 20px var(--cyan-glow);background:var(--cyan2)}
 .hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:100px clamp(16px,4vw,48px) 80px;overflow:hidden}
-.hero-bg{position:absolute;inset:0;background-image:url('/images/credx-hero-bg.jpg');background-size:cover;background-position:center 18%;background-repeat:no-repeat;opacity:.55;filter:saturate(1.05) brightness(.95)}
-.hero-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(6,10,18,.95) 40%,rgba(6,10,18,.6) 100%)}
+.hero-bg{position:absolute;inset:0;background-image:url('/images/credx-hero-bg.jpg');background-size:contain;background-position:center center;background-repeat:no-repeat;opacity:.82;filter:saturate(1.08) brightness(1.04)}
+.hero-overlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(6,10,18,.94) 0%,rgba(6,10,18,.78) 44%,rgba(6,10,18,.28) 100%),linear-gradient(180deg,rgba(6,10,18,.32),rgba(6,10,18,.18) 48%,rgba(6,10,18,.58))}
 .hero-inner{position:relative;z-index:2;max-width:720px}
 .hero-tag{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;background:var(--cyan-dim);border:1px solid var(--border-c);border-radius:100px;font-size:11px;font-weight:600;color:var(--cyan);letter-spacing:.6px;text-transform:uppercase;margin-bottom:24px}
 .hero-tag::before{content:'';width:6px;height:6px;background:var(--cyan);border-radius:50%;animation:pulse 2s infinite}
@@ -84,6 +84,9 @@ h1{font-size:clamp(36px,5vw,64px);font-weight:900;line-height:1.08;letter-spacin
 h1 .accent{color:var(--cyan);position:relative}
 .hero-sub{font-size:17px;color:var(--muted);max-width:540px;margin-bottom:36px;font-weight:400;line-height:1.7}
 .hero-btns{display:flex;gap:12px;flex-wrap:wrap}
+.hero-login-note{margin-top:12px;font-size:12px;color:var(--muted)}
+.hero-login-note a{color:var(--cyan);font-weight:700;text-decoration:none}
+.hero-login-note a:hover{color:var(--cyan2)}
 .btn{height:48px;padding:0 28px;display:inline-flex;align-items:center;font-family:var(--font-display);font-weight:700;font-size:14px;border-radius:8px;border:none;cursor:pointer;transition:all .25s}
 .btn-primary{background:var(--cyan);color:var(--bg);box-shadow:0 0 24px rgba(0,198,251,.2)}
 .btn-primary:hover{background:var(--cyan2);box-shadow:0 0 36px var(--cyan-glow);transform:translateY(-1px)}
@@ -318,18 +321,13 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   <h1>CredX helps you <span class="accent">learn, rebuild, and rise.</span></h1>
   <p class="hero-sub">Free credit analysis, dispute support, score tracking, and strategy designed to move you toward approvals and stronger financial positioning.</p>
   <div class="hero-btns">
-   <a href="/signup?offer=program" class="btn btn-primary">Sign Up for the Program</a>
-   <a href="/signup?offer=masterclass" class="btn btn-outline">Join the Masterclass</a>
+   <a href="/signup" class="btn btn-primary">Sign Up</a>
   </div>
+  <p class="hero-login-note">Already enrolled? <a href="/portal">Portal login</a></p>
   <div class="hero-stats">
    <div><div class="hs-num">24/7</div><div class="hs-label">Portal Access</div></div>
    <div><div class="hs-num">1:1</div><div class="hs-label">Strategic Support</div></div>
    <div><div class="hs-num">Custom</div><div class="hs-label">Action Plans</div></div>
-  </div>
-  <div class="chat-quick-actions" style="justify-content:center;padding:18px 0 0;background:transparent">
-   <a href="/signup?offer=program" class="chat-quick" style="text-decoration:none">Program Sign Up</a>
-   <a href="/signup?offer=masterclass" class="chat-quick" style="text-decoration:none">Masterclass Sign Up</a>
-   <a href="/portal" class="chat-quick" style="text-decoration:none">Portal Login</a>
   </div>
  </div>
 </section>
@@ -623,16 +621,16 @@ function appendChatMessage(role,text){
 function getCesarReply(message){
  const text=(message||'').toLowerCase();
  if(!text.trim()) return 'Ask me anything about the CredX program, the 5-Day Masterclass, disputes, financing readiness, or rebuilding your credit.';
- if(text.includes('portal')||text.includes('sign in')||text.includes('login')||text.includes('log in')) return 'If you already have portal access, sign in here: <a href="/portal">CredX Client Portal</a>.<br><br>If you are new and want to get started first, use the direct sign-up page here: <a href="/signup?offer=program">Program Sign Up</a>.';
- if(text.includes('how do i get started')||text.includes('get started')||text.includes('how to start')||text.includes('sign up')||text.includes('signup')||text.includes('apply')) return 'Here\'s the fastest path:<br><br>• <a href="/signup?offer=program">Sign up for the CredX Program</a><br>• <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>• <a href="/portal">Portal login</a> if you already have an account.<br><br>If you want, tell me whether you want DIY education or guided support and I\'ll point you to the best option.';
- if(text.includes('help me')||text==='help'||text.includes('what can you help')||text.includes('how can you help')) return 'I can help you do one of three things right now:<br><br>1. <a href="/signup?offer=program">Start the guided CredX Program</a><br>2. <a href="/signup?offer=masterclass">Join the 5-Day Masterclass</a><br>3. <a href="/portal">Open your portal login</a><br><br>If you tell me your goal—dispute inaccurate items, prepare for financing, or rebuild after collections—I\'ll recommend the best path.';
- if(text.includes('masterclass')||text.includes('diy')) return 'The 5-Day Masterclass is the DIY path inside CredX. It walks you through credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. If that sounds right, start here: <a href="/signup?offer=masterclass">Masterclass Sign Up</a>.';
- if(text.includes('program')||text.includes('coaching')||text.includes('service')) return 'The CredX Program is the guided path with software, AI support, and coaching. If you want hands-on structure and follow-through, start here: <a href="/signup?offer=program">Program Sign Up</a>.';
- if(text.includes('financing')||text.includes('mortgage')||text.includes('car')||text.includes('approval')) return 'If your goal is financing readiness, the best move is the guided program so your file can be reviewed in context. You can start here: <a href="/signup?offer=program">Program Sign Up</a>.';
- if(text.includes('dispute')||text.includes('collection')||text.includes('inquiry')) return 'CredX can help organize dispute workflow and identify what looks challengeable, but the strongest next step is still getting your file into review. Start here: <a href="/signup?offer=program">Free Analysis / Program Sign Up</a>.';
- if(text.includes('price')||text.includes('cost')||text.includes('pricing')) return 'CredX has two main paths right now: the guided Program and the 5-Day Masterclass. If you want support, choose the Program. If you want DIY education, choose the Masterclass.<br><br>• <a href="/signup?offer=program">Program Sign Up</a><br>• <a href="/signup?offer=masterclass">Masterclass Sign Up</a>';
- if(text.includes('next step')) return 'Your next step is to choose your path and submit the short sign-up form:<br><br>• <a href="/signup?offer=program">CredX Program</a><br>• <a href="/signup?offer=masterclass">5-Day Masterclass</a>';
- return 'I can help you choose the fastest path:<br><br>• <a href="/signup?offer=program">Sign up for the Program</a><br>• <a href="/signup?offer=masterclass">Join the Masterclass</a><br>• <a href="/portal">Portal Login</a><br><br>If you tell me your goal, I\'ll point you to the best one.';
+ if(text.includes('portal')||text.includes('sign in')||text.includes('login')||text.includes('log in')) return 'If you already have portal access, sign in here: <a href="/portal">CredX Client Portal</a>.<br><br>If you are new and want to get started first, use the sign-up page here: <a href="/signup">Sign Up</a>.';
+ if(text.includes('how do i get started')||text.includes('get started')||text.includes('how to start')||text.includes('sign up')||text.includes('signup')||text.includes('apply')) return 'Here\'s the fastest path:<br><br>• <a href="/signup">Sign up for CredX</a><br>• <a href="/portal">Portal login</a> if you already have an account.<br><br>The sign-up page will let you choose the path that fits you best.';
+ if(text.includes('help me')||text==='help'||text.includes('what can you help')||text.includes('how can you help')) return 'I can help you choose your next step. If you are new, start here: <a href="/signup">Sign Up</a>. If you already have access, use the <a href="/portal">portal login</a>.<br><br>If you tell me your goal—dispute inaccurate items, prepare for financing, or rebuild after collections—I\'ll point you to the best path.';
+ if(text.includes('masterclass')||text.includes('diy')) return 'The 5-Day Masterclass is the DIY path inside CredX. Start on the sign-up page and choose the Masterclass option there: <a href="/signup">Sign Up</a>.';
+ if(text.includes('program')||text.includes('coaching')||text.includes('service')) return 'The CredX Program is the guided path with software, AI support, and coaching. Start on the sign-up page and choose the program option there: <a href="/signup">Sign Up</a>.';
+ if(text.includes('financing')||text.includes('mortgage')||text.includes('car')||text.includes('approval')) return 'If your goal is financing readiness, start with the CredX sign-up so your file can be reviewed in context: <a href="/signup">Sign Up</a>.';
+ if(text.includes('dispute')||text.includes('collection')||text.includes('inquiry')) return 'CredX can help organize dispute workflow and identify what looks challengeable, but the strongest next step is still getting your file into review. Start here: <a href="/signup">Sign Up</a>.';
+ if(text.includes('price')||text.includes('cost')||text.includes('pricing')) return 'CredX has guided support and DIY education paths. Start with the single sign-up page and choose the option that fits you best: <a href="/signup">Sign Up</a>.';
+ if(text.includes('next step')) return 'Your next step is to submit the short sign-up form and choose your path there: <a href="/signup">Sign Up</a>.';
+ return 'I can help you choose the fastest path. If you are new, start here: <a href="/signup">Sign Up</a>. If you already have access, use the <a href="/portal">Portal Login</a>.<br><br>If you tell me your goal, I\'ll point you to the best option.';
 }
 
 function sendChat(){
