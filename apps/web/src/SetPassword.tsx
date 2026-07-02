@@ -104,10 +104,16 @@ export default function SetPassword() {
       }
 
       const complete = body as CompleteResponse;
-      localStorage.setItem(TOKEN_KEY, complete.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(complete.user));
+      const isMasterclassSetup = status.verify.purpose === 'setup' && nextDestination.includes('welcome=masterclass');
+      if (isMasterclassSetup) {
+        localStorage.setItem(TOKEN_KEY, complete.token);
+        localStorage.setItem(USER_KEY, JSON.stringify(complete.user));
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+      }
       setStatus({ kind: 'success' });
-      window.location.assign(nextDestination);
+      window.location.assign(isMasterclassSetup ? nextDestination : '/portal?password=created');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Could not set password.');
       setStatus({ kind: 'ready', verify: status.verify });
@@ -147,7 +153,7 @@ export default function SetPassword() {
         <div className="auth-card">
           <p className="eyebrow">CredX Portal</p>
           <h1>Password saved</h1>
-          <p className="helper-text">Taking you to your portal…</p>
+          <p className="helper-text">Taking you to the login page…</p>
         </div>
       </div>
     );

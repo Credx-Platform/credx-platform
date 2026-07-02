@@ -54,8 +54,7 @@ authRouter.post('/register', async (req, res, next) => {
     const existing = await prisma.user.findUnique({ where: { email: data.email.toLowerCase() } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
-    const publicPasswordCreated = typeof data.password === 'string' && data.password.length >= 8;
-    const provisionalPassword = data.password ?? randomBytes(24).toString('base64url');
+    const provisionalPassword = randomBytes(24).toString('base64url');
     const passwordHash = await bcrypt.hash(provisionalPassword, 10);
     const user = await prisma.user.create({
       data: {
@@ -103,27 +102,8 @@ authRouter.post('/register', async (req, res, next) => {
       source: 'credx-platform-api-register'
     });
 
-    const token = publicPasswordCreated ? signToken({ sub: user.id, role: user.role }) : null;
-    let setupEmail: Awaited<ReturnType<typeof sendPasswordSetupEmail>> | null = null;
-    let setupLink: string | null = null;
-    if (!publicPasswordCreated) {
-      const { rawToken, expiresAt } = await issuePasswordSetupToken({
-        userId: user.id,
-        purpose: 'setup'
-      });
-      setupLink = buildPasswordSetupLink(config.appUrl, rawToken);
-      setupEmail = await sendPasswordSetupEmail({
-        to: user.email,
-        firstName: user.firstName,
-        setupLink,
-        purpose: 'setup',
-        expiresAt
-      });
-    }
-
-    const contractLink = publicPasswordCreated && token
-      ? `${config.appUrl.replace(/\/$/, '')}/start?token=${encodeURIComponent(token)}#onboarding`
-      : setupLink || `${config.appUrl.replace(/\/$/, '')}/portal`;
+    const token = signToken({ sub: user.id, role: user.role });
+    const contractLink = `${config.appUrl.replace(/\/$/, '')}/start?token=${encodeURIComponent(token)}#onboarding`;
     const welcomeEmail = await sendWelcomeLeadEmail({
       firstName: user.firstName || '',
       email: user.email,
@@ -135,8 +115,8 @@ authRouter.post('/register', async (req, res, next) => {
     return res.status(201).json({
       user: safeUser,
       token,
-      requiresPasswordSetup: !publicPasswordCreated,
-      setupEmail: setupEmail?.delivery ?? null,
+      requiresPasswordSetup: true,
+      setupEmail: null,
       welcomeEmail: welcomeEmail.delivery
     });
   } catch (error) {

@@ -367,7 +367,7 @@ h1 {
   <form class="card" id="signupForm" novalidate>
     <div class="eyebrow" id="eyebrow">CredX Sign Up</div>
     <h1 id="formHeading">Let us get you signed up.</h1>
-    <p class="subhead" id="formSubhead">Answer a few quick questions. We will email your secure portal setup link after your intake is received.</p>
+    <p class="subhead" id="formSubhead">Answer a few quick questions. We will email one secure onboarding link so you can sign your agreement and finish intake before creating your portal password.</p>
 
     <div class="upgrade-banner" id="upgradeBanner">
       <strong id="upgradeBannerName">Welcome back.</strong>
@@ -389,7 +389,7 @@ h1 {
     <div class="success-panel" id="successPanel">
       <div class="success-icon">✓</div>
       <div class="success-title" id="successTitle">Sign-up received</div>
-      <p class="success-msg" id="successMsg">Thank you for signing up. Please check your email to verify your account and set up your password.</p>
+      <p class="success-msg" id="successMsg">Thank you for signing up. Please check your email for your secure onboarding link.</p>
       <div class="success-links">
         <a href="/">Back to homepage</a>
         <a href="/portal">Portal login</a>
@@ -590,7 +590,7 @@ function getSteps() {
       render: () => mode === 'upgrade'
         ? `<p class="subhead">You are already authenticated through your portal session. Press Next to choose the path you want.</p>`
         : `
-          <div class="auth-note">Text verification is skipped for now. Your phone number is required for onboarding, and your secure password setup link will be sent to your email after this form is submitted.</div>
+          <div class="auth-note">Text verification is skipped for now. Your phone number is required for onboarding, and your secure onboarding link will be sent to your email after this form is submitted.</div>
           <label class="consent">
             <input id="contactAuthConfirmed" type="checkbox" ${state.contactAuthConfirmed ? 'checked' : ''}>
             <span>I confirm this phone number and email address are accurate for my CredX account.</span>
@@ -960,7 +960,7 @@ async function submitSignup() {
     showToast('Signup received. Check your email.');
     showSuccess(
       'Thank you for signing up',
-      'Please check your email to verify your account and set up your password. After that, your agreement and next onboarding step will appear in your portal.'
+      'Please check your email for your secure onboarding link. You will sign your agreement first, complete intake, then receive your password setup email as the final step.'
     );
   } catch (error) {
     showError(error.message || 'Submission failed.');

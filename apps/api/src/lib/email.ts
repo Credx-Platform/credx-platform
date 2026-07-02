@@ -559,7 +559,7 @@ function renderPortalReadyEmail(params: {
   const subject = 'Set your CredX password to access your portal';
   const bodyHtml = `
     <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">You're all set, ${params.firstName || 'there'}.</h1>
-    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Your contract is signed, your profile is on file, and your credit monitoring credentials are connected. Your CredX portal is ready.</p>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Your contract is signed and your profile is on file. Your CredX portal is ready.</p>
     <p style="margin:0 0 4px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Before you can enter the portal, you need to create your password using the secure button below.</p>
     ${emailButton(params.setupLink, 'Set my password')}
     <p style="margin:18px 0 8px;color:${EMAIL_TEXT_SOFT};font-size:14px;line-height:1.6;">After your password is set, you can sign in to your portal here:<br /><a href="${params.loginLink}" style="color:${EMAIL_CYAN};word-break:break-all;">${params.loginLink}</a></p>
@@ -575,7 +575,7 @@ function renderPortalReadyEmail(params: {
 
 Hi ${params.firstName || 'there'},
 
-Your contract is signed, your profile is on file, and your credit monitoring credentials are connected. Your CredX portal is ready.
+Your contract is signed and your profile is on file. Your CredX portal is ready.
 
 Before you can enter the portal, create your password here:
 ${params.setupLink}
