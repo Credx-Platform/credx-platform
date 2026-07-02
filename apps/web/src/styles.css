@@ -177,6 +177,24 @@ h1, h2, h3, .eyebrow, .top-title, button { font-family: var(--cx-font-display); 
 }
 
 .main { padding: 28px; }
+.onboarding-shell {
+  display: block;
+  min-height: 100vh;
+}
+.onboarding-main {
+  width: 100%;
+  min-width: 0;
+  padding: clamp(14px, 2.4vw, 32px);
+}
+.onboarding-main .topbar,
+.onboarding-main .panel {
+  width: 100%;
+  max-width: min(1280px, calc(100vw - clamp(28px, 4.8vw, 64px)));
+  margin-inline: auto;
+}
+.onboarding-main .panel {
+  overflow: visible;
+}
 
 .site-footer {
   margin-top: 32px;
@@ -1305,16 +1323,16 @@ button:hover,
   width: 100%;
   max-width: 100%;
   margin: 0;
-  padding: 28px 32px;
+  padding: clamp(18px, 2.4vw, 32px);
 }
 .contract-card .contract-body {
   display: block;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.7;
   color: var(--surface-text);
-  max-height: 70vh;
+  max-height: min(68vh, 760px);
   overflow-y: auto;
-  padding: 22px 26px;
+  padding: clamp(16px, 2vw, 28px);
   background: #fff;
   border: 1px solid var(--surface-border);
   border-radius: 12px;
@@ -1347,8 +1365,13 @@ button:hover,
 .contract-card .signature-pad-label { font-size: 12px; color: #475569; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 700; }
 .contract-card .signature-pad-clear { background: transparent; color: #b45309; border: 1px solid rgba(180,83,9,0.45); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
 @media (max-width: 720px) {
-  .contract-card { padding: 18px; }
-  .contract-card .contract-body { font-size: 14px; line-height: 1.6; padding: 16px; max-height: 60vh; }
+  .onboarding-main { padding: 12px; }
+  .onboarding-main .topbar,
+  .onboarding-main .panel {
+    max-width: 100%;
+  }
+  .contract-card { padding: 14px; }
+  .contract-card .contract-body { font-size: 14px; line-height: 1.6; padding: 14px; max-height: 58vh; }
   .contract-card .signature-pad-canvas { height: 150px; }
   .contract-card .contract-agree { font-size: 14px; }
 }

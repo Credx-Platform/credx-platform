@@ -3398,8 +3398,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
   if (onboardingOnly) {
     return (
-      <div className="shell client-shell">
-        <main className="main" style={{ marginLeft: 0 }}>
+      <div className="shell client-shell onboarding-shell">
+        <main className="main onboarding-main">
           <header className="topbar"><div><div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">CredX Onboarding</p></div><h1 className="top-title">Complete your signup</h1><p className="helper-text">Review your agreement, finish your intake, and connect your credit monitoring provider.</p></div></header>
           {error ? <div className="error-banner">{error}</div> : null}
           {!progress?.onboarding?.completedAt && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
