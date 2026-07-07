@@ -1,7 +1,6 @@
 import express, { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
-import { activateClientDisputeCampaign } from '../lib/disputeAutomation.js';
 import Stripe from 'stripe';
 
 export const billingRouter = Router();
@@ -38,14 +37,18 @@ billingRouter.post('/confirm', async (req, res, next) => {
     const currency = typeof req.body?.currency === 'string' ? req.body.currency : undefined;
     const reference = typeof req.body?.reference === 'string' ? req.body.reference : undefined;
 
-    const { settlePaymentAndActivate } = await import('../lib/billingActivation.js');
-    const result = await settlePaymentAndActivate(clientId, { amount, currency, reference, method: 'online' });
+    // Settle ONLY — payment never triggers dispute work (counsel, 2026-07-07).
+    // The processor already captured the money, so an early payment is recorded
+    // and flagged for review/refund rather than rejected.
+    const { settleSetupPayment } = await import('../lib/billingActivation.js');
+    const result = await settleSetupPayment(clientId, {
+      amount, currency, reference, method: 'online', recordDespiteGate: true
+    });
 
-    return res.json({ success: true, activated: true, ...result });
+    return res.json({ success: true, settled: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (message === 'Client not found') return res.status(404).json({ error: message });
-    if (message.startsWith('No credit analysis')) return res.status(400).json({ error: message });
     next(error);
   }
 });
@@ -108,57 +111,26 @@ billingRouter.post('/webhook', async (req, res) => {
     }
 
     try {
-      const client = await prisma.client.findUnique({
-        where: { id: clientId },
-        include: { user: true, progress: true }
+      // Settle ONLY — payment never triggers dispute work (counsel, 2026-07-07).
+      // Stripe already captured the money, so an early payment is recorded and
+      // flagged for review/refund rather than rejected.
+      const { settleSetupPayment } = await import('../lib/billingActivation.js');
+      const result = await settleSetupPayment(clientId, {
+        amount: (paymentIntent.amount_received || paymentIntent.amount || 0) / 100,
+        currency: (paymentIntent.currency || 'usd').toUpperCase(),
+        stripePaymentIntentId: paymentIntent.id || undefined,
+        reference: paymentIntent.id || undefined,
+        method: 'stripe',
+        recordDespiteGate: true
       });
 
-      if (!client) {
-        return res.json({ received: true, activated: false, reason: 'Client not found' });
-      }
-
-      if (!client.progress?.analysis) {
-        return res.json({ received: true, activated: false, reason: 'No credit analysis found' });
-      }
-
-      // Record payment
-      await prisma.payment.create({
-        data: {
-          clientId,
-          amount: (paymentIntent.amount_received || paymentIntent.amount || 0) / 100,
-          currency: (paymentIntent.currency || 'usd').toUpperCase(),
-          type: 'SETUP_FEE',
-          status: 'PAID',
-          stripePaymentIntentId: paymentIntent.id || null,
-          paidAt: new Date()
-        }
-      });
-
-      // Clear old dispute items if any exist
-      const existingItems = await prisma.disputeItem.findMany({ where: { clientId }, select: { id: true } });
-      if (existingItems.length > 0) {
-        const ids = existingItems.map(d => d.id);
-        await prisma.disputeRound.deleteMany({ where: { disputeItemId: { in: ids } } });
-        await prisma.disputeItem.deleteMany({ where: { clientId } });
-        await prisma.document.deleteMany({ where: { clientId, type: 'DISPUTE_LETTER' } });
-      }
-
-      // Activate and generate letters
-      const result = await activateClientDisputeCampaign(clientId);
-
-      await prisma.activityEvent.create({
-        data: {
-          clientId,
-          type: 'AUTO_ACTIVATED',
-          message: `Client auto-activated after payment. ${result.lettersGenerated} dispute letter(s) generated.`,
-          metadata: { eventType: event.type, paymentIntentId: paymentIntent.id, lettersGenerated: result.lettersGenerated }
-        }
-      });
-
-      return res.json({ received: true, activated: true, lettersGenerated: result.lettersGenerated, clientId });
+      return res.json({ received: true, settled: true, gateWarnings: result.gateWarnings, clientId });
     } catch (err: any) {
-      console.error('Auto-activation failed:', err);
-      return res.status(500).json({ received: true, activated: false, error: err.message });
+      if (err?.message === 'Client not found') {
+        return res.json({ received: true, settled: false, reason: 'Client not found' });
+      }
+      console.error('Payment settlement failed:', err);
+      return res.status(500).json({ received: true, settled: false, error: err.message });
     }
   }
 

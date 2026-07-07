@@ -71,25 +71,40 @@ lobRouter.post('/send', requireAuth, async (req: AuthedRequest, res, next) => {
       return res.status(response.status).json({ error: body?.error?.message || 'Lob request failed', details: body });
     }
 
-    if (req.auth?.sub) {
-      const client = await prisma.client.findUnique({ where: { userId: req.auth.sub } });
-      if (client) {
-        await prisma.activityEvent.create({
-          data: {
-            clientId: client.id,
-            type: 'dispute.letter.mailed',
-            message: `Dispute letter mailed via Lob to ${payload.to.name}`,
-            metadata: {
-              lobId: body.id,
-              expectedDeliveryDate: body.expected_delivery_date,
-              trackingNumber: body.tracking_number || null,
-              trackingUrl: body.url || null,
-              to: payload.to,
-              certified: payload.certified,
-              userMetadata: payload.metadata || {}
-            } as any
-          }
-        });
+    // Resolve the client this letter belongs to: the client's own auth for
+    // portal sends, or metadata.clientId for staff/admin-initiated sends.
+    let client = req.auth?.sub
+      ? await prisma.client.findUnique({ where: { userId: req.auth.sub } })
+      : null;
+    if (!client && (req.auth?.role === 'STAFF' || req.auth?.role === 'ADMIN') && payload.metadata?.clientId) {
+      client = await prisma.client.findUnique({ where: { id: payload.metadata.clientId } });
+    }
+    if (client) {
+      await prisma.activityEvent.create({
+        data: {
+          clientId: client.id,
+          type: 'dispute.letter.mailed',
+          message: `Dispute letter mailed via Lob to ${payload.to.name}`,
+          metadata: {
+            lobId: body.id,
+            expectedDeliveryDate: body.expected_delivery_date,
+            trackingNumber: body.tracking_number || null,
+            trackingUrl: body.url || null,
+            to: payload.to,
+            certified: payload.certified,
+            userMetadata: payload.metadata || {}
+          } as any
+        }
+      });
+
+      // Proof of mailing now exists — raise the pending setup bill (idempotent).
+      // Per counsel (2026-07-07) this is the moment the fee becomes billable,
+      // subject to the cancellation-window check at settlement time.
+      try {
+        const { createPendingSetupBill } = await import('../lib/billingActivation.js');
+        await createPendingSetupBill(client.id, client.serviceTier);
+      } catch (billErr) {
+        console.error('[lob] could not raise pending setup bill:', billErr);
       }
     }
 

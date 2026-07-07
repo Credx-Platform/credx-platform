@@ -486,7 +486,7 @@ export async function sendDisputeInitiationEmail(
         </td></tr>
         <tr><td style="padding: 22px 32px 30px; color: #94a3b8; font-size: 12px; line-height: 1.6; border-top: 1px solid rgba(133,157,186,0.18);">
           <strong style="color: #f8fafc; font-size: 14px;">CredX</strong><br/>
-          Credit Education & Financial Strategy Support<br/>
+          Dispute Preparation & Financial Strategy Support<br/>
           <a href="https://credxme.com" style="color: #00c6fb; text-decoration: none;">credxme.com</a> ·
           <a href="mailto:contact@credxme.com" style="color: #00c6fb; text-decoration: none;">contact@credxme.com</a> ·
           <a href="tel:+18662733963" style="color: #00c6fb; text-decoration: none;">866-CREDX-ME</a>
@@ -520,7 +520,7 @@ Credit bureaus have 30 days to investigate under the FCRA. Round 1 responses typ
 Questions? Reply to this email or contact contact@credxme.com.
 
 CredX
-Credit Education & Financial Strategy Support`;
+Dispute Preparation & Financial Strategy Support`;
 
   const result = await sendEmail({
     to: client.user.email,
@@ -537,7 +537,8 @@ Credit Education & Financial Strategy Support`;
 // ============================================================
 
 export async function activateClientDisputeCampaign(
-  clientId: string
+  clientId: string,
+  opts?: { stateReviewOverride?: boolean; overrideBy?: string }
 ): Promise<{
   success: boolean;
   lettersGenerated: number;
@@ -545,13 +546,13 @@ export async function activateClientDisputeCampaign(
   errors?: string[];
 }> {
   const errors: string[] = [];
-  
+
   try {
     // 1. Get client with analysis
     const client = await prisma.client.findUnique({
       where: { id: clientId },
-      include: { 
-        user: true, 
+      include: {
+        user: true,
         progress: true,
         creditReports: { orderBy: { pulledAt: 'desc' }, include: { tradelines: true } }
       }
@@ -563,6 +564,41 @@ export async function activateClientDisputeCampaign(
 
     if (!client.progress?.analysis) {
       return { success: false, lettersGenerated: 0, emailSent: false, errors: ['No credit analysis found. Upload credit report first.'] };
+    }
+
+    // CROA work gate: no paid dispute work until the service agreement is signed
+    // and the 3-business-day cancellation window has expired (counsel, 2026-07-07).
+    const { disputeWorkGate } = await import('./croaCompliance.js');
+    const workGate = await disputeWorkGate(clientId);
+    if (!workGate.eligible) {
+      return { success: false, lettersGenerated: 0, emailSent: false, errors: workGate.reasons };
+    }
+
+    // State eligibility gate: blocked states are refused outright; review_required
+    // states need an explicit, logged admin override.
+    const { stateBucket } = await import('./stateEligibility.js');
+    const bucket = stateBucket(client.currentState);
+    if (bucket === 'blocked') {
+      return {
+        success: false, lettersGenerated: 0, emailSent: false,
+        errors: [`Dispute service is blocked in ${client.currentState || 'this state'} pending registration/bonding. Activation refused.`]
+      };
+    }
+    if (bucket === 'review_required') {
+      if (!opts?.stateReviewOverride) {
+        return {
+          success: false, lettersGenerated: 0, emailSent: false,
+          errors: [`STATE_REVIEW_REQUIRED: ${client.currentState || 'Unknown state'} has not been counsel-approved for the dispute service. An admin must confirm state eligibility to proceed.`]
+        };
+      }
+      await prisma.activityEvent.create({
+        data: {
+          clientId,
+          type: 'STATE_REVIEW_OVERRIDE',
+          message: `Activation in review-required state ${client.currentState || 'UNKNOWN'} approved by admin override.`,
+          metadata: { state: client.currentState || null, overrideBy: opts.overrideBy || 'unknown' }
+        }
+      });
     }
 
     const analysis = client.progress.analysis as unknown as CreditAnalysis;

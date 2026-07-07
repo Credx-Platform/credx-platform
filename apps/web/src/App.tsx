@@ -31,6 +31,7 @@ type ClientEducationProgress = {
 
 type ClientProgress = {
   education?: ClientEducationProgress;
+  analysis?: unknown;
   scores?: { equifax?: number | null; experian?: number | null; transunion?: number | null };
   workflow?: { stage?: string; next?: string[] };
   uploadedDocs?: Array<{ name?: string; fileName?: string; type?: string; uploadedAt?: string; secure?: boolean; sizeBytes?: number }>;
@@ -205,6 +206,27 @@ async function apiUpload<T>(path: string, token: string, formData: FormData): Pr
   const body = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(body?.error ?? `Upload failed: ${response.status}`);
   return body as T;
+}
+
+async function downloadApiFile(path: string, token: string, filename: string) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: { authorization: `Bearer ${token}` }
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text || `Download failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 function money(value: number | null) {
@@ -547,9 +569,11 @@ const CLIENT_STATUS_FILTERS: Array<{ key: string; label: string }> = [
   { key: 'CANCELLED', label: 'Cancelled' }
 ];
 
-function Leads({ leads, clients }: { leads: LeadRecord[]; clients: ClientRecord[] }) {
+function Leads({ token, leads, clients }: { token: string; leads: LeadRecord[]; clients: ClientRecord[] }) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const leadRows = useMemo(() => buildLeadPipelineRows(leads, clients), [leads, clients]);
 
   const filtered = useMemo(() => {
@@ -570,6 +594,17 @@ function Leads({ leads, clients }: { leads: LeadRecord[]; clients: ClientRecord[
 
   const awaitingSignup = filtered.filter((l) => !l.isRegistered).length;
   const pendingPayment = filtered.filter((l) => l.isPendingPayment).length;
+  const exportCompatibilityCsv = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      await downloadApiFile('/api/compatibility/lead-client-records?format=csv', token, 'credx-lead-client-records.csv');
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Unable to export compatibility CSV');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <section className="panel">
@@ -583,14 +618,20 @@ function Leads({ leads, clients }: { leads: LeadRecord[]; clients: ClientRecord[
             <span>· <strong>{awaitingSignup}</strong> awaiting signup</span>
             <span>· <strong>{pendingPayment}</strong> pending payment</span>
           </div>
+          {exportError ? <p className="helper-text helper-text--error">{exportError}</p> : null}
         </div>
-        <input
-          type="search"
-          className="search-input"
-          placeholder="Search name, email, phone…"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+        <div className="lead-toolbar">
+          <input
+            type="search"
+            className="search-input"
+            placeholder="Search name, email, phone…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <button type="button" className="ghost-button" onClick={exportCompatibilityCsv} disabled={exporting}>
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -1059,23 +1100,30 @@ function ClientDetailRoute({ token }: { token: string }) {
                       className="ghost-button"
                       style={{ borderColor: '#22c55e', color: '#22c55e', fontWeight: 600 }}
                       onClick={async () => {
-                        if (!confirm(`Mark ${fullName} as paid and activate? This settles the pending bill, sets status to ACTIVE, and auto-generates dispute letters from the current analysis.`)) return;
+                        if (!confirm(`Activate ${fullName} and generate Round 1 dispute letters? No payment is taken now — per CROA the fee is billed only after the letters are mailed with proof and the cancellation window has passed.`)) return;
                         setSaving(true);
                         try {
-                          // No amount sent — the API settles the pending bill at the client's tier amount.
-                          const res = await apiFetch<{ success: boolean; activated: boolean; lettersGenerated: number; payment: any }>(`/api/clients/${client.id}/mark-paid-and-activate`, token, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({})
-                          });
-                          if (res.success && res.activated) {
-                            alert(`✅ ${fullName} is now ACTIVE. ${res.lettersGenerated} dispute letter(s) generated. Payment: $${res.payment.amount} ${res.payment.currency}.`);
-                          } else {
-                            alert('Activation completed but no letters were generated. Check analysis data.');
+                          const activateOnce = (override: boolean) =>
+                            apiFetch<{ success: boolean; lettersGenerated: number; errors?: string[] }>(`/api/clients/${client.id}/activate`, token, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(override ? { stateReviewOverride: true } : {})
+                            });
+                          let res = await activateOnce(false);
+                          if (!res.success && res.errors?.some((e) => e.startsWith('STATE_REVIEW_REQUIRED'))) {
+                            const msg = res.errors.find((e) => e.startsWith('STATE_REVIEW_REQUIRED')) || '';
+                            if (confirm(`${msg.replace('STATE_REVIEW_REQUIRED: ', '')}\n\nOverride and proceed anyway? This is logged for compliance.`)) {
+                              res = await activateOnce(true);
+                            }
                           }
-                          const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
-                          setClient(updated.client);
-                          setStatusValue('ACTIVE');
+                          if (res.success) {
+                            alert(`✅ ${fullName} is now ACTIVE. ${res.lettersGenerated} dispute letter(s) generated. Bill the setup fee after the letters are mailed with proof.`);
+                            const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
+                            setClient(updated.client);
+                            setStatusValue('ACTIVE');
+                          } else {
+                            alert(`Activation blocked:\n${(res.errors || ['Unknown error']).join('\n')}`);
+                          }
                         } catch (err) {
                           alert(`Activation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
                         } finally {
@@ -1084,7 +1132,60 @@ function ClientDetailRoute({ token }: { token: string }) {
                       }}
                       disabled={saving}
                     >
-                      💳 Mark Paid & Activate
+                      🚀 Activate & Generate Letters
+                    </button>
+                  ) : null}
+                  {client.status === 'ACTIVE' ? (
+                    <button
+                      className="ghost-button"
+                      style={{ borderColor: '#a855f7', color: '#a855f7' }}
+                      onClick={async () => {
+                        const trackingNumber = prompt(`Record proof of mailing for ${fullName} (letters mailed outside Lob).\n\nTracking number (recommended, blank to skip):`);
+                        if (trackingNumber === null) return;
+                        setSaving(true);
+                        try {
+                          await apiFetch<{ success: boolean }>(`/api/disputes/mark-mailed`, token, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ clientId: client.id, trackingNumber: trackingNumber.trim() || undefined })
+                          });
+                          alert(`✅ Mailing proof recorded. The setup-fee bill is raised and becomes chargeable once the cancellation window has passed.`);
+                        } catch (err) {
+                          alert(`Could not record mailing proof: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving}
+                    >
+                      📮 Record Mailing Proof
+                    </button>
+                  ) : null}
+                  {client.progress?.analysis ? (
+                    <button
+                      className="ghost-button"
+                      style={{ borderColor: '#f59e0b', color: '#b45309', fontWeight: 600 }}
+                      onClick={async () => {
+                        if (!confirm(`Mark the setup fee as PAID for ${fullName}? Only after the first round is mailed with proof and the CROA 3-business-day window has passed — the API refuses otherwise.`)) return;
+                        setSaving(true);
+                        try {
+                          const res = await apiFetch<{ success: boolean; payment: any }>(`/api/clients/${client.id}/mark-paid-and-activate`, token, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({})
+                          });
+                          alert(`✅ Setup fee settled: $${res.payment.amount} ${res.payment.currency}.`);
+                          const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
+                          setClient(updated.client);
+                        } catch (err) {
+                          alert(`Payment not recorded: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving}
+                    >
+                      💳 Mark Setup Fee Paid
                     </button>
                   ) : null}
                   {client.status === 'ACTIVE' && client.progress?.analysis ? (
@@ -2594,7 +2695,7 @@ export default function App() {
         {error ? <div className="error-banner">{error}</div> : null}
         <Routes>
           <Route path="/" element={<Overview clients={clients} disputes={disputes} plans={plans} leadPipelineCount={leadPipelineRows.length} />} />
-          <Route path="/leads" element={<Leads leads={leads} clients={clients} />} />
+          <Route path="/leads" element={<Leads token={token} leads={leads} clients={clients} />} />
           <Route path="/clients" element={<Clients clients={clients} />} />
           <Route path="/clients/:id" element={<ClientDetailRoute token={token} />} />
           <Route path="/disputes" element={<DisputesRoute token={token} disputes={disputes} clients={clients} />} />

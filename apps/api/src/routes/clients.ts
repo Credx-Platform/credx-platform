@@ -323,14 +323,10 @@ clientsRouter.post('/:id/analysis', requireAuth, requireRole(['STAFF', 'ADMIN'])
       include: { user: true, payments: true, disputes: true, documents: true, activities: true }
     });
 
-    // Analysis is now sent — raise the pending bill so payment can trigger disputes.
-    // Non-fatal: a billing hiccup must not block publishing the analysis.
-    try {
-      const { createPendingSetupBill } = await import('../lib/billingActivation.js');
-      await createPendingSetupBill(client.id, client.serviceTier);
-    } catch (billErr) {
-      console.error('[analysis] could not create pending setup bill:', billErr);
-    }
+    // NOTE: the pending setup bill is intentionally NOT raised here. Per counsel
+    // (2026-07-07) the fee becomes chargeable only after the first dispute round
+    // is mailed with proof and the CROA cancellation window has expired — the
+    // bill is created when mailing proof is recorded (see lob.ts / mark-mailed).
 
     return res.status(201).json({ client });
   } catch (error) {
@@ -413,7 +409,7 @@ clientsRouter.post('/:id/clear-disputes', requireAuth, requireRole(['STAFF', 'AD
   }
 });
 
-clientsRouter.post('/:id/regenerate-letters', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+clientsRouter.post('/:id/regenerate-letters', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req: AuthedRequest, res, next) => {
   try {
     const id = String(req.params.id);
     const client = await prisma.client.findUnique({
@@ -444,7 +440,10 @@ clientsRouter.post('/:id/regenerate-letters', requireAuth, requireRole(['STAFF',
 
     // Step 2: Activate / regenerate
     const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
-    const result = await activateClientDisputeCampaign(id);
+    const result = await activateClientDisputeCampaign(id, {
+      stateReviewOverride: req.body?.stateReviewOverride === true,
+      overrideBy: req.auth?.sub
+    });
 
     // Step 3: Fetch the newly created documents
     const newDocuments = await prisma.document.findMany({
@@ -468,26 +467,24 @@ clientsRouter.post('/:id/regenerate-letters', requireAuth, requireRole(['STAFF',
   }
 });
 
-// ========== MARK PAID & ACTIVATE (Admin one-click payment + activation + letter generation) ==========
+// ========== MARK PAID (Admin manual settlement — settle ONLY, never activates) ==========
 
-// Manual "Mark Paid" path (cash / off-platform payment). Settles the pending bill
-// and triggers disputes via the same helper the online webhook uses. Amount comes
-// from the pending bill / service tier unless explicitly overridden in the body.
+// Manual "Mark Paid" path (cash / off-platform payment). Per counsel (2026-07-07)
+// payment never triggers dispute work: this settles the bill and refuses with 409
+// unless the CROA gate is satisfied (first round mailed with proof + cancellation
+// window expired). Activation is the separate /:id/activate admin action.
 clientsRouter.post('/:id/mark-paid-and-activate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
   try {
     const id = String(req.params.id);
     const amount = typeof req.body.amount === 'number' ? req.body.amount : undefined;
     const currency = typeof req.body.currency === 'string' ? req.body.currency : undefined;
 
-    const { settlePaymentAndActivate } = await import('../lib/billingActivation.js');
-    const result = await settlePaymentAndActivate(id, { amount, currency, method: 'manual' });
+    const { settleSetupPayment } = await import('../lib/billingActivation.js');
+    const result = await settleSetupPayment(id, { amount, currency, method: 'manual' });
 
     return res.json({
       success: true,
-      activated: true,
-      lettersGenerated: result.lettersGenerated,
-      emailSent: result.emailSent,
-      errors: result.errors,
+      settled: true,
       payment: result.payment,
       client: await prisma.client.findUnique({
         where: { id },
@@ -497,12 +494,14 @@ clientsRouter.post('/:id/mark-paid-and-activate', requireAuth, requireRole(['STA
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (message === 'Client not found') return res.status(404).json({ error: message });
-    if (message.startsWith('No credit analysis')) return res.status(400).json({ error: message });
+    if (error instanceof Error && error.name === 'BillingGateError') {
+      return res.status(409).json({ error: error.message, reasons: (error as any).reasons });
+    }
     next(error);
   }
 });
 
-clientsRouter.post('/:id/activate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+clientsRouter.post('/:id/activate', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req: AuthedRequest, res, next) => {
   try {
     const id = String(req.params.id);
     const client = await prisma.client.findUnique({
@@ -515,7 +514,10 @@ clientsRouter.post('/:id/activate', requireAuth, requireRole(['STAFF', 'ADMIN'])
     if (client.status === 'ACTIVE') return res.status(400).json({ error: 'Client is already active.' });
 
     const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
-    const result = await activateClientDisputeCampaign(id);
+    const result = await activateClientDisputeCampaign(id, {
+      stateReviewOverride: req.body?.stateReviewOverride === true,
+      overrideBy: req.auth?.sub
+    });
 
     return res.json({
       success: result.success,

@@ -13,8 +13,11 @@ export function setupFeeForTier(tier?: string | null): number {
 }
 
 /**
- * Create the pending "bill" once the analysis has been sent. Idempotent: if a
- * SETUP_FEE payment already exists for the client (pending or paid), it is reused.
+ * Create the pending "bill". Called when proof of mailing for the first dispute
+ * round is recorded (Lob send or manual mail log) — NOT at analysis time; per
+ * counsel (2026-07-07) the fee becomes chargeable only after the work is
+ * performed. Idempotent: if a SETUP_FEE payment already exists for the client
+ * (pending or paid), it is reused.
  */
 export async function createPendingSetupBill(clientId: string, tier?: string | null) {
   const existing = await prisma.payment.findFirst({
@@ -36,30 +39,39 @@ export async function createPendingSetupBill(clientId: string, tier?: string | n
 
 export type SettleResult = {
   payment: { amount: number; currency: string; status: 'PAID' };
-  lettersGenerated: number;
-  emailSent?: boolean;
-  errors?: unknown;
+  gateWarnings?: string[];
 };
 
 /**
- * Settle the client's pending setup bill and trigger the dispute campaign.
- * This is the single entry point used by BOTH the manual "Mark Paid" button and
- * the online payment-confirmation webhook, so payment (by either path) is the one
- * thing that activates dispute generation.
+ * Settle the client's setup-fee bill. Settle ONLY — per counsel guidance
+ * (2026-07-07), payment must never trigger dispute work; the sequence is
+ * work → proof of mailing → cancellation window expired → then charge.
+ * Dispute activation is a separate admin action (activateClientDisputeCampaign)
+ * and the pending bill is raised when mailing proof is first recorded.
  *
- * Throws 'Client not found' or 'No credit analysis...' so callers can map to 404/400.
+ * Throws BillingGateError when the CROA gate isn't satisfied, unless
+ * opts.recordDespiteGate is set (online webhooks: the processor already moved
+ * the money, so record it and flag for review/refund instead of dropping it).
+ * Throws 'Client not found' so callers can map to 404.
  */
-export async function settlePaymentAndActivate(
+export async function settleSetupPayment(
   clientId: string,
-  opts?: { amount?: number; currency?: string; reference?: string; method?: string }
+  opts?: {
+    amount?: number;
+    currency?: string;
+    reference?: string;
+    method?: string;
+    stripePaymentIntentId?: string;
+    recordDespiteGate?: boolean;
+  }
 ): Promise<SettleResult> {
-  const client = await prisma.client.findUnique({
-    where: { id: clientId },
-    include: { progress: true }
-  });
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
   if (!client) throw new Error('Client not found');
-  if (!client.progress?.analysis) {
-    throw new Error('No credit analysis found. Generate the analysis before taking payment.');
+
+  const { setupFeeBillingGate, BillingGateError } = await import('./croaCompliance.js');
+  const gate = await setupFeeBillingGate(clientId);
+  if (!gate.eligible && !opts?.recordDespiteGate) {
+    throw new BillingGateError(gate.reasons);
   }
 
   // Settle the existing pending bill, or create a paid record if none exists yet.
@@ -73,46 +85,57 @@ export async function settlePaymentAndActivate(
   if (pending) {
     await prisma.payment.update({
       where: { id: pending.id },
-      data: { status: 'PAID', paidAt: new Date(), amount, currency }
+      data: {
+        status: 'PAID',
+        paidAt: new Date(),
+        amount,
+        currency,
+        ...(opts?.stripePaymentIntentId ? { stripePaymentIntentId: opts.stripePaymentIntentId } : {})
+      }
     });
   } else {
     await prisma.payment.create({
-      data: { clientId, amount, currency, type: 'SETUP_FEE', status: 'PAID', paidAt: new Date() }
+      data: {
+        clientId,
+        amount,
+        currency,
+        type: 'SETUP_FEE',
+        status: 'PAID',
+        paidAt: new Date(),
+        stripePaymentIntentId: opts?.stripePaymentIntentId || null
+      }
     });
   }
 
-  // Fresh start: clear any prior dispute items / letters before regenerating.
-  const existingItems = await prisma.disputeItem.findMany({ where: { clientId }, select: { id: true } });
-  if (existingItems.length > 0) {
-    const ids = existingItems.map((d) => d.id);
-    await prisma.disputeRound.deleteMany({ where: { disputeItemId: { in: ids } } });
-    await prisma.disputeItem.deleteMany({ where: { clientId } });
-    await prisma.document.deleteMany({ where: { clientId, type: 'DISPUTE_LETTER' } });
+  if (!gate.eligible) {
+    // Money arrived before the CROA gate was satisfied — surface loudly for review/refund.
+    await prisma.activityEvent.create({
+      data: {
+        clientId,
+        type: 'EARLY_PAYMENT_FLAGGED',
+        message: `Setup payment of $${amount} ${currency} received BEFORE the CROA billing gate was satisfied. Review for refund/hold. ${gate.reasons.join(' ')}`,
+        metadata: { amount, currency, method: opts?.method || 'unknown', reasons: gate.reasons }
+      }
+    });
   }
-
-  // Generate + send letters and set the client ACTIVE (handled inside).
-  const { activateClientDisputeCampaign } = await import('./disputeAutomation.js');
-  const result = await activateClientDisputeCampaign(clientId);
 
   await prisma.activityEvent.create({
     data: {
       clientId,
       type: 'PAYMENT_RECEIVED',
-      message: `Payment of $${amount} ${currency} received${opts?.method ? ` (${opts.method})` : ''}. Client activated and ${result.lettersGenerated} dispute letter(s) generated.`,
+      message: `Setup payment of $${amount} ${currency} received${opts?.method ? ` (${opts.method})` : ''}.`,
       metadata: {
         amount,
         currency,
         method: opts?.method || 'manual',
         reference: opts?.reference || null,
-        lettersGenerated: result.lettersGenerated
+        gateEligible: gate.eligible
       }
     }
   });
 
   return {
     payment: { amount, currency, status: 'PAID' },
-    lettersGenerated: result.lettersGenerated,
-    emailSent: result.emailSent,
-    errors: result.errors
+    gateWarnings: gate.eligible ? undefined : gate.reasons
   };
 }

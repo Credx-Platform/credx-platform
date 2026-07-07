@@ -847,7 +847,10 @@ disputesRouter.post('/auto-generate', requireAuth, requireRole(['STAFF', 'ADMIN'
     if (!client.progress?.analysis) return res.status(400).json({ error: 'No credit analysis found for this client.' });
 
     const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
-    const result = await activateClientDisputeCampaign(clientId);
+    const result = await activateClientDisputeCampaign(clientId, {
+      stateReviewOverride: req.body?.stateReviewOverride === true,
+      overrideBy: (req as AuthedRequest).auth?.sub
+    });
 
     return res.json({
       success: result.success,
@@ -855,6 +858,46 @@ disputesRouter.post('/auto-generate', requireAuth, requireRole(['STAFF', 'ADMIN'
       emailSent: result.emailSent,
       errors: result.errors
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Record proof of mailing for letters mailed OUTSIDE Lob (post office / certified
+// mail by hand). Creates the same `dispute.letter.mailed` activity the Lob path
+// creates, which is the CROA billing gate's proof-of-mailing signal, and raises
+// the pending setup bill (idempotent).
+disputesRouter.post('/mark-mailed', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req: AuthedRequest, res, next) => {
+  try {
+    const { clientId, trackingNumber, carrier, notes } = z.object({
+      clientId: z.string().uuid(),
+      trackingNumber: z.string().max(120).optional(),
+      carrier: z.string().max(60).optional(),
+      notes: z.string().max(500).optional()
+    }).parse(req.body);
+
+    const client = await prisma.client.findUnique({ where: { id: clientId } });
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const event = await prisma.activityEvent.create({
+      data: {
+        clientId,
+        type: 'dispute.letter.mailed',
+        message: `Dispute letter(s) mailed manually${carrier ? ` via ${carrier}` : ''}${trackingNumber ? ` (tracking ${trackingNumber})` : ''}.`,
+        metadata: {
+          method: 'manual',
+          carrier: carrier || null,
+          trackingNumber: trackingNumber || null,
+          notes: notes || null,
+          recordedBy: req.auth?.sub || null
+        } as any
+      }
+    });
+
+    const { createPendingSetupBill } = await import('../lib/billingActivation.js');
+    const bill = await createPendingSetupBill(clientId, client.serviceTier);
+
+    return res.json({ success: true, proofEventId: event.id, bill: { id: bill.id, amount: Number(bill.amount), status: bill.status } });
   } catch (error) {
     next(error);
   }

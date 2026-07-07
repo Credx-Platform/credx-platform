@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { cancellationWindowEnd } from '../lib/croaCompliance.js';
 
 export const contractsRouter = Router();
 
@@ -15,8 +16,9 @@ const MASTERCLASS_AGREEMENT_TEXT = `CREDX 5-DAY MASTERCLASS AGREEMENT\n\nThis Ag
 const DISCLOSURE_STATEMENT = `Consumer Credit File Rights Under State and Federal Law\n\nYou have a right to dispute inaccurate information in your credit report by contacting the credit bureau directly. However, neither you nor any credit repair company has the right to have accurate, current, and verifiable information removed from your credit report. The credit bureau must remove accurate negative information only if it is over 7 years old, and bankruptcy information can be reported for 10 years.\n\nYou have the right to sue a credit repair organization that violates the Credit Repair Organizations Act. You have the right to cancel your contract with any credit repair organization for any reason within 3 business days from the date you signed it.`;
 
 function buildCancellationNotice(signedAtIso: string) {
-  const signedAt = new Date(signedAtIso);
-  const cancelBy = new Date(signedAt.getTime() + 3 * 24 * 60 * 60 * 1000);
+  // CROA: "before midnight of the 3rd BUSINESS day" — weekends don't count
+  // (counsel, 2026-07-07). Shared math with the billing/work gates.
+  const cancelBy = cancellationWindowEnd(new Date(signedAtIso));
   return {
     heading: 'Notice of Cancellation',
     text: `You may cancel this contract, without penalty or obligation, at any time before midnight of ${cancelBy.toDateString()}. To cancel this contract, mail or deliver a signed, dated copy of this cancellation notice, or any other written notice, to ${BUSINESS_NAME} at ${BUSINESS_ADDRESS} before midnight of that date.`
