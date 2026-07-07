@@ -130,6 +130,25 @@ type LeadRecord = {
   notes?: string | null;
 };
 
+type LeadPipelineRow = {
+  id: string;
+  clientId?: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  creditGoal?: string | null;
+  sourceLabel: string;
+  sourceDetail?: string | null;
+  sourceType: string;
+  interest?: string | null;
+  submittedAt: string;
+  status: string;
+  statusLabel: string;
+  isPendingPayment: boolean;
+  isRegistered: boolean;
+};
+
 type DisputeRecord = {
   id: string;
   creditorName: string;
@@ -201,6 +220,11 @@ function statusClass(status: string) {
   return `status-badge status-${status.toLowerCase()}`;
 }
 
+function statusLabel(status: string) {
+  if (status === 'UPGRADE_OFFERED') return 'Pending Payment';
+  return status.replace(/_/g, ' ');
+}
+
 function bureauLabel(bureau: DisputeRecord['bureau']) {
   return bureau === 'TRANSUNION' ? 'TransUnion' : bureau === 'EQUIFAX' ? 'Equifax' : 'Experian';
 }
@@ -231,6 +255,135 @@ function isMasterclassStudent(progress?: ClientProgress | null) {
 
 function isStudentClient(client: ClientRecord) {
   return client.status === 'STUDENT' || isMasterclassStudent(client.progress);
+}
+
+const LEAD_PIPELINE_STATUSES = new Set<ClientRecord['status']>([
+  'LEAD',
+  'STUDENT',
+  'CONTRACT_SENT',
+  'INTAKE_RECEIVED',
+  'ANALYSIS_READY',
+  'UPGRADE_OFFERED'
+]);
+
+function textValue(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function sourceTypeFor(label: string) {
+  const normalized = label.toLowerCase();
+  if (normalized.includes('referral') || normalized.includes('referred') || normalized.includes('friend')) return 'referral';
+  if (normalized.includes('masterclass') || normalized.includes('class')) return 'masterclass';
+  if (normalized.includes('instagram') || normalized.includes('facebook') || normalized.includes('tiktok') || normalized.includes('social')) return 'social';
+  if (normalized.includes('google') || normalized.includes('website') || normalized.includes('organic') || normalized.includes('search')) return 'web';
+  if (normalized.includes('direct')) return 'direct';
+  if (normalized.includes('other')) return 'other';
+  return 'signup';
+}
+
+function humanizeSource(value: string) {
+  return value.replace(/[_-]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function leadSourceInfo(lead: LeadRecord) {
+  const label = textValue(lead.referralSource) || 'Landing Page';
+  const detail = [lead.referralName, lead.referralOther].map(textValue).filter(Boolean).join(' · ');
+  return {
+    label: humanizeSource(label),
+    detail: detail || null,
+    type: sourceTypeFor(label)
+  };
+}
+
+function clientSourceInfo(client: ClientRecord, lead?: LeadRecord) {
+  const onboarding = client.progress?.onboarding;
+  const signupIntake = isObjectRecord(onboarding?.signupIntake) ? onboarding?.signupIntake : null;
+  const lastSignupIntake = isObjectRecord(onboarding?.lastSignupIntake) ? onboarding?.lastSignupIntake : null;
+  const fallbackLead = lead ? leadSourceInfo(lead) : null;
+  const label =
+    textValue(onboarding?.referralSource) ||
+    textValue(signupIntake?.referralSource) ||
+    textValue(lastSignupIntake?.referralSource) ||
+    fallbackLead?.label ||
+    'Signup';
+  const detail =
+    textValue(onboarding?.referralDetail) ||
+    textValue(signupIntake?.referralDetail) ||
+    textValue(lastSignupIntake?.referralDetail) ||
+    textValue(signupIntake?.referralName) ||
+    textValue(lastSignupIntake?.referralName) ||
+    fallbackLead?.detail ||
+    null;
+  const interest =
+    textValue(onboarding?.initialOfferInterest) ||
+    textValue(onboarding?.lastOfferInterest) ||
+    textValue(signupIntake?.planPath) ||
+    textValue(lastSignupIntake?.planPath) ||
+    lead?.offerInterest ||
+    null;
+
+  return {
+    label: humanizeSource(label),
+    detail,
+    type: sourceTypeFor(label),
+    interest
+  };
+}
+
+function buildLeadPipelineRows(leads: LeadRecord[], clients: ClientRecord[]): LeadPipelineRow[] {
+  const leadByEmail = new Map(leads.map((lead) => [lead.email.toLowerCase(), lead]));
+  const clientEmails = new Set<string>();
+  const rows: LeadPipelineRow[] = [];
+
+  for (const client of clients) {
+    if (!LEAD_PIPELINE_STATUSES.has(client.status)) continue;
+    const email = client.user.email.toLowerCase();
+    clientEmails.add(email);
+    const matchingLead = leadByEmail.get(email);
+    const source = clientSourceInfo(client, matchingLead);
+    rows.push({
+      id: `client-${client.id}`,
+      clientId: client.id,
+      firstName: client.user.firstName,
+      lastName: client.user.lastName,
+      email: client.user.email,
+      phone: null,
+      creditGoal: matchingLead?.creditGoal || null,
+      sourceLabel: source.label,
+      sourceDetail: source.detail,
+      sourceType: source.type,
+      interest: source.interest,
+      submittedAt: matchingLead?.createdAt || client.createdAt,
+      status: client.status,
+      statusLabel: statusLabel(client.status),
+      isPendingPayment: client.status === 'UPGRADE_OFFERED',
+      isRegistered: true
+    });
+  }
+
+  for (const lead of leads) {
+    if (clientEmails.has(lead.email.toLowerCase())) continue;
+    const source = leadSourceInfo(lead);
+    rows.push({
+      id: `lead-${lead.id}`,
+      firstName: lead.firstName,
+      lastName: lead.lastName,
+      email: lead.email,
+      phone: lead.phone,
+      creditGoal: lead.creditGoal,
+      sourceLabel: source.label,
+      sourceDetail: source.detail,
+      sourceType: source.type,
+      interest: lead.offerInterest,
+      submittedAt: lead.createdAt,
+      status: 'AWAITING_SIGNUP',
+      statusLabel: 'Awaiting Signup',
+      isPendingPayment: false,
+      isRegistered: false
+    });
+  }
+
+  return rows.sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
 }
 
 function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
@@ -290,7 +443,7 @@ function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
   );
 }
 
-function Overview({ clients, disputes, plans, leadsCount }: { clients: ClientRecord[]; disputes: DisputeRecord[]; plans: Plan[]; leadsCount: number }) {
+function Overview({ clients, disputes, plans, leadPipelineCount }: { clients: ClientRecord[]; disputes: DisputeRecord[]; plans: Plan[]; leadPipelineCount: number }) {
   const navigate = useNavigate();
   const newLeads = clients.filter((client) => client.status === 'LEAD' || client.status === 'INTAKE_RECEIVED').length;
   const activeClients = clients.filter((client) => client.status === 'ACTIVE').length;
@@ -339,7 +492,7 @@ function Overview({ clients, disputes, plans, leadsCount }: { clients: ClientRec
       <section className="panel">
         <div className="panel-header"><div><p className="eyebrow">Quick Stats</p><h2>At a glance</h2></div></div>
         <div className="hero-stats">
-          <button className="stat-card stat-card--interactive" onClick={() => navigate('/leads')}><span>Marketing Leads</span><strong>{leadsCount}</strong></button>
+          <button className="stat-card stat-card--interactive" onClick={() => navigate('/leads')}><span>Lead Pipeline</span><strong>{leadPipelineCount}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=NEW')}><span>New Leads</span><strong>{newLeads}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?view=students')}><span>Masterclass Students</span><strong>{masterclassStudents}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ANALYSIS_READY')}><span>Analysis Ready</span><strong>{analysisReady}</strong></button>
@@ -366,7 +519,7 @@ function Overview({ clients, disputes, plans, leadsCount }: { clients: ClientRec
             {clients.filter((client) => ['INTAKE_RECEIVED', 'ANALYSIS_READY', 'UPGRADE_OFFERED', 'PAST_DUE', 'RESTRICTED'].includes(client.status)).slice(0, 4).map((client) => (
               <div key={client.id} className="plan-card clickable-card" onClick={() => navigate(`/clients/${client.id}?tab=overview`)}>
                 <strong>{client.user.firstName} {client.user.lastName}</strong>
-                <span>Status {client.status.replace('_', ' ')}</span>
+                <span>Status {statusLabel(client.status)}</span>
                 <span>Timeline {client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} months` : 'Pending analysis'}</span>
                 {client.analysisSummary ? <small>{client.analysisSummary.slice(0, 90)}{client.analysisSummary.length > 90 ? '…' : ''}</small> : <small>Analysis not published yet.</small>}
               </div>
@@ -395,36 +548,40 @@ const CLIENT_STATUS_FILTERS: Array<{ key: string; label: string }> = [
 ];
 
 function Leads({ leads, clients }: { leads: LeadRecord[]; clients: ClientRecord[] }) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const registeredEmails = useMemo(() => {
-    const set = new Set<string>();
-    for (const c of clients) set.add(c.user.email.toLowerCase());
-    return set;
-  }, [clients]);
+  const leadRows = useMemo(() => buildLeadPipelineRows(leads, clients), [leads, clients]);
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return leads;
+    if (!searchQuery.trim()) return leadRows;
     const q = searchQuery.toLowerCase();
-    return leads.filter((l) =>
+    return leadRows.filter((l) =>
       l.firstName.toLowerCase().includes(q) ||
       l.lastName.toLowerCase().includes(q) ||
       l.email.toLowerCase().includes(q) ||
       (l.phone || '').toLowerCase().includes(q) ||
-      (l.creditGoal || '').toLowerCase().includes(q)
+      (l.creditGoal || '').toLowerCase().includes(q) ||
+      l.sourceLabel.toLowerCase().includes(q) ||
+      (l.sourceDetail || '').toLowerCase().includes(q) ||
+      (l.interest || '').toLowerCase().includes(q) ||
+      l.statusLabel.toLowerCase().includes(q)
     );
-  }, [leads, searchQuery]);
+  }, [leadRows, searchQuery]);
 
-  const unconverted = filtered.filter((l) => !registeredEmails.has(l.email.toLowerCase())).length;
+  const awaitingSignup = filtered.filter((l) => !l.isRegistered).length;
+  const pendingPayment = filtered.filter((l) => l.isPendingPayment).length;
 
   return (
     <section className="panel">
       <div className="panel-header">
         <div>
-          <p className="eyebrow">Landing Page Submissions</p>
-          <h2>Marketing Leads</h2>
+          <p className="eyebrow">Lead Pipeline</p>
+          <h2>Leads</h2>
+          <p className="helper-text">Track every lead from first source through onboarding, analysis, and payment activation.</p>
           <div className="filter-summary">
-            <span>Showing <strong>{filtered.length}</strong> of <strong>{leads.length}</strong></span>
-            <span>· <strong>{unconverted}</strong> not yet registered</span>
+            <span>Showing <strong>{filtered.length}</strong> of <strong>{leadRows.length}</strong></span>
+            <span>· <strong>{awaitingSignup}</strong> awaiting signup</span>
+            <span>· <strong>{pendingPayment}</strong> pending payment</span>
           </div>
         </div>
         <input
@@ -439,11 +596,11 @@ function Leads({ leads, clients }: { leads: LeadRecord[]; clients: ClientRecord[
       {filtered.length === 0 ? (
         <div className="empty-state-card">
           <strong>No leads yet</strong>
-          <p>Form submissions from the landing page will appear here.</p>
+          <p>Lead form submissions and unpaid client signups will appear here.</p>
         </div>
       ) : (
         <div className="table-wrapper">
-          <table className="data-table">
+          <table className="data-table lead-pipeline-table">
             <thead>
               <tr>
                 <th>Name</th>
@@ -458,23 +615,30 @@ function Leads({ leads, clients }: { leads: LeadRecord[]; clients: ClientRecord[
             </thead>
             <tbody>
               {filtered.map((lead) => {
-                const isRegistered = registeredEmails.has(lead.email.toLowerCase());
-                const source = [lead.referralSource, lead.referralName, lead.referralOther].filter(Boolean).join(' · ');
                 return (
-                  <tr key={lead.id}>
+                  <tr
+                    key={lead.id}
+                    className={`${lead.clientId ? 'clickable-row' : ''} ${lead.isPendingPayment ? 'lead-row--pending-payment' : ''}`}
+                    onClick={() => {
+                      if (lead.clientId) navigate(`/clients/${lead.clientId}?tab=overview`);
+                    }}
+                  >
                     <td>{lead.firstName} {lead.lastName}</td>
                     <td>{lead.email}</td>
                     <td>{lead.phone || '—'}</td>
                     <td>{lead.creditGoal || '—'}</td>
-                    <td>{source || '—'}</td>
-                    <td>{lead.offerInterest || '—'}</td>
-                    <td>{formatDate(lead.createdAt)}</td>
                     <td>
-                      {isRegistered ? (
-                        <span className="status-pill status-pill--ok">Registered</span>
-                      ) : (
-                        <span className="status-pill">Awaiting signup</span>
-                      )}
+                      <div className="lead-source-cell">
+                        <span className={`source-bubble source-bubble--${lead.sourceType}`}>{lead.sourceLabel}</span>
+                        <span>{lead.sourceDetail ? `Referred from ${lead.sourceDetail}` : `Referred from ${lead.sourceLabel}`}</span>
+                      </div>
+                    </td>
+                    <td>{lead.interest || '—'}</td>
+                    <td>{formatDate(lead.submittedAt)}</td>
+                    <td>
+                      <span className={lead.isPendingPayment ? 'status-pill status-pill--warning' : lead.isRegistered ? 'status-pill status-pill--ok' : 'status-pill'}>
+                        {lead.statusLabel}
+                      </span>
                     </td>
                   </tr>
                 );
@@ -2289,6 +2453,7 @@ export default function App() {
     if (!user) return 'Staff Mode';
     return `${user.role} Mode`;
   }, [user]);
+  const leadPipelineRows = useMemo(() => buildLeadPipelineRows(leads, clients), [leads, clients]);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2372,7 +2537,7 @@ export default function App() {
             : path.startsWith('/clients')
               ? 'Client management'
               : path.startsWith('/leads')
-                ? 'Marketing leads'
+                ? 'Lead pipeline'
                 : path.startsWith('/tasks')
                   ? 'Task checklist'
                   : 'Operations dashboard';
@@ -2383,7 +2548,7 @@ export default function App() {
             : path.startsWith('/clients')
               ? 'Search, open, and update client files. Identity data is encrypted at rest.'
               : path.startsWith('/leads')
-                ? 'Landing-page submissions awaiting contract and onboarding.'
+                ? 'Track every lead source through onboarding, analysis, and payment.'
                 : path.startsWith('/tasks')
                   ? 'Track internal tasks, deadlines, and priorities across the team.'
                   : 'Live snapshot of leads, active programs, dispute throughput, and revenue.';
@@ -2428,7 +2593,7 @@ export default function App() {
 
         {error ? <div className="error-banner">{error}</div> : null}
         <Routes>
-          <Route path="/" element={<Overview clients={clients} disputes={disputes} plans={plans} leadsCount={leads.length} />} />
+          <Route path="/" element={<Overview clients={clients} disputes={disputes} plans={plans} leadPipelineCount={leadPipelineRows.length} />} />
           <Route path="/leads" element={<Leads leads={leads} clients={clients} />} />
           <Route path="/clients" element={<Clients clients={clients} />} />
           <Route path="/clients/:id" element={<ClientDetailRoute token={token} />} />

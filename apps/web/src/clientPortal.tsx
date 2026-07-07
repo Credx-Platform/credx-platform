@@ -156,6 +156,18 @@ const DEFAULT_AFFILIATE_LINKS = [
   { label: 'Kikoff Credit Builder', url: 'https://kikoff.com/', category: 'credit_builder' },
   { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }
 ] as const;
+const CREDIT_MONITORING_PROVIDERS = [
+  {
+    label: 'MyFreeScoreNow',
+    url: 'https://app.myfreescorenow.com/enroll/B02B3064',
+    logo: '/images/credit-monitoring/myfreescorenow.jpg'
+  },
+  {
+    label: 'IdentityIQ',
+    url: 'https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4',
+    logo: '/images/credit-monitoring/identityiq.jpg'
+  }
+] as const;
 
 function currentAffiliateLinks(links?: Array<{ label: string; url: string; category?: string }>) {
   const selected = links?.length ? links : [...DEFAULT_AFFILIATE_LINKS];
@@ -508,7 +520,6 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
   const [contractAgreed, setContractAgreed] = useState(false);
   const [docUpload, setDocUpload] = useState<SecureUploadState>({ file: null, type: 'credit_report' });
   const [wizardState, setWizardState] = useState<WizardState>({ ...defaultWizardState, fullName: `${user.firstName} ${user.lastName}`.trim(), email: user.email, phone: user.phone || '' });
-  const affiliateLinks = currentAffiliateLinks(progress?.education?.affiliateLinks).filter((item) => ['monitoring', 'credit_builder'].includes(String(item.category || '').toLowerCase()));
 
   useEffect(() => {
     let cancelled = false;
@@ -676,21 +687,41 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
         {needsApplication ? <form className="dispute-card-live" onSubmit={submitApplication}><div className="dispute-card-top"><strong>Step 2, complete intake</strong><span className="security-note-inline" aria-label="Encrypted">🔒 Encrypted</span></div><div className="field-grid"><input className="chat-input" value={wizardState.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Full name" /><input className="chat-input" value={wizardState.email} onChange={(e) => setField('email', e.target.value)} placeholder="Email" /><input className="chat-input" value={wizardState.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="Phone" /><input className="chat-input" value={wizardState.address1} onChange={(e) => setField('address1', e.target.value)} placeholder="Address line 1" /><input className="chat-input" value={wizardState.address2} onChange={(e) => setField('address2', e.target.value)} placeholder="Address line 2" /><input className="chat-input" value={wizardState.city} onChange={(e) => setField('city', e.target.value)} placeholder="City" /><input className="chat-input" value={wizardState.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" /><input className="chat-input" value={wizardState.zip} onChange={(e) => setField('zip', e.target.value)} placeholder="ZIP" /><input className="chat-input" value={wizardState.dob} onChange={(e) => setField('dob', e.target.value)} placeholder="Date of birth (YYYY-MM-DD)" /><input className="chat-input" type="password" value={wizardState.ssn} onChange={(e) => setField('ssn', e.target.value)} placeholder="SSN" autoComplete="off" /><button className="ghost-button" type="submit" disabled={busyStep === 'application'}>{busyStep === 'application' ? 'Saving...' : 'Save intake'}</button></div><p className="helper-text" style={{ marginTop: '0.5rem' }}>SSN and date of birth are encrypted before they're saved. Only the last 4 digits of your SSN are ever shown back to you.</p></form> : null}
         {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}>
           <div className="dispute-card-top">
-            <strong>Step 3, connect credit monitoring (optional)</strong>
-            <span className="security-note-inline" aria-label="Optional">Optional</span>
+            <strong>Step 3, choose your credit monitoring</strong>
+            <span className="security-note-inline" aria-label="Encrypted">Encrypted</span>
           </div>
           <p className="helper-text" style={{ marginBottom: '0.75rem' }}>
-            You can connect now or do it later from inside your portal. Your password setup link will be emailed as soon as this step is either submitted or skipped.
+            Choose one of the two approved credit monitoring options below so CredX can review the right tri-merge report.
           </p>
-          <div className="field-grid">
-            <select className="chat-input" value={wizardState.provider} onChange={(e) => setField('provider', e.target.value)}><option value="">Select provider</option><option value="IdentityIQ">IdentityIQ</option><option value="MyFreeScoreNow">MyFreeScoreNow</option></select>
+          <div className="monitoring-provider-grid" role="radiogroup" aria-label="Credit monitoring provider">
+            {CREDIT_MONITORING_PROVIDERS.map((provider) => {
+              const selected = wizardState.provider === provider.label;
+              return (
+                <div key={provider.label} className={`monitoring-provider-card${selected ? ' is-selected' : ''}`}>
+                  <button
+                    type="button"
+                    className="monitoring-provider-select"
+                    onClick={() => setField('provider', provider.label)}
+                    aria-pressed={selected}
+                  >
+                    <span className="monitoring-provider-check" aria-hidden="true">{selected ? 'Selected' : 'Choose'}</span>
+                    <img src={provider.logo} alt={`${provider.label} logo`} />
+                  </button>
+                  <a href={provider.url} target="_blank" rel="noopener noreferrer sponsored" className="monitoring-provider-link">
+                    Open {provider.label}
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+          <p className="helper-text monitoring-credential-copy">Please add your login credentials below.</p>
+          <div className="field-grid monitoring-credential-grid">
             <input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" />
             <input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" />
             <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}</button>
             <button className="ghost-button" type="button" onClick={skipMonitoring} disabled={busyStep === 'monitoring'} style={{ background: 'transparent' }}>{busyStep === 'monitoring' ? 'Saving...' : 'Skip for now'}</button>
           </div>
-          <div className="helper-link-grid">{affiliateLinks.map((item, index) => <a key={`${item.url}-${index}`} className="resource-link-card" href={item.url} target="_blank" rel="noopener noreferrer sponsored"><strong>{item.label}</strong><span>{String(item.category || '').replace(/_/g, ' ')}</span></a>)}</div>
-          <p className="helper-text">Pick a provider and submit credentials, or skip for now and add them later. Either way, your portal is unlocked once this step is acknowledged.</p>
+          <p className="helper-text">If you already have your report, add your credentials above.</p>
         </form> : null}
         {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Step 4, upload your credit report</strong></div><div className="field-grid"><input className="chat-input" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => setDocUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} /><select className="chat-input" value={docUpload.type} onChange={(e) => setDocUpload((current) => ({ ...current, type: e.target.value }))}><option value="credit_report">Credit report</option><option value="identity">Driver's license or ID</option><option value="proof_of_address">Proof of address</option><option value="other">Other</option></select><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docUpload.file}>{busyStep === 'upload' ? 'Uploading...' : 'Upload securely'}</button></div><p className="helper-text">Upload credit reports as PDF or HTML files. JPG, PNG, and WEBP are also accepted for screenshots and supporting images.</p></form> : null}
         {completedAt ? <div className="empty-state-card">Onboarding complete. Your file is now in review.</div> : null}
