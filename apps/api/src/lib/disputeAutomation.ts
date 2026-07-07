@@ -413,7 +413,7 @@ export async function sendDisputeInitiationEmail(
 </head>
 <body style="margin: 0; padding: 0; background: #060a12; font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; color: #e2e8f0;">
   <div style="display: none; font-size: 1px; color: #060a12; line-height: 1px; max-height: 0; max-width: 0; opacity: 0; overflow: hidden;">
-    Your dispute letters are ready. Review and approve to begin your credit repair campaign.
+    Your dispute letters are ready. Review and approve to begin your dispute campaign.
   </div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #060a12; padding: 32px 16px;">
     <tr><td align="center">
@@ -486,7 +486,7 @@ export async function sendDisputeInitiationEmail(
         </td></tr>
         <tr><td style="padding: 22px 32px 30px; color: #94a3b8; font-size: 12px; line-height: 1.6; border-top: 1px solid rgba(133,157,186,0.18);">
           <strong style="color: #f8fafc; font-size: 14px;">CredX</strong><br/>
-          Credit Repair & Financial Strategy Support<br/>
+          Credit Education & Financial Strategy Support<br/>
           <a href="https://credxme.com" style="color: #00c6fb; text-decoration: none;">credxme.com</a> ·
           <a href="mailto:contact@credxme.com" style="color: #00c6fb; text-decoration: none;">contact@credxme.com</a> ·
           <a href="tel:+18662733963" style="color: #00c6fb; text-decoration: none;">866-CREDX-ME</a>
@@ -520,7 +520,7 @@ Credit bureaus have 30 days to investigate under the FCRA. Round 1 responses typ
 Questions? Reply to this email or contact contact@credxme.com.
 
 CredX
-Credit Repair & Financial Strategy Support`;
+Credit Education & Financial Strategy Support`;
 
   const result = await sendEmail({
     to: client.user.email,

@@ -10,7 +10,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 
 const ANTHROPIC_BASE = 'https://api.anthropic.com/v1/messages';
 const MODEL = process.env.ANTHROPIC_VISION_MODEL || 'claude-opus-4-7';
 
-const SYSTEM_PROMPT = `You are a credit-repair compliance analyst reading a credit bureau response letter.
+const SYSTEM_PROMPT = `You are a consumer-credit compliance analyst reading a credit bureau response letter.
 Classify the response and extract structured findings. Return STRICT JSON matching this schema:
 {
   "bureau": "equifax" | "experian" | "transunion" | "unknown",

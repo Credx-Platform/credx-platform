@@ -174,7 +174,7 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
         choices: [
           'The bureau that sends your monthly statement',
           'The original company that reported the account (the lender, card issuer, or collector)',
-          'The lawyer hired to defend a credit-repair company',
+          'The attorney who represents the credit bureau in court',
           'A retailer that resells a charged-off debt to a collector'
         ],
         correctIndex: 1,
@@ -222,7 +222,7 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
         choices: [
           'Aggressive language and threats of lawsuits',
           'A specific reason for each item with supporting evidence, sent certified mail',
-          'Filing it through every credit-repair website at once',
+          'Submitting it through multiple online dispute portals at once',
           'A handwritten note attached to the bureau\'s online form'
         ],
         correctIndex: 1,
@@ -423,7 +423,7 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
         choices: [
           'A loan that buys you a new credit score',
           'A small loan where the funds are held in savings until you pay it off, with each on-time payment reported',
-          'A loan from a credit-repair agency',
+          'A personal loan marketed to people with low scores',
           'A loan that automatically pays your credit card bill'
         ],
         correctIndex: 1,

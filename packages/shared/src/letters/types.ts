@@ -1,4 +1,4 @@
-// Letter template types for credit repair letter generation
+// Letter template types for dispute letter generation
 
 export type LetterType = 
   | 'VALIDATION_REQUEST'
@@ -84,7 +84,7 @@ export interface LetterTemplateConfig {
 
 export const DEFAULT_LETTER_CONFIG: LetterTemplateConfig = {
   header: '',
-  footer: 'CredX Credit Repair Services',
+  footer: '',
   fontFamily: 'Arial, sans-serif',
   fontSize: 12,
   lineHeight: 1.6,

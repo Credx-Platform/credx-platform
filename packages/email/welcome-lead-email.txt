@@ -4,7 +4,7 @@ Hi {{first_name}},
 
 Welcome to CredX.
 
-We’re excited to support you on your credit repair and financial rebuilding journey. Your inquiry has been received, and the next step is to complete your CredX service agreement so we can begin your onboarding process properly.
+We’re excited to support you on your credit education and financial rebuilding journey. Your inquiry has been received, and the next step is to complete your CredX service agreement so we can begin your onboarding process properly.
 
 Next Steps:
 1. Review and sign your CredX contract.
@@ -18,5 +18,5 @@ Complete Your Signup:
 If you have any questions, simply reply to this email and the CredX team will help you.
 
 CredX
-Credit Repair & Financial Strategy Support
+Credit Education & Financial Strategy Support
 Sent from hello@credxme.com
