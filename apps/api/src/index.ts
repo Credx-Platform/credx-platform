@@ -18,6 +18,7 @@ import { responseIngestRouter } from './routes/responseIngest.js';
 import { billingRouter } from './routes/billing.js';
 import { progressRouter } from './routes/progress.js';
 import { masterclassRouter } from './routes/masterclass.js';
+import { compatibilityRouter } from './routes/compatibility.js';
 
 const app = express();
 
@@ -103,6 +104,7 @@ function mountAll(prefix: string) {
   app.use(`${prefix}/billing`, billingRouter);
   app.use(`${prefix}/progress`, progressRouter);
   app.use(`${prefix}/masterclass`, masterclassRouter);
+  app.use(`${prefix}/compatibility`, compatibilityRouter);
 }
 
 mountAll('/api');
