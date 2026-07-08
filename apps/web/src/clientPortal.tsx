@@ -3542,7 +3542,6 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                 <h1 className="top-title">{tabLabel}</h1>
               </div>
               <div className="topbar-actions">
-                <a className="ghost-button" href="/signup">Sign up</a>
                 <button className="ghost-button" onClick={handleLogout}>Sign out</button>
               </div>
             </header>
@@ -3554,7 +3553,6 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           value={activeTab}
           onChange={(e) => {
             const value = e.target.value;
-            if (value === '__signup') { window.location.href = '/signup'; return; }
             setActiveTab(value as PortalTab);
           }}
           aria-label="Portal section"
@@ -3562,7 +3560,6 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           {navItems.map((item) => (
             <option key={item.key} value={item.key}>{item.label}</option>
           ))}
-          <option value="__signup">Sign up</option>
         </select>
 
         {error ? <div className="error-banner">{error}</div> : null}
