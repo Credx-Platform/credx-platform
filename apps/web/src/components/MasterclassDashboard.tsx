@@ -33,13 +33,13 @@ type Props = {
 const DAY_ONE_REPORT_PROVIDERS = [
   {
     label: 'MyFreeScoreNow',
-    note: 'Start here for a fresh 3-bureau report. The trial is advertised by the provider at $1.',
+    note: 'Get access to your most recent 3-bureau report through our MyFreeScoreNow partner offer.',
     url: 'https://app.myfreescorenow.com/enroll/B02B3064',
     logo: '/images/credit-monitoring/myfreescorenow.jpg'
   },
   {
     label: 'IdentityIQ',
-    note: 'Use this as the second option if you prefer IdentityIQ for your report and monitoring access.',
+    note: 'Or use IdentityIQ to obtain your latest 3-bureau report and monitoring access.',
     url: 'https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4',
     logo: '/images/credit-monitoring/identityiq.jpg'
   }
@@ -294,8 +294,9 @@ function DayOneCreditReportOffer() {
         <p className="eyebrow">Credit report access</p>
         <h3>Pull the reports you will learn to read</h3>
         <p>
-          After you understand the basics, open one of these partner options and pull a fresh 3-bureau report.
-          Start with MyFreeScoreNow, then use IdentityIQ if you prefer that provider.
+          CredX partnered with leading credit monitoring providers that offer 3-bureau reports to CredX clients
+          through promotional access starting at $1. Choose either option below to obtain your most recent credit
+          report, then use Day 1 to learn how to read what each bureau is showing.
         </p>
       </div>
       <div className="mc-report-provider-grid">

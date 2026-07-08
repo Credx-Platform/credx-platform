@@ -1478,7 +1478,7 @@ button:hover,
 
 /* === Masterclass Dashboard === */
 .mc-shell { display: flex; flex-direction: column; gap: 24px; width: 100%; min-width: 0; --day-accent: #00c6fb; }
-.mc-hero { display: flex; gap: 24px; align-items: center; justify-content: space-between; padding: 28px 30px; background: linear-gradient(135deg, color-mix(in srgb, var(--day-accent) 18%, transparent), rgba(11,17,32,0.7)); border: 1px solid color-mix(in srgb, var(--day-accent) 35%, transparent); border-radius: 18px; flex-wrap: wrap; transition: background 0.3s, border-color 0.3s; }
+.mc-hero { display: flex; gap: 24px; align-items: center; justify-content: space-between; padding: 28px 30px; background: linear-gradient(135deg, rgba(3,7,18,0.98) 0%, color-mix(in srgb, var(--day-accent) 16%, #07111f) 58%, rgba(6,10,18,0.96) 100%); border: 1px solid color-mix(in srgb, var(--day-accent) 42%, rgba(255,255,255,0.10)); border-radius: 18px; flex-wrap: wrap; transition: background 0.3s, border-color 0.3s; box-shadow: 0 20px 44px rgba(0,0,0,0.34); }
 .mc-hero-title { font-size: clamp(24px, 3vw, 34px); font-weight: 800; margin: 6px 0 8px; letter-spacing: -0.4px; color: #ffffff; }
 .mc-hero-sub { color: #cbd5e1; font-size: 15px; max-width: 540px; line-height: 1.7; }
 .mc-progress { min-width: 220px; }
