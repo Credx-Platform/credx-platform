@@ -1471,6 +1471,15 @@ button:hover,
 .mc-day-card.is-active::before { opacity: 1; width: 8px; }
 .mc-day-card.is-bonus { border-color: color-mix(in srgb, var(--card-accent, #f59e0b) 40%, transparent); }
 .mc-day-card.is-bonus.is-active { border-color: var(--card-accent, #f59e0b); box-shadow: 0 0 28px color-mix(in srgb, var(--card-accent, #f59e0b) 35%, transparent); }
+.mc-day-card.is-locked {
+  cursor: not-allowed;
+  opacity: 0.52;
+  filter: grayscale(0.35);
+}
+.mc-day-card.is-locked:hover {
+  transform: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-accent, #00c6fb) 10%, #0f1a2e) 0%, #0b1322 100%);
+}
 .mc-day-card.is-done::after { content: '✓'; position: absolute; top: 14px; right: 14px; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: #22c55e; color: #052e16; font-size: 12px; font-weight: 900; box-shadow: 0 0 12px rgba(34,197,94,.55); }
 
 .mc-day-card-row { display: flex; gap: 16px; align-items: flex-start; }

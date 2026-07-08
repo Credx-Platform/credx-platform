@@ -1912,64 +1912,61 @@ function ResourcesSection({ progress }: { progress: Progress | null; }) {
   const monitoringLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'monitoring');
   const creditBuilderLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'credit_builder');
   const reportLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'reports');
+  const renderLinks = (items: ReturnType<typeof currentAffiliateLinks>, empty: string, description: string) => (
+    <div className="dispute-list">
+      {items.length ? items.map((item, index) => (
+        <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noopener noreferrer sponsored">
+          <strong>{item.label}</strong>
+          <span>{description}</span>
+          <small>Open partner link</small>
+        </a>
+      )) : <div className="empty-state-card">{empty}</div>}
+    </div>
+  );
 
   return (
     <div className="page-grid">
       <section className="hero-card hero-card--compact">
         <div>
-          <p className="eyebrow">Resources</p>
-          <h1>Affiliate tools & credit builders</h1>
-          <p>These are the partner tools currently attached to the CredX experience for onboarding, monitoring, and post-dispute rebuilding.</p>
+          <p className="eyebrow">Credit Builders</p>
+          <h1>Credit Builder Hub</h1>
+          <p>Use this section to choose monitoring, add positive reporting tools, and keep your rebuild organized after each masterclass lesson.</p>
         </div>
         <div className="hero-stats">
           <div className="stat-card"><span>Monitoring Options</span><strong>{monitoringLinks.length}</strong></div>
-          <div className="stat-card"><span>Credit Builders</span><strong>{creditBuilderLinks.length}</strong></div>
+          <div className="stat-card"><span>Builder Tools</span><strong>{creditBuilderLinks.length}</strong></div>
           <div className="stat-card"><span>Report Sources</span><strong>{reportLinks.length}</strong></div>
-          <div className="stat-card"><span>Masterclass</span><strong>{progress?.education?.masterclassEnrolled ? 'Active' : 'Available'}</strong></div>
+          <div className="stat-card"><span>Masterclass</span><strong>{progress?.education?.masterclassEnrolled ? 'Active' : 'Open'}</strong></div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Sequence</p><h2>Build in the right order</h2></div></div>
+        <div className="mc-tutorial-grid">
+          <div className="mc-tutorial-card"><strong>1. Monitor your reports</strong><span>Know what each bureau is showing before you add or dispute anything.</span></div>
+          <div className="mc-tutorial-card"><strong>2. Keep utilization low</strong><span>Use cards lightly, pay before statement close, and avoid maxed-out balances.</span></div>
+          <div className="mc-tutorial-card"><strong>3. Add positive reporting</strong><span>Use builder accounts only when the terms fit and the account reports to bureaus.</span></div>
+          <div className="mc-tutorial-card"><strong>4. Track every change</strong><span>Give new accounts time to report, then measure score and report changes monthly.</span></div>
         </div>
       </section>
 
       <section className="panel two-col">
         <div>
-          <div className="panel-header"><div><p className="eyebrow">Monitoring</p><h2>Credit monitoring signup links</h2></div></div>
-          <div className="dispute-list">
-            {monitoringLinks.map((item, index) => <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noopener noreferrer sponsored"><strong>{item.label}</strong><span>Use this during onboarding when choosing your provider.</span><small>Open partner link</small></a>)}
-          </div>
+          <div className="panel-header"><div><p className="eyebrow">Step 1</p><h2>Credit monitoring</h2></div></div>
+          {renderLinks(monitoringLinks, 'No monitoring links are attached yet.', 'Use this to watch bureau changes and keep your reports current.')}
         </div>
         <div>
-          <div className="panel-header"><div><p className="eyebrow">Credit Building</p><h2>Recommended builder accounts</h2></div></div>
-          <div className="dispute-list">
-            {creditBuilderLinks.map((item, index) => <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noopener noreferrer sponsored"><strong>{item.label}</strong><span>Helpful for rebuilding after cleanup and utilization work.</span><small>Open partner link</small></a>)}
-          </div>
+          <div className="panel-header"><div><p className="eyebrow">Step 2</p><h2>Builder accounts</h2></div></div>
+          {renderLinks(creditBuilderLinks, 'No builder tools are attached yet.', 'Review terms first, then use only tools that fit your rebuild plan.')}
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Report Sources</p><h2>Fresh report access</h2></div></div>
+        {renderLinks(reportLinks, 'No report source links are attached yet.', 'Use this when you need a current report copy for your own review.')}
       </section>
 
       <p className="helper-text">CredX may earn compensation if you use a partner link. This does not change your price. Approval, rates, and terms depend on the provider and your qualifications.</p>
-
-      <section className="panel two-col">
-        <div>
-          <div className="panel-header"><div><p className="eyebrow">Masterclass</p><h2>5-Day Masterclass offer</h2></div></div>
-          <div className="dispute-card-live">
-            <div className="dispute-card-top"><strong>DIY education + affiliate stack</strong><span className={progress?.education?.masterclassEnrolled ? 'status-badge status-active' : 'status-badge status-pending'}>{progress?.education?.masterclassEnrolled ? 'Enrolled' : 'Available'}</span></div>
-            <div className="cell-subtext">
-              {progress?.education?.masterclassEnrolled
-                ? 'You are already enrolled. Upgrade adds the paid CredX service path to this account instead of starting over.'
-                : 'Position the masterclass as the self-serve path: five days of guided education, bonus content, and recommended partner tools inside the same CredX ecosystem.'}
-            </div>
-            <div style={{ marginTop: '12px' }}>
-              <a className="ghost-button" href={progress?.education?.masterclassEnrolled ? '/signup?offer=program&upgrade=masterclass' : '/signup?offer=masterclass'}>
-                {progress?.education?.masterclassEnrolled ? 'Upgrade to paid service' : 'Open masterclass offer'}
-              </a>
-            </div>
-          </div>
-        </div>
-        <div>
-          <div className="panel-header"><div><p className="eyebrow">Reports</p><h2>Report access</h2></div></div>
-          <div className="dispute-list">
-            {reportLinks.map((item, index) => <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noreferrer"><strong>{item.label}</strong><span>Use this when you need a fresh bureau copy for review or upload.</span><small>Open report source</small></a>)}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

@@ -75,6 +75,17 @@ export default function MasterclassDashboard({
   );
   const quizPassed = passedQuizzes.includes(day.slug);
   const dayAttempt = quizAttempts[day.slug];
+  const isDayUnlocked = (target: LessonDay) => {
+    const index = MASTERCLASS_DAYS.findIndex((item) => item.slug === target.slug);
+    if (index <= 0) return true;
+    return MASTERCLASS_DAYS.slice(0, index).every((item) => passedQuizzes.includes(item.slug));
+  };
+
+  useEffect(() => {
+    if (isDayUnlocked(day)) return;
+    const lastUnlocked = [...MASTERCLASS_DAYS].reverse().find((item) => isDayUnlocked(item)) || MASTERCLASS_DAYS[0];
+    setSelection({ kind: 'day', day: lastUnlocked.day });
+  }, [day.slug, passedQuizzes.join('|')]);
 
   return (
     <div className="mc-shell" style={{ ['--day-accent' as string]: accent } as CSSProperties}>
@@ -95,18 +106,23 @@ export default function MasterclassDashboard({
           const done = completedDays.includes(d.slug);
           const isActive = d.day === activeDay;
           const passed = passedQuizzes.includes(d.slug);
+          const locked = !isDayUnlocked(d);
           return (
             <button
               key={d.day}
               type="button"
-              onClick={() => setSelection({ kind: 'day', day: d.day })}
-              className={`mc-day-card${isActive ? ' is-active' : ''}${d.isBonus ? ' is-bonus' : ''}${done ? ' is-done' : ''}`}
+              onClick={() => {
+                if (!locked) setSelection({ kind: 'day', day: d.day });
+              }}
+              disabled={locked}
+              title={locked ? 'Pass the previous day quiz to unlock this day.' : undefined}
+              className={`mc-day-card${isActive ? ' is-active' : ''}${d.isBonus ? ' is-bonus' : ''}${done ? ' is-done' : ''}${locked ? ' is-locked' : ''}`}
               style={{ ['--card-accent' as string]: d.accent } as CSSProperties}
             >
               <div className="mc-day-card-body">
                 <div className="mc-day-card-badge">{d.isBonus ? 'Bonus' : `Day ${d.day}`}</div>
                 <div className="mc-day-card-title">{d.title}</div>
-                {done ? <div className="mc-day-card-done">✓ Completed</div> : passed ? <div className="mc-day-card-done">Quiz passed</div> : null}
+                {locked ? <div className="mc-day-card-done">Locked</div> : done ? <div className="mc-day-card-done">✓ Completed</div> : passed ? <div className="mc-day-card-done">Quiz passed</div> : null}
               </div>
             </button>
           );
