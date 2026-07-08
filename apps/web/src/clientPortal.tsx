@@ -155,7 +155,13 @@ const DEFAULT_AFFILIATE_LINKS = [
   { label: 'Ava', url: 'https://meetava.app.link/tdMaQUdV7Rb', category: 'credit_builder' },
   { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }
 ] as const;
-const CARRD_CREDIT_BUILDER_LINKS = [
+type BuilderLink = {
+  label: string;
+  url: string;
+  type: string;
+  description: string;
+};
+const CARRD_CREDIT_BUILDER_LINKS: BuilderLink[] = [
   {
     label: 'Self Lender',
     url: 'https://self.inc/refer/16452347',
@@ -198,7 +204,27 @@ const CARRD_CREDIT_BUILDER_LINKS = [
     type: 'Rent and utility reporting',
     description: 'Use rent and utility payment reporting to help add positive history when payments are made on time.'
   }
-] as const;
+];
+const AUTHORIZED_TRADELINE_LINKS: BuilderLink[] = [
+  {
+    label: 'Tradeline Supply Company',
+    url: 'https://tradelinesupply.com/',
+    type: 'Authorized-user tradeline marketplace',
+    description: 'Browse authorized-user tradeline options. Review age, limit, posting window, refund policy, and lender scrutiny before choosing any tradeline.'
+  },
+  {
+    label: 'Coast Tradelines',
+    url: 'https://coasttradelines.com/',
+    type: 'Authorized-user tradeline marketplace',
+    description: 'Compare available tradeline options and review all terms carefully before purchase. Results depend on bureau reporting and your full credit profile.'
+  },
+  {
+    label: 'Superior Tradelines',
+    url: 'https://www.superiortradelines.com/',
+    type: 'Authorized-user tradeline marketplace',
+    description: 'Review authorized-user tradeline offers as a higher-risk credit-building option. Confirm issuer, reporting, timing, and cancellation terms first.'
+  }
+];
 const CREDIT_MONITORING_PROVIDERS = [
   {
     label: 'MyFreeScoreNow',
@@ -1952,7 +1978,11 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
 
 function ResourcesSection({ progress }: { progress: Progress | null; }) {
   const builderLinks = [...CARRD_CREDIT_BUILDER_LINKS];
-  const renderLinks = (items: typeof CARRD_CREDIT_BUILDER_LINKS) => (
+  const rentReportingLinks = builderLinks.filter((item) => ['Rent Reporters', 'Ava'].includes(item.label));
+  const cardAndLoanLinks = builderLinks.filter((item) => !['Rent Reporters', 'Ava'].includes(item.label));
+  const authorizedTradelineLinks = [...AUTHORIZED_TRADELINE_LINKS];
+  const totalBuilderTools = cardAndLoanLinks.length + rentReportingLinks.length + authorizedTradelineLinks.length;
+  const renderLinks = (items: BuilderLink[], empty = 'No credit builder links are attached yet.') => (
     <div className="dispute-list">
       {items.length ? items.map((item, index) => (
         <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noopener noreferrer sponsored">
@@ -1960,7 +1990,7 @@ function ResourcesSection({ progress }: { progress: Progress | null; }) {
           <span>{item.description}</span>
           <small>{item.type} · Open builder link</small>
         </a>
-      )) : <div className="empty-state-card">No credit builder links are attached yet.</div>}
+      )) : <div className="empty-state-card">{empty}</div>}
     </div>
   );
 
@@ -1973,9 +2003,9 @@ function ResourcesSection({ progress }: { progress: Progress | null; }) {
           <p>Use this section only for accounts and tools that can add positive reporting, strengthen payment history, or support score-building activity.</p>
         </div>
         <div className="hero-stats">
-          <div className="stat-card"><span>Builder Accounts</span><strong>{builderLinks.length}</strong></div>
+          <div className="stat-card"><span>Builder Tools</span><strong>{totalBuilderTools}</strong></div>
           <div className="stat-card"><span>Focus</span><strong>Score</strong></div>
-          <div className="stat-card"><span>Reporting Types</span><strong>4</strong></div>
+          <div className="stat-card"><span>Boxes</span><strong>3</strong></div>
           <div className="stat-card"><span>Masterclass</span><strong>{progress?.education?.masterclassEnrolled ? 'Active' : 'Open'}</strong></div>
         </div>
       </section>
@@ -1991,8 +2021,21 @@ function ResourcesSection({ progress }: { progress: Progress | null; }) {
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div><p className="eyebrow">Credit builder accounts</p><h2>CredX builder list</h2></div></div>
-        {renderLinks(builderLinks)}
+        <div className="panel-header"><div><p className="eyebrow">Builder cards and loans</p><h2>Credit builder cards, loans, and plans</h2></div></div>
+        {renderLinks(cardAndLoanLinks)}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Rent reporting</p><h2>Rent and utility reporter accounts</h2></div></div>
+        {renderLinks(rentReportingLinks)}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Authorized tradelines</p><h2>Authorized-user tradeline accounts</h2></div></div>
+        <p className="helper-text" style={{ marginBottom: 14 }}>
+          Authorized-user tradelines can be scrutinized by lenders and may violate some issuer terms. Review every provider's terms, refund rules, posting window, and reporting details before using this option.
+        </p>
+        {renderLinks(authorizedTradelineLinks, 'No authorized tradeline links are attached yet.')}
       </section>
 
       <p className="helper-text">CredX may earn compensation if you use a partner link. This does not change your price. Approval, account terms, reporting, and score impact depend on the provider and your qualifications.</p>
