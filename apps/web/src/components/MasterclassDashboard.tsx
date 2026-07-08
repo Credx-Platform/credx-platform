@@ -30,6 +30,21 @@ type Props = {
   onActiveDayChange?: (day: LessonDay) => void;
 };
 
+const DAY_ONE_REPORT_PROVIDERS = [
+  {
+    label: 'MyFreeScoreNow',
+    note: 'Start here for a fresh 3-bureau report. The trial is advertised by the provider at $1.',
+    url: 'https://app.myfreescorenow.com/enroll/B02B3064',
+    logo: '/images/credit-monitoring/myfreescorenow.jpg'
+  },
+  {
+    label: 'IdentityIQ',
+    note: 'Use this as the second option if you prefer IdentityIQ for your report and monitoring access.',
+    url: 'https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4',
+    logo: '/images/credit-monitoring/identityiq.jpg'
+  }
+] as const;
+
 export default function MasterclassDashboard({
   firstName,
   completedDays,
@@ -146,6 +161,8 @@ export default function MasterclassDashboard({
           </ul>
         </div>
 
+        {day.day === 1 ? <DayOneCreditReportOffer /> : null}
+
         <div className="mc-section">
           <h3 className="mc-section-h">Lessons</h3>
           <div className="mc-video-grid">
@@ -250,12 +267,57 @@ export default function MasterclassDashboard({
             <div className="mc-complete-state">✓ Day {day.day} marked complete</div>
           ) : null}
           {activeDay < MASTERCLASS_DAYS.length ? (
-            <button type="button" className="ghost-button" onClick={() => setSelection({ kind: 'day', day: activeDay + 1 })}>
-              Next day →
+            <button
+              type="button"
+              className="ghost-button"
+              disabled={!isDayUnlocked(MASTERCLASS_DAYS[activeDay])}
+              title={isDayUnlocked(MASTERCLASS_DAYS[activeDay]) ? undefined : 'Pass this day quiz to unlock the next day.'}
+              onClick={() => {
+                if (isDayUnlocked(MASTERCLASS_DAYS[activeDay])) {
+                  setSelection({ kind: 'day', day: activeDay + 1 });
+                }
+              }}
+            >
+              {isDayUnlocked(MASTERCLASS_DAYS[activeDay]) ? 'Next day →' : 'Next day locked'}
             </button>
           ) : null}
         </div>
       </section>
+    </div>
+  );
+}
+
+function DayOneCreditReportOffer() {
+  return (
+    <div className="mc-section mc-report-offer">
+      <div className="mc-report-offer-copy">
+        <p className="eyebrow">Credit report access</p>
+        <h3>Pull the reports you will learn to read</h3>
+        <p>
+          After you understand the basics, open one of these partner options and pull a fresh 3-bureau report.
+          Start with MyFreeScoreNow, then use IdentityIQ if you prefer that provider.
+        </p>
+      </div>
+      <div className="mc-report-provider-grid">
+        {DAY_ONE_REPORT_PROVIDERS.map((provider, index) => (
+          <a
+            key={provider.label}
+            className="mc-report-provider-card"
+            href={provider.url}
+            target="_blank"
+            rel="noopener noreferrer sponsored"
+          >
+            <span className="mc-report-provider-rank">Option {index + 1}</span>
+            <img src={provider.logo} alt={`${provider.label} logo`} />
+            <strong>{provider.label}</strong>
+            <small>{provider.note}</small>
+            <span className="mc-report-provider-cta">Open provider ↗</span>
+          </a>
+        ))}
+      </div>
+      <p className="mc-report-disclosure">
+        CredX may earn compensation from partner links. Provider pricing, trial terms, cancellation rules, and report access are controlled by the provider.
+      </p>
     </div>
   );
 }
