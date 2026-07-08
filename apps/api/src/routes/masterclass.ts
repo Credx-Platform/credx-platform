@@ -149,7 +149,7 @@ masterclassRouter.post('/progress', requireAuth, async (req: AuthedRequest, res,
     const completed = Array.isArray(education.masterclassProgress) ? (education.masterclassProgress as string[]) : [];
     const passedQuizzes = Array.isArray((education as any).masterclassPassedQuizzes) ? ((education as any).masterclassPassedQuizzes as string[]) : [];
     if (!passedQuizzes.includes(daySlug)) {
-      return res.status(403).json({ error: 'Quiz must be passed (80%+) before this day can be marked complete.' });
+      return res.status(403).json({ error: 'Quiz must be passed (60%+) before this day can be marked complete.' });
     }
     if (!completed.includes(daySlug)) completed.push(daySlug);
 
@@ -257,7 +257,7 @@ masterclassRouter.get('/quiz/state', requireAuth, async (req: AuthedRequest, res
     return res.json({
       passedQuizzes,
       attempts,
-      passingScore: 0.8,
+      passingScore: 0.6,
       maxAttemptsBeforeCooldown: QUIZ_MAX_ATTEMPTS_BEFORE_COOLDOWN,
       knownDays: QUIZ_ANSWER_KEYS.map(k => ({ day: k.day, slug: k.slug, total: Object.keys(k.answers).length }))
     });

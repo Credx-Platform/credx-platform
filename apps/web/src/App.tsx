@@ -82,6 +82,7 @@ type ClientRecord = {
   disputePlanSummary?: string | null;
   estimatedTimelineMonths?: number | null;
   portalRestricted?: boolean;
+  setupFeePaid?: boolean;
   ssnLast4?: string | null;
   currentAddressLine1?: string | null;
   currentAddressLine2?: string | null;
@@ -279,17 +280,16 @@ function isStudentClient(client: ClientRecord) {
   return client.status === 'STUDENT' || isMasterclassStudent(client.progress);
 }
 
-const LEAD_PIPELINE_STATUSES = new Set<ClientRecord['status']>([
-  'LEAD',
-  'STUDENT',
-  'CONTRACT_SENT',
-  'INTAKE_RECEIVED',
-  'ANALYSIS_READY',
-  'UPGRADE_OFFERED'
-]);
-
 function textValue(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function hasPaidService(client: ClientRecord) {
+  return client.setupFeePaid === true || client.payments.some((payment) => payment.status === 'PAID');
+}
+
+function isUnpaidApplication(client: ClientRecord) {
+  return client.status !== 'CANCELLED' && !hasPaidService(client);
 }
 
 function sourceTypeFor(label: string) {
@@ -358,7 +358,7 @@ function buildLeadPipelineRows(leads: LeadRecord[], clients: ClientRecord[]): Le
   const rows: LeadPipelineRow[] = [];
 
   for (const client of clients) {
-    if (!LEAD_PIPELINE_STATUSES.has(client.status)) continue;
+    if (!isUnpaidApplication(client)) continue;
     const email = client.user.email.toLowerCase();
     clientEmails.add(email);
     const matchingLead = leadByEmail.get(email);
@@ -378,7 +378,7 @@ function buildLeadPipelineRows(leads: LeadRecord[], clients: ClientRecord[]): Le
       submittedAt: matchingLead?.createdAt || client.createdAt,
       status: client.status,
       statusLabel: statusLabel(client.status),
-      isPendingPayment: client.status === 'UPGRADE_OFFERED',
+      isPendingPayment: client.status === 'UPGRADE_OFFERED' || client.payments.some((payment) => payment.status === 'PENDING'),
       isRegistered: true
     });
   }
@@ -467,11 +467,10 @@ function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
 
 function Overview({ clients, disputes, plans, leadPipelineCount }: { clients: ClientRecord[]; disputes: DisputeRecord[]; plans: Plan[]; leadPipelineCount: number }) {
   const navigate = useNavigate();
-  const newLeads = clients.filter((client) => client.status === 'LEAD' || client.status === 'INTAKE_RECEIVED').length;
+  const totalClients = clients.length;
   const activeClients = clients.filter((client) => client.status === 'ACTIVE').length;
-  const analysisReady = clients.filter((client) => ['ANALYSIS_READY', 'UPGRADE_OFFERED'].includes(client.status)).length;
+  const analysisReady = clients.filter((client) => client.status === 'ANALYSIS_READY').length;
   const pendingDisputes = disputes.filter((dispute) => !['COMPLETED', 'REJECTED'].includes(dispute.status)).length;
-  const uploadsAwaitingReview = clients.reduce((sum, client) => sum + client.documents.length, 0);
   const masterclassStudents = clients.filter(isStudentClient).length;
 
   const recentActivity = clients
@@ -514,8 +513,8 @@ function Overview({ clients, disputes, plans, leadPipelineCount }: { clients: Cl
       <section className="panel">
         <div className="panel-header"><div><p className="eyebrow">Quick Stats</p><h2>At a glance</h2></div></div>
         <div className="hero-stats">
-          <button className="stat-card stat-card--interactive" onClick={() => navigate('/leads')}><span>Lead Pipeline</span><strong>{leadPipelineCount}</strong></button>
-          <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=NEW')}><span>New Leads</span><strong>{newLeads}</strong></button>
+          <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients')}><span>Clients</span><strong>{totalClients}</strong></button>
+          <button className="stat-card stat-card--interactive" onClick={() => navigate('/leads')}><span>Leads</span><strong>{leadPipelineCount}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?view=students')}><span>Masterclass Students</span><strong>{masterclassStudents}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ANALYSIS_READY')}><span>Analysis Ready</span><strong>{analysisReady}</strong></button>
           <button className="stat-card stat-card--interactive" onClick={() => navigate('/clients?status=ACTIVE')}><span>Active Clients</span><strong>{activeClients}</strong></button>
@@ -698,18 +697,14 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
   const [searchQuery, setSearchQuery] = useState('');
   const statusFilter = searchParams.get('status');
   const viewParam = searchParams.get('view');
-  const activeView: 'paid' | 'students' = viewParam === 'students' ? 'students' : 'paid';
+  const activeView: 'all' | 'students' = viewParam === 'students' ? 'students' : 'all';
   const hasActiveFilter = Boolean(statusFilter) || searchQuery.trim().length > 0;
 
-  // A "paid" client has moved beyond just being a masterclass lead
-  const isPaidClient = (c: ClientRecord) =>
-    !['LEAD', 'STUDENT'].includes(c.status) || c.payments.length > 0 || c.disputes.length > 0;
   const isStudent = (c: ClientRecord) => isStudentClient(c);
 
-  const paidClients = clients.filter(isPaidClient);
   const studentClients = clients.filter(isStudent);
 
-  const displayedClients = activeView === 'students' ? studentClients : paidClients;
+  const displayedClients = activeView === 'students' ? studentClients : clients;
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -749,7 +744,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
     setSearchParams(next);
   };
 
-  const switchView = (view: 'paid' | 'students') => {
+  const switchView = (view: 'all' | 'students') => {
     setSearchQuery('');
     const next = new URLSearchParams();
     if (view === 'students') next.set('view', 'students');
@@ -764,12 +759,12 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
             <p className="eyebrow">Client Management</p>
             <h2>Customers</h2>
             <div className="filter-summary">
-              <span>Showing <strong>{filteredClients.length}</strong> of <strong>{activeView === 'students' ? studentClients.length : paidClients.length}</strong> {activeView === 'students' ? 'students' : 'paid clients'}</span>
+              <span>Showing <strong>{filteredClients.length}</strong> of <strong>{displayedClients.length}</strong> {activeView === 'students' ? 'students' : 'clients'}</span>
               {statusFilter ? <span>· <strong>{statusFilter.replace(/_/g, ' ')}</strong></span> : null}
               {searchQuery.trim() ? <span>· search: <strong>"{searchQuery.trim()}"</strong></span> : null}
               {hasActiveFilter ? (
                 <button type="button" className="filter-summary__clear" onClick={clearFilters}>
-                  Clear · show all ({activeView === 'students' ? studentClients.length : paidClients.length})
+                  Clear · show all ({displayedClients.length})
                 </button>
               ) : null}
             </div>
@@ -787,10 +782,10 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
         <div className="view-switcher">
           <button
             type="button"
-            className={`tab ${activeView === 'paid' ? 'active' : ''}`}
-            onClick={() => switchView('paid')}
+            className={`tab ${activeView === 'all' ? 'active' : ''}`}
+            onClick={() => switchView('all')}
           >
-            Paid Clients ({paidClients.length})
+            All Clients ({clients.length})
           </button>
           <button
             type="button"
@@ -869,7 +864,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
               )) : (
                 <tr>
                   <td colSpan={activeView === 'students' ? 8 : 7} className="empty-row">
-                    {searchQuery ? 'No clients match your search.' : activeView === 'students' ? 'No masterclass students yet.' : 'No paid clients yet.'}
+                    {searchQuery ? 'No clients match your search.' : activeView === 'students' ? 'No masterclass students yet.' : 'No clients yet.'}
                   </td>
                 </tr>
               )}
@@ -2642,31 +2637,12 @@ export default function App() {
                 : path.startsWith('/tasks')
                   ? 'Task checklist'
                   : 'Operations dashboard';
-          const subtitle = path.startsWith('/disputes')
-            ? 'Track every dispute round, bureau status, and outcome across the book.'
-            : path.startsWith('/print')
-              ? 'Print dispute packets, signed agreements, uploads, and client analysis documents.'
-            : path.startsWith('/clients')
-              ? 'Search, open, and update client files. Identity data is encrypted at rest.'
-              : path.startsWith('/leads')
-                ? 'Track every lead source through onboarding, analysis, and payment.'
-                : path.startsWith('/tasks')
-                  ? 'Track internal tasks, deadlines, and priorities across the team.'
-                  : 'Live snapshot of leads, active programs, dispute throughput, and revenue.';
           return (
             <header className="topbar topbar--themed" style={{ ['--section-accent' as string]: accent } as React.CSSProperties}>
               <div>
-                <div className="brand-row">
-                  <img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" />
-                  <p className="eyebrow" style={{ color: accent }}>Admin · {user?.role || 'STAFF'}</p>
-                </div>
                 <h1 className="top-title">{sectionLabel}</h1>
-                <p className="top-subtitle">{subtitle}</p>
-                {dataLoading ? <p className="helper-text">Refreshing live CredX data...</p> : null}
               </div>
               <div className="topbar-actions">
-                <div className="admin-pill">{statsTitle}</div>
-                <span className="security-note-inline" aria-label="Encrypted">🔒 Staff-only · Encrypted</span>
                 <button className="ghost-button" onClick={handleLogout}>Sign out</button>
               </div>
             </header>
@@ -2678,7 +2654,6 @@ export default function App() {
           value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/print') ? '/print' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : '/'}
           onChange={(e) => {
             const value = e.target.value;
-            if (value === '__signup') { window.location.href = '/signup'; return; }
             navigate(value);
           }}
           aria-label="Admin section"
@@ -2689,7 +2664,6 @@ export default function App() {
           <option value="/disputes">Disputes</option>
           <option value="/print">Print Center</option>
           <option value="/tasks">Tasks</option>
-          <option value="__signup">Sign up</option>
         </select>
 
         {error ? <div className="error-banner">{error}</div> : null}

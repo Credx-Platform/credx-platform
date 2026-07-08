@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import MasterclassDashboard from './components/MasterclassDashboard';
-import type { LessonDay } from './masterclassCurriculum';
+import { MASTERCLASS_DAYS, type LessonDay } from './masterclassCurriculum';
 import { FILING_WORKFLOWS, type FilingWorkflow } from './filingWorkflows';
 import { renderBestPrintHtml } from './printing';
 import { SiteFooter } from './components/SiteFooter.js';
@@ -3323,7 +3323,9 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
   const [activeMcDay, setActiveMcDay] = useState<LessonDay | null>(null);
   const masterclassEnrolled = !!progress?.education?.masterclassEnrolled;
-  const masterclassOnly = masterclassEnrolled && ['LEAD', 'STUDENT'].includes((client?.status || '').toUpperCase());
+  const clientStatusUpper = (client?.status || '').toUpperCase();
+  const tier2 = ['ACTIVE', 'PAST_DUE'].includes(clientStatusUpper);
+  const masterclassOnly = masterclassEnrolled && !tier2 && !['RESTRICTED', 'CANCELLED'].includes(clientStatusUpper);
   const completedMasterclassDays = useMemo(
     () => (progress?.education?.masterclassProgress || []).filter((s): s is string => typeof s === 'string'),
     [progress?.education?.masterclassProgress]
@@ -3342,13 +3344,13 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     const url = new URL(window.location.href);
     const welcome = url.searchParams.get('welcome');
     if (welcome === 'masterclass' && masterclassEnrolled) {
-      setActiveTab('masterclass');
+      setActiveTab(masterclassOnly ? 'overview' : 'masterclass');
       url.searchParams.delete('welcome');
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
       return;
     }
     if (masterclassOnly) {
-      setActiveTab('masterclass');
+      setActiveTab('overview');
     }
   }, [user?.id, masterclassEnrolled, masterclassOnly]);
 
@@ -3383,14 +3385,13 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   // Tier 0: paid client just landed in portal — Overview + Profile only.
   // Tier 1: report uploaded → Analysis tab unlocks.
   // Tier 2: payment confirmed (status ACTIVE) → full menu including Disputes.
-  const clientStatusUpper = (client?.status || '').toUpperCase();
-  const tier2 = ['ACTIVE', 'PAST_DUE'].includes(clientStatusUpper);
   const tier1 = tier2 || hasCreditReport || hasAnalysis;
 
   const navItems: Array<{ key: PortalTab; label: string }> = masterclassOnly
     ? [
-        { key: 'masterclass', label: '5-Day Masterclass' },
+        { key: 'overview', label: 'Overview' },
         { key: 'profile', label: 'Profile' },
+        { key: 'masterclass', label: '5-Day Masterclass' },
         { key: 'resources', label: 'Credit Builders' }
       ]
     : tier2
@@ -3462,22 +3463,19 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
         {(() => {
           const tabLabel = navItems.find((item) => item.key === activeTab)?.label || 'Dashboard';
-          const sectionTheme = activeTab !== 'overview' && (activeTab in SECTION_THEMES) ? SECTION_THEMES[activeTab as Exclude<PortalTab, 'overview'>] : null;
           const isMc = activeTab === 'masterclass';
+          const sectionTheme = activeTab !== 'overview' && (activeTab in SECTION_THEMES) ? SECTION_THEMES[activeTab as Exclude<PortalTab, 'overview'>] : null;
           const accent = isMc && activeMcDay ? activeMcDay.accent : (sectionTheme?.accent || '#00c6fb');
-          const subtitle = isMc && activeMcDay
-            ? `${activeMcDay.eyebrow} — ${activeMcDay.tagline}`
-            : (sectionTheme?.desc || null);
           const topbarStyle = { ['--section-accent' as string]: accent } as CSSProperties;
           return (
             <header className="topbar topbar--themed" style={topbarStyle}>
               <div>
-                <div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow" style={{ color: accent }}>Client Portal</p></div>
                 <h1 className="top-title">{tabLabel}</h1>
-                {subtitle ? <p className="top-subtitle">{subtitle}</p> : null}
-                {dataLoading ? <p className="helper-text">Refreshing your latest CredX progress...</p> : null}
               </div>
-              <div className="topbar-actions"><button className="ghost-button" onClick={handleLogout}>Sign out</button></div>
+              <div className="topbar-actions">
+                <a className="ghost-button" href="/signup">Sign up</a>
+                <button className="ghost-button" onClick={handleLogout}>Sign out</button>
+              </div>
             </header>
           );
         })()}
@@ -3503,6 +3501,15 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
         <div className="page-grid">
           {activeTab === 'overview' ? (
+            masterclassOnly ? (
+              <MasterclassStudentOverview
+                user={user}
+                progress={progress}
+                completedDays={completedMasterclassDays}
+                passedQuizzes={passedMasterclassQuizzes}
+                onOpenMasterclass={() => setActiveTab('masterclass')}
+              />
+            ) : (
             <>
               {(() => {
                 const analysisAny = (progress?.analysis as any) || null;
@@ -3682,9 +3689,21 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                 </section>
               ) : null}
             </>
+            )
           ) : null}
 
-          {activeTab === 'profile' ? <ProfileSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} onUserUpdated={setUser} /> : null}
+          {activeTab === 'profile' ? (
+            masterclassOnly ? (
+              <MasterclassStudentProfile
+                user={user}
+                progress={progress}
+                completedDays={completedMasterclassDays}
+                passedQuizzes={passedMasterclassQuizzes}
+              />
+            ) : (
+              <ProfileSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} onUserUpdated={setUser} />
+            )
+          ) : null}
           {activeTab === 'disputes' ? <DisputesSection token={token} user={user} client={client} progress={progress} letters={generatedLetters} setLetters={persistLetters} filings={filings} setFilings={persistFilings} mailed={mailed} setMailed={persistMailed} responses={responses} setResponses={persistResponses} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
@@ -3704,15 +3723,122 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
           {activeTab === 'tasks' ? <ClientTasksSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} onTabChange={setActiveTab} /> : null}
 
-          <CrossPromoFooter
-            isPaid={tier2}
-            isMasterclassEnrolled={masterclassEnrolled}
-            isMasterclassOnly={masterclassOnly}
-          />
+          {!masterclassOnly ? (
+            <CrossPromoFooter
+              isPaid={tier2}
+              isMasterclassEnrolled={masterclassEnrolled}
+              isMasterclassOnly={masterclassOnly}
+            />
+          ) : null}
         </div>
         <SiteFooter />
       </main>
     </div>
+  );
+}
+
+function MasterclassStudentOverview({
+  user,
+  progress,
+  completedDays,
+  passedQuizzes,
+  onOpenMasterclass
+}: {
+  user: User | null;
+  progress: Progress | null;
+  completedDays: string[];
+  passedQuizzes: string[];
+  onOpenMasterclass: () => void;
+}) {
+  const completedSet = new Set(completedDays);
+  const completionPct = Math.round((completedDays.length / MASTERCLASS_DAYS.length) * 100);
+
+  return (
+    <>
+      <section className="mc-overview-hero">
+        <div>
+          <p className="eyebrow">5-Day Masterclass</p>
+          <h1>{user?.firstName ? `Welcome, ${user.firstName}` : 'Welcome to your learning portal'}</h1>
+          <p>
+            This is your education dashboard for the CredX 5-Day Masterclass. Work through each day in order,
+            watch the lessons, review the slide follow-along, study the key terms, complete the action steps,
+            and pass the quiz before moving your credit strategy forward.
+          </p>
+        </div>
+        <div className="mc-overview-progress" aria-label="Masterclass progress">
+          <strong>{completionPct}%</strong>
+          <span>{completedDays.length}/{MASTERCLASS_DAYS.length} days complete</span>
+          <div className="mc-progress-bar"><div className="mc-progress-fill" style={{ width: `${completionPct}%` }} /></div>
+          <button type="button" className="mc-complete-btn" onClick={onOpenMasterclass}>Continue lessons</button>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">How it works</p><h2>What to expect</h2></div></div>
+        <div className="mc-tutorial-grid">
+          <div className="mc-tutorial-card"><strong>1. Start with the daily lesson</strong><span>Each day has short lessons, a slide deck, and plain-English definitions.</span></div>
+          <div className="mc-tutorial-card"><strong>2. Take the action steps</strong><span>Use the assignments to review your own credit habits and plan your next move.</span></div>
+          <div className="mc-tutorial-card"><strong>3. Pass the quiz</strong><span>Quizzes confirm you understand the concepts before you rely on them.</span></div>
+          <div className="mc-tutorial-card"><strong>4. Upgrade only if needed</strong><span>If you later choose done-for-you service, that creates a separate paid-service client file.</span></div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Curriculum</p><h2>5-day breakdown</h2></div></div>
+        <div className="mc-overview-day-grid">
+          {MASTERCLASS_DAYS.map((day) => (
+            <button
+              key={day.slug}
+              type="button"
+              className={`mc-overview-day-card${completedSet.has(day.slug) ? ' is-done' : ''}`}
+              style={{ ['--card-accent' as string]: day.accent } as CSSProperties}
+              onClick={onOpenMasterclass}
+            >
+              <span>{day.isBonus ? 'Bonus' : `Day ${day.day}`}</span>
+              <strong>{day.title}</strong>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <MasterclassStudentProfile user={user} progress={progress} completedDays={completedDays} passedQuizzes={passedQuizzes} />
+    </>
+  );
+}
+
+function MasterclassStudentProfile({
+  user,
+  progress,
+  completedDays,
+  passedQuizzes
+}: {
+  user: User | null;
+  progress: Progress | null;
+  completedDays: string[];
+  passedQuizzes: string[];
+}) {
+  const education = progress?.education;
+  const completionPct = Math.round((completedDays.length / MASTERCLASS_DAYS.length) * 100);
+  const enrolledDate = education?.enrolledAt ? formatDate(education.enrolledAt) : 'Active';
+  const lastQuizAttempt = Object.values(education?.masterclassQuizAttempts || {})
+    .map((attempt) => attempt.lastAttemptAt)
+    .filter(Boolean)
+    .sort((a, b) => +new Date(b) - +new Date(a))[0];
+
+  return (
+    <section className="panel">
+      <div className="panel-header"><div><p className="eyebrow">Student Profile</p><h2>Profile and lesson stats</h2></div></div>
+      <div className="mc-profile-grid">
+        <div className="mc-profile-card"><span>Name</span><strong>{`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Student'}</strong></div>
+        <div className="mc-profile-card"><span>Email</span><strong>{user?.email || 'Not available'}</strong></div>
+        <div className="mc-profile-card"><span>Phone</span><strong>{user?.phone || 'Not provided'}</strong></div>
+        <div className="mc-profile-card"><span>Enrollment</span><strong>{enrolledDate}</strong></div>
+        <div className="mc-profile-card"><span>Lesson Progress</span><strong>{completedDays.length}/{MASTERCLASS_DAYS.length}</strong></div>
+        <div className="mc-profile-card"><span>Quizzes Passed</span><strong>{passedQuizzes.length}</strong></div>
+        <div className="mc-profile-card"><span>Course Score</span><strong>{completionPct}%</strong></div>
+        <div className="mc-profile-card"><span>Last Quiz Activity</span><strong>{lastQuizAttempt ? formatDate(lastQuizAttempt) : 'Not started'}</strong></div>
+      </div>
+    </section>
   );
 }
 

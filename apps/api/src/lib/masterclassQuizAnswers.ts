@@ -2,7 +2,7 @@
 // indices in apps/web/src/masterclassQuizzes.ts. Keep both files in sync — the
 // client renders prompts/choices; the server is authoritative for grading.
 
-export const QUIZ_PASSING_SCORE = 0.8;
+export const QUIZ_PASSING_SCORE = 0.6;
 export const QUIZ_MAX_ATTEMPTS_BEFORE_COOLDOWN = 3;
 export const QUIZ_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 

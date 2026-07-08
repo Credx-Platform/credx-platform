@@ -13,7 +13,7 @@ export type DayQuiz = {
   questions: QuizQuestion[];
 };
 
-export const QUIZ_PASSING_SCORE = 0.8;
+export const QUIZ_PASSING_SCORE = 0.6;
 export const QUIZ_MAX_ATTEMPTS_BEFORE_COOLDOWN = 3;
 export const QUIZ_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
@@ -21,7 +21,7 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
   {
     day: 1,
     slug: 'day-1-credit-fundamentals',
-    passingScore: 0.8,
+    passingScore: 0.6,
     questions: [
       {
         id: 'd1q1',
@@ -123,7 +123,7 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
   {
     day: 2,
     slug: 'day-2-disputes-decoded',
-    passingScore: 0.8,
+    passingScore: 0.6,
     questions: [
       {
         id: 'd2q1',
@@ -245,7 +245,7 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
   {
     day: 3,
     slug: 'day-3-advanced-tactics',
-    passingScore: 0.8,
+    passingScore: 0.6,
     questions: [
       {
         id: 'd3q1',
@@ -367,7 +367,7 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
   {
     day: 4,
     slug: 'day-4-building-positive-credit',
-    passingScore: 0.8,
+    passingScore: 0.6,
     questions: [
       {
         id: 'd4q1',
@@ -494,7 +494,7 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
   {
     day: 5,
     slug: 'day-5-business-credit',
-    passingScore: 0.8,
+    passingScore: 0.6,
     questions: [
       {
         id: 'd5q1',
@@ -616,7 +616,7 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
   {
     day: 6,
     slug: 'bonus-generational-wealth',
-    passingScore: 0.8,
+    passingScore: 0.6,
     questions: [
       {
         id: 'd6q1',

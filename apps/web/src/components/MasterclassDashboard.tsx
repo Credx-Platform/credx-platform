@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { MASTERCLASS_DAYS, MASTERCLASS_INTRO, type LessonDay } from '../masterclassCurriculum';
+import { MASTERCLASS_DAYS, type LessonDay } from '../masterclassCurriculum';
 import { MASTERCLASS_QUIZZES, QUIZ_PASSING_SCORE, type DayQuiz } from '../masterclassQuizzes';
 
-type IntroSelection = { kind: 'intro' };
 type DaySelection = { kind: 'day'; day: number };
-type Selection = IntroSelection | DaySelection;
+type Selection = DaySelection;
 
 export type QuizSubmitResult = {
   passed: boolean;
@@ -43,7 +42,7 @@ export default function MasterclassDashboard({
   const [selection, setSelection] = useState<Selection>(() => {
     if (typeof window === 'undefined') return { kind: 'day', day: 1 };
     const stored = sessionStorage.getItem('credx-masterclass-selection');
-    if (stored === 'intro') return { kind: 'intro' };
+    if (stored === 'intro') return { kind: 'day', day: 1 };
     if (stored) {
       const n = Number(stored);
       if (Number.isFinite(n) && n >= 1 && n <= MASTERCLASS_DAYS.length) return { kind: 'day', day: n };
@@ -53,35 +52,29 @@ export default function MasterclassDashboard({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    sessionStorage.setItem('credx-masterclass-selection', selection.kind === 'intro' ? 'intro' : String(selection.day));
+    sessionStorage.setItem('credx-masterclass-selection', String(selection.day));
   }, [selection]);
 
-  const isIntro = selection.kind === 'intro';
-  const activeDay = isIntro ? 0 : selection.day;
+  const activeDay = selection.day;
   const day = useMemo<LessonDay>(() => {
-    if (isIntro) return MASTERCLASS_DAYS[0]; // placeholder; not used when isIntro
     return MASTERCLASS_DAYS.find((d) => d.day === activeDay) || MASTERCLASS_DAYS[0];
-  }, [activeDay, isIntro]);
+  }, [activeDay]);
 
   // Notify parent so the topbar accent can match the active day's color.
   useEffect(() => {
-    if (isIntro) {
-      onActiveDayChange?.({ ...MASTERCLASS_DAYS[0], slug: MASTERCLASS_INTRO.slug, title: MASTERCLASS_INTRO.title, eyebrow: MASTERCLASS_INTRO.eyebrow, tagline: MASTERCLASS_INTRO.tagline, summary: MASTERCLASS_INTRO.summary, image: MASTERCLASS_INTRO.image, accent: MASTERCLASS_INTRO.accent } as LessonDay);
-    } else {
-      onActiveDayChange?.(day);
-    }
-  }, [day, isIntro, onActiveDayChange]);
+    onActiveDayChange?.(day);
+  }, [day, onActiveDayChange]);
 
-  const slidesSrc = isIntro ? MASTERCLASS_INTRO.slidesPath : day.slidesPath;
-  const isCompleted = !isIntro && completedDays.includes(day.slug);
-  const isBonus = !isIntro && !!day.isBonus;
-  const accent = isIntro ? MASTERCLASS_INTRO.accent : day.accent;
+  const slidesSrc = day.slidesPath;
+  const isCompleted = completedDays.includes(day.slug);
+  const isBonus = !!day.isBonus;
+  const accent = day.accent;
   const dayQuiz = useMemo<DayQuiz | null>(
-    () => (isIntro ? null : (MASTERCLASS_QUIZZES.find((q) => q.slug === day.slug) || null)),
-    [day.slug, isIntro]
+    () => MASTERCLASS_QUIZZES.find((q) => q.slug === day.slug) || null,
+    [day.slug]
   );
-  const quizPassed = !isIntro && passedQuizzes.includes(day.slug);
-  const dayAttempt = isIntro ? undefined : quizAttempts[day.slug];
+  const quizPassed = passedQuizzes.includes(day.slug);
+  const dayAttempt = quizAttempts[day.slug];
 
   return (
     <div className="mc-shell" style={{ ['--day-accent' as string]: accent } as CSSProperties}>
@@ -98,25 +91,9 @@ export default function MasterclassDashboard({
       </section>
 
       <section className="mc-day-grid">
-        <button
-          key="intro"
-          type="button"
-          onClick={() => setSelection({ kind: 'intro' })}
-          className={`mc-day-card${isIntro ? ' is-active' : ''}`}
-          style={{ ['--card-accent' as string]: MASTERCLASS_INTRO.accent } as CSSProperties}
-        >
-          <div className="mc-day-card-row">
-            <div className="mc-day-card-num">★</div>
-            <div className="mc-day-card-body">
-              <div className="mc-day-card-badge">Intro</div>
-              <div className="mc-day-card-title">Course Overview</div>
-              <div className="mc-day-card-sub">Start here — what the masterclass covers and how to use it.</div>
-            </div>
-          </div>
-        </button>
         {MASTERCLASS_DAYS.map((d) => {
           const done = completedDays.includes(d.slug);
-          const isActive = !isIntro && d.day === activeDay;
+          const isActive = d.day === activeDay;
           const passed = passedQuizzes.includes(d.slug);
           return (
             <button
@@ -131,7 +108,6 @@ export default function MasterclassDashboard({
                 <div className="mc-day-card-body">
                   <div className="mc-day-card-badge">{d.isBonus ? 'Bonus' : `Day ${d.day}`}</div>
                   <div className="mc-day-card-title">{d.title}</div>
-                  {d.tagline ? <div className="mc-day-card-sub">{d.tagline}</div> : null}
                   {done ? <div className="mc-day-card-done">✓ Completed</div> : passed ? <div className="mc-day-card-done">Quiz passed</div> : null}
                 </div>
               </div>
@@ -140,34 +116,6 @@ export default function MasterclassDashboard({
         })}
       </section>
 
-      {isIntro ? (
-        <section className="panel mc-day-panel">
-          <header className="mc-day-panel-head">
-            <div>
-              <p className="eyebrow" style={{ color: MASTERCLASS_INTRO.accent }}>{MASTERCLASS_INTRO.eyebrow}</p>
-              <h2 className="mc-day-panel-title">{MASTERCLASS_INTRO.tagline}</h2>
-            </div>
-            <img src={MASTERCLASS_INTRO.image} alt={MASTERCLASS_INTRO.title} className="mc-day-panel-img" style={{ borderColor: MASTERCLASS_INTRO.accent }} />
-          </header>
-          <p className="mc-day-panel-summary">{MASTERCLASS_INTRO.summary}</p>
-          <div className="mc-section">
-            <h3 className="mc-section-h">Course preview</h3>
-            <div className="mc-slides-frame">
-              <iframe src={MASTERCLASS_INTRO.slidesPath} title="Course Overview slides" />
-            </div>
-            <p className="mc-slides-help">
-              <a href={MASTERCLASS_INTRO.slidesPath} target="_blank" rel="noopener noreferrer">Open in a new tab →</a>
-            </p>
-          </div>
-          <div className="mc-day-footer">
-            <button type="button" className="mc-complete-btn" onClick={() => setSelection({ kind: 'day', day: 1 })}>
-              Start with Day 1 →
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {!isIntro ? (
       <section className={`panel mc-day-panel${isBonus ? ' is-bonus' : ''}`}>
         <header className="mc-day-panel-head">
           <div>
@@ -280,7 +228,7 @@ export default function MasterclassDashboard({
               className="mc-complete-btn"
               onClick={() => onMarkComplete(day.slug)}
               disabled={!quizPassed}
-              title={quizPassed ? undefined : 'Pass the quiz with 80%+ to unlock'}
+              title={quizPassed ? undefined : 'Pass the quiz with 60%+ to unlock'}
               style={!quizPassed ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
             >
               {quizPassed ? `Mark Day ${day.day} complete` : `Pass the quiz to mark Day ${day.day} complete`}
@@ -295,7 +243,6 @@ export default function MasterclassDashboard({
           ) : null}
         </div>
       </section>
-      ) : null}
     </div>
   );
 }
@@ -435,6 +382,9 @@ function DayQuizForm({
             </div>
             {result && !result.passed && !cooldownActive ? (
               <div style={{ fontSize: '0.85rem', color: 'rgba(226,232,240,0.78)', borderLeft: `3px solid ${accent}`, paddingLeft: 10 }}>
+                <strong style={{ display: 'block', color: '#86efac', marginBottom: 4 }}>
+                  Correct answer: {String.fromCharCode(65 + q.correctIndex)}. {q.choices[q.correctIndex]}
+                </strong>
                 <em>Why:</em> {q.rationale}
               </div>
             ) : null}
