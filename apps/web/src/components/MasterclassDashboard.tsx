@@ -103,13 +103,10 @@ export default function MasterclassDashboard({
               className={`mc-day-card${isActive ? ' is-active' : ''}${d.isBonus ? ' is-bonus' : ''}${done ? ' is-done' : ''}`}
               style={{ ['--card-accent' as string]: d.accent } as CSSProperties}
             >
-              <div className="mc-day-card-row">
-                <div className="mc-day-card-num">{d.isBonus ? '★' : `0${d.day}`}</div>
-                <div className="mc-day-card-body">
-                  <div className="mc-day-card-badge">{d.isBonus ? 'Bonus' : `Day ${d.day}`}</div>
-                  <div className="mc-day-card-title">{d.title}</div>
-                  {done ? <div className="mc-day-card-done">✓ Completed</div> : passed ? <div className="mc-day-card-done">Quiz passed</div> : null}
-                </div>
+              <div className="mc-day-card-body">
+                <div className="mc-day-card-badge">{d.isBonus ? 'Bonus' : `Day ${d.day}`}</div>
+                <div className="mc-day-card-title">{d.title}</div>
+                {done ? <div className="mc-day-card-done">✓ Completed</div> : passed ? <div className="mc-day-card-done">Quiz passed</div> : null}
               </div>
             </button>
           );
