@@ -146,15 +146,58 @@ const BRAND_LOGO = '/images/credx-logo-1.jpg';
 const DEFAULT_AFFILIATE_LINKS = [
   { label: 'IdentityIQ Credit Monitoring', url: 'https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4', category: 'monitoring' },
   { label: 'MyFreeScoreNow Credit Monitoring', url: 'https://app.myfreescorenow.com/enroll/B02B3064', category: 'monitoring' },
-  { label: 'Self — Credit Builder Account', url: 'https://self.inc/refer/16452347', category: 'credit_builder' },
+  { label: 'Self Lender', url: 'https://self.inc/refer/16452347', category: 'credit_builder' },
   { label: 'Credit Strong', url: 'https://tracking.creditstrong.com/aff_c?aff_id=1491&offer_id=2&source=MGFinstagram', category: 'credit_builder' },
   { label: 'Rent Reporters', url: 'https://prf.hn/click/camref:1101l52pUS', category: 'credit_builder' },
   { label: 'Credit Builder Card', url: 'https://www.creditbuildercard.com/mgf.html', category: 'credit_builder' },
   { label: 'Grow Credit', url: 'https://growcredit.com/?kid=12BYTD', category: 'credit_builder' },
   { label: 'Kovo', url: 'https://kovocredit.com/r/O6LDVXN7', category: 'credit_builder' },
   { label: 'Ava', url: 'https://meetava.app.link/tdMaQUdV7Rb', category: 'credit_builder' },
-  { label: 'Kikoff Credit Builder', url: 'https://kikoff.com/', category: 'credit_builder' },
   { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }
+] as const;
+const CARRD_CREDIT_BUILDER_LINKS = [
+  {
+    label: 'Self Lender',
+    url: 'https://self.inc/refer/16452347',
+    type: 'Credit builder account',
+    description: 'Build payment history while saving money. On-time monthly payments can strengthen your credit profile, with funds available at the end of the loan term.'
+  },
+  {
+    label: 'Credit Strong',
+    url: 'https://tracking.creditstrong.com/aff_c?aff_id=1491&offer_id=2&source=MGFinstagram',
+    type: 'Credit builder loan',
+    description: 'Choose a credit builder loan plan that fits your budget and reports payment activity designed to help establish or improve credit history.'
+  },
+  {
+    label: 'Rent Reporters',
+    url: 'https://prf.hn/click/camref:1101l52pUS',
+    type: 'Rent reporting',
+    description: 'Report qualifying rent payments to major credit bureaus, with possible backdating up to 2 years to add positive payment history.'
+  },
+  {
+    label: 'Credit Builder Card',
+    url: 'https://www.creditbuildercard.com/mgf.html',
+    type: 'Builder card',
+    description: 'Use a dedicated builder card to add positive revolving account activity when the terms fit your rebuild plan.'
+  },
+  {
+    label: 'Grow Credit',
+    url: 'https://growcredit.com/?kid=12BYTD',
+    type: 'Subscription reporting',
+    description: 'Build credit through eligible subscription payments, such as streaming services, with reported payment activity.'
+  },
+  {
+    label: 'Kovo',
+    url: 'https://kovocredit.com/r/O6LDVXN7',
+    type: 'Credit-building plan',
+    description: 'A monthly credit-building plan that reports payment activity and includes education resources for customers.'
+  },
+  {
+    label: 'Ava',
+    url: 'https://meetava.app.link/tdMaQUdV7Rb',
+    type: 'Rent and utility reporting',
+    description: 'Use rent and utility payment reporting to help add positive history when payments are made on time.'
+  }
 ] as const;
 const CREDIT_MONITORING_PROVIDERS = [
   {
@@ -1908,19 +1951,16 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
 }
 
 function ResourcesSection({ progress }: { progress: Progress | null; }) {
-  const affiliateLinks = currentAffiliateLinks(progress?.education?.affiliateLinks);
-  const monitoringLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'monitoring');
-  const creditBuilderLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'credit_builder');
-  const reportLinks = affiliateLinks.filter((item) => String(item.category || '').toLowerCase() === 'reports');
-  const renderLinks = (items: ReturnType<typeof currentAffiliateLinks>, empty: string, description: string) => (
+  const builderLinks = [...CARRD_CREDIT_BUILDER_LINKS];
+  const renderLinks = (items: typeof CARRD_CREDIT_BUILDER_LINKS) => (
     <div className="dispute-list">
       {items.length ? items.map((item, index) => (
         <a key={`${item.url}-${index}`} className="plan-card resource-link-card" href={item.url} target="_blank" rel="noopener noreferrer sponsored">
           <strong>{item.label}</strong>
-          <span>{description}</span>
-          <small>Open partner link</small>
+          <span>{item.description}</span>
+          <small>{item.type} · Open builder link</small>
         </a>
-      )) : <div className="empty-state-card">{empty}</div>}
+      )) : <div className="empty-state-card">No credit builder links are attached yet.</div>}
     </div>
   );
 
@@ -1929,44 +1969,33 @@ function ResourcesSection({ progress }: { progress: Progress | null; }) {
       <section className="hero-card hero-card--compact">
         <div>
           <p className="eyebrow">Credit Builders</p>
-          <h1>Credit Builder Hub</h1>
-          <p>Use this section to choose monitoring, add positive reporting tools, and keep your rebuild organized after each masterclass lesson.</p>
+          <h1>Credit Builder Accounts</h1>
+          <p>Use this section only for accounts and tools that can add positive reporting, strengthen payment history, or support score-building activity.</p>
         </div>
         <div className="hero-stats">
-          <div className="stat-card"><span>Monitoring Options</span><strong>{monitoringLinks.length}</strong></div>
-          <div className="stat-card"><span>Builder Tools</span><strong>{creditBuilderLinks.length}</strong></div>
-          <div className="stat-card"><span>Report Sources</span><strong>{reportLinks.length}</strong></div>
+          <div className="stat-card"><span>Builder Accounts</span><strong>{builderLinks.length}</strong></div>
+          <div className="stat-card"><span>Focus</span><strong>Score</strong></div>
+          <div className="stat-card"><span>Reporting Types</span><strong>4</strong></div>
           <div className="stat-card"><span>Masterclass</span><strong>{progress?.education?.masterclassEnrolled ? 'Active' : 'Open'}</strong></div>
         </div>
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div><p className="eyebrow">Sequence</p><h2>Build in the right order</h2></div></div>
+        <div className="panel-header"><div><p className="eyebrow">Score-building focus</p><h2>Choose accounts that add positive activity</h2></div></div>
         <div className="mc-tutorial-grid">
-          <div className="mc-tutorial-card"><strong>1. Monitor your reports</strong><span>Know what each bureau is showing before you add or dispute anything.</span></div>
-          <div className="mc-tutorial-card"><strong>2. Keep utilization low</strong><span>Use cards lightly, pay before statement close, and avoid maxed-out balances.</span></div>
-          <div className="mc-tutorial-card"><strong>3. Add positive reporting</strong><span>Use builder accounts only when the terms fit and the account reports to bureaus.</span></div>
-          <div className="mc-tutorial-card"><strong>4. Track every change</strong><span>Give new accounts time to report, then measure score and report changes monthly.</span></div>
-        </div>
-      </section>
-
-      <section className="panel two-col">
-        <div>
-          <div className="panel-header"><div><p className="eyebrow">Step 1</p><h2>Credit monitoring</h2></div></div>
-          {renderLinks(monitoringLinks, 'No monitoring links are attached yet.', 'Use this to watch bureau changes and keep your reports current.')}
-        </div>
-        <div>
-          <div className="panel-header"><div><p className="eyebrow">Step 2</p><h2>Builder accounts</h2></div></div>
-          {renderLinks(creditBuilderLinks, 'No builder tools are attached yet.', 'Review terms first, then use only tools that fit your rebuild plan.')}
+          <div className="mc-tutorial-card"><strong>Credit builder loans</strong><span>Add installment-style positive payment history when monthly payments fit your budget.</span></div>
+          <div className="mc-tutorial-card"><strong>Rent and utility reporting</strong><span>Turn qualifying on-time household payments into reported positive account activity.</span></div>
+          <div className="mc-tutorial-card"><strong>Builder cards</strong><span>Add revolving activity carefully while keeping utilization low and payments on time.</span></div>
+          <div className="mc-tutorial-card"><strong>Subscription reporting</strong><span>Use existing recurring payments to help build a stronger reporting profile.</span></div>
         </div>
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div><p className="eyebrow">Report Sources</p><h2>Fresh report access</h2></div></div>
-        {renderLinks(reportLinks, 'No report source links are attached yet.', 'Use this when you need a current report copy for your own review.')}
+        <div className="panel-header"><div><p className="eyebrow">Credit builder accounts</p><h2>CredX builder list</h2></div></div>
+        {renderLinks(builderLinks)}
       </section>
 
-      <p className="helper-text">CredX may earn compensation if you use a partner link. This does not change your price. Approval, rates, and terms depend on the provider and your qualifications.</p>
+      <p className="helper-text">CredX may earn compensation if you use a partner link. This does not change your price. Approval, account terms, reporting, and score impact depend on the provider and your qualifications.</p>
     </div>
   );
 }

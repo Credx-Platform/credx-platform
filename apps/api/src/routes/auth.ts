@@ -20,11 +20,13 @@ import { verifyTurnstileFromBody } from '../lib/turnstile.js';
 export const authRouter = Router();
 
 const defaultAffiliateLinks = [
-  { label: 'IdentityIQ Credit Monitoring', url: 'https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4', category: 'monitoring' },
-  { label: 'MyFreeScoreNow Credit Monitoring', url: 'https://app.myfreescorenow.com/enroll/B02B3064', category: 'monitoring' },
-  { label: 'Self Credit Builder', url: 'https://www.self.inc/', category: 'credit_builder' },
-  { label: 'Kikoff Credit Builder', url: 'https://kikoff.com/', category: 'credit_builder' },
-  { label: 'Annual Credit Report', url: 'https://www.annualcreditreport.com/', category: 'reports' }
+  { label: 'Self Lender', url: 'https://self.inc/refer/16452347', category: 'credit_builder' },
+  { label: 'Credit Strong', url: 'https://tracking.creditstrong.com/aff_c?aff_id=1491&offer_id=2&source=MGFinstagram', category: 'credit_builder' },
+  { label: 'Rent Reporters', url: 'https://prf.hn/click/camref:1101l52pUS', category: 'credit_builder' },
+  { label: 'Credit Builder Card', url: 'https://www.creditbuildercard.com/mgf.html', category: 'credit_builder' },
+  { label: 'Grow Credit', url: 'https://growcredit.com/?kid=12BYTD', category: 'credit_builder' },
+  { label: 'Kovo', url: 'https://kovocredit.com/r/O6LDVXN7', category: 'credit_builder' },
+  { label: 'Ava', url: 'https://meetava.app.link/tdMaQUdV7Rb', category: 'credit_builder' }
 ];
 
 const registerSchema = z.object({
