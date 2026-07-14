@@ -32,6 +32,13 @@ Production safety rules:
 Useful now:
 - `LEAD_NOTIFICATION_EMAIL`
 - `FROM_EMAIL`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM_EMAIL`
+- `SMTP_REPLY_TO`
 
 Optional signup event trigger:
 - `OPENCLAW_SIGNUP_WEBHOOK_URL`
@@ -94,8 +101,15 @@ APP_URL=https://credxme.com
 API_URL=https://api.credxme.com
 JWT_SECRET=<strong-random-secret>
 DATABASE_URL=<Railway Postgres URL>
-FROM_EMAIL=contact@credxme.com
-LEAD_NOTIFICATION_EMAIL=jmalloy@credxme.com
+FROM_EMAIL="CredX <contact@credxme.com>"
+LEAD_NOTIFICATION_EMAIL=contact@credxme.com
+SMTP_HOST=mail.privateemail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=contact@credxme.com
+SMTP_PASS=<Namecheap private email password>
+SMTP_FROM_EMAIL="CredX <contact@credxme.com>"
+SMTP_REPLY_TO=contact@credxme.com
 ```
 
 Build command:

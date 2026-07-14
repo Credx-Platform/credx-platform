@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
 /* ============================================================
    Shared email design system — synced with apps/web/src/design-tokens.css
@@ -371,9 +372,17 @@ export interface EmailAttachment {
 
 export async function sendEmail(params: { to: string; subject: string; html?: string; text?: string; attachments?: EmailAttachment[] }): Promise<{ id?: string; provider?: string; skipped?: boolean; reason?: string }> {
   const resendApiKey = process.env.RESEND_API_KEY;
-  const resendFrom = process.env.RESEND_FROM_EMAIL || process.env.FROM_EMAIL || 'CredX <onboarding@updates.credxme.com>';
+  const businessEmail = process.env.BUSINESS_EMAIL || 'contact@credxme.com';
+  const defaultFrom = `CredX <${businessEmail}>`;
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = Number(process.env.SMTP_PORT || 465);
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpSecure = process.env.SMTP_SECURE == null ? smtpPort === 465 : process.env.SMTP_SECURE !== 'false';
+  const smtpFrom = process.env.SMTP_FROM_EMAIL || process.env.FROM_EMAIL || defaultFrom;
+  const resendFrom = process.env.RESEND_FROM_EMAIL || process.env.FROM_EMAIL || defaultFrom;
   const sendgridApiKey = process.env.SENDGRID_API_KEY;
-  const sendgridFrom = process.env.SENDGRID_FROM_EMAIL || process.env.FROM_EMAIL || 'CredX <hello@credxme.com>';
+  const sendgridFrom = process.env.SENDGRID_FROM_EMAIL || process.env.FROM_EMAIL || defaultFrom;
 
   const parseFrom = (value: string) => {
     const email = value.includes('<') ? value.match(/<([^>]+)>/ )?.[1] || value : value;
@@ -382,6 +391,45 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
   };
 
   let resendFailure: string | null = null;
+  let smtpFailure: string | null = null;
+
+  if (smtpHost && smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass
+        }
+      });
+      const from = parseFrom(smtpFrom);
+      const result = await transporter.sendMail({
+        from: from.name ? `${from.name} <${from.email}>` : from.email,
+        to: params.to,
+        subject: params.subject,
+        headers: listUnsubscribeHeaders(),
+        replyTo: process.env.SMTP_REPLY_TO || businessEmail,
+        ...(params.html ? { html: params.html } : {}),
+        ...(params.text ? { text: params.text } : { text: '' }),
+        ...(params.attachments?.length
+          ? {
+              attachments: params.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                contentType: a.contentType
+              }))
+            }
+          : {})
+      });
+
+      return { id: result.messageId, provider: 'smtp' };
+    } catch (error) {
+      smtpFailure = error instanceof Error ? error.message : String(error);
+      console.warn('SMTP_EXCEPTION', smtpFailure);
+    }
+  }
 
   if (resendApiKey) {
     try {
@@ -418,7 +466,8 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
   }
 
   if (!sendgridApiKey) {
-    const reason = resendFailure ? `Resend failed and no SendGrid fallback is configured: ${resendFailure}` : 'No email provider configured';
+    const providerFailures = [smtpFailure && `SMTP failed: ${smtpFailure}`, resendFailure && `Resend failed: ${resendFailure}`].filter(Boolean).join(' | ');
+    const reason = providerFailures ? `${providerFailures} | no SendGrid fallback is configured` : 'No email provider configured';
     console.log('EMAIL_PREVIEW', { to: params.to, subject: params.subject, reason });
     return { skipped: true, reason };
   }
@@ -458,14 +507,16 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
       const body = await response.text().catch(() => '');
       const reason = `SENDGRID_SEND_FAILED:${response.status}:${body}`;
       console.warn('SENDGRID_SEND_FAILED', response.status, body);
-      return { skipped: true, reason: resendFailure ? `${resendFailure} | ${reason}` : reason };
+      const priorFailure = [smtpFailure, resendFailure].filter(Boolean).join(' | ');
+      return { skipped: true, reason: priorFailure ? `${priorFailure} | ${reason}` : reason };
     }
 
     return { id: response.headers.get('x-message-id') || 'sendgrid-accepted', provider: 'sendgrid' };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     console.warn('SENDGRID_EXCEPTION', reason);
-    return { skipped: true, reason: resendFailure ? `${resendFailure} | ${reason}` : reason };
+    const priorFailure = [smtpFailure, resendFailure].filter(Boolean).join(' | ');
+    return { skipped: true, reason: priorFailure ? `${priorFailure} | ${reason}` : reason };
   }
 }
 
@@ -732,6 +783,10 @@ export async function sendCreditAnalysisEmail(params: {
 }
 
 export async function notifyNewLead(params: { firstName: string; lastName: string; email: string; phone?: string; source?: string }) {
+  const leadNotificationEmail = process.env.LEAD_NOTIFICATION_EMAIL
+    || process.env.ADMIN_ALERT_EMAIL
+    || process.env.BUSINESS_EMAIL
+    || 'contact@credxme.com';
   const subject = `New CredX lead: ${params.firstName} ${params.lastName}`;
   const html = `
     <div style="font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.6;">
@@ -745,14 +800,14 @@ export async function notifyNewLead(params: { firstName: string; lastName: strin
   const text = `New CredX lead received\n\nName: ${params.firstName} ${params.lastName}\nEmail: ${params.email}\nPhone: ${params.phone || 'Not provided'}\nReferral source: ${params.source || 'Not provided'}`;
 
   const result = await sendEmail({
-    to: 'jmalloy@credxme.com',
+    to: leadNotificationEmail,
     subject,
     html,
     text
   });
 
   console.log('NEW_LEAD_NOTIFICATION_SEND_RESULT', {
-    to: 'jmalloy@credxme.com',
+    to: leadNotificationEmail,
     lead: params,
     result
   });

@@ -1,8 +1,8 @@
 # CredX Service Agreement Draft
 
 **Company:** CredX  
-**Business Email:** hello@credxme.com  
-**Internal Contact:** jmalloy@credxme.com  
+**Business Email:** contact@credxme.com  
+**Internal Contact:** contact@credxme.com  
 **Effective Date:** {{effective_date}}
 
 This Service Agreement ("Agreement") is entered into by and between **CredX** ("Company") and **{{client_full_name}}** ("Client"). By signing this Agreement, the Client agrees to the terms below for credit repair support, credit education, and related onboarding and account review services.

@@ -1650,7 +1650,18 @@ ${clientName}`;
 // Print via a hidden iframe rather than window.open. window.open is silently
 // blocked when called after an `await` (the user-gesture has expired), which is
 // exactly how every print button here is wired — so popups never appeared.
-function openPrintDocument(title: string, body: string, options?: { preferDisputeLetter?: boolean }) {
+type PrintableSignature = {
+  dataUrl?: string;
+  signedName?: string | null;
+  signedAt?: string | null;
+} | null;
+
+function openPrintDocument(title: string, body: string, options?: {
+  preferDisputeLetter?: boolean;
+  signatureDataUrl?: string | null;
+  signatureName?: string | null;
+  signatureDate?: string | null;
+}) {
   const html = renderBestPrintHtml(title, body, options);
   const existing = document.getElementById('credx-admin-print-frame');
   if (existing) existing.remove();
@@ -1887,7 +1898,7 @@ function PrintCenterRoute({ token, clients, disputes }: { token: string; clients
       return;
     }
     try {
-      const result = await apiFetch<{ document: DocumentRecord; content?: string; url?: string }>(
+      const result = await apiFetch<{ document: DocumentRecord; content?: string; url?: string; signature?: PrintableSignature }>(
         `/api/clients/${client.id}/documents/${document.id}/print`,
         token
       );
@@ -1896,7 +1907,12 @@ function PrintCenterRoute({ token, clients, disputes }: { token: string; clients
         const prefersDisputeLayout = result.document?.letterType === 'CONSOLIDATED_DISPUTE'
           || result.document?.type === 'DISPUTE_LETTER'
           || /dispute/i.test(result.document?.fileName || title);
-        openPrintDocument(title, result.content, { preferDisputeLetter: prefersDisputeLayout });
+        openPrintDocument(title, result.content, {
+          preferDisputeLetter: prefersDisputeLayout,
+          signatureDataUrl: result.signature?.dataUrl || null,
+          signatureName: result.signature?.signedName || null,
+          signatureDate: result.signature?.signedAt || null
+        });
         return;
       }
       if (result.url && /^https?:\/\//i.test(result.url)) {

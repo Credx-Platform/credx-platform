@@ -29,6 +29,37 @@ type ParsedDisputeLetter = {
   checklist: string[];
 };
 
+export type PrintRenderOptions = {
+  preferDisputeLetter?: boolean;
+  signatureDataUrl?: string | null;
+  signatureName?: string | null;
+  signatureDate?: string | null;
+};
+
+function safeSignatureDataUrl(value?: string | null): string | null {
+  if (!value) return null;
+  return /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(value) ? value : null;
+}
+
+function signatureLabel(options?: PrintRenderOptions): string {
+  const name = options?.signatureName?.trim();
+  const date = options?.signatureDate
+    ? new Date(options.signatureDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : null;
+  return [name, date].filter(Boolean).join(' - ');
+}
+
+function renderedSignatureHtml(options?: PrintRenderOptions): string {
+  const signatureDataUrl = safeSignatureDataUrl(options?.signatureDataUrl);
+  if (!signatureDataUrl) return '<div class="signature-space"></div>';
+
+  const label = signatureLabel(options);
+  return `<div class="signature-block">
+    <img src="${signatureDataUrl}" alt="Client signature">
+    ${label ? `<div class="signature-label">${escapePrintHtml(label)}</div>` : ''}
+  </div>`;
+}
+
 function normalizeParagraphs(text: string): string[] {
   return text
     .split(/\n{2,}/)
@@ -105,20 +136,39 @@ function parseDisputeLetterText(content: string): ParsedDisputeLetter | null {
   };
 }
 
-export function renderPlainTextPrintHtml(title: string, content: string): string {
+function plainTextBodyWithSignature(content: string, options?: PrintRenderOptions): string {
+  if (!safeSignatureDataUrl(options?.signatureDataUrl)) {
+    return `<pre>${escapePrintHtml(content)}</pre>`;
+  }
+
+  const signoff = content.match(/(^|\n)(Sincerely,\s*\n+)([^\n]+)?\s*$/i);
+  if (!signoff || signoff.index === undefined) {
+    return `<pre>${escapePrintHtml(content.trimEnd())}</pre><div class="signoff">Sincerely,</div>${renderedSignatureHtml(options)}`;
+  }
+
+  const before = content.slice(0, signoff.index + signoff[1].length);
+  const signedName = options?.signatureName || signoff[3] || '';
+  return `<pre>${escapePrintHtml(before.trimEnd())}</pre><div class="signoff">Sincerely,</div>${renderedSignatureHtml({ ...options, signatureName: signedName })}`;
+}
+
+export function renderPlainTextPrintHtml(title: string, content: string, options?: PrintRenderOptions): string {
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${escapePrintHtml(title)}</title>
 <style>
   body{font-family:Arial,sans-serif;color:#111827;background:#fff;margin:0;padding:0.55in;font-size:13px;line-height:1.35;}
   pre{white-space:pre-wrap;font:13px/1.35 Arial,sans-serif;margin:0;}
+  .signoff{margin-top:12px;}
+  .signature-block{margin-top:12px;}
+  .signature-block img{display:block;max-height:90px;max-width:340px;margin-bottom:6px;}
+  .signature-label{border-top:1px solid #0f172a;padding-top:4px;font-size:12.5px;display:inline-block;min-width:260px;}
   @page{margin:0.55in;}
   @media print{body{padding:0;}}
-</style></head><body><pre>${escapePrintHtml(content)}</pre></body></html>`;
+</style></head><body>${plainTextBodyWithSignature(content, options)}</body></html>`;
 }
 
-export function renderDisputeLetterPrintHtml(title: string, content: string): string {
+export function renderDisputeLetterPrintHtml(title: string, content: string, options?: PrintRenderOptions): string {
   const parsed = parseDisputeLetterText(content);
-  if (!parsed) return renderPlainTextPrintHtml(title, content);
+  if (!parsed) return renderPlainTextPrintHtml(title, content, options);
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const profileHtml = parsed.profileLines.length
@@ -151,6 +201,9 @@ export function renderDisputeLetterPrintHtml(title: string, content: string): st
   .request-list{margin:0 0 14px 18px;padding:0;}
   .request-list li{margin:0 0 6px;}
   .signature-space{height:34px;}
+  .signature-block{margin-top:12px;}
+  .signature-block img{display:block;max-height:90px;max-width:340px;margin-bottom:6px;}
+  .signature-label{border-top:1px solid #0f172a;padding-top:4px;font-size:12.5px;display:inline-block;min-width:260px;}
   @page{margin:0.6in;}
   @media print{body{padding:0;}}
 </style></head><body>
@@ -175,15 +228,15 @@ export function renderDisputeLetterPrintHtml(title: string, content: string): st
     ${requestsHtml}
     <div class="closing">${closingHtml}</div>
     <div>Sincerely,</div>
-    <div class="signature-space"></div>
+    ${renderedSignatureHtml(options)}
     ${checklistHtml}
   </div>
 </body></html>`;
 }
 
-export function renderBestPrintHtml(title: string, content: string, options?: { preferDisputeLetter?: boolean }): string {
+export function renderBestPrintHtml(title: string, content: string, options?: PrintRenderOptions): string {
   if (options?.preferDisputeLetter !== false) {
-    return renderDisputeLetterPrintHtml(title, content);
+    return renderDisputeLetterPrintHtml(title, content, options);
   }
-  return renderPlainTextPrintHtml(title, content);
+  return renderPlainTextPrintHtml(title, content, options);
 }

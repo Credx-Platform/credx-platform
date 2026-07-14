@@ -104,6 +104,12 @@ type ContractTextResponse = {
   company?: { name?: string; address?: string };
 };
 
+type PrintableSignature = {
+  dataUrl?: string;
+  signedName?: string | null;
+  signedAt?: string | null;
+} | null;
+
 type WizardState = {
   fullName: string;
   email: string;
@@ -1594,7 +1600,7 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
     setMailError(null);
     setDocPrintBusy(document.id);
     try {
-      const result = await apiFetch<{ document: ClientDocument; content?: string; url?: string }>(
+      const result = await apiFetch<{ document: ClientDocument; content?: string; url?: string; signature?: PrintableSignature }>(
         `/api/clients/me/documents/${document.id}/print`,
         token
       );
@@ -1603,7 +1609,12 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
         const prefersDisputeLayout = result.document?.letterType === 'CONSOLIDATED_DISPUTE'
           || result.document?.type === 'DISPUTE_LETTER'
           || /dispute/i.test(result.document?.fileName || title);
-        printHtmlDocument(title, renderBestPrintHtml(title, result.content, { preferDisputeLetter: prefersDisputeLayout }));
+        printHtmlDocument(title, renderBestPrintHtml(title, result.content, {
+          preferDisputeLetter: prefersDisputeLayout,
+          signatureDataUrl: result.signature?.dataUrl || null,
+          signatureName: result.signature?.signedName || null,
+          signatureDate: result.signature?.signedAt || null
+        }));
         return;
       }
       if (result.url && /^https?:\/\//i.test(result.url)) {

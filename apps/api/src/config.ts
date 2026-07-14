@@ -51,6 +51,7 @@ function assertProductionUrl(name: string, value: string): string {
 const jwtSecret = assertProductionSafe('JWT_SECRET', required('JWT_SECRET', 'change-me'), ['change-me']);
 const appUrl = assertProductionUrl('APP_URL', required('APP_URL', 'http://localhost:5173'));
 const apiUrl = assertProductionUrl('API_URL', required('API_URL', 'http://localhost:3000'));
+const defaultBusinessEmail = process.env.BUSINESS_EMAIL ?? 'contact@credxme.com';
 
 export const config = {
   nodeEnv,
@@ -62,6 +63,7 @@ export const config = {
   businessName: process.env.BUSINESS_NAME ?? 'CredX',
   cancellationWindowHours: Number(process.env.CANCELLATION_WINDOW_HOURS ?? 72),
   contractPath: process.env.CONTRACT_PATH ?? '/contract',
-  fromEmail: process.env.FROM_EMAIL ?? process.env.SENDGRID_FROM_EMAIL ?? 'hello@credxme.com',
-  leadNotificationEmail: process.env.LEAD_NOTIFICATION_EMAIL ?? process.env.ADMIN_ALERT_EMAIL ?? 'jmalloy@credxme.com'
+  businessEmail: defaultBusinessEmail,
+  fromEmail: process.env.FROM_EMAIL ?? process.env.SENDGRID_FROM_EMAIL ?? defaultBusinessEmail,
+  leadNotificationEmail: process.env.LEAD_NOTIFICATION_EMAIL ?? process.env.ADMIN_ALERT_EMAIL ?? defaultBusinessEmail
 };

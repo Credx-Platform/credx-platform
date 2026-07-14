@@ -22,6 +22,31 @@ type PrintableDocument = {
   [key: string]: unknown;
 };
 
+type PrintableSignature = {
+  dataUrl: string;
+  signedName?: string | null;
+  signedAt?: string | null;
+} | null;
+
+async function signatureForPrintableDocument(document: PrintableDocument): Promise<PrintableSignature> {
+  if (!document.clientId) return null;
+
+  const progress = await prisma.clientProgress.findUnique({
+    where: { clientId: document.clientId },
+    select: { onboarding: true }
+  });
+
+  const signature = (progress?.onboarding as any)?.signature;
+  if (!signature?.dataUrl || typeof signature.dataUrl !== 'string') return null;
+  if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(signature.dataUrl)) return null;
+
+  return {
+    dataUrl: signature.dataUrl,
+    signedName: typeof signature.signedName === 'string' ? signature.signedName : null,
+    signedAt: typeof signature.signedAt === 'string' ? signature.signedAt : null
+  };
+}
+
 /**
  * Self-heals a legacy dispute letter whose body was lost (it only ever lived on
  * Railway's ephemeral /tmp, wiped on redeploy). Rebuilds the consolidated letter
@@ -56,10 +81,14 @@ async function recoverDisputeLetterContent(document: PrintableDocument): Promise
 }
 
 async function sendPrintableDocument(res: any, document: PrintableDocument) {
+  const signature = document.type === 'DISPUTE_LETTER'
+    ? await signatureForPrintableDocument(document)
+    : null;
+
   // Prefer the DB-stored body: reliable across redeploys/replicas. Generated
   // dispute letters store their content here.
   if (document.content) {
-    return res.json({ document, content: document.content });
+    return res.json({ document, content: document.content, signature });
   }
 
   const s3Key = document.s3Key || '';
@@ -69,13 +98,13 @@ async function sendPrintableDocument(res: any, document: PrintableDocument) {
   if (s3Key) {
     const signedUrl = await getSignedUrlForStoredDocument(s3Key);
     if (signedUrl) {
-      return res.json({ document, url: signedUrl });
+      return res.json({ document, url: signedUrl, signature });
     }
   }
 
   // Legacy public HTTPS URLs (non-blob) pass through unchanged.
   if (/^https?:\/\//i.test(s3Key)) {
-    return res.json({ document, url: s3Key });
+    return res.json({ document, url: s3Key, signature });
   }
 
   const name = (document.fileName || '').toLowerCase();
@@ -83,20 +112,20 @@ async function sendPrintableDocument(res: any, document: PrintableDocument) {
   if (document.contentType?.startsWith('text/') || name.endsWith('.txt') || name.endsWith('.md') || key.endsWith('.txt') || key.endsWith('.md')) {
     try {
       const content = await fs.readFile(s3Key, 'utf-8');
-      return res.json({ document, content });
+      return res.json({ document, content, signature });
     } catch {
       // Legacy letter written only to ephemeral /tmp and since wiped. Rebuild it
       // from the client's analysis and persist it — no destructive regenerate,
       // no loss of dispute-round history.
       const recovered = await recoverDisputeLetterContent(document);
       if (recovered) {
-        return res.json({ document: { ...document, content: recovered }, content: recovered });
+        return res.json({ document: { ...document, content: recovered }, content: recovered, signature });
       }
       return res.status(410).json({ error: 'This letter could not be recovered automatically (no saved analysis for this client). Use "Regenerate Letters" on the client to recreate it.' });
     }
   }
 
-  if (s3Key) return res.json({ document, url: s3Key });
+  if (s3Key) return res.json({ document, url: s3Key, signature });
   return res.status(410).json({ error: 'This document has no printable content on file.' });
 }
 

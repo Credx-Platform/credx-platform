@@ -60,8 +60,15 @@ APP_URL=https://credxme.com
 API_URL=https://api.credxme.com
 JWT_SECRET=<generate a strong random secret>
 DATABASE_URL=<copy from Railway Postgres>
-FROM_EMAIL=contact@credxme.com
-LEAD_NOTIFICATION_EMAIL=jmalloy@credxme.com
+FROM_EMAIL="CredX <contact@credxme.com>"
+LEAD_NOTIFICATION_EMAIL=contact@credxme.com
+SMTP_HOST=mail.privateemail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=contact@credxme.com
+SMTP_PASS=<Namecheap private email password>
+SMTP_FROM_EMAIL="CredX <contact@credxme.com>"
+SMTP_REPLY_TO=contact@credxme.com
 ```
 
 - Health check path: `/health`

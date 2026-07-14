@@ -18,5 +18,8 @@
     "prisma:generate": "npm run prisma:generate --workspace @credx/db",
     "prisma:migrate": "npm run prisma:migrate --workspace @credx/db",
     "railway:dbpush": "npx prisma db push --schema packages/db/prisma/schema.prisma"
+  },
+  "dependencies": {
+    "imapflow": "^1.4.6"
   }
 }
