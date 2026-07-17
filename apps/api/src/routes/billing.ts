@@ -1,9 +1,24 @@
 import express, { Router } from 'express';
+import { z } from 'zod';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import Stripe from 'stripe';
+import {
+  paypalEnabled,
+  paypalPublicConfig,
+  createPaypalOrder,
+  capturePaypalOrder,
+  getPaypalOrder,
+  verifyPaypalWebhookSignature
+} from '../lib/paypal.js';
 
 export const billingRouter = Router();
+
+// PayPal carries the EDUCATION product only. Credit repair services require
+// PayPal pre-approval under their Acceptable Use Policy — dispute-plan fees
+// stay on the high-risk processor path (/confirm below).
+const MASTERCLASS_PRICE_USD = 47;
+const MASTERCLASS_CUSTOM_ID = 'masterclass';
 
 billingRouter.get('/plans', (_req, res) => {
   res.json({
@@ -14,6 +29,205 @@ billingRouter.get('/plans', (_req, res) => {
       { code: 'FAMILY', setupFee: 300, monthly: 95 }
     ]
   });
+});
+
+// ============================================================
+// PayPal — education (masterclass) checkout only
+// ============================================================
+
+billingRouter.get('/paypal/config', (_req, res) => {
+  res.json(paypalPublicConfig());
+});
+
+const paypalOrderSchema = z.object({
+  product: z.literal('MASTERCLASS')
+});
+
+billingRouter.post('/paypal/order', async (req, res, next) => {
+  try {
+    if (!paypalEnabled()) return res.status(503).json({ error: 'Online checkout is not available yet.' });
+    paypalOrderSchema.parse(req.body);
+
+    const order = await createPaypalOrder({
+      amount: MASTERCLASS_PRICE_USD,
+      currency: 'USD',
+      description: 'CredX 5-Day Credit Education Masterclass (digital course)',
+      customId: MASTERCLASS_CUSTOM_ID,
+      invoiceId: `MC-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+    });
+
+    return res.json({ orderId: order.id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const paypalCaptureSchema = z.object({
+  firstName: z.string().min(1).max(80),
+  lastName: z.string().min(1).max(80),
+  email: z.string().email()
+});
+
+async function recordMasterclassPayment(input: {
+  clientId: string;
+  amount: number;
+  currency: string;
+  captureId: string;
+  status: 'PAID' | 'PENDING';
+}) {
+  const existing = await prisma.payment.findFirst({
+    where: { provider: 'paypal', providerRef: input.captureId }
+  });
+  if (existing) {
+    if (existing.status === 'PENDING' && input.status === 'PAID') {
+      return prisma.payment.update({
+        where: { id: existing.id },
+        data: { status: 'PAID', paidAt: new Date() }
+      });
+    }
+    return existing;
+  }
+  return prisma.payment.create({
+    data: {
+      clientId: input.clientId,
+      amount: input.amount,
+      currency: input.currency,
+      type: 'MASTERCLASS',
+      status: input.status,
+      provider: 'paypal',
+      providerRef: input.captureId,
+      ...(input.status === 'PAID' ? { paidAt: new Date() } : {})
+    }
+  });
+}
+
+function extractCapture(orderResult: any): { id: string; status: string; amount: number; currency: string } | null {
+  const capture = orderResult?.purchase_units?.[0]?.payments?.captures?.[0];
+  if (!capture?.id) return null;
+  return {
+    id: capture.id,
+    status: capture.status,
+    amount: Number(capture.amount?.value ?? 0),
+    currency: capture.amount?.currency_code || 'USD'
+  };
+}
+
+billingRouter.post('/paypal/order/:orderId/capture', async (req, res, next) => {
+  try {
+    if (!paypalEnabled()) return res.status(503).json({ error: 'Online checkout is not available yet.' });
+    const buyer = paypalCaptureSchema.parse(req.body);
+    const orderId = String(req.params.orderId || '');
+    if (!orderId) return res.status(400).json({ error: 'orderId is required' });
+
+    const result = await capturePaypalOrder(orderId);
+    const capture = extractCapture(result);
+    if (!capture) {
+      return res.status(402).json({ error: 'Payment was not completed. You have not been charged.' });
+    }
+
+    // PENDING captures (e.g. eChecks) enroll once the PAYMENT.CAPTURE.COMPLETED
+    // webhook arrives — don't grant access before the money clears.
+    if (capture.status !== 'COMPLETED') {
+      console.log(`PayPal capture ${capture.id} is ${capture.status}; deferring enrollment to webhook.`);
+      return res.json({ success: true, pending: true, message: 'Payment is processing. Your access email will arrive once it clears.' });
+    }
+
+    const { enrollMasterclassStudent } = await import('../lib/masterclassEnrollment.js');
+    const enrollment = await enrollMasterclassStudent({
+      firstName: buyer.firstName,
+      lastName: buyer.lastName,
+      email: buyer.email,
+      source: 'masterclass-paypal'
+    });
+
+    await recordMasterclassPayment({
+      clientId: enrollment.clientId,
+      amount: capture.amount,
+      currency: capture.currency,
+      captureId: capture.id,
+      status: 'PAID'
+    });
+
+    await prisma.activityEvent.create({
+      data: {
+        clientId: enrollment.clientId,
+        type: 'PAYMENT_RECEIVED',
+        message: `Masterclass payment of $${capture.amount} ${capture.currency} received (PayPal).`,
+        metadata: { amount: capture.amount, currency: capture.currency, method: 'paypal', reference: capture.id }
+      }
+    });
+
+    return res.json({ success: true, enrolled: true, emailSent: enrollment.emailSent });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PayPal webhook — backstop for captures that complete asynchronously (eChecks)
+// or where the browser died before our capture endpoint recorded the sale.
+billingRouter.post('/paypal/webhook', async (req, res) => {
+  try {
+    if (!paypalEnabled()) return res.status(503).json({ error: 'PayPal not configured' });
+
+    const rawBody: string = (req as any).rawBody
+      ? (req as any).rawBody.toString('utf8')
+      : JSON.stringify(req.body);
+    const verified = await verifyPaypalWebhookSignature(req.headers, rawBody);
+    if (!verified) return res.status(400).json({ error: 'Webhook signature verification failed' });
+
+    const event = req.body;
+    if (event?.event_type !== 'PAYMENT.CAPTURE.COMPLETED') {
+      return res.json({ received: true });
+    }
+
+    const capture = event.resource;
+    if (capture?.custom_id !== MASTERCLASS_CUSTOM_ID) {
+      // Only education payments run through PayPal by design; log anything else.
+      console.warn(`PayPal capture ${capture?.id} has unexpected custom_id ${capture?.custom_id}; not auto-processed.`);
+      return res.json({ received: true, processed: false });
+    }
+
+    const captureId = String(capture.id || '');
+    const alreadyRecorded = captureId
+      ? await prisma.payment.findFirst({ where: { provider: 'paypal', providerRef: captureId, status: 'PAID' } })
+      : null;
+    if (alreadyRecorded) return res.json({ received: true, processed: true, duplicate: true });
+
+    // Pull the order to get the payer identity for enrollment.
+    const orderId = capture?.supplementary_data?.related_ids?.order_id;
+    if (!orderId) {
+      console.error(`PayPal webhook: capture ${captureId} completed but no related order id; manual review needed.`);
+      return res.json({ received: true, processed: false, reason: 'No order id on capture' });
+    }
+
+    const order = await getPaypalOrder(orderId);
+    const payerEmail = order?.payer?.email_address;
+    if (!payerEmail) {
+      console.error(`PayPal webhook: order ${orderId} has no payer email; manual review needed.`);
+      return res.json({ received: true, processed: false, reason: 'No payer email' });
+    }
+
+    const { enrollMasterclassStudent } = await import('../lib/masterclassEnrollment.js');
+    const enrollment = await enrollMasterclassStudent({
+      firstName: order?.payer?.name?.given_name || 'Student',
+      lastName: order?.payer?.name?.surname || '',
+      email: payerEmail,
+      source: 'masterclass-paypal-webhook'
+    });
+
+    await recordMasterclassPayment({
+      clientId: enrollment.clientId,
+      amount: Number(capture?.amount?.value ?? MASTERCLASS_PRICE_USD),
+      currency: capture?.amount?.currency_code || 'USD',
+      captureId,
+      status: 'PAID'
+    });
+
+    return res.json({ received: true, processed: true });
+  } catch (err: any) {
+    console.error('PayPal webhook processing failed:', err?.message);
+    return res.status(500).json({ received: true, error: err?.message });
+  }
 });
 
 // Online payment confirmation — processor-agnostic (Authorize.Net / PaymentCloud).
@@ -84,7 +298,9 @@ billingRouter.post('/webhook', async (req, res) => {
     if (stripeSecretKey && stripeWebhookSecret && sig) {
       // Verify signature with Stripe SDK
       const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-05-27.dahlia' as any });
-      const payload = JSON.stringify(req.body);
+      // Stripe signs the raw request bytes — re-serializing the parsed body
+      // breaks verification, so use the rawBody stashed by express.json's verify hook.
+      const payload = (req as any).rawBody ?? JSON.stringify(req.body);
       try {
         event = stripe.webhooks.constructEvent(payload, sig, stripeWebhookSecret);
       } catch (verifyErr: any) {

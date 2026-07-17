@@ -3945,7 +3945,7 @@ function CrossPromoFooter({ isPaid, isMasterclassEnrolled, isMasterclassOnly }: 
           </>
         ) : (
           <>
-            <a className="ghost-button" href="/signup?offer=masterclass" style={{ background: '#00c6fb', color: '#060a12', border: 'none', fontWeight: 700, textDecoration: 'none' }}>Add the 5-Day Masterclass →</a>
+            <a className="ghost-button" href="/masterclass-checkout" style={{ background: '#00c6fb', color: '#060a12', border: 'none', fontWeight: 700, textDecoration: 'none' }}>Add the 5-Day Masterclass →</a>
             <a className="ghost-button" href="/signup?offer=masterclass&preview=1" style={{ background: '#101a2b', color: '#f8fafc', border: '1px solid rgba(0,198,251,0.45)', fontWeight: 600, textDecoration: 'none' }}>Preview the curriculum</a>
           </>
         )}

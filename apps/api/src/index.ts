@@ -51,7 +51,14 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({
+  limit: '2mb',
+  // Webhook signature verification (Stripe, PayPal) needs the raw bytes the
+  // processor signed — keep them alongside the parsed body.
+  verify: (req, _res, buf) => {
+    (req as any).rawBody = buf;
+  }
+}));
 
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false });
 const authLimiter = rateLimit({

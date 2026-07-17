@@ -49,6 +49,7 @@ enum DisputeStatus {
 enum PaymentType {
   SETUP_FEE
   MONTHLY
+  MASTERCLASS
 }
 
 enum PaymentStatus {
@@ -339,10 +340,14 @@ model Payment {
   status                PaymentStatus
   stripePaymentIntentId String?
   stripeInvoiceId       String?
+  provider              String?
+  providerRef           String?
   attemptCount          Int           @default(0)
   dueAt                 DateTime?
   paidAt                DateTime?
   createdAt             DateTime      @default(now())
+
+  @@index([providerRef])
 }
 
 model Agreement {
