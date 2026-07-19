@@ -208,17 +208,18 @@ function renderMasterclassWelcomeEmail(params: { firstName: string; setupLink: s
   const expiresHours = Math.max(1, Math.round((params.expiresAt.getTime() - Date.now()) / 3_600_000));
   const bodyHtml = `
     <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">You're enrolled, ${params.firstName || 'there'}.</h1>
-    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Welcome to the CredX 5-Day Credit Education Masterclass. No contracts, no intake forms — just set your password and you're in.</p>
-    <p style="margin:0 0 4px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;"><strong style="color:${EMAIL_TEXT};">Day 1: Credit Fundamentals</strong> is waiting for you the moment you log in.</p>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Welcome to the CredX Academy. Your 5-Day Credit Education Masterclass access is active — no contracts, no intake forms.</p>
+    <p style="margin:0 0 4px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;"><strong style="color:${EMAIL_TEXT};">Day 1: Credit Fundamentals</strong> is waiting for you the moment you set your password and enter the student portal.</p>
     ${emailButton(params.setupLink, 'Set my password')}
     <p style="margin:18px 0 6px;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">This link expires in about ${expiresHours} hours and can only be used once.</p>
     <p style="margin:6px 0 0;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">If the button doesn't open, copy this link into your browser:<br /><span style="color:${EMAIL_TEXT};word-break:break-all;">${params.setupLink}</span></p>
     <div style="margin-top:22px;padding:14px 16px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;">
-      <strong style="color:${EMAIL_TEXT};font-size:13px;letter-spacing:0.4px;text-transform:uppercase;">What's next</strong>
+      <strong style="color:${EMAIL_TEXT};font-size:13px;letter-spacing:0.4px;text-transform:uppercase;">Academy setup</strong>
       <ol style="margin:10px 0 0 18px;padding:0;color:${EMAIL_TEXT_SOFT};font-size:14px;line-height:1.65;">
-        <li>Click the button above and set your password.</li>
-        <li>You'll land on Day 1 automatically.</li>
-        <li>Work through one day at a time at your own pace.</li>
+        <li>Click the button above and create your CredX portal password.</li>
+        <li>Log in with the same email address you used at checkout.</li>
+        <li>Open the Masterclass area inside the portal and begin Day 1.</li>
+        <li>Watch for the next lesson emails as the academy sequence continues.</li>
       </ol>
     </div>
   `;
@@ -232,16 +233,17 @@ function renderMasterclassWelcomeEmail(params: { firstName: string; setupLink: s
 
 Hi ${params.firstName || 'there'},
 
-You're enrolled. No contract, no intake — just set your password and Day 1 is ready.
+You're enrolled in CredX Academy. No contract, no intake — just set your password and Day 1 is ready.
 
 Set your password: ${params.setupLink}
 
 This link expires in about ${expiresHours} hours and can only be used once.
 
-What's next:
-1. Click the link and set your password.
-2. You'll land on Day 1 automatically.
-3. Work through one day at a time at your own pace.
+Academy setup:
+1. Click the link and create your CredX portal password.
+2. Log in with the same email address you used at checkout.
+3. Open the Masterclass area inside the portal and begin Day 1.
+4. Watch for the next lesson emails as the academy sequence continues.
 
 Questions? Reply to this email or write to contact@credxme.com.
 

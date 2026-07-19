@@ -19,6 +19,27 @@ export const billingRouter = Router();
 // stay on the high-risk processor path (/confirm below).
 const MASTERCLASS_PRICE_USD = 47;
 const MASTERCLASS_CUSTOM_ID = 'masterclass';
+const MASTERCLASS_OFFERS = {
+  'friends-family': { key: 'friends-family', label: 'Friends & family', discountPercent: 100 },
+  'social-media': { key: 'social-media', label: 'Social media', discountPercent: 66 }
+} as const;
+
+type MasterclassOffer = (typeof MASTERCLASS_OFFERS)[keyof typeof MASTERCLASS_OFFERS];
+
+function normalizeOfferKey(key: unknown) {
+  return String(key || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+}
+
+function getMasterclassOffer(key: unknown): MasterclassOffer | null {
+  const normalized = normalizeOfferKey(key);
+  return (MASTERCLASS_OFFERS as Record<string, MasterclassOffer>)[normalized] || null;
+}
+
+function masterclassPriceForOffer(offer: MasterclassOffer | null) {
+  if (!offer) return MASTERCLASS_PRICE_USD;
+  const discount = MASTERCLASS_PRICE_USD * (offer.discountPercent / 100);
+  return Math.max(0, Number((MASTERCLASS_PRICE_USD - discount).toFixed(2)));
+}
 
 billingRouter.get('/plans', (_req, res) => {
   res.json({
@@ -40,20 +61,28 @@ billingRouter.get('/paypal/config', (_req, res) => {
 });
 
 const paypalOrderSchema = z.object({
-  product: z.literal('MASTERCLASS')
+  product: z.literal('MASTERCLASS'),
+  offerKey: z.string().max(40).optional()
 });
 
 billingRouter.post('/paypal/order', async (req, res, next) => {
   try {
     if (!paypalEnabled()) return res.status(503).json({ error: 'Online checkout is not available yet.' });
-    paypalOrderSchema.parse(req.body);
+    const data = paypalOrderSchema.parse(req.body);
+    const offer = getMasterclassOffer(data.offerKey);
+    const amount = masterclassPriceForOffer(offer);
+    if (amount <= 0) {
+      return res.status(400).json({ error: 'This offer does not require PayPal checkout.' });
+    }
 
     const order = await createPaypalOrder({
-      amount: MASTERCLASS_PRICE_USD,
+      amount,
       currency: 'USD',
-      description: 'CredX 5-Day Credit Education Masterclass (digital course)',
+      description: offer
+        ? `CredX 5-Day Credit Education Masterclass (${offer.label} offer)`
+        : 'CredX 5-Day Credit Education Masterclass (digital course)',
       customId: MASTERCLASS_CUSTOM_ID,
-      invoiceId: `MC-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+      invoiceId: `MC-${offer ? 'OFFER-' : ''}${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
     });
 
     return res.json({ orderId: order.id });
@@ -74,9 +103,11 @@ async function recordMasterclassPayment(input: {
   currency: string;
   captureId: string;
   status: 'PAID' | 'PENDING';
+  provider?: string;
 }) {
+  const provider = input.provider || 'paypal';
   const existing = await prisma.payment.findFirst({
-    where: { provider: 'paypal', providerRef: input.captureId }
+    where: { provider, providerRef: input.captureId }
   });
   if (existing) {
     if (existing.status === 'PENDING' && input.status === 'PAID') {
@@ -94,12 +125,57 @@ async function recordMasterclassPayment(input: {
       currency: input.currency,
       type: 'MASTERCLASS',
       status: input.status,
-      provider: 'paypal',
+      provider,
       providerRef: input.captureId,
       ...(input.status === 'PAID' ? { paidAt: new Date() } : {})
     }
   });
 }
+
+const freePromoEnrollSchema = paypalCaptureSchema.extend({
+  product: z.literal('MASTERCLASS'),
+  offerKey: z.string().min(1).max(40)
+});
+
+billingRouter.post('/masterclass/promo-enroll', async (req, res, next) => {
+  try {
+    const data = freePromoEnrollSchema.parse(req.body);
+    const offer = getMasterclassOffer(data.offerKey);
+    if (!offer || offer.discountPercent !== 100) {
+      return res.status(400).json({ error: 'This offer is not valid for free masterclass access.' });
+    }
+
+    const { enrollMasterclassStudent } = await import('../lib/masterclassEnrollment.js');
+    const enrollment = await enrollMasterclassStudent({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      source: `masterclass-offer-${offer.key}`
+    });
+
+    await recordMasterclassPayment({
+      clientId: enrollment.clientId,
+      amount: 0,
+      currency: 'USD',
+      captureId: `offer:${offer.key}:${enrollment.clientId}:${Date.now()}`,
+      status: 'PAID',
+      provider: 'offer'
+    });
+
+    await prisma.activityEvent.create({
+      data: {
+        clientId: enrollment.clientId,
+        type: 'PAYMENT_RECEIVED',
+        message: `Masterclass access granted with ${offer.label} offer (${offer.discountPercent}% off).`,
+        metadata: { amount: 0, currency: 'USD', method: 'offer', offerKey: offer.key }
+      }
+    });
+
+    return res.status(201).json({ success: true, enrolled: true, emailSent: enrollment.emailSent });
+  } catch (error) {
+    next(error);
+  }
+});
 
 function extractCapture(orderResult: any): { id: string; status: string; amount: number; currency: string } | null {
   const capture = orderResult?.purchase_units?.[0]?.payments?.captures?.[0];

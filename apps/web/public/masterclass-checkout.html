@@ -34,12 +34,18 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
 .order .what span{font-size:12.5px;color:var(--muted2);line-height:1.5;display:block;margin-top:4px}
 .order .price{font-size:26px;font-weight:900;color:var(--cyan);letter-spacing:-.5px;white-space:nowrap}
 .order .price small{display:block;font-size:11px;font-weight:400;color:var(--muted2);text-align:right}
+.promo-line{display:none;margin:-4px 0 18px;padding:10px 12px;background:rgba(0,198,251,.08);border:1px solid var(--border-c);border-radius:8px;color:var(--white);font-size:13px;line-height:1.45}
+.promo-line.show{display:block}
+.promo-line strong{color:var(--cyan)}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
 .field span{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
 .field input{height:44px;padding:0 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--white);font-family:var(--font);font-size:14px;outline:none;transition:border-color .2s}
 .field input:focus{border-color:var(--border-c)}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 #paypalButtons{margin-top:20px;min-height:48px}
+.claim-btn{display:none;width:100%;height:48px;margin-top:20px;border:0;border-radius:8px;background:var(--cyan);color:#06101f;font-family:var(--font);font-size:15px;font-weight:800;cursor:pointer;transition:transform .2s,background .2s}
+.claim-btn:hover{background:var(--cyan2);transform:translateY(-1px)}
+.claim-btn:disabled{opacity:.65;cursor:wait;transform:none}
 .note{margin-top:14px;font-size:11.5px;color:var(--muted2);line-height:1.6}
 .note a{color:var(--cyan);text-decoration:none}
 .msg{display:none;margin-top:16px;padding:14px 16px;border-radius:10px;font-size:13.5px;line-height:1.6}
@@ -68,8 +74,9 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
       <strong>CredX 5-Day Credit Education Masterclass</strong>
       <span>Full 5-day curriculum + bonus wealth day, DIY roadmap, affiliate resource stack, and client portal access. Digital educational product.</span>
     </div>
-    <div class="price">$47<small>one time, USD</small></div>
+    <div class="price" id="priceBox">$47<small>one time, USD</small></div>
   </div>
+  <div class="promo-line" id="promoLine"></div>
 
   <div id="checkoutForm">
     <div class="row">
@@ -78,6 +85,7 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
     </div>
     <label class="field"><span>Email (your access link goes here)</span><input type="email" id="email" required autocomplete="email"></label>
     <div id="paypalButtons"></div>
+    <button type="button" class="claim-btn" id="claimFreeBtn">Claim free access</button>
     <div class="note">Payments are processed securely by PayPal — card details never touch our servers. By purchasing you agree to the <a href="/masterclass-terms">Masterclass Terms</a> and <a href="/refund-policy">Refund Policy</a> (7-day window, subject to content accessed).</div>
   </div>
 
@@ -94,13 +102,40 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
 
 <div class="legal">© 2026 CredX / The Malloy Group Financial LLC · 1392 Madison Avenue, New York, NY 10029<br>
 <a href="mailto:contact@credxme.com">contact@credxme.com</a> · <a href="tel:+18662733963">866-CREDX-ME</a><br>
-<a href="/masterclass-terms">Masterclass Terms</a> · <a href="/refund-policy">Refund Policy</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></div>
+<a href="/masterclass-terms">Masterclass Terms</a> · <a href="/refund-policy">Refund Policy</a> · <a href="/cancellation-policy">Cancellation Policy</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></div>
 </div>
 
 <script>
 (function () {
   var errorBox = document.getElementById('errorBox');
   var pendingBox = document.getElementById('pendingBox');
+  var paypalButtons = document.getElementById('paypalButtons');
+  var claimFreeBtn = document.getElementById('claimFreeBtn');
+  var priceBox = document.getElementById('priceBox');
+  var promoLine = document.getElementById('promoLine');
+  var offerKey = currentOfferKey();
+  var offers = {
+    'friends-family': { label: 'Friends & family', discountPercent: 100, price: '$0' },
+    'social-media': { label: 'Social media', discountPercent: 66, price: '$15.98' }
+  };
+  var offer = offers[offerKey] || null;
+
+  function currentOfferKey() {
+    var parts = window.location.pathname.split('/').filter(Boolean);
+    if (parts[0] !== 'masterclass-checkout') return '';
+    return String(parts[1] || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  }
+
+  function updateOfferDisplay() {
+    if (!offer) return;
+    priceBox.innerHTML = offer.price + '<small>' + offer.discountPercent + '% off, USD</small>';
+    promoLine.innerHTML = '<strong>' + offer.label + ' offer applied:</strong> ' + offer.discountPercent + '% off the CredX 5-Day Masterclass.';
+    promoLine.classList.add('show');
+    if (offer.discountPercent === 100) {
+      paypalButtons.style.display = 'none';
+      claimFreeBtn.style.display = 'block';
+    }
+  }
 
   function showError(text) {
     pendingBox.classList.remove('show');
@@ -121,6 +156,45 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
   function buyerValid(b) {
     return b.firstName && b.lastName && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.email);
   }
+  function showSuccess(email) {
+    document.getElementById('successEmail').textContent = email;
+    document.getElementById('checkoutForm').style.display = 'none';
+    document.getElementById('successBox').classList.add('show');
+  }
+  function claimFreeAccess() {
+    clearMessages();
+    var b = buyer();
+    if (!buyerValid(b)) {
+      showError('Enter your first name, last name, and a valid email first — that’s where your access link is sent.');
+      return;
+    }
+    claimFreeBtn.disabled = true;
+    claimFreeBtn.textContent = 'Creating your access...';
+    fetch('/api/billing/masterclass/promo-enroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        product: 'MASTERCLASS',
+        offerKey: offerKey,
+        firstName: b.firstName,
+        lastName: b.lastName,
+        email: b.email
+      })
+    }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+    }).then(function (res) {
+      if (!res.ok) throw new Error(res.d && res.d.error ? res.d.error : 'promo');
+      showSuccess(b.email);
+    }).catch(function (err) {
+      showError(err.message || 'Couldn’t create your access. Email contact@credxme.com and we’ll help.');
+      claimFreeBtn.disabled = false;
+      claimFreeBtn.textContent = 'Claim free access';
+    });
+  }
+
+  updateOfferDisplay();
+  claimFreeBtn.addEventListener('click', claimFreeAccess);
+  if (offer && offer.discountPercent === 100) return;
 
   fetch('/api/billing/paypal/config')
     .then(function (r) { return r.json(); })
@@ -152,7 +226,7 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
         return fetch('/api/billing/paypal/order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ product: 'MASTERCLASS' })
+          body: JSON.stringify({ product: 'MASTERCLASS', offerKey: offerKey || undefined })
         }).then(function (r) {
           if (!r.ok) throw new Error('order');
           return r.json();
@@ -171,9 +245,7 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
               pendingBox.classList.add('show');
               return;
             }
-            document.getElementById('successEmail').textContent = buyer().email;
-            document.getElementById('checkoutForm').style.display = 'none';
-            document.getElementById('successBox').classList.add('show');
+            showSuccess(buyer().email);
           });
       },
       onError: function () {

@@ -138,7 +138,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
     <li><a href="#day5">Day 5</a></li>
     <li><a href="#bonus">Bonus</a></li>
   </ul>
-  <a href="#enroll" class="nav-cta">Enroll</a>
+  <a href="/masterclass-checkout" class="nav-cta">Enroll</a>
 </nav>
 
 <section class="hero">
@@ -149,7 +149,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
     <h1 class="hero-h">5-Day Credit Education <span class="accent">Masterclass</span></h1>
     <p class="hero-sub">The complete DIY system for understanding your credit, removing inaccurate negatives, building positive history, and unlocking business funding. Plus a bonus day on generational wealth.</p>
     <div class="hero-btns">
-      <a href="#enroll" class="btn btn-primary">Enroll in the Masterclass</a>
+      <a href="/masterclass-checkout" class="btn btn-primary">Enroll in the Masterclass</a>
       <a href="/portal" class="btn btn-outline">Already enrolled? Sign in</a>
     </div>
   </div>
@@ -277,24 +277,9 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   <div class="cta-card">
     <div class="stag" style="text-align:center">Your turn</div>
     <h2>Enroll in the Masterclass</h2>
-    <p>Just your name and email. We'll send you a link to set your password, and you'll land on Day 1 the moment you log in. No contracts, no intake forms.</p>
-    <form id="enrollForm" class="enroll-form" novalidate>
-      <div class="enroll-row">
-        <label class="enroll-field"><span>First name</span><input type="text" name="firstName" required autocomplete="given-name"></label>
-        <label class="enroll-field"><span>Last name</span><input type="text" name="lastName" required autocomplete="family-name"></label>
-      </div>
-      <label class="enroll-field"><span>Email</span><input type="email" name="email" required autocomplete="email"></label>
-      <div class="cf-turnstile-slot" style="margin:4px 0;"></div>
-      <button type="submit" class="btn btn-primary enroll-submit">Send my access link</button>
-      <p class="enroll-fineprint">We'll email you a one-time setup link. By enrolling you agree to receive course-related email from CredX. You can unsubscribe anytime.</p>
-    </form>
-    <div id="enrollSuccess" class="enroll-success">
-      <div class="enroll-check">✓</div>
-      <h3>Check your email.</h3>
-      <p>We just sent your password-setup link to <strong id="enrollSuccessEmail"></strong>. Click the button in the email, set your password, and you'll go straight to Day 1.</p>
-      <p class="enroll-fineprint">Don't see it in 2 minutes? Check spam, or write to <a href="mailto:contact@credxme.com">contact@credxme.com</a>.</p>
-    </div>
-    <div id="enrollError" class="enroll-error" hidden></div>
+    <p>One-time $47 payment. After checkout, CredX sends your password setup link so you can start Day 1.</p>
+    <a href="/masterclass-checkout" class="btn btn-primary enroll-submit">Go to secure checkout</a>
+    <p class="enroll-fineprint">No subscription and no recurring charges. By purchasing you agree to receive course-related email from CredX.</p>
   </div>
 </section>
 
@@ -319,66 +304,6 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   }
 </style>
 
-<script>
-(function(){
-  var form = document.getElementById('enrollForm');
-  var success = document.getElementById('enrollSuccess');
-  var successEmail = document.getElementById('enrollSuccessEmail');
-  var errorBox = document.getElementById('enrollError');
-  var submit = form.querySelector('.enroll-submit');
-  var apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:3000'
-    : '';
-
-  function showError(msg){
-    errorBox.textContent = msg;
-    errorBox.hidden = false;
-  }
-
-  form.addEventListener('submit', async function(e){
-    e.preventDefault();
-    errorBox.hidden = true;
-    var fd = new FormData(form);
-    var payload = {
-      firstName: String(fd.get('firstName') || '').trim(),
-      lastName: String(fd.get('lastName') || '').trim(),
-      email: String(fd.get('email') || '').trim(),
-      turnstileToken: (window.CredXTurnstile && window.CredXTurnstile.getToken()) || undefined
-    };
-    if(!payload.firstName || !payload.lastName || !payload.email){
-      showError('Please fill in all three fields.');
-      return;
-    }
-    submit.disabled = true;
-    submit.textContent = 'Sending...';
-    try {
-      var res = await fetch(apiBase + '/api/masterclass/enroll', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      var data = await res.json().catch(function(){ return {}; });
-      if(!res.ok){
-        showError(data.error || 'Enrollment failed. Try again or email contact@credxme.com.');
-        submit.disabled = false;
-        submit.textContent = 'Send my access link';
-        return;
-      }
-      successEmail.textContent = payload.email;
-      form.classList.add('hidden');
-      success.classList.add('show');
-    } catch(err){
-      showError('Network error. Check your connection and try again.');
-      submit.disabled = false;
-      submit.textContent = 'Send my access link';
-    }
-    window.CredXTurnstile && window.CredXTurnstile.reset();
-  });
-})();
-</script>
-<script src="/turnstile-widget.js"></script>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onCredXTurnstileLoad" async defer></script>
-
 <footer>
   <div class="footer-inner">
     <div class="footer-brand">
@@ -390,7 +315,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
     <div class="footer-col"><h5>Contact</h5><a href="tel:+18662733963">866-CREDX-ME</a><a href="mailto:contact@credxme.com">contact@credxme.com</a><a href="https://credxme.com">credxme.com</a></div>
   </div>
   <div class="footer-bottom">
-    <span>© 2026 CredX · <a href="/privacy" style="color:inherit">Privacy</a> · <a href="/masterclass-terms" style="color:inherit">Masterclass Terms</a> · <a href="/terms" style="color:inherit">Terms</a></span>
+    <span>© 2026 CredX · <a href="/privacy" style="color:inherit">Privacy</a> · <a href="/masterclass-terms" style="color:inherit">Masterclass Terms</a> · <a href="/terms" style="color:inherit">Terms</a> · <a href="/refund-policy" style="color:inherit">Refunds</a> · <a href="/cancellation-policy" style="color:inherit">Cancellation</a></span>
     <span style="max-width:560px">CredX may earn a commission from affiliate links on this site at no extra cost to you. Credit strategy and education, no guaranteed outcomes.</span>
   </div>
 </footer>
