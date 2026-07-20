@@ -438,6 +438,8 @@ const state = {
   contactAuthConfirmed: false,
   masterclassTimeline: '',
   specialistInterest: '',
+  promoCode: '',
+  promoOfferKey: '',
   aiPlanScope: 'single',
   singleTier: 'standard',
   familyMembers: '2',
@@ -492,6 +494,33 @@ function selectedAiPriceLabel() {
   return state.singleTier === 'aggressive' ? '$447 after delivery' : '$150 after first round';
 }
 
+const masterclassOffers = {
+  'friends-family': { label: 'Friends & family', discountPercent: 100, price: '$0' },
+  'social-media': { label: 'Social media', discountPercent: 66, price: '$15.98' }
+};
+
+const promoAliases = {
+  FRIENDSFAMILY: 'friends-family',
+  FRIENDSFAM: 'friends-family',
+  FAMILY: 'friends-family',
+  SOCIALMEDIA: 'social-media',
+  SOCIAL: 'social-media',
+  IG: 'social-media',
+  TIKTOK: 'social-media'
+};
+
+function offerKeyForPromoCode(value) {
+  const raw = String(value || '').trim();
+  const normalized = raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (masterclassOffers[normalized]) return normalized;
+  return promoAliases[raw.toUpperCase().replace(/[^A-Z0-9]/g, '')] || '';
+}
+
+function selectedMasterclassPriceLabel() {
+  const offer = masterclassOffers[state.promoOfferKey];
+  return offer ? `${offer.price} (${offer.discountPercent}% off)` : '$47 one time';
+}
+
 function familyMonthlyAmount() {
   const members = Math.max(2, Number(state.familyMembers || 2));
   const additionalMembers = Math.max(0, members - 1);
@@ -508,7 +537,10 @@ function signupIntake() {
     singleTier: state.offerInterest === 'program' && state.aiPlanScope === 'single' ? state.singleTier : null,
     familyMembers: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? Number(state.familyMembers || 2) : null,
     quotedDeposit: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? '$300 family first-work fee (billed after first round)' : selectedAiPriceLabel(),
-    quotedMonthly: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? `$${familyMonthlyAmount()}/mo` : null
+    quotedMonthly: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? `$${familyMonthlyAmount()}/mo` : null,
+    masterclassPromoCode: state.offerInterest === 'masterclass' ? state.promoCode.trim() || null : null,
+    masterclassPromoOffer: state.offerInterest === 'masterclass' ? state.promoOfferKey || null : null,
+    quotedMasterclassPrice: state.offerInterest === 'masterclass' ? selectedMasterclassPriceLabel() : null
   };
 }
 
@@ -658,6 +690,38 @@ function getSteps() {
         });
       },
       validate: () => state.masterclassTimeline ? null : 'Choose a completion timeline.'
+    },
+    {
+      key: 'promoCode',
+      label: 'Masterclass',
+      title: 'Do you have a promo code?',
+      shouldShow: () => state.offerInterest === 'masterclass',
+      render: () => {
+        const offer = masterclassOffers[state.promoOfferKey];
+        const promoMessage = state.promoCode.trim() && !offer
+          ? 'Promo code not recognized yet. You can continue at the standard $47 price or check the code spelling.'
+          : offer
+            ? `${offer.label} offer applied. Your checkout price updates to ${selectedMasterclassPriceLabel()}.`
+            : 'No code needed. The standard Masterclass price is $47 one time.';
+        return `
+          <label class="field" for="promoCode">
+            <span>Promo code</span>
+            <input id="promoCode" type="text" autocomplete="off" inputmode="text" placeholder="Optional" value="${escapeHtml(state.promoCode)}">
+          </label>
+          <div class="price-note"><strong>Checkout price:</strong> ${escapeHtml(selectedMasterclassPriceLabel())}<br>${escapeHtml(promoMessage)}</div>
+        `;
+      },
+      bind: () => {
+        const input = document.getElementById('promoCode');
+        input.addEventListener('input', (event) => {
+          state.promoCode = event.target.value;
+          state.promoOfferKey = offerKeyForPromoCode(state.promoCode);
+          renderStep();
+        });
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      },
+      validate: () => null
     },
     {
       key: 'specialistInterest',
@@ -819,7 +883,7 @@ function getSteps() {
           <div><span>Email</span><strong>${escapeHtml(state.email.trim())}</strong></div>
           <div><span>Phone</span><strong>${escapeHtml(state.phone.trim() || 'Not provided')}</strong></div>
           <div><span>Path</span><strong>${escapeHtml(selectedPlanLabel())}</strong></div>
-          <div><span>Plan detail</span><strong>${escapeHtml(state.offerInterest === 'masterclass' ? (state.masterclassTimeline || 'Timeline pending') : selectedAiPriceLabel())}</strong></div>
+          <div><span>Plan detail</span><strong>${escapeHtml(state.offerInterest === 'masterclass' ? `${selectedMasterclassPriceLabel()} · ${state.masterclassTimeline || 'Timeline pending'}` : selectedAiPriceLabel())}</strong></div>
           <div><span>Source</span><strong>${escapeHtml(state.referralSource || 'Not selected')}</strong></div>
         </div>
         <label class="consent">

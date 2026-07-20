@@ -37,6 +37,11 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
 .promo-line{display:none;margin:-4px 0 18px;padding:10px 12px;background:rgba(0,198,251,.08);border:1px solid var(--border-c);border-radius:8px;color:var(--white);font-size:13px;line-height:1.45}
 .promo-line.show{display:block}
 .promo-line strong{color:var(--cyan)}
+.promo-field{display:grid;grid-template-columns:1fr auto;gap:10px;margin:-4px 0 18px}
+.promo-field input{height:42px;padding:0 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--white);font-family:var(--font);font-size:13px;text-transform:uppercase;outline:none}
+.promo-field input:focus{border-color:var(--border-c)}
+.promo-field button{height:42px;padding:0 14px;border:1px solid var(--border-c);border-radius:8px;background:rgba(0,198,251,.1);color:var(--cyan);font-family:var(--font);font-size:12px;font-weight:800;cursor:pointer}
+.promo-field button:hover{background:rgba(0,198,251,.16)}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
 .field span{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
 .field input{height:44px;padding:0 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--white);font-family:var(--font);font-size:14px;outline:none;transition:border-color .2s}
@@ -77,6 +82,10 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
     <div class="price" id="priceBox">$47<small>one time, USD</small></div>
   </div>
   <div class="promo-line" id="promoLine"></div>
+  <div class="promo-field">
+    <input type="text" id="promoCode" placeholder="Promo code" autocomplete="off" inputmode="text" aria-label="Promo code">
+    <button type="button" id="promoApplyBtn">Apply</button>
+  </div>
 
   <div id="checkoutForm">
     <div class="row">
@@ -113,28 +122,78 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
   var claimFreeBtn = document.getElementById('claimFreeBtn');
   var priceBox = document.getElementById('priceBox');
   var promoLine = document.getElementById('promoLine');
+  var promoCode = document.getElementById('promoCode');
+  var promoApplyBtn = document.getElementById('promoApplyBtn');
   var offerKey = currentOfferKey();
   var offers = {
     'friends-family': { label: 'Friends & family', discountPercent: 100, price: '$0' },
     'social-media': { label: 'Social media', discountPercent: 66, price: '$15.98' }
   };
+  var promoCodes = {
+    'FRIENDSFAMILY': 'friends-family',
+    'FRIENDSFAM': 'friends-family',
+    'FAMILY': 'friends-family',
+    'SOCIALMEDIA': 'social-media',
+    'SOCIAL': 'social-media',
+    'IG': 'social-media',
+    'TIKTOK': 'social-media'
+  };
   var offer = offers[offerKey] || null;
 
   function currentOfferKey() {
     var parts = window.location.pathname.split('/').filter(Boolean);
-    if (parts[0] !== 'masterclass-checkout') return '';
-    return String(parts[1] || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+    var pathOffer = parts[0] === 'masterclass-checkout' ? String(parts[1] || '') : '';
+    var queryOffer = new URLSearchParams(window.location.search).get('promo') || '';
+    return offerKeyForCode(pathOffer || queryOffer);
+  }
+
+  function offerKeyForCode(value) {
+    var raw = String(value || '').trim();
+    var normalized = raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (offers[normalized]) return normalized;
+    return promoCodes[raw.toUpperCase().replace(/[^A-Z0-9]/g, '')] || '';
   }
 
   function updateOfferDisplay() {
-    if (!offer) return;
-    priceBox.innerHTML = offer.price + '<small>' + offer.discountPercent + '% off, USD</small>';
-    promoLine.innerHTML = '<strong>' + offer.label + ' offer applied:</strong> ' + offer.discountPercent + '% off the CredX 5-Day Masterclass.';
+    priceBox.innerHTML = offer ? offer.price + '<small>' + offer.discountPercent + '% off, USD</small>' : '$47<small>one time, USD</small>';
+    paypalButtons.style.display = offer && offer.discountPercent === 100 ? 'none' : 'block';
+    claimFreeBtn.style.display = offer && offer.discountPercent === 100 ? 'block' : 'none';
+    if (!offer) {
+      promoLine.classList.remove('show');
+      promoLine.textContent = '';
+      return;
+    }
+    promoLine.innerHTML = '<strong>' + offer.label + ' offer applied:</strong> ' + offer.discountPercent + '% off the CredX 5-Day Masterclass. The checkout total updated instantly.';
     promoLine.classList.add('show');
+  }
+
+  function applyPromoCode(showInvalid) {
+    clearMessages();
+    var code = promoCode.value.trim();
+    if (!code) {
+      offerKey = '';
+      offer = null;
+      updateOfferDisplay();
+      return;
+    }
+    var nextOfferKey = offerKeyForCode(code);
+    if (!nextOfferKey) {
+      offerKey = '';
+      offer = null;
+      updateOfferDisplay();
+      if (showInvalid) {
+        promoLine.textContent = 'Promo code not recognized. Check the spelling or continue at the standard $47 price.';
+        promoLine.classList.add('show');
+      }
+      return;
+    }
+    offerKey = nextOfferKey;
+    offer = offers[offerKey] || null;
     if (offer.discountPercent === 100) {
       paypalButtons.style.display = 'none';
       claimFreeBtn.style.display = 'block';
     }
+    updateOfferDisplay();
   }
 
   function showError(text) {
@@ -192,9 +251,13 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
     });
   }
 
+  if (offerKey) {
+    promoCode.value = offerKey.toUpperCase();
+  }
   updateOfferDisplay();
+  promoCode.addEventListener('input', function () { applyPromoCode(false); });
+  promoApplyBtn.addEventListener('click', function () { applyPromoCode(true); });
   claimFreeBtn.addEventListener('click', claimFreeAccess);
-  if (offer && offer.discountPercent === 100) return;
 
   fetch('/api/billing/paypal/config')
     .then(function (r) { return r.json(); })

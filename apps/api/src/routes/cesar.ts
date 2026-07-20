@@ -47,6 +47,7 @@ function htmlToText(html: string): string {
 const LINKS = {
   signup: '<a href="/signup">Sign Up</a>',
   masterclass: '<a href="/masterclass">5-Day Masterclass</a>',
+  masterclassCheckout: '<a href="/masterclass-checkout">Masterclass Checkout</a>',
   pricing: '<a href="/pricing">Pricing</a>',
   portal: '<a href="/portal">Portal Login</a>'
 };
@@ -181,8 +182,14 @@ function rulesReply(message: string, ctx: CesarContext): CesarReply {
   if (/(help me|^help$|what can you help|how can you help)/.test(text)) {
     return wrap(`I can help you do one of three things right now:<br><br>1. ${LINKS.signup}<br>2. ${LINKS.masterclass}<br>3. ${LINKS.portal}<br><br>Tell me your goal — dispute inaccurate items, prepare for financing, or rebuild after collections — and I'll recommend the best path.`);
   }
+  if (/(price|cost|pricing|how much)/.test(text) && /(masterclass|diy)/.test(text)) {
+    return wrap(`The CredX 5-Day Masterclass is <strong>$47 one time</strong>. It includes the 5-day curriculum, bonus wealth day, DIY roadmap, resource stack, and portal access. You can review it here: ${LINKS.masterclass}, or go straight to ${LINKS.masterclassCheckout}.`);
+  }
+  if (/(price|cost|pricing|how much)/.test(text)) {
+    return wrap(`Here are the current CredX prices:<br><br>• 5-Day Masterclass: <strong>$47 one time</strong><br>• Essential AI Assistance: <strong>$150 after the first round</strong><br>• Premium: <strong>$447 after delivery</strong><br>• Family: <strong>$300 after the first round</strong>, then monthly support based on family size<br><br>You can compare the options here: ${LINKS.pricing}.`);
+  }
   if (/(masterclass|diy)/.test(text)) {
-    return wrap(`The 5-Day Masterclass is the DIY path inside CredX: credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. Start here: ${LINKS.masterclass}.`);
+    return wrap(`The 5-Day Masterclass is the DIY path inside CredX: credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. It is <strong>$47 one time</strong>. Start here: ${LINKS.masterclass}.`);
   }
   if (/(program|coaching|service)/.test(text)) {
     return wrap(`The CredX Program is the guided path with software, AI support, and coaching. If you want hands-on structure and follow-through, start here: ${LINKS.signup}.`);
@@ -192,9 +199,6 @@ function rulesReply(message: string, ctx: CesarContext): CesarReply {
   }
   if (/(dispute|collection|inquiry)/.test(text)) {
     return wrap(`CredX helps organize dispute workflow and identify what looks inaccurate or challengeable, but the strongest next step is getting your file into review. Start here: ${LINKS.signup}.`);
-  }
-  if (/(price|cost|pricing)/.test(text)) {
-    return wrap(`You can see how CredX is priced here: ${LINKS.pricing}.<br><br>Want support? Choose the Program via ${LINKS.signup}. Want DIY education? Choose the ${LINKS.masterclass}.`);
   }
   return wrap(`I can help you choose the fastest path:<br><br>• ${LINKS.signup}<br>• ${LINKS.masterclass}<br>• ${LINKS.portal}<br><br>Tell me your goal and I'll point you to the best one.`);
 
@@ -221,6 +225,7 @@ function buildSystemPrompt(ctx: CesarContext): string {
     'Hard compliance rules you must never break:',
     ...GUARDRAILS.map((g) => `- ${g}`),
     'Never give legal advice. Never promise outcomes or timelines.',
+    'Pricing facts: the 5-Day Masterclass is $47 one time; Essential AI Assistance is $150 after the first round; Premium is $447 after delivery; Family is $300 after the first round, then monthly support based on family size.',
     'Keep replies short (a few sentences). If the user seems stuck or reluctant, suggest they reply to their CredX welcome email to set up a human check-in rather than pushing.'
   ];
   if (ctx.user && ctx.stage) {

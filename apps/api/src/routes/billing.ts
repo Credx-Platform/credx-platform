@@ -27,7 +27,19 @@ const MASTERCLASS_OFFERS = {
 type MasterclassOffer = (typeof MASTERCLASS_OFFERS)[keyof typeof MASTERCLASS_OFFERS];
 
 function normalizeOfferKey(key: unknown) {
-  return String(key || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const raw = String(key || '').trim();
+  const normalized = raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const compact = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const promoAliases: Record<string, keyof typeof MASTERCLASS_OFFERS> = {
+    FRIENDSFAMILY: 'friends-family',
+    FRIENDSFAM: 'friends-family',
+    FAMILY: 'friends-family',
+    SOCIALMEDIA: 'social-media',
+    SOCIAL: 'social-media',
+    IG: 'social-media',
+    TIKTOK: 'social-media'
+  };
+  return promoAliases[compact] || normalized;
 }
 
 function getMasterclassOffer(key: unknown): MasterclassOffer | null {
