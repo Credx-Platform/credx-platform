@@ -3810,6 +3810,106 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         </div>
         <SiteFooter />
       </main>
+      <CesarChatWidget token={token} user={user} />
+    </div>
+  );
+}
+
+type CesarChatMessage = { role: 'user' | 'assistant'; content: string; html?: string };
+
+function CesarChatWidget({ token, user }: { token: string; user: User | null }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<CesarChatMessage[]>([]);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const greetedRef = useRef(false);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, open]);
+
+  // First open: ask Cesar for the client's next step so the panel starts with
+  // stage-aware guidance instead of an empty window.
+  useEffect(() => {
+    if (!open || greetedRef.current) return;
+    greetedRef.current = true;
+    void requestReply('', []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  async function requestReply(message: string, history: CesarChatMessage[]) {
+    setBusy(true);
+    try {
+      const data = await apiFetch<{ reply: string; html: string }>('/api/cesar/chat', token, {
+        method: 'POST',
+        body: JSON.stringify({ message, history: history.slice(-8).map((m) => ({ role: m.role, content: m.content })) })
+      });
+      setMessages((current) => [...current, { role: 'assistant', content: data.reply, html: data.html }]);
+    } catch {
+      setMessages((current) => [...current, {
+        role: 'assistant',
+        content: "I couldn't reach the CredX server just now — give it a moment and try again, or use the portal tabs for your next step."
+      }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function send(e?: FormEvent) {
+    e?.preventDefault();
+    const value = draft.trim();
+    if (!value || busy) return;
+    const history = messages;
+    setMessages((current) => [...current, { role: 'user', content: value }]);
+    setDraft('');
+    void requestReply(value, history);
+  }
+
+  const cyan = '#00c6fb';
+  const panelBg = '#0b1220';
+
+  return (
+    <div style={{ position: 'fixed', right: '1.25rem', bottom: '1.25rem', zIndex: 60, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.6rem' }}>
+      {open ? (
+        <div style={{ width: 'min(360px, calc(100vw - 2.5rem))', height: 'min(460px, 70vh)', background: panelBg, border: '1px solid rgba(0,198,251,0.35)', borderRadius: '14px', boxShadow: '0 18px 50px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.9rem', background: '#101a2b', borderBottom: '1px solid rgba(148,163,184,0.18)' }}>
+            <div style={{ width: 34, height: 34, borderRadius: '50%', background: `linear-gradient(135deg, ${cyan}, #0055cc)`, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>C</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: 14 }}>Cesar</div>
+              <div style={{ color: '#22c55e', fontSize: 11 }}>CredX guidance · online</div>
+            </div>
+            <button type="button" onClick={() => setOpen(false)} aria-label="Close Cesar chat" style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          </div>
+          <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+            {messages.map((m, i) => (
+              <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', padding: '0.55rem 0.75rem', borderRadius: 10, fontSize: 13, lineHeight: 1.55, background: m.role === 'user' ? 'rgba(0,198,251,0.14)' : '#101a2b', border: '1px solid ' + (m.role === 'user' ? 'rgba(0,198,251,0.35)' : 'rgba(148,163,184,0.18)'), color: '#e2e8f0' }}>
+                {m.role === 'assistant' && m.html
+                  ? <span dangerouslySetInnerHTML={{ __html: m.html }} />
+                  : m.content}
+              </div>
+            ))}
+            {busy ? <div style={{ alignSelf: 'flex-start', color: '#94a3b8', fontSize: 12, padding: '0.3rem 0.2rem' }}>Cesar is typing…</div> : null}
+          </div>
+          <form onSubmit={send} style={{ display: 'flex', gap: '0.5rem', padding: '0.7rem 0.9rem', background: '#101a2b', borderTop: '1px solid rgba(148,163,184,0.18)' }}>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={user ? `Ask about your next step, ${user.firstName}...` : 'Ask about your next step...'}
+              style={{ flex: 1, background: panelBg, border: '1px solid rgba(148,163,184,0.25)', borderRadius: 8, color: '#f8fafc', padding: '0.5rem 0.7rem', fontSize: 13, outline: 'none' }}
+            />
+            <button type="submit" disabled={busy || !draft.trim()} style={{ background: cyan, color: '#060a12', border: 'none', borderRadius: 8, padding: '0 0.9rem', fontWeight: 700, cursor: busy || !draft.trim() ? 'default' : 'pointer', opacity: busy || !draft.trim() ? 0.6 : 1 }}>Send</button>
+          </form>
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={open ? 'Close Cesar chat' : 'Chat with Cesar'}
+        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: open ? '#101a2b' : `linear-gradient(135deg, ${cyan}, #0055cc)`, color: open ? '#94a3b8' : '#fff', border: open ? '1px solid rgba(148,163,184,0.3)' : 'none', borderRadius: 999, padding: '0.65rem 1.1rem', fontWeight: 700, fontSize: 14, cursor: 'pointer', boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}
+      >
+        {open ? 'Hide chat' : 'Chat with Cesar'}
+      </button>
     </div>
   );
 }

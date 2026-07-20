@@ -19,6 +19,7 @@ import { billingRouter } from './routes/billing.js';
 import { progressRouter } from './routes/progress.js';
 import { masterclassRouter } from './routes/masterclass.js';
 import { compatibilityRouter } from './routes/compatibility.js';
+import { cesarRouter } from './routes/cesar.js';
 
 const app = express();
 
@@ -68,6 +69,13 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many auth attempts. Try again in a few minutes.' }
 });
+const cesarLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { source: 'rate_limited', reply: "You're sending messages a little fast — give me a moment and try again.", html: "You're sending messages a little fast — give me a moment and try again." }
+});
 const leadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
@@ -96,6 +104,8 @@ app.use('/api/v1/auth/register', authLimiter);
 app.use('/api/v1/auth/password-setup', authLimiter);
 app.use('/api/leads', leadLimiter);
 app.use('/api/v1/leads', leadLimiter);
+app.use('/api/cesar', cesarLimiter);
+app.use('/api/v1/cesar', cesarLimiter);
 
 function mountAll(prefix: string) {
   app.use(`${prefix}/auth`, authRouter);
@@ -112,6 +122,7 @@ function mountAll(prefix: string) {
   app.use(`${prefix}/progress`, progressRouter);
   app.use(`${prefix}/masterclass`, masterclassRouter);
   app.use(`${prefix}/compatibility`, compatibilityRouter);
+  app.use(`${prefix}/cesar`, cesarRouter);
 }
 
 mountAll('/api');

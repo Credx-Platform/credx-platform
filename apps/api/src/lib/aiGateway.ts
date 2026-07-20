@@ -65,6 +65,71 @@ export async function callAiGateway(options: AiCallOptions): Promise<AiCallResul
   }
 }
 
+export interface AiChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface AiChatOptions {
+  messages: AiChatMessage[];
+  model?: string;
+  maxTokens?: number;
+  temperature?: number;
+  timeoutMs?: number;
+}
+
+/**
+ * Multi-turn variant of callAiGateway for conversational features (Cesar).
+ * Same gateway, same key; callers pass the full message array.
+ */
+export async function callAiGatewayChat(options: AiChatOptions): Promise<AiCallResult | null> {
+  const apiKey = process.env.AI_GATEWAY_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  const model = options.model?.trim()
+    || process.env.AI_GATEWAY_MODEL?.trim()
+    || 'anthropic/claude-haiku-4-5-20251001';
+
+  const controller = new AbortController();
+  const timeoutMs = options.timeoutMs ?? Number(process.env.AI_GATEWAY_TIMEOUT_MS || 60_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(AI_GATEWAY_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        messages: options.messages,
+        max_tokens: options.maxTokens ?? 1024,
+        temperature: options.temperature ?? 0.6
+      }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.error('[aiGateway] non-OK chat response', response.status, body.slice(0, 300));
+      return null;
+    }
+
+    const data = await response.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const text = data.choices?.[0]?.message?.content?.trim();
+    if (!text) return null;
+    return { text, model };
+  } catch (error) {
+    console.error('[aiGateway] chat call failed:', (error as Error).message);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function extractJsonObject(raw: string): unknown | null {
   if (!raw) return null;
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);

@@ -508,12 +508,54 @@ function getCesarReply(message){
  return 'I can help you choose the fastest path. If you are new, start here: <a href="/signup">Sign Up</a>. If you already have access, use the <a href="/portal">Portal Login</a>.<br><br>If you tell me your goal, I\'ll point you to the best option.';
 }
 
+// Live Cesar: send the message to the CredX API; if the API is unreachable,
+// fall back to the local canned replies so the chat never goes dead.
+const chatHistory=[];
+
+function showChatTyping(){
+ const row=document.createElement('div');
+ row.className='chat-msg agent';
+ row.innerHTML='<div class="chat-msg-av">CX</div><div class="chat-typing"><span></span><span></span><span></span></div>';
+ chatMessages.appendChild(row);
+ chatMessages.scrollTop=chatMessages.scrollHeight;
+ return row;
+}
+
+async function fetchCesarReply(message){
+ const controller=new AbortController();
+ const timer=window.setTimeout(()=>controller.abort(),12000);
+ try{
+  const res=await fetch('/api/cesar/chat',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({message,history:chatHistory.slice(-8)}),
+   signal:controller.signal
+  });
+  if(!res.ok) throw new Error('cesar status '+res.status);
+  const data=await res.json();
+  if(!data||!data.html) throw new Error('cesar empty reply');
+  return data;
+ }finally{window.clearTimeout(timer);}
+}
+
+async function deliverCesarReply(value){
+ const typing=showChatTyping();
+ let data=null;
+ try{data=await fetchCesarReply(value);}catch(e){}
+ typing.remove();
+ const html=data&&data.html?data.html:getCesarReply(value);
+ appendChatMessage('agent',html);
+ const plain=data&&data.reply?data.reply:html.replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'');
+ chatHistory.push({role:'user',content:value},{role:'assistant',content:plain});
+ if(chatHistory.length>16) chatHistory.splice(0,chatHistory.length-16);
+}
+
 function sendChat(){
  const value=chatInput.value.trim();
  if(!value) return;
  appendChatMessage('user',value);
  chatInput.value='';
- window.setTimeout(()=>appendChatMessage('agent',getCesarReply(value)),250);
+ deliverCesarReply(value);
 }
 
 document.getElementById('chatSend').addEventListener('click',sendChat);
@@ -521,7 +563,7 @@ chatInput.addEventListener('keydown',(event)=>{ if(event.key==='Enter'){ event.p
 document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('click',()=>{
  const prompt=btn.textContent.trim();
  appendChatMessage('user',prompt);
- window.setTimeout(()=>appendChatMessage('agent',getCesarReply(prompt)),250);
+ deliverCesarReply(prompt);
 }));
 
 // Cesar attention nudge: after 15s on the page, slide in a prompt inviting a
