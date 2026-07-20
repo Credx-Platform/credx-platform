@@ -80,6 +80,12 @@ contractsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => 
     const progress = client.progress as any;
     const agreementText = agreementTextForClient(client);
     const contractType = isMasterclassClient(client) ? 'masterclass' : 'ai_assistance';
+    const priorOnboarding = (progress.onboarding || {}) as Record<string, any>;
+    const priorWorkflow = (progress.workflow || {}) as Record<string, any>;
+    const signatureRepairMode = Boolean(
+      priorOnboarding.completedAt &&
+      !(priorOnboarding.signature?.signedAt && priorOnboarding.signature?.dataUrl)
+    );
 
     const signatureRecord = {
       contractId,
@@ -98,15 +104,15 @@ contractsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => 
       where: { clientId: client.id },
       data: {
         onboarding: {
-          ...(progress.onboarding || {}),
-          status: 'contract_signed',
+          ...priorOnboarding,
+          status: signatureRepairMode ? priorOnboarding.status || 'completed' : 'contract_signed',
           signature: signatureRecord
         },
         workflow: {
-          ...(progress.workflow || {}),
-          stage: 'contract_signed',
+          ...priorWorkflow,
+          stage: signatureRepairMode ? priorWorkflow.stage || 'portal_unlocked' : 'contract_signed',
           updatedAt: signedAt,
-          next: ['complete_application', 'select_credit_report_provider']
+          next: signatureRepairMode ? priorWorkflow.next || [] : ['complete_application', 'select_credit_report_provider']
         }
       }
     });
@@ -143,7 +149,7 @@ contractsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => 
         status: 'signed'
       },
       progress: updated,
-      next_step: 'application'
+      next_step: signatureRepairMode ? 'portal' : 'application'
     });
   } catch (error) {
     next(error);

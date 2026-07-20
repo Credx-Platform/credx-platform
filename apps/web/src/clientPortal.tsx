@@ -608,8 +608,10 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
 
   const stage = progress?.workflow?.stage || 'signup_received';
   const completedAt = progress?.onboarding?.completedAt;
-  const needsContract = ['signup_received', 'contract_pending'].includes(stage);
-  const needsApplication = ['contract_signed', 'application_pending'].includes(stage);
+  const hasStoredSignature = Boolean(progress?.onboarding?.signature?.signedAt && progress?.onboarding?.signature?.dataUrl);
+  const signatureRepairMode = Boolean(completedAt && !hasStoredSignature);
+  const needsContract = signatureRepairMode || ['signup_received', 'contract_pending'].includes(stage);
+  const needsApplication = !signatureRepairMode && ['contract_signed', 'application_pending'].includes(stage);
   const needsMonitoring = stage === 'application_completed';
   const needsUpload = ['portal_unlocked', 'upload_credit_report', 'credit_report_received'].includes(stage) && !completedAt;
 
@@ -3514,8 +3516,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         <main className="main onboarding-main">
           <header className="topbar"><div><div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">CredX Onboarding</p></div><h1 className="top-title">Complete your signup</h1><p className="helper-text">Review your agreement, finish your intake, and connect your credit monitoring provider.</p></div></header>
           {error ? <div className="error-banner">{error}</div> : null}
-          {!progress?.onboarding?.completedAt && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
-          {progress?.onboarding?.completedAt ? <section className="panel"><div className="empty-state-card">Signup complete. Check your email for the password setup link to access your client portal.</div></section> : null}
+          {(!progress?.onboarding?.completedAt || !progress?.onboarding?.signature?.signedAt || !progress?.onboarding?.signature?.dataUrl) && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
+          {progress?.onboarding?.completedAt && progress?.onboarding?.signature?.signedAt && progress?.onboarding?.signature?.dataUrl ? <section className="panel"><div className="empty-state-card">Signup complete. Check your email for the password setup link to access your client portal.</div></section> : null}
         </main>
       </div>
     );
