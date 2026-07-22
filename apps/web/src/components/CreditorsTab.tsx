@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { DisputeItem, ImportedTradeline } from './DisputeManager';
+import { tradelineIdentityKey, type DisputeItem, type ImportedTradeline } from './DisputeManager';
 
 interface CreditorsTabProps {
   token: string;
@@ -64,7 +64,7 @@ type BatchEntry = {
 function groupTradelines(tradelines: ImportedTradeline[]): TradelineGroup[] {
   const map = new Map<string, TradelineGroup>();
   for (const t of tradelines) {
-    const key = `${(t.creditorName || '').trim().toLowerCase()}|${(t.accountNumber || '').trim()}`;
+    const key = tradelineIdentityKey(t);
     const entry = map.get(key);
     if (entry) entry.bureaus.add(t.bureau);
     else map.set(key, { key, sample: t, bureaus: new Set([t.bureau]) });
@@ -160,7 +160,7 @@ export function CreditorsTab({
   const usedTradelineKeys = useMemo(() => {
     const used = new Set<string>();
     for (const item of items) {
-      used.add(`${(item.furnisher || '').trim().toLowerCase()}|${(item.accountNumber || '').trim()}`);
+      used.add(tradelineIdentityKey(item));
     }
     for (const e of batch) used.add(e.tradelineKey);
     return used;

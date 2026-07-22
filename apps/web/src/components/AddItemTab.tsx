@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { DisputeItem, ImportedTradeline } from './DisputeManager';
+import { tradelineIdentityKey, type DisputeItem, type ImportedTradeline } from './DisputeManager';
 
 interface AddItemTabProps {
   token: string;
@@ -84,7 +84,7 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
   const groupedTradelines = useMemo(() => {
     const map = new Map<string, { key: string; sample: ImportedTradeline; bureaus: Set<'EXPERIAN' | 'EQUIFAX' | 'TRANSUNION'> }>();
     for (const t of tradelines) {
-      const key = `${(t.creditorName || '').trim().toLowerCase()}|${(t.accountNumber || '').trim()}`;
+      const key = tradelineIdentityKey(t);
       const entry = map.get(key);
       if (entry) entry.bureaus.add(t.bureau);
       else map.set(key, { key, sample: t, bureaus: new Set([t.bureau]) });
@@ -96,7 +96,7 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
   const usedTradelineKeys = useMemo(() => {
     const used = new Set<string>();
     for (const item of items) {
-      used.add(`${(item.furnisher || '').trim().toLowerCase()}|${(item.accountNumber || '').trim()}`);
+      used.add(tradelineIdentityKey(item));
     }
     return used;
   }, [items]);

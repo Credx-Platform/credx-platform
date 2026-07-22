@@ -82,6 +82,26 @@ export type ImportedTradeline = {
   lastReported?: string | null;
 };
 
+export type TradelineIdentityInput = {
+  creditorName?: string | null;
+  furnisher?: string | null;
+  accountNumber?: string | null;
+};
+
+export function tradelineIdentityKey(input: TradelineIdentityInput): string {
+  const name = String(input.creditorName || input.furnisher || 'unknown')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+  const account = String(input.accountNumber || '').toLowerCase();
+  const digits = account.replace(/\D/g, '');
+  const accountKey = digits.length >= 4
+    ? `last4:${digits.slice(-4)}`
+    : account.replace(/[^a-z0-9]+/g, '').slice(-10) || 'no-account';
+  return `${name}|${accountKey}`;
+}
+
 type ReportDocument = {
   id: string;
   fileName?: string | null;
@@ -194,7 +214,7 @@ function analysisAccountsToTradelines(analysis: any): ImportedTradeline[] {
 function mergeTradelines(rows: ImportedTradeline[]): ImportedTradeline[] {
   const map = new Map<string, ImportedTradeline>();
   for (const row of rows) {
-    const key = `${(row.creditorName || '').trim().toLowerCase()}|${(row.accountNumber || '').trim()}|${row.bureau}`;
+    const key = `${tradelineIdentityKey(row)}|${row.bureau}`;
     const existing = map.get(key);
     if (!existing) {
       map.set(key, row);
