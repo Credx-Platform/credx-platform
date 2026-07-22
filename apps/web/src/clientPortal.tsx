@@ -371,6 +371,78 @@ function normalizeDisputes(client: Client | null, progress: Progress | null) {
   return [...fromClient, ...fromProgress].filter((item, index, arr) => arr.findIndex((other) => other.id === item.id) === index);
 }
 
+type NegativeAccountDetail = {
+  accountName: string;
+  accountNumber: string | null;
+  accountType: string;
+  status: string;
+  balance: number | null;
+  bureaus: string[];
+  priority: string;
+  issue: string;
+  reason: string;
+  dateOpened: string | null;
+  lastReported: string | null;
+};
+
+function normalizeBureauName(value: unknown): string {
+  const text = String(value || '').trim();
+  const key = text.toLowerCase();
+  if (key.includes('equifax')) return 'Equifax';
+  if (key.includes('experian')) return 'Experian';
+  if (key.includes('transunion') || key.includes('trans union')) return 'TransUnion';
+  return text || 'Bureau pending';
+}
+
+function normalizeBureauList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(normalizeBureauName).filter(Boolean);
+  if (typeof value === 'string' && value.trim()) return value.split(/[,\|/]+/).map(normalizeBureauName).filter(Boolean);
+  return [];
+}
+
+function collectNegativeAccountDetails(analysis: any): NegativeAccountDetail[] {
+  if (!analysis || typeof analysis !== 'object') return [];
+  const buckets = [
+    ...(Array.isArray(analysis.negativeAccounts) ? analysis.negativeAccounts : []),
+    ...(Array.isArray(analysis.derogatoryAccounts) ? analysis.derogatoryAccounts : []),
+    ...(Array.isArray(analysis.accounts) ? analysis.accounts.filter((item: any) => item?.isNegative || item?.negative || /collection|charge.?off|late|derogatory|past due/i.test(`${item?.status || ''} ${item?.accountType || ''}`)) : []),
+    ...(Array.isArray(analysis.tradelines) ? analysis.tradelines.filter((item: any) => item?.isNegative || item?.negative || /collection|charge.?off|late|derogatory|past due/i.test(`${item?.status || ''} ${item?.accountType || ''}`)) : []),
+    ...(Array.isArray(analysis.disputeOpportunities) ? analysis.disputeOpportunities : [])
+  ];
+
+  const byKey = new Map<string, NegativeAccountDetail>();
+  for (const item of buckets) {
+    const accountName = String(item?.accountName || item?.creditorName || item?.furnisher || item?.name || item?.title || 'Reported account');
+    const accountNumber = item?.accountNumber || item?.account || item?.partialAccountNumber || null;
+    const bureaus = normalizeBureauList(item?.bureaus || item?.bureau || item?.reportedBureaus);
+    const detail: NegativeAccountDetail = {
+      accountName,
+      accountNumber: accountNumber ? String(accountNumber) : null,
+      accountType: String(item?.accountType || item?.type || item?.category || 'Negative account'),
+      status: String(item?.status || item?.reportingStatus || item?.accountStatus || 'Reported negative'),
+      balance: item?.balance == null ? null : Number(item.balance),
+      bureaus,
+      priority: String(item?.priority || item?.severity || 'review'),
+      issue: String(item?.issue || item?.description || item?.finding || 'Negative reporting identified in the analysis.'),
+      reason: String(item?.reason || item?.recommendation || item?.recommendedAction || 'Review for inaccurate, incomplete, outdated, inconsistent, or unverifiable reporting.'),
+      dateOpened: item?.dateOpened || item?.openedDate || item?.openDate || null,
+      lastReported: item?.lastReported || item?.reportedDate || item?.dateReported || item?.updatedAt || null
+    };
+    const key = `${detail.accountName.toLowerCase()}|${detail.accountNumber || ''}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      byKey.set(key, {
+        ...existing,
+        ...detail,
+        bureaus: Array.from(new Set([...existing.bureaus, ...detail.bureaus]))
+      });
+    } else {
+      byKey.set(key, detail);
+    }
+  }
+  return Array.from(byKey.values());
+}
+
 type ScoreBand = { label: string; color: string; range: string };
 
 function scoreBand(score: number): ScoreBand {
@@ -2737,6 +2809,7 @@ function AnalysisSection({ token, user, client, progress, refreshAll }: { token:
 
   const findings = hasAnalysis ? (analysis.keyFindings || []) : [];
   const disputeOps = hasAnalysis ? (analysis.disputeOpportunities || []) : [];
+  const negativeAccounts = hasAnalysis ? collectNegativeAccountDetails(analysis) : [];
   const actionPlan = hasAnalysis ? (analysis.actionPlan || []) : [];
   const bureauSummaries = hasAnalysis ? (analysis.bureauSummaries || []) : [];
   const overallStats = hasAnalysis ? (analysis.overallStats || {}) : {};
@@ -2829,7 +2902,37 @@ function AnalysisSection({ token, user, client, progress, refreshAll }: { token:
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div><p className="eyebrow">Dispute Opportunities</p><h2>Accounts ready for dispute</h2></div></div>
+        <div className="panel-header"><div><p className="eyebrow">Negative Accounts</p><h2>Full negative-account detail</h2></div></div>
+        <div className="dispute-list">
+          {negativeAccounts.length ? negativeAccounts.map((account, idx) => (
+            <div key={`${account.accountName}-${account.accountNumber || idx}`} className="dispute-card-live">
+              <div className="dispute-card-top">
+                <strong>{account.accountName}</strong>
+                <span className="status-badge" style={{
+                  background: account.priority === 'high' || account.priority === 'critical' ? '#fef2f2' : account.priority === 'medium' ? '#fefce8' : '#f1f5f9',
+                  color: account.priority === 'high' || account.priority === 'critical' ? '#dc2626' : account.priority === 'medium' ? '#ca8a04' : '#475569'
+                }}>
+                  {account.priority} priority
+                </span>
+              </div>
+              <ul className="detail-list" style={{ marginTop: '10px' }}>
+                <li><strong>Account number</strong><span>{account.accountNumber || 'Not shown'}</span></li>
+                <li><strong>Type</strong><span>{account.accountType.replace(/_/g, ' ')}</span></li>
+                <li><strong>Status</strong><span>{account.status.replace(/_/g, ' ')}</span></li>
+                <li><strong>Balance</strong><span>{account.balance == null || Number.isNaN(account.balance) ? 'Not reported' : `$${account.balance.toLocaleString()}`}</span></li>
+                <li><strong>Bureaus</strong><span>{account.bureaus.length ? account.bureaus.join(', ') : 'Bureau details pending'}</span></li>
+                <li><strong>Date opened</strong><span>{account.dateOpened ? String(account.dateOpened) : 'Not reported'}</span></li>
+                <li><strong>Last reported</strong><span>{account.lastReported ? String(account.lastReported) : 'Not reported'}</span></li>
+                <li><strong>Finding</strong><span>{account.issue}</span></li>
+                <li><strong>Review reason</strong><span>{account.reason}</span></li>
+              </ul>
+            </div>
+          )) : <div className="empty-state-card">No negative accounts identified yet.</div>}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Analysis Flags</p><h2>Accounts CredX may dispute</h2></div></div>
         <div className="dispute-list">
           {disputeOps.length ? disputeOps.map((op: any, idx: number) => (
             <div key={idx} className="dispute-card-live">
@@ -2982,13 +3085,13 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
 
       if (pending > 0) {
         const isSubmitted = submittedTasks.has('review_disputes');
-        tasks.push({ id: 'review_disputes', title: `📨 Review and approve dispute letters (${pending} items)`, desc: isSubmitted ? 'Waiting for CredX team to mail your certified letters.' : 'Your Round 1 dispute letters are ready. Review and approve them for certified mailing.', action: isSubmitted ? 'Submitted for review' : 'Review & approve', actionTab: 'disputes' as PortalTab, priority: 'high', auto: false, currentStatus: 'ACTIVE', submitted: isSubmitted });
+        tasks.push({ id: 'review_disputes', title: `📨 Dispute letters prepared (${pending} items)`, desc: isSubmitted ? 'Waiting for CredX team to mail your certified letters.' : 'Your CredX team is preparing the mailing packet from your analysis.', action: isSubmitted ? 'Submitted for review' : 'View analysis', actionTab: 'analysis' as PortalTab, priority: 'high', auto: false, currentStatus: 'ACTIVE', submitted: isSubmitted });
       } else if (sent > 0 && responseDue === 0) {
-        tasks.push({ id: 'track_delivery', title: `📍 Track delivery — ${sent} letters sent`, desc: 'Your certified letters are in transit. Delivery confirmation typically arrives within 3–5 days.', action: 'Check tracking', actionTab: 'disputes' as PortalTab, priority: 'medium', auto: true, currentStatus: 'ACTIVE' });
+        tasks.push({ id: 'track_delivery', title: `📍 Track delivery — ${sent} letters sent`, desc: 'Your certified letters are in transit. Delivery confirmation typically arrives within 3–5 days.', action: 'View analysis', actionTab: 'analysis' as PortalTab, priority: 'medium', auto: true, currentStatus: 'ACTIVE' });
       } else if (responseDue > 0) {
-        tasks.push({ id: 'review_responses', title: `📋 Review bureau responses (${responseDue} due)`, desc: 'Bureau responses have been received. Review outcomes and plan Round 2 if needed.', action: 'Review responses', actionTab: 'disputes' as PortalTab, priority: 'high', auto: true, currentStatus: 'ACTIVE' });
+        tasks.push({ id: 'review_responses', title: `📋 Bureau responses received (${responseDue} due)`, desc: 'CredX is reviewing bureau responses and planning the next round if needed.', action: 'View analysis', actionTab: 'analysis' as PortalTab, priority: 'high', auto: true, currentStatus: 'ACTIVE' });
       } else if (disputes.length === 0) {
-        tasks.push({ id: 'wait_disputes', title: '🔧 Disputes being prepared', desc: 'Your dispute strategy is being generated. You will receive an email when letters are ready.', action: 'Check status', actionTab: 'disputes' as PortalTab, priority: 'low', auto: true, currentStatus: 'ACTIVE' });
+        tasks.push({ id: 'wait_disputes', title: '🔧 Disputes being prepared', desc: 'Your dispute strategy is being generated. You will receive an email when letters are ready.', action: 'View analysis', actionTab: 'analysis' as PortalTab, priority: 'low', auto: true, currentStatus: 'ACTIVE' });
       }
     }
 
@@ -3482,7 +3585,6 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
           { key: 'analysis', label: 'Analysis & Reports' },
           { key: 'profile', label: 'Profile' },
-          { key: 'disputes', label: 'Disputes' },
           { key: 'activity', label: 'Activity' },
           { key: 'resources', label: 'Credit Builders' },
           { key: 'tasks', label: 'Tasks' }
@@ -3746,27 +3848,6 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                 </ul>
               </section>
 
-              {tier2 && generatedLetters.length ? (
-                <section className="panel">
-                  <div className="panel-header">
-                    <div><p className="eyebrow" style={{ color: '#a855f7' }}>Disputed items</p><h2>Live across your portal</h2></div>
-                    <button type="button" className="ghost-button" onClick={() => setActiveTab('disputes')} style={{ background: '#a855f7', color: '#fff', border: 'none', fontWeight: 700 }}>Open dispute desk →</button>
-                  </div>
-                  <div className="dispute-list">
-                    {generatedLetters.map((letter) => (
-                      <div key={letter.bureau} className="dispute-card-live">
-                        <div className="dispute-card-top"><strong style={{ color: '#0f172a' }}>{letter.bureauLabel}</strong><span className="status-badge status-pending">{letter.items.length} item{letter.items.length === 1 ? '' : 's'}</span></div>
-                        <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0 }}>
-                          {letter.items.slice(0, 4).map((it: any, i: number) => (
-                            <li key={i} style={{ fontSize: '0.86rem', color: '#1e293b', fontWeight: 500, padding: '2px 0' }}>• <strong style={{ color: '#0f172a' }}>{it.accountName}</strong> — {it.issue}</li>
-                          ))}
-                          {letter.items.length > 4 ? <li style={{ fontSize: '0.78rem', color: '#64748b', padding: '2px 0' }}>+ {letter.items.length - 4} more</li> : null}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
             </>
             )
           ) : null}
@@ -3783,7 +3864,6 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
               <ProfileSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} onUserUpdated={setUser} />
             )
           ) : null}
-          {activeTab === 'disputes' ? <DisputesSection token={token} user={user} client={client} progress={progress} letters={generatedLetters} setLetters={persistLetters} filings={filings} setFilings={persistFilings} mailed={mailed} setMailed={persistMailed} responses={responses} setResponses={persistResponses} /> : null}
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
           {activeTab === 'analysis' ? <AnalysisSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} /> : null}

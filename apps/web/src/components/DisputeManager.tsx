@@ -57,7 +57,7 @@ export type Furnisher = {
   isActive: boolean;
 };
 
-type Tab = 'import' | 'add' | 'bureaus' | 'creditors' | 'tracking' | 'results';
+type Tab = 'import' | 'add' | 'bureaus' | 'creditors' | 'collectors' | 'respond' | 'tracking' | 'results';
 
 interface DisputeManagerProps {
   token: string;
@@ -210,10 +210,12 @@ export function DisputeManager({ token }: DisputeManagerProps) {
   };
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'import', label: 'IMPORT REPORT' },
-    { id: 'add', label: 'ADD ITEM' },
-    { id: 'bureaus', label: 'BUREAUS' },
+    { id: 'import', label: 'ADD REPORT' },
+    { id: 'add', label: 'ADD DISPUTE' },
+    { id: 'bureaus', label: 'BUREAU DISPUTE' },
     { id: 'creditors', label: 'CREDITORS' },
+    { id: 'collectors', label: 'COLLECTORS' },
+    { id: 'respond', label: 'RESPOND' },
     { id: 'tracking', label: 'TRACKING' },
     { id: 'results', label: 'RESULTS' }
   ];
@@ -336,11 +338,54 @@ export function DisputeManager({ token }: DisputeManagerProps) {
           border:1px dashed #cbd5e1;
           border-radius:12px;
         }
+        .dm-workflow-rail {
+          display:grid;
+          grid-template-columns:repeat(4,minmax(0,1fr));
+          gap:.65rem;
+        }
+        .dm-workflow-step {
+          padding:.8rem .9rem;
+          border:1px solid #e2e8f0;
+          background:#fff;
+          border-radius:8px;
+          color:#334155;
+          font-size:.8rem;
+        }
+        .dm-workflow-step strong { display:block; color:#0f172a; font-size:.9rem; margin-bottom:2px; }
+        .dm-placeholder {
+          padding:1.5rem;
+          display:grid;
+          gap:1rem;
+        }
+        .dm-placeholder-card {
+          border:1px solid #e2e8f0;
+          background:#fff;
+          border-radius:8px;
+          padding:1.1rem;
+        }
+        .dm-placeholder-card h3 { margin:0 0 .35rem; color:#0f172a; font-size:1.05rem; }
+        .dm-placeholder-card p { margin:0; color:#64748b; font-size:.9rem; line-height:1.5; }
+        .dm-action-grid {
+          display:grid;
+          grid-template-columns:repeat(3,minmax(0,1fr));
+          gap:.75rem;
+        }
+        .dm-action-tile {
+          text-align:left;
+          border:1px solid #dbeafe;
+          background:#eff6ff;
+          color:#1e40af;
+          border-radius:8px;
+          padding:.85rem;
+          font-weight:700;
+          cursor:pointer;
+        }
         @media (max-width: 720px) {
           .dm-tabs { padding-bottom:0.5rem; border-radius:8px; }
           .dm-tab { padding:0.65rem 1rem; }
           .dm-client-bar { align-items:stretch; }
           .dm-client-picker { width:100%; min-width:0; }
+          .dm-workflow-rail, .dm-action-grid { grid-template-columns:1fr; }
         }
       `}</style>
 
@@ -358,6 +403,12 @@ export function DisputeManager({ token }: DisputeManagerProps) {
               </option>
             ))}
           </select>
+        </div>
+        <div className="dm-workflow-rail" aria-label="Dispute workflow">
+          <div className="dm-workflow-step"><strong>1. Add report</strong>Import or upload the client credit report.</div>
+          <div className="dm-workflow-step"><strong>2. Add dispute</strong>Review negative tradelines from analysis.</div>
+          <div className="dm-workflow-step"><strong>3. Build letters</strong>Create bureau, creditor, collector, or response work.</div>
+          <div className="dm-workflow-step"><strong>4. Track results</strong>Monitor due dates, responses, and outcomes.</div>
         </div>
       </div>
 
@@ -449,6 +500,38 @@ export function DisputeManager({ token }: DisputeManagerProps) {
                 onBackToItems={() => setActiveTab('add')}
                 onOpenTracking={() => setActiveTab('tracking')}
               />
+            )}
+
+            {activeTab === 'collectors' && (
+              <CreditorsTab
+                token={token}
+                selectedClientId={selectedClientId}
+                selectedClientLabel={selectedClientLabel}
+                clientName={selectedClient ? `${selectedClient.user.firstName} ${selectedClient.user.lastName}` : undefined}
+                items={items}
+                tradelines={tradelines.filter((t) => `${t.accountType || ''} ${t.status || ''} ${t.creditorName || ''}`.toLowerCase().includes('collect'))}
+                prefillKey={creditorsPrefillKey}
+                onConsumePrefill={() => setCreditorsPrefillKey(null)}
+                pendingTradelineKeys={pendingCreditorsKeys}
+                onConsumePendingKeys={() => setPendingCreditorsKeys([])}
+                onItemCreated={handleItemCreated}
+                onBackToItems={() => setActiveTab('add')}
+                onOpenTracking={() => setActiveTab('tracking')}
+              />
+            )}
+
+            {activeTab === 'respond' && (
+              <div className="dm-placeholder">
+                <div className="dm-placeholder-card">
+                  <h3>Respond</h3>
+                  <p>Use this desk when a bureau, creditor, or collector response comes in. Start from Tracking to find response-due items, then update Results after the response is reviewed.</p>
+                </div>
+                <div className="dm-action-grid">
+                  <button type="button" className="dm-action-tile" onClick={() => setActiveTab('tracking')}>Open response queue</button>
+                  <button type="button" className="dm-action-tile" onClick={() => setActiveTab('results')}>Update results</button>
+                  <button type="button" className="dm-action-tile" onClick={() => setActiveTab('bureaus')}>Build bureau reply</button>
+                </div>
+              </div>
             )}
             
             {activeTab === 'tracking' && (

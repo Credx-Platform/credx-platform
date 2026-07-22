@@ -1723,7 +1723,6 @@ function DisputesRoute({ token, disputes, clients }: { token: string; disputes: 
   const [clientFilter, setClientFilter] = useState('');
   const [bureauFilter, setBureauFilter] = useState('');
   const [sortKey, setSortKey] = useState<'status' | 'client' | 'creditor' | 'bureau' | 'round'>('status');
-  const [showManager, setShowManager] = useState(false);
 
   const clientsById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
 
@@ -1768,9 +1767,9 @@ function DisputesRoute({ token, disputes, clients }: { token: string; disputes: 
     <div className="page-grid">
       <section className="hero-card hero-card--compact">
         <div>
-          <p className="eyebrow">Dispute Center</p>
-          <h1>Dispute Center</h1>
-          <p>Every dispute item across the book in one chart. Filter, sort, and print letters individually or send the whole set to Bulk Print.</p>
+          <p className="eyebrow">Admin Dispute Manager</p>
+          <h1>Dispute Operations</h1>
+          <p>Work client files from report upload through add dispute, bureau dispute, creditor or collector disputes, response handling, tracking, and results.</p>
         </div>
         <div className="hero-stats">
           <div className="stat-card"><span>Active</span><strong>{active.length}</strong></div>
@@ -1782,7 +1781,18 @@ function DisputesRoute({ token, disputes, clients }: { token: string; disputes: 
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Dispute Chart</p>
+            <p className="eyebrow">Client Dispute Manager</p>
+            <h2>Build and track disputes</h2>
+            <p className="helper-text">This admin-only section starts from the analysis report so staff can work only the disputeable negative items for a selected client.</p>
+          </div>
+        </div>
+        <DisputeManager token={token} />
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Global Tracking</p>
             <h2>All dispute items ({rows.length})</h2>
             <p className="helper-text">Print a single letter from any row, or send the filtered set to Bulk Print.</p>
           </div>
@@ -1792,9 +1802,6 @@ function DisputesRoute({ token, disputes, clients }: { token: string; disputes: 
             </button>
             <button type="button" className="ghost-button" onClick={() => window.location.assign('/adminportal/print')}>
               Open Bulk Print
-            </button>
-            <button type="button" className="ghost-button" onClick={() => setShowManager((v) => !v)}>
-              {showManager ? 'Hide manager tools' : 'Manager tools'}
             </button>
           </div>
         </div>
@@ -1860,14 +1867,6 @@ function DisputesRoute({ token, disputes, clients }: { token: string; disputes: 
         ) : (
           <div className="empty-state-card">No dispute items match this filter.</div>
         )}
-
-        {showManager ? (
-          <div style={{ marginTop: '18px' }}>
-            <h3>Manager tools</h3>
-            <p className="helper-text">Import reports, add items, and track bureau status.</p>
-            <DisputeManager token={token} />
-          </div>
-        ) : null}
       </section>
     </div>
   );
