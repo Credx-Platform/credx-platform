@@ -181,8 +181,8 @@ export function CreditorsTab({
       disputeEquifax: g.bureaus.has('EQUIFAX'),
       disputeExperian: g.bureaus.has('EXPERIAN'),
       disputeTransunion: g.bureaus.has('TRANSUNION'),
-      reason: g.sample.isNegative ? 'Not mine' : '',
-      customInstruction: ''
+      reason: g.sample.reason || (g.sample.isNegative ? 'Inaccurate Reporting' : ''),
+      customInstruction: g.sample.issue || ''
     });
     setError(null);
   };
@@ -214,8 +214,8 @@ export function CreditorsTab({
         disputeEquifax: g.bureaus.has('EQUIFAX'),
         disputeExperian: g.bureaus.has('EXPERIAN'),
         disputeTransunion: g.bureaus.has('TRANSUNION'),
-        reason: 'Inaccurate Reporting',
-        customInstruction: ''
+        reason: g.sample.reason || 'Inaccurate Reporting',
+        customInstruction: g.sample.issue || ''
       });
     }
     if (additions.length) {

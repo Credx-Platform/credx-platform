@@ -429,6 +429,9 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
       sizeBytes: file.size,
       secure: true
     };
+    const inlineContent = docType === 'credit_report'
+      ? `data:${file.mimetype || 'application/octet-stream'};base64,${file.buffer.toString('base64')}`
+      : undefined;
 
     const progress = client.progress as any;
     const uploadedDocs = Array.isArray(progress.uploadedDocs) ? [...progress.uploadedDocs, secureDoc] : [secureDoc];
@@ -452,6 +455,7 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
       update: {
         type: toPrismaDocumentType(docType),
         s3Key: storageKey,
+        content: inlineContent,
         contentType: file.mimetype,
         uploadedAt: new Date(uploadedAt)
       },
@@ -460,6 +464,7 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
         type: toPrismaDocumentType(docType),
         fileName: safeName,
         s3Key: storageKey,
+        content: inlineContent,
         contentType: file.mimetype,
         uploadedAt: new Date(uploadedAt)
       }

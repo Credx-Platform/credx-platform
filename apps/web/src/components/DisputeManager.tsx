@@ -74,7 +74,143 @@ export type ImportedTradeline = {
   balance: number | null;
   isNegative: boolean;
   bureau: 'EXPERIAN' | 'EQUIFAX' | 'TRANSUNION';
+  source?: 'credit_report' | 'analysis';
+  issue?: string | null;
+  reason?: string | null;
+  priority?: string | null;
+  dateOpened?: string | null;
+  lastReported?: string | null;
 };
+
+type ReportDocument = {
+  id: string;
+  fileName?: string | null;
+  type?: string | null;
+  uploadedAt?: string | null;
+  createdAt?: string | null;
+  contentType?: string | null;
+};
+
+type SelectedClientContext = {
+  documents?: ReportDocument[];
+  creditReports?: Array<{
+    id: string;
+    bureau: 'EXPERIAN' | 'EQUIFAX' | 'TRANSUNION';
+    pulledAt: string;
+    tradelines?: Array<{
+      id: string;
+      creditorName?: string | null;
+      accountNumber?: string | null;
+      accountType?: string | null;
+      status?: string | null;
+      balance?: number | string | null;
+      isNegative?: boolean | null;
+    }>;
+  }>;
+  progress?: {
+    analysis?: any;
+  } | null;
+};
+
+const BUREAU_ALIASES: Record<string, ImportedTradeline['bureau']> = {
+  equifax: 'EQUIFAX',
+  efx: 'EQUIFAX',
+  experian: 'EXPERIAN',
+  xpn: 'EXPERIAN',
+  transunion: 'TRANSUNION',
+  trans: 'TRANSUNION',
+  tu: 'TRANSUNION'
+};
+
+function toBureau(value: unknown): ImportedTradeline['bureau'] | null {
+  const key = String(value || '').trim().toLowerCase().replace(/[^a-z]/g, '');
+  if (key.includes('equifax')) return 'EQUIFAX';
+  if (key.includes('experian')) return 'EXPERIAN';
+  if (key.includes('transunion')) return 'TRANSUNION';
+  return BUREAU_ALIASES[key] || null;
+}
+
+function toBureaus(value: unknown): ImportedTradeline['bureau'][] {
+  if (Array.isArray(value)) {
+    return Array.from(new Set(value.map(toBureau).filter(Boolean))) as ImportedTradeline['bureau'][];
+  }
+  if (typeof value === 'string' && value.trim()) {
+    return Array.from(new Set(value.split(/[,\|/]+/).map(toBureau).filter(Boolean))) as ImportedTradeline['bureau'][];
+  }
+  return [];
+}
+
+function accountLooksNegative(item: any) {
+  return !!item?.isNegative || !!item?.negative || /collection|charge.?off|late|derogatory|past due|negative/i.test(`${item?.status || ''} ${item?.accountType || ''} ${item?.category || ''} ${item?.type || ''}`);
+}
+
+function normalizeAccountType(value: unknown): string | null {
+  const text = String(value || '').toLowerCase();
+  if (text.includes('collection')) return 'COLLECTION';
+  if (text.includes('charge')) return 'CHARGE_OFF';
+  if (text.includes('late') || text.includes('past due')) return 'LATE_PAYMENT';
+  if (text.includes('inquir')) return 'INQUIRY';
+  return value ? String(value) : null;
+}
+
+function analysisAccountsToTradelines(analysis: any): ImportedTradeline[] {
+  if (!analysis || typeof analysis !== 'object') return [];
+  const rawAccounts = [
+    ...(Array.isArray(analysis.negativeAccounts) ? analysis.negativeAccounts : []),
+    ...(Array.isArray(analysis.derogatoryAccounts) ? analysis.derogatoryAccounts : []),
+    ...(Array.isArray(analysis.accounts) ? analysis.accounts.filter(accountLooksNegative) : []),
+    ...(Array.isArray(analysis.tradelines) ? analysis.tradelines.filter(accountLooksNegative) : []),
+    ...(Array.isArray(analysis.disputeOpportunities) ? analysis.disputeOpportunities : [])
+  ];
+
+  const out: ImportedTradeline[] = [];
+  rawAccounts.forEach((item, index) => {
+    const bureaus = toBureaus(item?.bureaus || item?.bureau || item?.reportedBureaus);
+    const reportBureaus = bureaus.length ? bureaus : (['EQUIFAX', 'EXPERIAN', 'TRANSUNION'] as ImportedTradeline['bureau'][]);
+    const accountName = String(item?.accountName || item?.creditorName || item?.furnisher || item?.name || item?.title || 'Reported account');
+    const accountNumber = item?.accountNumber || item?.account || item?.partialAccountNumber || null;
+    reportBureaus.forEach((bureau) => {
+      out.push({
+        id: `analysis-${index}-${bureau}`,
+        creditorName: accountName,
+        accountNumber: accountNumber ? String(accountNumber) : null,
+        accountType: normalizeAccountType(item?.accountType || item?.type || item?.category),
+        status: item?.status || item?.reportingStatus || item?.accountStatus || 'Analysis negative',
+        balance: item?.balance == null ? null : Number(item.balance),
+        isNegative: true,
+        bureau,
+        source: 'analysis',
+        issue: item?.issue || item?.description || item?.finding || null,
+        reason: item?.reason || item?.recommendation || item?.recommendedAction || 'Review for inaccurate, incomplete, outdated, inconsistent, or unverifiable reporting.',
+        priority: item?.priority || item?.severity || null,
+        dateOpened: item?.dateOpened || item?.openedDate || item?.openDate || null,
+        lastReported: item?.lastReported || item?.reportedDate || item?.dateReported || item?.updatedAt || null
+      });
+    });
+  });
+  return out;
+}
+
+function mergeTradelines(rows: ImportedTradeline[]): ImportedTradeline[] {
+  const map = new Map<string, ImportedTradeline>();
+  for (const row of rows) {
+    const key = `${(row.creditorName || '').trim().toLowerCase()}|${(row.accountNumber || '').trim()}|${row.bureau}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, row);
+      continue;
+    }
+    map.set(key, {
+      ...existing,
+      ...row,
+      source: existing.source === 'credit_report' ? existing.source : row.source,
+      issue: existing.issue || row.issue,
+      reason: existing.reason || row.reason,
+      priority: existing.priority || row.priority
+    });
+  }
+  return Array.from(map.values());
+}
 
 export function DisputeManager({ token }: DisputeManagerProps) {
   const [activeTab, setActiveTab] = useState<Tab>('add');
@@ -85,6 +221,8 @@ export function DisputeManager({ token }: DisputeManagerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tradelines, setTradelines] = useState<ImportedTradeline[]>([]);
+  const [reportDocuments, setReportDocuments] = useState<ReportDocument[]>([]);
+  const [openingReportId, setOpeningReportId] = useState<string | null>(null);
   const [bureausPrefillKey, setBureausPrefillKey] = useState<string | null>(null);
   const [creditorsPrefillKey, setCreditorsPrefillKey] = useState<string | null>(null);
   const [pendingBureausKeys, setPendingBureausKeys] = useState<string[]>([]);
@@ -144,33 +282,43 @@ export function DisputeManager({ token }: DisputeManagerProps) {
   const fetchTradelines = useCallback(async () => {
     if (!selectedClientId) {
       setTradelines([]);
+      setReportDocuments([]);
       return;
     }
     try {
       const response = await fetch(`${API_BASE}/api/clients/${selectedClientId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (!response.ok) { setTradelines([]); return; }
-      const data = await response.json();
-      const reports = data?.client?.creditReports || [];
+      if (!response.ok) { setTradelines([]); setReportDocuments([]); return; }
+      const data = await response.json() as { client?: SelectedClientContext };
+      const client = data?.client || {};
+      const reports = client.creditReports || [];
       const flat: ImportedTradeline[] = [];
       for (const r of reports) {
         for (const t of (r.tradelines || [])) {
           flat.push({
             id: t.id,
-            creditorName: t.creditorName,
-            accountNumber: t.accountNumber,
-            accountType: t.accountType,
-            status: t.status,
+            creditorName: t.creditorName || 'Unknown creditor',
+            accountNumber: t.accountNumber || null,
+            accountType: t.accountType || null,
+            status: t.status || null,
             balance: t.balance == null ? null : Number(t.balance),
             isNegative: !!t.isNegative,
-            bureau: r.bureau
+            bureau: r.bureau,
+            source: 'credit_report'
           });
         }
       }
-      setTradelines(flat);
+      const analysisRows = analysisAccountsToTradelines(client.progress?.analysis);
+      setTradelines(mergeTradelines([...flat, ...analysisRows]));
+      setReportDocuments((client.documents || []).filter((doc) => {
+        const type = String(doc.type || '').toUpperCase();
+        const name = String(doc.fileName || '').toLowerCase();
+        return type === 'CREDIT_REPORT' || name.includes('credit') || name.includes('report');
+      }));
     } catch {
       setTradelines([]);
+      setReportDocuments([]);
     }
   }, [token, selectedClientId]);
 
@@ -207,6 +355,33 @@ export function DisputeManager({ token }: DisputeManagerProps) {
       if (tries < 15) setTimeout(poll, 4000);
     };
     setTimeout(poll, 3000);
+  };
+
+  const openReportDocument = async (doc: ReportDocument) => {
+    if (!selectedClientId) return;
+    setOpeningReportId(doc.id);
+    try {
+      const response = await fetch(`${API_BASE}/api/clients/${selectedClientId}/documents/${doc.id}/print`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || `Could not open report: ${response.status}`);
+      if (payload.url) {
+        window.open(payload.url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      if (payload.content) {
+        const w = window.open('', '_blank', 'noopener,noreferrer');
+        if (!w) return;
+        const isHtml = /html/i.test(doc.contentType || doc.fileName || '');
+        w.document.write(isHtml ? String(payload.content) : `<pre style="white-space:pre-wrap;font-family:Arial,sans-serif;padding:24px;">${String(payload.content).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c])}</pre>`);
+        w.document.close();
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not open report');
+    } finally {
+      setOpeningReportId(null);
+    }
   };
 
   const tabs: { id: Tab; label: string }[] = [
@@ -319,6 +494,22 @@ export function DisputeManager({ token }: DisputeManagerProps) {
         .dm-client-copy strong { display:block; color:#0f172a; font-size:1rem; }
         .dm-client-copy span { color:#64748b; font-size:.875rem; }
         .dm-client-copy { min-width:0; }
+        .dm-report-links { display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; }
+        .dm-report-link {
+          border:1px solid #bfdbfe;
+          background:#eff6ff;
+          color:#1d4ed8;
+          border-radius:7px;
+          padding:.45rem .65rem;
+          font-size:.78rem;
+          font-weight:700;
+          cursor:pointer;
+          max-width:260px;
+          overflow:hidden;
+          text-overflow:ellipsis;
+          white-space:nowrap;
+        }
+        .dm-report-link:disabled { opacity:.6; cursor:wait; }
 
         .dm-client-picker {
           min-width:320px;
@@ -403,6 +594,20 @@ export function DisputeManager({ token }: DisputeManagerProps) {
               </option>
             ))}
           </select>
+          <div className="dm-report-links">
+            {reportDocuments.length ? reportDocuments.slice(0, 3).map((doc) => (
+              <button
+                key={doc.id}
+                type="button"
+                className="dm-report-link"
+                onClick={() => openReportDocument(doc)}
+                disabled={openingReportId === doc.id}
+                title={doc.fileName || 'Credit report'}
+              >
+                {openingReportId === doc.id ? 'Opening...' : `Report: ${doc.fileName || doc.id}`}
+              </button>
+            )) : <span style={{ color: '#94a3b8', fontSize: '.78rem' }}>No uploaded credit report document found.</span>}
+          </div>
         </div>
         <div className="dm-workflow-rail" aria-label="Dispute workflow">
           <div className="dm-workflow-step"><strong>1. Add report</strong>Import or upload the client credit report.</div>

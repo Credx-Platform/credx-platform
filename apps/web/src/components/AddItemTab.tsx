@@ -150,6 +150,20 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
     clearTradelineSelection();
   };
 
+  const sendAllVisibleToBureaus = () => {
+    if (!onAddTradelinesToBureaus) return;
+    const keys = visibleTradelines.filter((g) => !usedTradelineKeys.has(g.key)).map((g) => g.key);
+    if (!keys.length) return;
+    onAddTradelinesToBureaus(keys);
+    clearTradelineSelection();
+  };
+
+  const sendOneToBureaus = (key: string) => {
+    if (!onAddTradelinesToBureaus || usedTradelineKeys.has(key)) return;
+    onAddTradelinesToBureaus([key]);
+    clearTradelineSelection();
+  };
+
   const sendSelectedToCreditors = () => {
     if (!selectedTradelineKeys.size || !onAddTradelinesToCreditors) return;
     onAddTradelinesToCreditors(Array.from(selectedTradelineKeys));
@@ -302,6 +316,11 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
                   <button type="button" onClick={selectAllVisibleTradelines} style={{ fontSize: 11, padding: '3px 9px', background: 'transparent', border: '1px solid #cbd5e1', borderRadius: 4, color: '#475569', cursor: 'pointer', fontWeight: 600 }}>
                     Select all visible ({selectableCount})
                   </button>
+                  {onAddTradelinesToBureaus ? (
+                    <button type="button" onClick={sendAllVisibleToBureaus} style={{ fontSize: 11, padding: '3px 9px', background: '#0f172a', border: '1px solid #0f172a', borderRadius: 4, color: '#fff', cursor: 'pointer', fontWeight: 700 }}>
+                      Add all negative to Bureaus
+                    </button>
+                  ) : null}
                   {selectedCount ? (
                     <button type="button" onClick={clearTradelineSelection} style={{ fontSize: 11, padding: '3px 9px', background: 'transparent', border: '1px solid #cbd5e1', borderRadius: 4, color: '#475569', cursor: 'pointer', fontWeight: 600 }}>
                       Clear
@@ -355,6 +374,23 @@ export function AddItemTab({ token, items, selectedClientId, selectedClientLabel
                     </div>
                     <div className="tradeline-row__sub">
                       {g.sample.accountNumber ? `Acct ${g.sample.accountNumber} · ` : ''}{g.sample.accountType || 'Unknown type'}{g.sample.status ? ` · ${g.sample.status}` : ''}
+                      {g.sample.source === 'analysis' ? ' · Analysis' : ''}
+                    </div>
+                    {(g.sample.issue || g.sample.reason) ? (
+                      <div className="tradeline-row__sub" style={{ marginTop: 2 }}>
+                        {g.sample.issue || g.sample.reason}
+                      </div>
+                    ) : null}
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                      {onAddTradelinesToBureaus && !used ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => { ev.stopPropagation(); sendOneToBureaus(g.key); }}
+                          style={{ fontSize: 11, padding: '3px 8px', background: '#00c6fb', color: '#0f1929', border: 'none', borderRadius: 4, fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Add to Bureaus
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>

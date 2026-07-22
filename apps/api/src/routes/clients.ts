@@ -87,6 +87,10 @@ async function sendPrintableDocument(res: any, document: PrintableDocument) {
 
   // Prefer the DB-stored body: reliable across redeploys/replicas. Generated
   // dispute letters store their content here.
+  if (document.content && /^data:/i.test(document.content.trim())) {
+    return res.json({ document, url: document.content, signature });
+  }
+
   if (document.content) {
     return res.json({ document, content: document.content, signature });
   }
