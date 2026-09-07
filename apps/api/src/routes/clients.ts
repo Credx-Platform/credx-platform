@@ -9,6 +9,7 @@ import { CreditAnalysisService } from '../lib/creditAnalysis.js';
 import { dispatchAnalysisEmail } from '../lib/analysisEmailDispatch.js';
 import { decryptPII, encryptPII } from '../lib/encryption.js';
 import { getSignedUrlForStoredDocument } from '../lib/blob-storage.js';
+import { findClientDocumentForUser } from '../lib/tenantQueries.js';
 import { extractReport } from '../lib/reportExtractor.js';
 import { syncReportDerivedClientData } from '../lib/clientReportSync.js';
 import { defaultAffiliateLinks, recommendedAffiliateLinksForAnalysis } from '../lib/affiliateLinks.js';
@@ -288,16 +289,7 @@ clientsRouter.get('/me', requireAuth, async (req: AuthedRequest, res, next) => {
 clientsRouter.get('/me/documents/:documentId/print', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
     const documentId = String(req.params.documentId);
-    const client = await prisma.client.findUnique({
-      where: { userId: req.auth!.sub },
-      select: { id: true }
-    });
-
-    if (!client) return res.status(404).json({ error: 'Client not found' });
-
-    const document = await prisma.document.findFirst({
-      where: { id: documentId, clientId: client.id }
-    });
+    const document = await findClientDocumentForUser(req.auth!.sub, documentId);
 
     if (!document) return res.status(404).json({ error: 'Document not found' });
 

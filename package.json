@@ -14,6 +14,7 @@
     "build:web": "npm run build --workspace @credx/web",
     "test:readiness": "node --import tsx --test apps/api/tests/readinessScore.test.ts",
   "test": "node --import tsx --test apps/api/tests/*.test.ts",
+    "test:integration": "node --import tsx --test apps/api/tests/*.integration.test.ts",
     "start": "npm run start:api",
     "start:api": "npm run start --workspace @credx/api",
     "start:worker": "npm run start:worker --workspace @credx/api",
