@@ -49,7 +49,7 @@ usersRouter.put('/me/profile', requireAuth, async (req: AuthedRequest, res, next
 usersRouter.get('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (_req, res, next) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, email: true, firstName: true, lastName: true, role: true, createdAt: true, updatedAt: true },
+      select: { id: true, email: true, firstName: true, lastName: true, phone: true, role: true, createdAt: true, updatedAt: true },
       orderBy: { createdAt: 'desc' }
     });
     return res.json(users);

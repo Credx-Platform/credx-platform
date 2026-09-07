@@ -11,6 +11,8 @@ import {
   getPaypalOrder,
   verifyPaypalWebhookSignature
 } from '../lib/paypal.js';
+import { config } from '../config.js';
+import { entitlementsForPlan, planCodeForServiceTier, publicPlanCatalog } from '../lib/entitlements.js';
 
 export const billingRouter = Router();
 
@@ -54,14 +56,26 @@ function masterclassPriceForOffer(offer: MasterclassOffer | null) {
 }
 
 billingRouter.get('/plans', (_req, res) => {
-  res.json({
-    plans: [
-      { code: 'MASTERCLASS', oneTime: 47, monthly: null, note: '+ applicable taxes & processing fees.' },
-      { code: 'ESSENTIAL', setupFee: 150, monthly: 75 },
-      { code: 'PREMIUM', oneTime: 447, monthly: null, billing: 'Billed after first full dispute round is delivered. No guaranteed outcome.' },
-      { code: 'FAMILY', setupFee: 300, monthly: 95 }
-    ]
-  });
+  res.json({ plans: publicPlanCatalog() });
+});
+
+billingRouter.get('/entitlements/me', requireAuth, async (req, res, next) => {
+  try {
+    const authed = req as express.Request & { auth?: { sub: string; role: string } };
+    const client = await prisma.client.findUnique({
+      where: { userId: authed.auth!.sub },
+      include: { progress: true }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client profile not found' });
+
+    const education = client.progress?.education as Record<string, unknown> | null;
+    const masterclassOnly = client.status === 'STUDENT' || education?.masterclassAccess === true;
+    const plan = masterclassOnly ? 'MASTERCLASS' : planCodeForServiceTier(client.serviceTier);
+    return res.json({ plan, entitlements: entitlementsForPlan(plan) });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================
@@ -318,13 +332,17 @@ billingRouter.post('/paypal/webhook', async (req, res) => {
   }
 });
 
-// Online payment confirmation — processor-agnostic (Authorize.Net / PaymentCloud).
-// Your processor's webhook (or a relay) POSTs here once a payment clears, and this
-// triggers the SAME settle-and-activate path as the manual "Mark Paid" button.
-// Secured with a shared secret (BILLING_CONFIRM_SECRET) sent as x-billing-secret
-// or in the body. The caller must include the clientId (e.g. mapped from the
-// Authorize.Net invoice/refId you set at checkout).
-billingRouter.post('/confirm', async (req, res, next) => {
+const processorConfirmSchema = z.object({
+  clientId: z.string().min(1),
+  paymentType: z.enum(['SETUP_FEE', 'MONTHLY']).default('SETUP_FEE'),
+  amount: z.number().nonnegative().optional(),
+  currency: z.string().min(3).max(3).optional(),
+  reference: z.string().max(160).optional(),
+  provider: z.string().max(40).optional(),
+  secret: z.string().optional()
+});
+
+async function confirmProcessorPayment(req: express.Request, res: express.Response, next: express.NextFunction, defaultProvider: string) {
   try {
     const secret = process.env.BILLING_CONFIRM_SECRET || '';
     const provided = (req.headers['x-billing-secret'] as string | undefined) || req.body?.secret;
@@ -332,28 +350,45 @@ billingRouter.post('/confirm', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const clientId = String(req.body?.clientId || '');
-    if (!clientId) return res.status(400).json({ error: 'clientId is required' });
-
-    const amount = typeof req.body?.amount === 'number' ? req.body.amount : undefined;
-    const currency = typeof req.body?.currency === 'string' ? req.body.currency : undefined;
-    const reference = typeof req.body?.reference === 'string' ? req.body.reference : undefined;
+    const data = processorConfirmSchema.parse(req.body);
+    const provider = (data.provider || defaultProvider).toLowerCase();
 
     // Settle ONLY — payment never triggers dispute work (counsel, 2026-07-07).
     // The processor already captured the money, so an early payment is recorded
     // and flagged for review/refund rather than rejected.
-    const { settleSetupPayment } = await import('../lib/billingActivation.js');
-    const result = await settleSetupPayment(clientId, {
-      amount, currency, reference, method: 'online', recordDespiteGate: true
-    });
+    const { settleSetupPayment, recordMonthlySubscriptionPayment } = await import('../lib/billingActivation.js');
+    const result = data.paymentType === 'MONTHLY'
+      ? await recordMonthlySubscriptionPayment(data.clientId, {
+        amount: data.amount,
+        currency: data.currency,
+        reference: data.reference,
+        method: provider
+      })
+      : await settleSetupPayment(data.clientId, {
+        amount: data.amount,
+        currency: data.currency,
+        reference: data.reference,
+        method: provider,
+        recordDespiteGate: true
+      });
 
-    return res.json({ success: true, settled: true, ...result });
+    return res.json({ success: true, settled: true, provider, paymentType: data.paymentType, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (message === 'Client not found') return res.status(404).json({ error: message });
     next(error);
   }
-});
+}
+
+// Online payment confirmation — processor-agnostic (Authorize.Net / PaymentCloud).
+// Your processor's webhook (or a relay) POSTs here once a payment clears.
+// Secured with BILLING_CONFIRM_SECRET sent as x-billing-secret or in the body.
+// The caller must include clientId and should include reference. paymentType
+// defaults to SETUP_FEE; use MONTHLY for paid subscription renewals.
+billingRouter.post('/confirm', (req, res, next) => confirmProcessorPayment(req, res, next, 'online'));
+
+// Explicit PaymentCloud relay endpoint for production payment/subscription wiring.
+billingRouter.post('/paymentcloud/confirm', (req, res, next) => confirmProcessorPayment(req, res, next, 'paymentcloud'));
 
 billingRouter.get('/admin/aging', requireAuth, requireRole(['STAFF', 'ADMIN']), (_req, res) => {
   res.json({ message: 'Billing retry automation scaffold pending Stripe webhook + scheduler integration.' });
@@ -379,11 +414,18 @@ billingRouter.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'] as string | undefined;
   const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
+  const stripeConfigured = Boolean(stripeSecretKey && stripeWebhookSecret);
   
   let event: any;
   
   try {
-    if (stripeSecretKey && stripeWebhookSecret && sig) {
+    if (config.nodeEnv === 'production' && !stripeConfigured) {
+      return res.status(503).json({ error: 'Stripe webhook is not configured' });
+    }
+    if (config.nodeEnv === 'production' && !sig) {
+      return res.status(400).json({ error: 'Missing Stripe webhook signature' });
+    }
+    if (stripeConfigured && sig) {
       // Verify signature with Stripe SDK
       const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-05-27.dahlia' as any });
       // Stripe signs the raw request bytes — re-serializing the parsed body
@@ -396,7 +438,7 @@ billingRouter.post('/webhook', async (req, res) => {
         return res.status(400).send(`Webhook signature verification failed: ${verifyErr.message}`);
       }
     } else {
-      // No Stripe credentials configured — parse body directly (testing mode)
+      // No Stripe credentials configured — parse body directly in local/dev testing only.
       event = req.body;
     }
   } catch (err: any) {

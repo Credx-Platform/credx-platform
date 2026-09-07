@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { config } from '../config.js';
 import { notifyNewLead, sendWelcomeLeadEmail } from '../lib/email.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { verifyTurnstileFromBody } from '../lib/turnstile.js';
+import { logTurnstileRejection, verifyTurnstileFromBody } from '../lib/turnstile.js';
 
 export const leadsRouter = Router();
 
@@ -32,12 +32,20 @@ const createLeadSchema = z.object({
 leadsRouter.post('/', async (req, res, next) => {
   try {
     const captcha = await verifyTurnstileFromBody(req.body, req.ip);
-    if (!captcha.ok) return res.status(400).json({ error: captcha.reason || 'CAPTCHA verification failed' });
+    if (!captcha.ok) {
+      logTurnstileRejection('/api/leads', captcha, {
+        hasToken: Boolean(req.body?.turnstileToken || req.body?.['cf-turnstile-response']),
+        referer: req.headers.referer,
+        origin: req.headers.origin,
+        userAgent: req.headers['user-agent']
+      });
+      return res.status(400).json({ error: captcha.reason || 'CAPTCHA verification failed' });
+    }
     const data = createLeadSchema.parse(req.body);
     const offerEligibleUntil = new Date(Date.now() + 48 * 60 * 60 * 1000);
     const affiliateLinks = [
       { label: 'Self Lender', url: 'https://self.inc/refer/16452347', category: 'credit_builder' },
-      { label: 'Credit Strong', url: 'https://tracking.creditstrong.com/aff_c?aff_id=1491&offer_id=2&source=MGFinstagram', category: 'credit_builder' },
+      { label: 'Credit Strong', url: 'https://creditstrong.referralrock.com/l/3JAMES442/', category: 'credit_builder' },
       { label: 'Rent Reporters', url: 'https://prf.hn/click/camref:1101l52pUS', category: 'credit_builder' },
       { label: 'Credit Builder Card', url: 'https://www.creditbuildercard.com/mgf.html', category: 'credit_builder' },
       { label: 'Grow Credit', url: 'https://growcredit.com/?kid=12BYTD', category: 'credit_builder' },

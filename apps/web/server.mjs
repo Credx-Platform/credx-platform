@@ -12,6 +12,11 @@ const canonicalHost = process.env.CANONICAL_HOST ?? 'www.credxme.com';
 const redirectHosts = new Set(
   (process.env.REDIRECT_HOSTS ?? 'credxme.com').split(',').map((h) => h.trim()).filter(Boolean)
 );
+const turnstileSiteKey = (
+  process.env.TURNSTILE_SITE_KEY ??
+  process.env.CLOUDFLARE_TURNSTILE_SITE_KEY ??
+  ''
+).trim();
 
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -45,9 +50,11 @@ const securityHeaders = {
 };
 
 const staticPageRoutes = new Map([
+  ['/product', 'product.html'],
   ['/start', 'start.html'],
   ['/signup', 'signup.html'],
   ['/contract', 'signup.html'],
+  ['/affiliate-onboarding', 'portal.html'],
   ['/portal', 'portal.html'],
   ['/adminportal', 'adminportal.html'],
   ['/masterclass', 'masterclass.html'],
@@ -61,11 +68,19 @@ const staticPageRoutes = new Map([
   ['/cancellation-policy', 'cancellation-policy.html']
 ]);
 
+const routeRedirects = new Map([
+  ['/affiliate', '/affiliate-onboarding'],
+  ['/employee', '/adminportal'],
+  ['/staff', '/adminportal']
+]);
+
 // Prefix routes serve their page for any subpath (client-side routing / promo slugs).
 const prefixPageRoutes = [
   ['/start/', 'start.html'],
+  ['/product/', 'product.html'],
   ['/signup/', 'signup.html'],
   ['/contract/', 'signup.html'],
+  ['/affiliate-onboarding/', 'portal.html'],
   ['/portal/', 'portal.html'],
   ['/adminportal/', 'adminportal.html'],
   ['/masterclass-checkout/', 'masterclass-checkout.html']
@@ -90,6 +105,16 @@ function serveFile(res, path) {
   }
   res.writeHead(200, headers);
   createReadStream(path).pipe(res);
+}
+
+function serveTurnstileConfig(res) {
+  const body = `window.CREDX_TURNSTILE_SITE_KEY=${JSON.stringify(turnstileSiteKey)};\n`;
+  res.writeHead(200, {
+    'content-type': 'application/javascript; charset=utf-8',
+    'cache-control': 'public, max-age=0, must-revalidate',
+    ...securityHeaders
+  });
+  res.end(body);
 }
 
 async function proxyToApi(req, res) {
@@ -144,7 +169,8 @@ async function proxyToApi(req, res) {
 }
 
 const server = createServer(async (req, res) => {
-  const requestPath = new URL(req.url ?? '/', 'http://localhost').pathname;
+  const requestUrl = new URL(req.url ?? '/', 'http://localhost');
+  const requestPath = requestUrl.pathname;
 
   const host = (req.headers.host ?? '').split(':')[0].toLowerCase();
   if (canonicalHost && redirectHosts.has(host)) {
@@ -154,6 +180,19 @@ const server = createServer(async (req, res) => {
 
   if (requestPath === '/health' || requestPath.startsWith('/api/')) {
     return proxyToApi(req, res);
+  }
+
+  if (requestPath === '/turnstile-config.js') {
+    return serveTurnstileConfig(res);
+  }
+
+  const redirectKey = requestPath.endsWith('/') && requestPath !== '/'
+    ? requestPath.slice(0, -1)
+    : requestPath;
+  const redirectTarget = routeRedirects.get(redirectKey);
+  if (redirectTarget) {
+    res.writeHead(308, { location: `${redirectTarget}${requestUrl.search}`, ...securityHeaders });
+    return res.end();
   }
 
   if (requestPath === '/' || requestPath === '/index.html') {

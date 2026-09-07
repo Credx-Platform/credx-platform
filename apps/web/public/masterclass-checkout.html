@@ -205,6 +205,18 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
     errorBox.classList.remove('show');
     pendingBox.classList.remove('show');
   }
+  function fetchWithTimeout(url, options, timeoutMs) {
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); }, timeoutMs || 20000);
+    return fetch(url, Object.assign({}, options || {}, { signal: controller.signal }))
+      .catch(function (err) {
+        if (controller.signal.aborted) {
+          throw new Error('This is taking longer than normal. Your enrollment may still be processing. Check your email in a minute, then try again only if no CredX email arrives.');
+        }
+        throw err;
+      })
+      .finally(function () { clearTimeout(timeout); });
+  }
   function buyer() {
     return {
       firstName: document.getElementById('firstName').value.trim(),
@@ -229,7 +241,7 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
     }
     claimFreeBtn.disabled = true;
     claimFreeBtn.textContent = 'Creating your access...';
-    fetch('/api/billing/masterclass/promo-enroll', {
+    fetchWithTimeout('/api/billing/masterclass/promo-enroll', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -239,7 +251,7 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
         lastName: b.lastName,
         email: b.email
       })
-    }).then(function (r) {
+    }, 20000).then(function (r) {
       return r.json().then(function (d) { return { ok: r.ok, d: d }; });
     }).then(function (res) {
       if (!res.ok) throw new Error(res.d && res.d.error ? res.d.error : 'promo');
@@ -259,7 +271,7 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
   promoApplyBtn.addEventListener('click', function () { applyPromoCode(true); });
   claimFreeBtn.addEventListener('click', claimFreeAccess);
 
-  fetch('/api/billing/paypal/config')
+  fetchWithTimeout('/api/billing/paypal/config', {}, 10000)
     .then(function (r) { return r.json(); })
     .then(function (cfg) {
       if (!cfg.enabled || !cfg.clientId) {
@@ -286,21 +298,21 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
         return actions.resolve();
       },
       createOrder: function () {
-        return fetch('/api/billing/paypal/order', {
+        return fetchWithTimeout('/api/billing/paypal/order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ product: 'MASTERCLASS', offerKey: offerKey || undefined })
-        }).then(function (r) {
+        }, 20000).then(function (r) {
           if (!r.ok) throw new Error('order');
           return r.json();
         }).then(function (d) { return d.orderId; });
       },
       onApprove: function (data) {
-        return fetch('/api/billing/paypal/order/' + encodeURIComponent(data.orderID) + '/capture', {
+        return fetchWithTimeout('/api/billing/paypal/order/' + encodeURIComponent(data.orderID) + '/capture', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(buyer())
-        }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        }, 25000).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
             if (!res.ok) throw new Error(res.d && res.d.error ? res.d.error : 'capture');
             if (res.d.pending) {

@@ -49,6 +49,17 @@ function onboardingStep(client) {
   return 'intake';
 }
 
+function compactStatus(value) {
+  return String(value || '')
+    .replace(/_/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function contactName(contact) {
+  return [contact?.firstName, contact?.lastName].filter(Boolean).join(' ').trim() || contact?.email || contact?.phone || 'Unknown lead';
+}
+
 function shanghaiDayWindow(now = new Date()) {
   const shanghaiOffsetMs = 8 * 60 * 60 * 1000;
   const local = new Date(now.getTime() + shanghaiOffsetMs);
@@ -117,7 +128,7 @@ async function signupWatch() {
 
 async function dailyReport() {
   const { start, end } = shanghaiDayWindow();
-  const [newClients, updatedClients, leads, openTasks, completedTasks, activityEvents, auditLogs] = await Promise.all([
+  const [newClients, updatedClients, leads, subAgentContacts, openTasks, completedTasks, activityEvents, auditLogs] = await Promise.all([
     prisma.client.findMany({
       where: { createdAt: { gte: start, lte: end } },
       orderBy: { createdAt: 'asc' },
@@ -130,6 +141,12 @@ async function dailyReport() {
       include: { user: true, progress: true }
     }),
     prisma.lead.findMany({ where: { createdAt: { gte: start, lte: end } }, orderBy: { createdAt: 'asc' } }),
+    prisma.subAgentContact.findMany({
+      where: { createdAt: { gte: start, lte: end } },
+      orderBy: { createdAt: 'asc' },
+      take: 20,
+      include: { subAgent: true }
+    }),
     prisma.task.findMany({
       where: { completed: false },
       orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }],
@@ -155,14 +172,31 @@ async function dailyReport() {
     })
   ]);
 
-  const done = [
-    ...newClients.map((client) => `New client signup: ${fullName(client.user)} (${onboardingStep(client)})`),
-    ...leads.map((lead) => `New lead form: ${fullName(lead)} (${lead.offerInterest || 'program'})`),
+  const newClientIds = new Set(newClients.map((client) => client.id));
+  const updatedExistingClients = updatedClients.filter((client) => !newClientIds.has(client.id));
+  const clientAuditLogs = auditLogs.filter(
+    (log) => ['Client', 'Task', 'ActivityEvent'].includes(log.entityType) && !String(log.action).includes('DELETED')
+  );
+
+  const clientActivity = [
     ...activityEvents.map((event) => `${fullName(event.client.user)}: ${event.message}`),
-    ...completedTasks.map((task) => `Completed task: ${task.title} for ${fullName(task.client.user)}`)
+    ...completedTasks.map((task) => `Completed task: ${task.title} for ${fullName(task.client.user)}`),
+    ...updatedExistingClients.map(
+      (client) => `Updated client: ${fullName(client.user)} (${compactStatus(client.status)}; ${onboardingStep(client)})`
+    ),
+    ...clientAuditLogs.map((log) => `Admin activity: ${compactStatus(log.action)} on ${compactStatus(log.entityType)}`)
   ];
 
-  const tomorrow = [
+  const leadActivity = [
+    ...newClients.map((client) => `New client signup: ${fullName(client.user)} (${onboardingStep(client)})`),
+    ...leads.map((lead) => `New lead form: ${fullName(lead)} (${lead.offerInterest || 'program'})`),
+    ...subAgentContacts.map((contact) => {
+      const source = contact.subAgent?.name ? ` via ${contact.subAgent.name}` : '';
+      return `Sub-agent lead: ${contactName(contact)} (${compactStatus(contact.status) || 'tracked'}${source})`;
+    })
+  ];
+
+  const followUps = [
     ...openTasks.slice(0, 8).map((task) => `Follow up: ${task.title} for ${fullName(task.client.user)}`),
     ...updatedClients
       .filter((client) => onboardingStep(client).includes('pending'))
@@ -176,19 +210,23 @@ async function dailyReport() {
     counts: {
       newClientSignups: newClients.length,
       leadForms: leads.length,
+      subAgentContacts: subAgentContacts.length,
       updatedClients: updatedClients.length,
       activityEvents: activityEvents.length,
       openTasks: openTasks.length,
       auditLogs: auditLogs.length
     },
     message: [
-      'CredX daily report',
+      'CredX daily review',
       '',
-      'Done today:',
-      ...(done.length ? done.map((item) => `- ${item}`) : ['- No client-facing activity recorded in the database today.']),
+      'Client activity:',
+      ...(clientActivity.length ? clientActivity.map((item) => `- ${item}`) : ['- No client activity recorded today.']),
       '',
-      'Tomorrow:',
-      ...(tomorrow.length ? tomorrow.map((item) => `- ${item}`) : ['- Review new leads, onboarding stalls, and any manual follow-ups in the admin portal.'])
+      'Leads:',
+      ...(leadActivity.length ? leadActivity.map((item) => `- ${item}`) : ['- No new leads recorded today.']),
+      '',
+      'Next-day follow-ups:',
+      ...(followUps.length ? followUps.map((item) => `- ${item}`) : ['- Review new leads, onboarding stalls, and any manual follow-ups in the admin portal.'])
     ].join('\n')
   });
 }

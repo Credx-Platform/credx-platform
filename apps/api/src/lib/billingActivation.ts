@@ -1,23 +1,32 @@
 import { prisma } from './prisma.js';
+import { monthlyFeeForPlan, planCodeForServiceTier, setupFeeForPlan } from './entitlements.js';
 
-// First-work fee by service tier. Charged only AFTER the analysis is delivered and
-// the dispute work begins (see /pricing). Single source of truth for the setup amount.
+// First-work fee by service tier. Charged only AFTER the analysis review is
+// delivered and confirmed (see /pricing). Single source of truth for the setup amount.
 export const TIER_SETUP_FEE: Record<string, number> = {
   ESSENTIAL: 150,
   AGGRESSIVE: 447, // "Premium" tier
   FAMILY: 300
 };
 
+export const TIER_MONTHLY_FEE: Record<string, number> = {
+  ESSENTIAL: 75,
+  AGGRESSIVE: 0, // Premium is one-time after analysis review
+  FAMILY: 95
+};
+
 export function setupFeeForTier(tier?: string | null): number {
-  return TIER_SETUP_FEE[(tier || 'ESSENTIAL').toUpperCase()] ?? 150;
+  return setupFeeForPlan(planCodeForServiceTier(tier));
+}
+
+export function monthlyFeeForTier(tier?: string | null): number {
+  return monthlyFeeForPlan(planCodeForServiceTier(tier));
 }
 
 /**
- * Create the pending "bill". Called when proof of mailing for the first dispute
- * round is recorded (Lob send or manual mail log) — NOT at analysis time; per
- * counsel (2026-07-07) the fee becomes chargeable only after the work is
- * performed. Idempotent: if a SETUP_FEE payment already exists for the client
- * (pending or paid), it is reused.
+ * Create the pending "bill". Called after the analysis review has been delivered
+ * and confirmed. Idempotent: if a SETUP_FEE payment already exists for the
+ * client (pending or paid), it is reused.
  */
 export async function createPendingSetupBill(clientId: string, tier?: string | null) {
   const existing = await prisma.payment.findFirst({
@@ -42,12 +51,16 @@ export type SettleResult = {
   gateWarnings?: string[];
 };
 
+export type MonthlyPaymentResult = {
+  payment: { amount: number; currency: string; status: 'PAID' };
+};
+
 /**
  * Settle the client's setup-fee bill. Settle ONLY — per counsel guidance
  * (2026-07-07), payment must never trigger dispute work; the sequence is
- * work → proof of mailing → cancellation window expired → then charge.
+ * analysis review delivered → cancellation window expired → then charge.
  * Dispute activation is a separate admin action (activateClientDisputeCampaign)
- * and the pending bill is raised when mailing proof is first recorded.
+ * and the pending bill is raised after analysis review.
  *
  * Throws BillingGateError when the CROA gate isn't satisfied, unless
  * opts.recordDespiteGate is set (online webhooks: the processor already moved
@@ -137,5 +150,63 @@ export async function settleSetupPayment(
   return {
     payment: { amount, currency, status: 'PAID' },
     gateWarnings: gate.eligible ? undefined : gate.reasons
+  };
+}
+
+export async function recordMonthlySubscriptionPayment(
+  clientId: string,
+  opts?: {
+    amount?: number;
+    currency?: string;
+    reference?: string;
+    method?: string;
+  }
+): Promise<MonthlyPaymentResult> {
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) throw new Error('Client not found');
+
+  const amount = opts?.amount ?? monthlyFeeForTier(client.serviceTier);
+  const currency = opts?.currency ?? 'USD';
+  const method = opts?.method || 'paymentcloud';
+
+  await prisma.payment.create({
+    data: {
+      clientId,
+      amount,
+      currency,
+      type: 'MONTHLY',
+      status: 'PAID',
+      paidAt: new Date(),
+      provider: method,
+      providerRef: opts?.reference || null
+    }
+  });
+
+  if (client.status === 'PAST_DUE' || client.status === 'RESTRICTED' || client.portalRestricted) {
+    await prisma.client.update({
+      where: { id: clientId },
+      data: {
+        status: 'ACTIVE',
+        portalRestricted: false
+      }
+    });
+  }
+
+  await prisma.activityEvent.create({
+    data: {
+      clientId,
+      type: 'PAYMENT_RECEIVED',
+      message: `Monthly subscription payment of $${amount} ${currency} received (${method}).`,
+      metadata: {
+        amount,
+        currency,
+        method,
+        reference: opts?.reference || null
+      }
+    }
+  });
+
+  return {
+    payment: { amount, currency, status: 'PAID' }
   };
 }

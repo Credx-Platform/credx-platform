@@ -4,7 +4,7 @@ import { prisma } from './prisma.js';
  * CROA billing/work gates per counsel guidance (2026-07-07).
  *
  * Setup fee may be charged only when ALL of:
- *   first_round_sent && proof_of_mailing_recorded && cancellation_window_expired
+ *   analysis_review_completed && service_agreement_signed && cancellation_window_expired
  * and no paid dispute work (letter generation/mailing) may begin until the
  * contract is signed and the 3-business-day cancellation window has expired.
  */
@@ -80,13 +80,12 @@ export async function disputeWorkGate(clientId: string): Promise<GateResult> {
 export async function setupFeeBillingGate(clientId: string): Promise<GateResult> {
   const { reasons, windowEndsAt } = contractWindowReasons(await serviceContractFor(clientId));
 
-  const round = await prisma.disputeRound.findFirst({
-    where: { disputeItem: { clientId }, roundNumber: 1 }
+  const progress = await prisma.clientProgress.findUnique({
+    where: { clientId },
+    select: { workflow: true }
   });
-  if (!round) reasons.push('First dispute round has not been generated.');
-
-  const proof = await firstRoundMailingProof(clientId);
-  if (!proof) reasons.push('No proof of mailing recorded for the first dispute round.');
+  const completedAt = (progress?.workflow as any)?.analysisReview?.completedAt;
+  if (!completedAt) reasons.push('Analysis review has not been completed and confirmed.');
 
   return { eligible: reasons.length === 0, reasons, windowEndsAt };
 }

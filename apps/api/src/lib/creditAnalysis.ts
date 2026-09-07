@@ -782,7 +782,7 @@ const EDUCATION_SECTION = `
 **Your rights under the FCRA:**
 - You can dispute any inaccurate, incomplete, or unverifiable item
 - Bureaus must reinvestigate within 30 days
-- If an item cannot be verified, it must be deleted
+- If an item cannot be verified as accurate and complete, it should be corrected or deleted
 - You can request method-of-verification details from the bureau
 
 **What makes an item challengeable:**

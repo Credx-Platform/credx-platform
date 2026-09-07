@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { sendEmail } from '../lib/email.js';
@@ -81,9 +82,9 @@ disputesRouter.post('/seed-case', requireAuth, async (req: AuthedRequest, res, n
 
     const now = new Date().toISOString();
     const disputes = [
-      { id: crypto.randomUUID(), title: 'Capital One dispute', bureau: 'Experian', status: 'drafted', priority: 'high', type: 'bureau_packet', createdAt: now },
-      { id: crypto.randomUUID(), title: 'Midland Credit validation', bureau: 'Experian / TransUnion', status: 'drafted', priority: 'high', type: 'collector_validation', createdAt: now },
-      { id: crypto.randomUUID(), title: 'Personal information cleanup', bureau: 'All 3 Bureaus', status: 'drafted', priority: 'high', type: 'bureau_packet', createdAt: now }
+      { id: randomUUID(), title: 'Capital One dispute', bureau: 'Experian', status: 'drafted', priority: 'high', type: 'bureau_packet', createdAt: now },
+      { id: randomUUID(), title: 'Midland Credit validation', bureau: 'Experian / TransUnion', status: 'drafted', priority: 'high', type: 'collector_validation', createdAt: now },
+      { id: randomUUID(), title: 'Personal information cleanup', bureau: 'All 3 Bureaus', status: 'drafted', priority: 'high', type: 'bureau_packet', createdAt: now }
     ];
     const analysis = {
       caseId: 'galloway',
@@ -129,7 +130,7 @@ disputesRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => {
 
       const createdAt = new Date().toISOString();
       const dispute = {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         title: `${String(req.body?.accountName || 'Manual dispute').trim()} dispute`,
         bureau: String(req.body?.bureau || 'All 3 Bureaus'),
         status: 'drafted',

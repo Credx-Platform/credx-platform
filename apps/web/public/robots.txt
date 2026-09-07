@@ -6,4 +6,4 @@ Disallow: /adminportal
 Disallow: /adminportal/
 Disallow: /api/
 
-Sitemap: https://credxme.com/sitemap.xml
+Sitemap: https://www.credxme.com/sitemap.xml

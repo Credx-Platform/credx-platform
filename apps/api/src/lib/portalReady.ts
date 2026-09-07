@@ -5,14 +5,8 @@ import { buildPasswordSetupLink, issuePasswordSetupToken } from './passwordSetup
 
 /**
  * Single source of truth for "is the client allowed into the portal yet,
- * and have we already emailed them the setup link?" Called from both the
- * /applications and /monitoring route handlers so finishing either step
- * (whichever happens last) can fire the email.
- *
- * Monitoring credentials used to be required here. They no longer are —
- * we don't want to lose paid leads to an abandoned monitoring step. The
- * portal-ready email now fires as soon as contract + profile are both
- * complete; clients can connect monitoring later from inside the portal.
+ * and have we already emailed them the setup link?" Called after the client
+ * chooses an approved monitoring provider or uploads a PDF/HTML credit report.
  *
  * FAIL-SOFT: This function never throws. Every error is caught and
  * returned as a `{ status: 'failed' }` result so callers (the upload /
@@ -23,7 +17,7 @@ export const PORTAL_READY_GUARD_KEY = 'portalReadyEmailSentAt';
 
 export function isContractSigned(progress: any): boolean {
   const stage = progress?.workflow?.stage;
-  return ['contract_signed', 'application_completed', 'portal_unlocked'].includes(stage);
+  return ['contract_signed', 'application_completed', 'portal_unlocked', 'credit_report_received', 'dispute_review_pending'].includes(stage);
 }
 
 export function isProfileFilled(client: {

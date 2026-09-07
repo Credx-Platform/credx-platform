@@ -1,23 +1,73 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://credxme.com/</loc>
+    <loc>https://www.credxme.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://credxme.com/signup</loc>
+    <loc>https://www.credxme.com/start</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://credxme.com/masterclass</loc>
+    <loc>https://www.credxme.com/signup</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://credxme.com/contract</loc>
+    <loc>https://www.credxme.com/product</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.credxme.com/pricing</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.credxme.com/masterclass</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.credxme.com/masterclass-checkout</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.credxme.com/affiliate-onboarding</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.credxme.com/contract</loc>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.credxme.com/privacy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.credxme.com/terms</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.credxme.com/croa-disclosure</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.credxme.com/refund-policy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.credxme.com/cancellation-policy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
   </url>
 </urlset>

@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 
 export interface AuthedRequest extends Request {
-  auth?: { sub: string; role: string };
+  auth?: { sub: string; role: string; email?: string };
 }
 
 export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
@@ -14,7 +14,7 @@ export function requireAuth(req: AuthedRequest, res: Response, next: NextFunctio
 
   try {
     const token = header.slice(7);
-    req.auth = jwt.verify(token, config.jwtSecret) as { sub: string; role: string };
+    req.auth = jwt.verify(token, config.jwtSecret) as { sub: string; role: string; email?: string };
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid token' });

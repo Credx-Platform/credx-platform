@@ -10,14 +10,16 @@
     "postinstall": "if [ -n \"$SKIP_PRISMA_GENERATE\" ]; then echo 'Skipping prisma generate'; else npm run prisma:generate; fi",
     "dev": "npm run dev --workspace @credx/api",
     "build": "npm run build:api && npm run build:web",
-    "build:api": "npm run build --workspace @credx/api",
+    "build:api": "node scripts/check-node-crypto-imports.mjs && npm run build --workspace @credx/api",
     "build:web": "npm run build --workspace @credx/web",
+    "test:readiness": "node --import tsx --test apps/api/tests/readinessScore.test.ts",
     "start": "npm run start:api",
     "start:api": "npm run start --workspace @credx/api",
     "start:web": "npm run start --workspace @credx/web",
     "prisma:generate": "npm run prisma:generate --workspace @credx/db",
     "prisma:migrate": "npm run prisma:migrate --workspace @credx/db",
-    "railway:dbpush": "npx prisma db push --schema packages/db/prisma/schema.prisma"
+    "railway:dbpush": "npx prisma db push --schema packages/db/prisma/schema.prisma",
+    "analysis:reprocess": "node scripts/reprocess-credit-report.mjs"
   },
   "dependencies": {
     "imapflow": "^1.4.6"

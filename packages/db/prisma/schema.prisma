@@ -9,6 +9,7 @@ datasource db {
 
 enum Role {
   CLIENT
+  AFFILIATE
   STAFF
   ADMIN
 }
@@ -89,8 +90,10 @@ model User {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   client              Client?
+  subAgentProfile     SubAgent?            @relation("SubAgentAdminUser")
   auditLogs           AuditLog[]
   passwordSetupTokens PasswordSetupToken[]
+  orgMemberships      OrganizationMember[]
 }
 
 model PasswordSetupToken {
@@ -108,90 +111,153 @@ model PasswordSetupToken {
 }
 
 model Lead {
-  id         String   @id @default(uuid())
-  firstName  String
-  lastName   String
-  email      String
-  phone      String?
-  creditGoal String?
-  referralSource String?
-  referralName String?
-  referralOther String?
-  offerInterest String?
+  id                 String    @id @default(uuid())
+  firstName          String
+  lastName           String
+  email              String
+  phone              String?
+  creditGoal         String?
+  referralSource     String?
+  referralName       String?
+  referralOther      String?
+  offerInterest      String?
   offerEligibleUntil DateTime?
-  createdAt  DateTime @default(now())
-  notes      String?
+  createdAt          DateTime  @default(now())
+  notes              String?
+}
+
+model SubAgent {
+  id                       String            @id @default(uuid())
+  affiliateId              String            @unique @default(uuid())
+  name                     String
+  email                    String?
+  phone                    String?
+  referralCode             String            @unique
+  status                   String            @default("ACTIVE")
+  notes                    String?
+  adminUserId              String?           @unique
+  adminUser                User?             @relation("SubAgentAdminUser", fields: [adminUserId], references: [id], onDelete: SetNull)
+  onboardingTokenHash      String?           @unique
+  onboardingTokenExpiresAt DateTime?
+  policyAcceptedAt         DateTime?
+  policySignature          String?
+  policyIpAddress          String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  contacts                 SubAgentContact[]
+  referredClients          Client[]          @relation("ClientReferralSubAgent")
+
+  @@index([status])
+}
+
+model SubAgentContact {
+  id          String   @id @default(uuid())
+  subAgentId  String
+  subAgent    SubAgent @relation(fields: [subAgentId], references: [id], onDelete: Cascade)
+  status      String   @default("CLICKED")
+  firstName   String?
+  lastName    String?
+  email       String?
+  phone       String?
+  creditGoal  String?
+  sourceUrl   String?
+  landingPath String?
+  ipAddress   String?
+  city        String?
+  region      String?
+  country     String?
+  location    String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([subAgentId])
+  @@index([createdAt])
+  @@index([status])
 }
 
 model Client {
-  id                   String          @id @default(uuid())
-  userId               String          @unique
-  user                 User            @relation(fields: [userId], references: [id])
-  ssnEncrypted         String?
-  ssnLast4             String?
-  dobEncrypted         String?
-  status               ClientStatus    @default(LEAD)
-  serviceTier          ServiceTier     @default(ESSENTIAL)
-  currentAddressLine1  String?
-  currentAddressLine2  String?
-  currentCity          String?
-  currentState         String?
-  currentPostalCode    String?
-  analysisSummary      String?
-  disputePlanSummary   String?
+  id                      String                   @id @default(uuid())
+  customerType            String                   @default("DIRECT")
+  referralCodeAtSignup    String?
+  referredBySubAgentId    String?
+  referredBySubAgent      SubAgent?                @relation("ClientReferralSubAgent", fields: [referredBySubAgentId], references: [id], onDelete: SetNull)
+  userId                  String                   @unique
+  user                    User                     @relation(fields: [userId], references: [id])
+  ssnEncrypted            String?
+  ssnLast4                String?
+  dobEncrypted            String?
+  status                  ClientStatus             @default(LEAD)
+  serviceTier             ServiceTier              @default(ESSENTIAL)
+  currentAddressLine1     String?
+  currentAddressLine2     String?
+  currentCity             String?
+  currentState            String?
+  currentPostalCode       String?
+  analysisSummary         String?
+  disputePlanSummary      String?
   estimatedTimelineMonths Int?
-  upgradeOfferedAt     DateTime?
-  activatedAt          DateTime?
-  flaggedAt            DateTime?
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
-  setupFeePaid         Boolean         @default(false)
-  portalRestricted     Boolean         @default(false)
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  disputes             Dispute[]
-  disputeItems         DisputeItem[]   @relation(name: "ClientDisputeItems")
-  payments             Payment[]
-  documents            Document[]
-  agreements           Agreement[]
-  tasks                Task[]
-  notes                Note[]
-  creditReports        CreditReport[]
-  activities           ActivityEvent[]
-  progress             ClientProgress?
+  upgradeOfferedAt        DateTime?
+  activatedAt             DateTime?
+  flaggedAt               DateTime?
+  stripeCustomerId        String?
+  stripeSubscriptionId    String?
+  setupFeePaid            Boolean                  @default(false)
+  portalRestricted        Boolean                  @default(false)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  disputes                Dispute[]
+  disputeItems            DisputeItem[]            @relation(name: "ClientDisputeItems")
+  payments                Payment[]
+  documents               Document[]
+  agreements              Agreement[]
+  tasks                   Task[]
+  notes                   Note[]
+  creditReports           CreditReport[]
+  activities              ActivityEvent[]
+  creditScores            CreditScore[]
+  readinessSnapshots      ReadinessScoreSnapshot[]
+  progress                ClientProgress?
+  organizationId          String?
+  organization            Organization?            @relation("OrganizationClients", fields: [organizationId], references: [id], onDelete: SetNull)
+  orgMembership           OrganizationMember?
+
+  @@index([customerType])
+  @@index([referredBySubAgentId])
+  @@index([organizationId])
 }
 
 model ClientProgress {
-  id                String   @id @default(uuid())
-  clientId          String   @unique
-  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  completedDays     String[] @default([])
-  passedQuizzes     String[] @default([])
-  uploadedDocs      Json     @default("[]")
-  disputes          Json     @default("[]")
-  scores            Json     @default("{\"equifax\":null,\"experian\":null,\"transunion\":null}")
-  onboarding        Json     @default("{\"status\":\"pending\",\"signupAt\":null,\"completedAt\":null}")
-  workflow          Json     @default("{\"stage\":\"signup_received\",\"updatedAt\":null,\"next\":[\"complete_onboarding\",\"upload_credit_report\"]}")
-  education         Json     @default("{\"masterclassEnrolled\":false,\"masterclassAccess\":false,\"masterclassProgress\":[],\"affiliateLinks\":[]}")
-  analysis          Json?
-  disputeStrategy   Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String   @id @default(uuid())
+  clientId        String   @unique
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  completedDays   String[] @default([])
+  passedQuizzes   String[] @default([])
+  uploadedDocs    Json     @default("[]")
+  disputes        Json     @default("[]")
+  scores          Json     @default("{\"equifax\":null,\"experian\":null,\"transunion\":null}")
+  onboarding      Json     @default("{\"status\":\"pending\",\"signupAt\":null,\"completedAt\":null}")
+  workflow        Json     @default("{\"stage\":\"signup_received\",\"updatedAt\":null,\"next\":[\"complete_onboarding\",\"upload_credit_report\"]}")
+  education       Json     @default("{\"masterclassEnrolled\":false,\"masterclassAccess\":false,\"masterclassProgress\":[],\"affiliateLinks\":[]}")
+  analysis        Json?
+  disputeStrategy Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([clientId])
 }
 
 model CreditReport {
-  id          String      @id @default(uuid())
-  clientId    String
-  client      Client      @relation(fields: [clientId], references: [id])
-  bureau      Bureau
-  source      String?
-  pulledAt    DateTime    @default(now())
-  score       Int?
-  rawPayload  Json?
-  createdAt   DateTime    @default(now())
-  tradelines  Tradeline[]
+  id         String      @id @default(uuid())
+  clientId   String
+  client     Client      @relation(fields: [clientId], references: [id])
+  bureau     Bureau
+  source     String?
+  pulledAt   DateTime    @default(now())
+  score      Int?
+  rawPayload Json?
+  createdAt  DateTime    @default(now())
+  tradelines Tradeline[]
 }
 
 model Tradeline {
@@ -242,92 +308,92 @@ model Dispute {
   letterSentAt  DateTime?
   responseDueAt DateTime?
   createdAt     DateTime      @default(now())
-  
+
   // New fields for CDM
-  accountType   AccountType?
-  balance       Decimal?
-  dateAdded     DateTime?
-  disputeEquifax   Boolean @default(false)
-  disputeExperian  Boolean @default(false)
-  disputeTransunion Boolean @default(false)
+  accountType       AccountType?
+  balance           Decimal?
+  dateAdded         DateTime?
+  disputeEquifax    Boolean      @default(false)
+  disputeExperian   Boolean      @default(false)
+  disputeTransunion Boolean      @default(false)
   customInstruction String?
 }
 
 // New: Detailed dispute item tracking (CDM-style)
 model DisputeItem {
-  id                String           @id @default(uuid())
-  clientId          String
-  client            Client           @relation(fields: [clientId], references: [id], name: "ClientDisputeItems")
-  
+  id       String @id @default(uuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], name: "ClientDisputeItems")
+
   // Account details
-  furnisher         String           // Creditor/Collector name
-  accountNumber     String?
-  accountType       AccountType      @default(OTHER)
-  balance           Decimal?
-  dateAdded         DateTime?        // When appeared on report
-  
+  furnisher     String // Creditor/Collector name
+  accountNumber String?
+  accountType   AccountType @default(OTHER)
+  balance       Decimal?
+  dateAdded     DateTime? // When appeared on report
+
   // Bureau dispute flags
-  disputeEquifax    Boolean          @default(false)
-  disputeExperian   Boolean          @default(false)
-  disputeTransunion Boolean          @default(false)
-  
+  disputeEquifax    Boolean @default(false)
+  disputeExperian   Boolean @default(false)
+  disputeTransunion Boolean @default(false)
+
   // Dispute details
   reason            String
   customInstruction String?
-  
+
   // Round tracking
-  currentRound      Int              @default(1)
-  status            DisputeItemStatus @default(PENDING)
-  
+  currentRound Int               @default(1)
+  status       DisputeItemStatus @default(PENDING)
+
   // Dates
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  dueDate           DateTime?        // For tracking overdue
-  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  dueDate   DateTime? // For tracking overdue
+
   // Relations
-  rounds            DisputeRound[]
-  documents         Document[]
-  
+  rounds    DisputeRound[]
+  documents Document[]
+
   // Dispute letter tracking
-  letterGenerated   Boolean          @default(false)
-  letterSent        Boolean          @default(false)
-  letterDocumentId  String?          @db.Uuid
-  generatedAt       DateTime?        // When letter was auto-generated
-  sentAt            DateTime?        // When letter was sent
-  
+  letterGenerated  Boolean   @default(false)
+  letterSent       Boolean   @default(false)
+  letterDocumentId String?   @db.Uuid
+  generatedAt      DateTime? // When letter was auto-generated
+  sentAt           DateTime? // When letter was sent
+
   // Analysis linkage
-  analysisId        String?          // Reference to the analysis that generated this dispute
-  priority          String?          @default("MEDIUM") // HIGH, MEDIUM, LOW
+  analysisId String? // Reference to the analysis that generated this dispute
+  priority   String? @default("MEDIUM") // HIGH, MEDIUM, LOW
 }
 
 // New: Track each round of disputes
 model DisputeRound {
-  id             String   @id @default(uuid())
-  disputeItemId  String
-  disputeItem    DisputeItem @relation(fields: [disputeItemId], references: [id], onDelete: Cascade)
-  
-  roundNumber    Int
-  sentDate       DateTime
-  dueDate        DateTime
-  status         String   @default("PENDING") // PENDING, RESPONSE_RECEIVED, NO_RESPONSE, ARCHIVED
-  notes          String?
-  
+  id            String      @id @default(uuid())
+  disputeItemId String
+  disputeItem   DisputeItem @relation(fields: [disputeItemId], references: [id], onDelete: Cascade)
+
+  roundNumber Int
+  sentDate    DateTime
+  dueDate     DateTime
+  status      String   @default("PENDING") // PENDING, RESPONSE_RECEIVED, NO_RESPONSE, ARCHIVED
+  notes       String?
+
   // Bureau-specific tracking
-  equifaxStatus  String?  // PENDING, SENT, RESPONSE_RECEIVED
-  experianStatus String?
+  equifaxStatus    String? // PENDING, SENT, RESPONSE_RECEIVED
+  experianStatus   String?
   transunionStatus String?
-  
-  createdAt      DateTime @default(now())
+
+  createdAt DateTime @default(now())
 }
 
 // New: Furnisher database for dropdown
 model Furnisher {
-  id        String       @id @default(uuid())
-  name      String       @unique
+  id        String        @id @default(uuid())
+  name      String        @unique
   type      FurnisherType @default(CREDITOR)
   address   String?
-  isActive  Boolean      @default(true)
-  createdAt DateTime     @default(now())
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
 }
 
 model Payment {
@@ -371,37 +437,38 @@ model Document {
   contentType String?
   content     String?      @db.Text // Inline letter/document body — reliable on ephemeral hosts (Railway /tmp is wiped on redeploy)
   uploadedAt  DateTime     @default(now())
-  
+
   // Dispute letter tracking fields
   disputeItemId String?
-  roundNumber   Int?    // R-1, R-2, etc.
+  roundNumber   Int? // R-1, R-2, etc.
   letterType    String? // DISPUTE, VALIDATION, PAY_FOR_DELETE, GOODWILL, CEASE_DESIST
   bureau        String? // EFX, XPN, TU, or ALL
   letterStatus  String? @default("DRAFTED") // DRAFTED, APPROVED, SENT, RESPONSE_RECEIVED, RESOLVED
-  
+
   // Relations
-  disputeItem   DisputeItem? @relation(fields: [disputeItemId], references: [id])
+  disputeItem DisputeItem? @relation(fields: [disputeItemId], references: [id])
 
   @@unique([clientId, fileName], name: "clientId_fileName")
 }
 
 model Task {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   clientId    String
-  client      Client   @relation(fields: [clientId], references: [id])
+  client      Client    @relation(fields: [clientId], references: [id])
   title       String
   description String?
-  completed   Boolean  @default(false)
+  completed   Boolean   @default(false)
   dueAt       DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
 }
 
 model Note {
-  id         String   @id @default(uuid())
-  clientId   String
-  client     Client   @relation(fields: [clientId], references: [id])
-  body       String
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
 }
 
 model AuditLog {
@@ -416,11 +483,250 @@ model AuditLog {
 }
 
 model ActivityEvent {
-  id         String   @id @default(uuid())
-  clientId   String
-  client     Client   @relation(fields: [clientId], references: [id])
-  type       String
-  message    String
-  metadata   Json?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+  type      String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model CreditScore {
+  id           String    @id @default(uuid())
+  clientId     String
+  client       Client    @relation(fields: [clientId], references: [id])
+  score        Int
+  bureau       String?
+  pulledAt     DateTime  @default(now())
+  lastPulledAt DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+model ReadinessScoreSnapshot {
+  id              String   @id @default(uuid())
+  clientId        String
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  score           Int
+  label           String
+  dataQuality     String
+  categories      Json     @default("[]")
+  strengths       Json     @default("[]")
+  opportunities   Json     @default("[]")
+  nextBestActions Json     @default("[]")
+  generatedAt     DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([clientId, createdAt])
+}
+
+// ============================================================
+// SaaS Upgrade: Webhook Event Ledger + Idempotency
+// ============================================================
+
+enum WebhookEventStatus {
+  RECEIVED
+  VALIDATED
+  PROCESSING
+  PROCESSED
+  FAILED
+  RETRYING
+  DEAD_LETTER
+}
+
+model WebhookEvent {
+  id           String             @id @default(uuid())
+  source       String // stripe, paypal, docusign, sendgrid, etc.
+  eventType    String // invoice.payment_succeeded, etc.
+  payload      Json
+  signature    String? // raw signature header for replay verification
+  status       WebhookEventStatus @default(RECEIVED)
+  processedAt  DateTime?
+  errorMessage String?
+  retryCount   Int                @default(0)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  // Idempotency: unique per source+event id
+  externalEventId String? @unique
+
+  @@index([source, eventType])
+  @@index([status, createdAt])
+  @@index([externalEventId])
+}
+
+model IdempotencyKey {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  scope       String // e.g. "webhook", "payment", "api"
+  payloadHash String? // hash of the payload for integrity
+  response    Json? // cached response for replay
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([key, scope])
+  @@index([expiresAt])
+}
+
+// ============================================================
+// SaaS Upgrade: Worker/Queue Architecture (BullMQ compatible)
+// ============================================================
+
+enum JobStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  FAILED
+  DELAYED
+  PAUSED
+  RETRYING
+}
+
+model JobQueue {
+  id          String    @id @default(uuid())
+  queueName   String // e.g. "emails", "disputes", "reports"
+  jobName     String // e.g. "send-welcome-email"
+  payload     Json
+  status      JobStatus @default(PENDING)
+  priority    Int       @default(0) // higher = sooner
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  delayUntil  DateTime?
+  processedAt DateTime?
+  failedAt    DateTime?
+  error       String?
+  result      Json?
+  workerId    String? // which worker instance processed this
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([queueName, status, priority])
+  @@index([queueName, status, createdAt])
+  @@index([status, delayUntil])
+}
+
+model WorkerHeartbeat {
+  id            String   @id @default(uuid())
+  workerId      String   @unique
+  queueName     String
+  hostname      String?
+  startedAt     DateTime @default(now())
+  lastBeat      DateTime @updatedAt
+  jobsProcessed Int      @default(0)
+  jobsFailed    Int      @default(0)
+
+  @@index([queueName, lastBeat])
+}
+
+// ============================================================
+// SaaS Upgrade: Organization/Team Model
+// ============================================================
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MEMBER
+  BILLING
+  VIEWER
+}
+
+model Organization {
+  id                   String   @id @default(uuid())
+  name                 String
+  slug                 String   @unique
+  logoUrl              String?
+  website              String?
+  description          String?
+  settings             Json     @default("{}")
+  // Billing
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  planCode             String   @default("ESSENTIAL") // MASTERCLASS, ESSENTIAL, PREMIUM, FAMILY
+  // Limits
+  maxMembers           Int      @default(5)
+  maxClients           Int      @default(50)
+  // Status
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  members     OrganizationMember[]
+  clients     Client[]                 @relation("OrganizationClients")
+  invitations OrganizationInvitation[]
+
+  @@index([slug])
+  @@index([stripeCustomerId])
+}
+
+model OrganizationMember {
+  id             String           @id @default(uuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  role           OrganizationRole @default(MEMBER)
+  // If this member represents a client (for family/team plans)
+  clientId       String?          @unique
+  client         Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  joinedAt       DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  User           User             @relation(fields: [userId], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, role])
+  @@index([userId])
+}
+
+model OrganizationInvitation {
+  id             String           @id @default(uuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           OrganizationRole @default(MEMBER)
+  tokenHash      String           @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime         @default(now())
+
+  @@unique([organizationId, email])
+  @@index([tokenHash])
+  @@index([expiresAt])
+}
+
+// ============================================================
+// SaaS Upgrade: Sentry Monitoring / Error Tracking
+// ============================================================
+
+model ErrorEvent {
+  id             String    @id @default(uuid())
+  // Sentry-compatible fields
+  eventId        String    @unique // Sentry event_id or internal
+  level          String    @default("error") // fatal, error, warning, info, debug
+  environment    String    @default("development")
+  release        String?
+  platform       String    @default("node")
+  // Error details
+  exceptionType  String?
+  exceptionValue String?
+  exceptionStack String?   @db.Text
+  // Context
+  userId         String?
+  clientId       String?
+  url            String?
+  method         String?
+  tags           Json      @default("{}")
+  extra          Json      @default("{}")
+  // Breadcrumbs (last N events before error)
+  breadcrumbs    Json      @default("[]")
+  // Processing
+  resolved       Boolean   @default(false)
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  // Timestamps
+  occurredAt     DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+
+  @@index([level, occurredAt])
+  @@index([environment, release])
+  @@index([userId, occurredAt])
+  @@index([resolved, occurredAt])
 }

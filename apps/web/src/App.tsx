@@ -17,7 +17,13 @@ type User = {
   firstName: string;
   lastName: string;
   email: string;
-  role: 'CLIENT' | 'STAFF' | 'ADMIN';
+  phone?: string | null;
+  role: 'CLIENT' | 'AFFILIATE' | 'STAFF' | 'ADMIN';
+};
+
+type StaffUser = User & {
+  createdAt: string;
+  updatedAt: string;
 };
 
 type ClientEducationProgress = {
@@ -45,6 +51,10 @@ type ClientProgress = {
     monitoringPassword?: string | null;
     monitoringSubmittedAt?: string | null;
     monitoringSkippedAt?: string | null;
+    smsConsent?: boolean;
+    smsConsentCapturedAt?: string | null;
+    smsConsentLanguage?: string | null;
+    smsConsentSource?: string | null;
     signature?: {
       dataUrl?: string;
       signedName?: string;
@@ -76,6 +86,10 @@ type DocumentRecord = {
 
 type ClientRecord = {
   id: string;
+  customerType?: string | null;
+  referralCodeAtSignup?: string | null;
+  referredBySubAgentId?: string | null;
+  referredBySubAgent?: Pick<SubAgentRecord, 'id' | 'name' | 'affiliateId' | 'referralCode'> | null;
   status: 'LEAD' | 'STUDENT' | 'CONTRACT_SENT' | 'INTAKE_RECEIVED' | 'ANALYSIS_READY' | 'UPGRADE_OFFERED' | 'ACTIVE' | 'PAST_DUE' | 'RESTRICTED' | 'CANCELLED';
   serviceTier: 'ESSENTIAL' | 'AGGRESSIVE' | 'FAMILY';
   analysisSummary?: string | null;
@@ -84,6 +98,7 @@ type ClientRecord = {
   portalRestricted?: boolean;
   setupFeePaid?: boolean;
   ssnLast4?: string | null;
+  dobEncrypted?: string | null;
   currentAddressLine1?: string | null;
   currentAddressLine2?: string | null;
   currentCity?: string | null;
@@ -93,7 +108,7 @@ type ClientRecord = {
   updatedAt: string;
   user: User;
   disputes: Array<{ id: string; status: string }>;
-  payments: Array<{ id: string; status: string }>;
+  payments: Array<{ id: string; status: string; type?: string; amount?: number | string; provider?: string | null; paidAt?: string | null }>;
   documents: DocumentRecord[];
   activities: Array<{ id: string; message: string; createdAt: string }>;
   progress?: ClientProgress | null;
@@ -112,8 +127,24 @@ type ClientDetail = ClientRecord & {
     createdAt: string;
   }>;
   progress?: ClientProgress | null;
-  creditReports?: Array<{ id: string; bureau: string; pulledAt: string; tradelines: Array<{ id: string }> }>;
+  creditReports?: Array<{ id: string; bureau: string; pulledAt: string; score?: number | null; tradelines: Array<{ id: string }> }>;
   tasks?: Array<{ id: string; title?: string | null; status?: string | null }>;
+};
+
+type ClientProfileForm = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  serviceTier: ClientRecord['serviceTier'];
+  currentAddressLine1: string;
+  currentAddressLine2: string;
+  currentCity: string;
+  currentState: string;
+  currentPostalCode: string;
+  ssnFull: string;
+  dob: string;
+  portalRestricted: boolean;
 };
 
 type LeadRecord = {
@@ -134,6 +165,7 @@ type LeadRecord = {
 
 type LeadPipelineRow = {
   id: string;
+  rawLeadId?: string;
   clientId?: string;
   firstName: string;
   lastName: string;
@@ -151,6 +183,12 @@ type LeadPipelineRow = {
   isRegistered: boolean;
 };
 
+type SubAgentLeadRow = LeadPipelineRow & {
+  subAgentId: string;
+  subAgentName: string;
+  subAgentCode: string;
+};
+
 type DisputeRecord = {
   id: string;
   creditorName: string;
@@ -165,6 +203,53 @@ type DisputeRecord = {
   };
 };
 
+type AffiliateLink = {
+  label: string;
+  url: string;
+  category: string;
+  placement: string;
+  disclosure: string;
+};
+
+type SubAgentContact = {
+  id: string;
+  status: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  creditGoal?: string | null;
+  sourceUrl?: string | null;
+  landingPath?: string | null;
+  ipAddress?: string | null;
+  city?: string | null;
+  region?: string | null;
+  country?: string | null;
+  location?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
+};
+
+type SubAgentRecord = {
+  id: string;
+  affiliateId: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  referralCode: string;
+  status: string;
+  notes?: string | null;
+  policyAcceptedAt?: string | null;
+  createdAt: string;
+  contacts: SubAgentContact[];
+  referredClients?: Array<{
+    id: string;
+    status: string;
+    createdAt: string;
+    user: { firstName: string; lastName: string; email: string };
+  }>;
+};
+
 type LoginResponse = {
   user: User;
   token: string;
@@ -177,6 +262,31 @@ const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() ||
 const TOKEN_KEY = 'credx-admin-token';
 const USER_KEY = 'credx-admin-user';
 
+const AFFILIATE_LINKS: AffiliateLink[] = [
+  { label: 'Self Lender', url: 'https://self.inc/refer/16452347', category: 'credit_builder', placement: 'Client portal, Credit Builders', disclosure: 'CredX may earn compensation if a client opens an account through this link.' },
+  { label: 'Credit Strong', url: 'https://creditstrong.referralrock.com/l/3JAMES442/', category: 'credit_builder', placement: 'Client portal, Credit Builders', disclosure: 'CredX may earn compensation if a client opens an account through this link.' },
+  { label: 'Rent Reporters', url: 'https://prf.hn/click/camref:1101l52pUS', category: 'rent_reporting', placement: 'Client portal, Credit Builders', disclosure: 'CredX may earn compensation if a client buys reporting services through this link.' },
+  { label: 'Credit Builder Card', url: 'https://www.creditbuildercard.com/mgf.html', category: 'builder_card', placement: 'Client portal, Credit Builders', disclosure: 'CredX may earn compensation if a client opens an account through this link.' },
+  { label: 'Grow Credit', url: 'https://growcredit.com/?kid=12BYTD', category: 'subscription_reporting', placement: 'Client portal, Credit Builders', disclosure: 'CredX may earn compensation if a client signs up through this link.' },
+  { label: 'Kovo', url: 'https://kovocredit.com/r/O6LDVXN7', category: 'credit_builder', placement: 'Client portal, Credit Builders', disclosure: 'CredX may earn compensation if a client signs up through this link.' },
+  { label: 'Ava', url: 'https://meetava.app.link/tdMaQUdV7Rb', category: 'rent_utility_reporting', placement: 'Client portal, Credit Builders', disclosure: 'CredX may earn compensation if a client signs up through this link.' }
+];
+
+function parseApiResponse(text: string, response: Response) {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    const contentType = response.headers.get('content-type') || 'unknown content type';
+    const preview = text.replace(/\s+/g, ' ').trim().slice(0, 120);
+    throw new Error(
+      response.ok
+        ? `The server returned ${contentType}, not JSON.`
+        : `Request failed: ${response.status}${preview ? ` - ${preview}` : ''}`
+    );
+  }
+}
+
 async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has('content-type') && init?.body) headers.set('content-type', 'application/json');
@@ -188,7 +298,7 @@ async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Pr
   });
 
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
+  const body = parseApiResponse(text, response);
 
   if (!response.ok) {
     throw new Error(body?.error ?? `Request failed: ${response.status}`);
@@ -204,7 +314,7 @@ async function apiUpload<T>(path: string, token: string, formData: FormData): Pr
     body: formData
   });
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
+  const body = parseApiResponse(text, response);
   if (!response.ok) throw new Error(body?.error ?? `Upload failed: ${response.status}`);
   return body as T;
 }
@@ -239,6 +349,20 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
+function formatMaskedSsn(last4?: string | null) {
+  return last4 ? `•••-••-${last4}` : 'Not on file';
+}
+
 function statusClass(status: string) {
   return `status-badge status-${status.toLowerCase()}`;
 }
@@ -254,6 +378,33 @@ function bureauLabel(bureau: DisputeRecord['bureau']) {
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function bureauScoreFromAnalysis(analysis: unknown, bureau: 'EXPERIAN' | 'EQUIFAX' | 'TRANSUNION') {
+  const scores = isObjectRecord(analysis) && Array.isArray(analysis.bureauScores) ? analysis.bureauScores : [];
+  const match = scores.find((score) => isObjectRecord(score) && score.bureau === bureau);
+  return isObjectRecord(match) && typeof match.score === 'number' ? match.score : null;
+}
+
+function reportProfileRows(analysis: unknown) {
+  const profile = isObjectRecord(analysis) && isObjectRecord(analysis.personalProfile) ? analysis.personalProfile : null;
+  if (!profile) return [];
+  const rows = [
+    ['Name', 'name'],
+    ['Date of birth', 'dateOfBirth'],
+    ['Current address', 'currentAddress'],
+    ['Also known as', 'alsoKnownAs'],
+    ['Employers', 'employers']
+  ] as const;
+  return rows.map(([label, key]) => {
+    const values = (['experian', 'equifax', 'transunion'] as const).map((bureau) => {
+      const col = isObjectRecord(profile[bureau]) ? profile[bureau] : null;
+      const value = col ? col[key] : null;
+      if (Array.isArray(value)) return value.filter(Boolean).join(', ');
+      return typeof value === 'string' && value.trim() ? value.trim() : null;
+    }).filter((value): value is string => !!value);
+    return { label, value: values[0] || null };
+  }).filter((row) => row.value);
 }
 
 function isMasterclassStudent(progress?: ClientProgress | null) {
@@ -280,6 +431,21 @@ function isStudentClient(client: ClientRecord) {
   return client.status === 'STUDENT' || isMasterclassStudent(client.progress);
 }
 
+function hasPaidMasterclassAccess(client: ClientRecord) {
+  return isStudentClient(client) && client.payments.some((payment) => payment.type === 'MASTERCLASS' && payment.status === 'PAID');
+}
+
+function clientTierLabel(client: ClientRecord) {
+  return isStudentClient(client) ? 'MASTERCLASS' : client.serviceTier;
+}
+
+function clientDisplayStatus(client: ClientRecord) {
+  if (hasPaidMasterclassAccess(client) || (isStudentClient(client) && client.progress?.education?.masterclassAccess)) {
+    return 'Active Student';
+  }
+  return statusLabel(client.status);
+}
+
 function textValue(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
@@ -289,7 +455,7 @@ function hasPaidService(client: ClientRecord) {
 }
 
 function isUnpaidApplication(client: ClientRecord) {
-  return client.status !== 'CANCELLED' && !hasPaidService(client);
+  return ['LEAD', 'CONTRACT_SENT', 'INTAKE_RECEIVED', 'ANALYSIS_READY', 'UPGRADE_OFFERED'].includes(client.status) && !hasPaidService(client);
 }
 
 function sourceTypeFor(label: string) {
@@ -352,6 +518,16 @@ function clientSourceInfo(client: ClientRecord, lead?: LeadRecord) {
   };
 }
 
+function clientReferralLabel(client: ClientRecord) {
+  if (client.referredBySubAgent) {
+    return client.referredBySubAgent.name;
+  }
+  if (client.referralCodeAtSignup) return `Sub Agent (${client.referralCodeAtSignup})`;
+  const source = clientSourceInfo(client);
+  if (source.detail) return `${source.label} - ${source.detail}`;
+  return source.label;
+}
+
 function buildLeadPipelineRows(leads: LeadRecord[], clients: ClientRecord[]): LeadPipelineRow[] {
   const leadByEmail = new Map(leads.map((lead) => [lead.email.toLowerCase(), lead]));
   const clientEmails = new Set<string>();
@@ -388,6 +564,7 @@ function buildLeadPipelineRows(leads: LeadRecord[], clients: ClientRecord[]): Le
     const source = leadSourceInfo(lead);
     rows.push({
       id: `lead-${lead.id}`,
+      rawLeadId: lead.id,
       firstName: lead.firstName,
       lastName: lead.lastName,
       email: lead.email,
@@ -462,6 +639,594 @@ function DisputeSnapshot({ disputes }: { disputes: DisputeRecord[] }) {
         )}
       </div>
     </section>
+  );
+}
+
+function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token: string; subAgents: SubAgentRecord[]; leads: LeadRecord[]; clients: ClientRecord[]; onRefresh: () => Promise<void> }) {
+  const navigate = useNavigate();
+  const [agentName, setAgentName] = useState('');
+  const [agentEmail, setAgentEmail] = useState('');
+  const [agentPhone, setAgentPhone] = useState('');
+  const [agentCode, setAgentCode] = useState('');
+  const [savingAgent, setSavingAgent] = useState(false);
+  const [refreshingActivity, setRefreshingActivity] = useState(false);
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copyingAgentId, setCopyingAgentId] = useState<string | null>(null);
+  const [copiedAgentId, setCopiedAgentId] = useState<string | null>(null);
+  const [emailingAgentId, setEmailingAgentId] = useState<string | null>(null);
+  const [emailedAgentId, setEmailedAgentId] = useState<string | null>(null);
+  const [selectedLeadAgentId, setSelectedLeadAgentId] = useState<string>('ALL');
+
+  const activeAgents = subAgents.filter((agent) => agent.status === 'ACTIVE');
+  const totalLinkEvents = subAgents.reduce((sum, agent) => sum + (agent.contacts?.length || 0), 0);
+  const totalRegistrations = subAgents.reduce(
+    (sum, agent) => {
+      const contactRegistrations = (agent.contacts || []).filter((event) => event.status.includes('CLIENT')).length;
+      return sum + Math.max(contactRegistrations, agent.referredClients?.length || 0);
+    },
+    0
+  );
+
+  const subAgentLeadRows = useMemo<SubAgentLeadRow[]>(() => {
+    const agentsById = new Map(subAgents.map((agent) => [agent.id, agent]));
+    const agentsByCode = new Map(subAgents.map((agent) => [agent.referralCode.toLowerCase(), agent]));
+    const agentsByName = new Map(subAgents.map((agent) => [agent.name.toLowerCase(), agent]));
+    const rows: SubAgentLeadRow[] = [];
+    const seen = new Set<string>();
+
+    for (const client of clients) {
+      const onboarding = client.progress?.onboarding || {};
+      const signupIntake = isObjectRecord(onboarding.signupIntake) ? onboarding.signupIntake : null;
+      const storedReferralCode =
+        client.referralCodeAtSignup ||
+        textValue(onboarding.subAgentReferralCode) ||
+        textValue(onboarding.referralDetail) ||
+        textValue(signupIntake?.subAgentReferralCode);
+      const agent = (client.referredBySubAgentId ? agentsById.get(client.referredBySubAgentId) : null) ||
+        (storedReferralCode ? agentsByCode.get(storedReferralCode.toLowerCase()) : null) ||
+        null;
+      if (!agent || client.status === 'CANCELLED') continue;
+      const source = clientSourceInfo(client);
+      const rowKey = `client-${client.id}`;
+      seen.add(rowKey);
+      rows.push({
+        id: rowKey,
+        clientId: client.id,
+        firstName: client.user.firstName,
+        lastName: client.user.lastName,
+        email: client.user.email,
+        phone: client.user.phone,
+        creditGoal: null,
+        sourceLabel: source.label,
+        sourceDetail: source.detail,
+        sourceType: source.type,
+        interest: source.interest,
+        submittedAt: client.createdAt,
+        status: client.status,
+        statusLabel: statusLabel(client.status),
+        isPendingPayment: client.status === 'UPGRADE_OFFERED' || client.payments.some((payment) => payment.status === 'PENDING'),
+        isRegistered: true,
+        subAgentId: agent.id,
+        subAgentName: agent.name,
+        subAgentCode: agent.referralCode
+      });
+    }
+
+    for (const lead of leads) {
+      const code = textValue(lead.referralName) || textValue(lead.referralOther);
+      const agent = (code ? agentsByCode.get(code.toLowerCase()) : null) ||
+        (lead.referralSource ? agentsByName.get(lead.referralSource.toLowerCase()) : null) ||
+        null;
+      if (!agent) continue;
+      const rowKey = `lead-${lead.id}`;
+      if (seen.has(rowKey)) continue;
+      const source = leadSourceInfo(lead);
+      rows.push({
+        id: rowKey,
+        rawLeadId: lead.id,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        email: lead.email,
+        phone: lead.phone,
+        creditGoal: lead.creditGoal,
+        sourceLabel: source.label,
+        sourceDetail: source.detail,
+        sourceType: source.type,
+        interest: lead.offerInterest,
+        submittedAt: lead.createdAt,
+        status: 'AWAITING_SIGNUP',
+        statusLabel: 'Awaiting Signup',
+        isPendingPayment: false,
+        isRegistered: false,
+        subAgentId: agent.id,
+        subAgentName: agent.name,
+        subAgentCode: agent.referralCode
+      });
+    }
+
+    return rows.sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
+  }, [clients, leads, subAgents]);
+
+  const visibleSubAgentLeadRows = selectedLeadAgentId === 'ALL'
+    ? subAgentLeadRows
+    : subAgentLeadRows.filter((lead) => lead.subAgentId === selectedLeadAgentId);
+
+  const referralUrl = (code: string) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.credxme.com';
+    return `${origin}/api/sub-agents/track/${encodeURIComponent(code)}`;
+  };
+
+  const openLeadRow = (lead: Pick<SubAgentLeadRow, 'clientId' | 'rawLeadId' | 'email'>) => {
+    if (lead.clientId) {
+      navigate(`/clients/${lead.clientId}?tab=overview`);
+      return;
+    }
+    const params = new URLSearchParams();
+    params.set('search', lead.email);
+    if (lead.rawLeadId) params.set('focus', lead.rawLeadId);
+    navigate(`/leads?${params.toString()}`);
+  };
+
+  const showNewLeadList = (agentId: string = 'ALL') => {
+    setSelectedLeadAgentId(agentId);
+    window.setTimeout(() => {
+      document.getElementById('subagent-new-leads')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  };
+
+  const showNotice = (message: string, ms = 2200) => {
+    setCopyNotice(message);
+    window.setTimeout(() => setCopyNotice(null), ms);
+  };
+
+  const copyText = async (value: string, label: string) => {
+    if (!value) return false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand('copy');
+        textarea.remove();
+        if (!copied) throw new Error('Fallback copy failed');
+      }
+      showNotice(`${label} copied`);
+      return true;
+    } catch {
+      window.prompt('Copy this affiliate link:', value);
+      showNotice('Copy dialog opened for this browser session', 2600);
+      return false;
+    }
+  };
+
+  const copyAgentLink = async (agent: SubAgentRecord) => {
+    setError(null);
+    setCopyingAgentId(agent.id);
+    setCopiedAgentId(null);
+    try {
+      const copied = await copyText(referralUrl(agent.referralCode), `${agent.name} link`);
+      if (copied) {
+        setCopiedAgentId(agent.id);
+        window.setTimeout(() => {
+          setCopiedAgentId((current) => current === agent.id ? null : current);
+        }, 2200);
+      }
+    } finally {
+      setCopyingAgentId(null);
+    }
+  };
+
+  const refreshActivityScan = async () => {
+    setRefreshingActivity(true);
+    setError(null);
+    try {
+      await onRefresh();
+      showNotice('Sub-agent activity and signup scan refreshed', 2600);
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : 'Unable to refresh sub-agent activity');
+    } finally {
+      setRefreshingActivity(false);
+    }
+  };
+
+  const createSubAgent = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSavingAgent(true);
+    setError(null);
+    try {
+      await apiFetch<{ subAgent: SubAgentRecord }>('/api/sub-agents', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: agentName,
+          email: agentEmail,
+          phone: agentPhone,
+          referralCode: agentCode
+        })
+      });
+      setAgentName('');
+      setAgentEmail('');
+      setAgentPhone('');
+      setAgentCode('');
+      await onRefresh();
+      showNotice('Sub-agent created');
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Unable to create sub-agent');
+    } finally {
+      setSavingAgent(false);
+    }
+  };
+
+  const deleteSubAgent = async (agent: SubAgentRecord) => {
+    if (!window.confirm(`Delete ${agent.name}? Existing referred clients will stay in Clients and be marked as former sub-agent referrals.`)) return;
+    setError(null);
+    try {
+      await apiFetch<{ success: boolean }>(`/api/sub-agents/${agent.id}`, token, { method: 'DELETE' });
+      await onRefresh();
+      showNotice('Sub-agent deleted');
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete sub-agent');
+    }
+  };
+
+  const sendAffiliateOnboarding = async (agent: SubAgentRecord) => {
+    if (!agent.email) {
+      setError('Add an email address before sending affiliate onboarding.');
+      return;
+    }
+    setEmailingAgentId(agent.id);
+    setEmailedAgentId(null);
+    setError(null);
+    try {
+      const response = await apiFetch<{ success: boolean; delivery?: { skipped?: boolean; reason?: string } }>(`/api/sub-agents/${agent.id}/onboarding-email`, token, { method: 'POST' });
+      if (!response.success || response.delivery?.skipped) {
+        setError(response.delivery?.reason || 'Affiliate onboarding email could not be sent.');
+        return;
+      }
+      setEmailedAgentId(agent.id);
+      showNotice(`Affiliate onboarding sent to ${agent.email}`, 2600);
+      await onRefresh();
+      window.setTimeout(() => {
+        setEmailedAgentId((current) => current === agent.id ? null : current);
+      }, 2600);
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : 'Unable to send affiliate onboarding');
+    } finally {
+      setEmailingAgentId(null);
+    }
+  };
+
+  const sortedEvents = (agent: SubAgentRecord) => [...(agent.contacts || [])]
+    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+
+  const linkStats = (agent: SubAgentRecord) => {
+    const events = sortedEvents(agent);
+    const clicks = events.filter((event) => event.status === 'CLICKED').length;
+    const contactRegistrations = events.filter((event) => event.status.includes('CLIENT')).length;
+    const clientRegistrations = agent.referredClients?.length || 0;
+    const registrations = Math.max(contactRegistrations, clientRegistrations);
+    const submitted = events.filter((event) => event.status === 'CONTACT_SUBMITTED').length;
+    const uniqueIps = new Set(events.map((event) => event.ipAddress).filter(Boolean)).size;
+    const lastClient = [...(agent.referredClients || [])].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0] || null;
+    const lastEvent = events[0] || null;
+    const lastActivityAt = [lastEvent?.createdAt, lastClient?.createdAt]
+      .filter(Boolean)
+      .sort((a, b) => +new Date(b as string) - +new Date(a as string))[0] || null;
+    return {
+      events,
+      clicks,
+      registrations,
+      clientRegistrations,
+      submitted,
+      uniqueIps,
+      lastEvent,
+      lastClient,
+      lastActivityAt
+    };
+  };
+
+  const sourceLabel = (event: SubAgentContact) => event.sourceUrl || event.landingPath || 'Direct / unknown';
+
+  const locationLabel = (event: SubAgentContact) => event.location || [event.city, event.region, event.country].filter(Boolean).join(', ') || 'Unknown';
+
+  const deviceLabel = (event: SubAgentContact) => {
+    const agent = event.userAgent || '';
+    if (!agent) return 'Unknown';
+    const platform = /iPhone|iPad|iPod/i.test(agent)
+      ? 'iOS'
+      : /Android/i.test(agent)
+        ? 'Android'
+        : /Windows/i.test(agent)
+          ? 'Windows'
+          : /Macintosh|Mac OS/i.test(agent)
+            ? 'Mac'
+            : 'Device';
+    const browser = /Edg\//i.test(agent)
+      ? 'Edge'
+      : /Chrome\//i.test(agent)
+        ? 'Chrome'
+        : /Safari\//i.test(agent)
+          ? 'Safari'
+          : /Firefox\//i.test(agent)
+            ? 'Firefox'
+            : 'Browser';
+    return `${platform} / ${browser}`;
+  };
+
+  return (
+    <div className="page-grid subagent-page">
+      <section className="hero-card hero-card--compact subagent-hero">
+        <div>
+          <p className="eyebrow">Sub-agent network</p>
+          <h1>Referral Agents &amp; Contacts</h1>
+          <p>Create a custom social link for each sub-agent. Link events are tracked back to that person so you can see who is sending attention to CredX.</p>
+        </div>
+        <div className="hero-stats">
+          <div className="stat-card"><span>Sub Agents</span><strong>{subAgents.length}</strong></div>
+          <div className="stat-card"><span>Active</span><strong>{activeAgents.length}</strong></div>
+          <div className="stat-card"><span>Link Events</span><strong>{totalLinkEvents}</strong></div>
+          <div className="stat-card"><span>Registrations</span><strong>{totalRegistrations}</strong></div>
+          <button type="button" className="stat-card stat-card--interactive" onClick={() => showNewLeadList('ALL')}><span>New Leads</span><strong>{subAgentLeadRows.length}</strong></button>
+          <div className="stat-card"><span>Link Type</span><strong>Social</strong></div>
+        </div>
+      </section>
+
+      <section className="panel two-col affiliate-setup-grid">
+        <div>
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Hire a sub-agent</p>
+              <h2>Create their custom link</h2>
+              <p className="helper-text">Give this link to the sub-agent for Instagram, TikTok, Facebook, or any profile bio. Every click records as a link event under that affiliate.</p>
+            </div>
+          </div>
+          <form className="field-stack" onSubmit={createSubAgent}>
+            <label>
+              <span>Sub-agent name</span>
+              <input value={agentName} onChange={(event) => setAgentName(event.target.value)} placeholder="Example: Jasmine Smith" required />
+            </label>
+            <label>
+              <span>Email</span>
+              <input value={agentEmail} onChange={(event) => setAgentEmail(event.target.value)} placeholder="agent@example.com" />
+            </label>
+            <div className="field-grid">
+              <label>
+                <span>Phone</span>
+                <input value={agentPhone} onChange={(event) => setAgentPhone(event.target.value)} placeholder="Optional" />
+              </label>
+              <label>
+                <span>Custom code</span>
+                <input value={agentCode} onChange={(event) => setAgentCode(event.target.value)} placeholder="jasmine-credit" />
+              </label>
+            </div>
+            <button type="submit" disabled={savingAgent}>{savingAgent ? 'Creating...' : 'Create Sub-Agent Link'}</button>
+            {error ? <p className="helper-text helper-text--error">{error}</p> : null}
+            {copyNotice ? <p className="helper-text helper-text--success">{copyNotice}</p> : null}
+          </form>
+        </div>
+
+        <div>
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Workflow</p>
+              <h2>How the social link works</h2>
+            </div>
+          </div>
+          <ol className="setup-steps">
+            <li><strong>Create the sub-agent</strong><span>CredX generates a custom tracking link tied to their name and code.</span></li>
+            <li><strong>They post the link</strong><span>The link can go in Instagram bio, stories, posts, TikTok, Facebook, or DMs.</span></li>
+            <li><strong>Prospect clicks</strong><span>The click is saved as a link event under that sub-agent, then the prospect is sent to signup.</span></li>
+            <li><strong>Admin reviews link usage</strong><span>Open the dropdown under an affiliate to see clicks, IPs, source pages, device data, and registrations.</span></li>
+          </ol>
+        </div>
+      </section>
+
+      <section className="panel" id="subagent-new-leads">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Sub-agent leads</p>
+            <h2>New leads by time</h2>
+            <p className="helper-text">Use this when more than one sub-agent has fresh activity. Rows are newest first and click through to the client record or filtered lead row.</p>
+          </div>
+          <div className="lead-toolbar">
+            <select
+              className="search-input"
+              value={selectedLeadAgentId}
+              onChange={(event) => setSelectedLeadAgentId(event.target.value)}
+              aria-label="Filter new leads by sub-agent"
+            >
+              <option value="ALL">All sub-agents</option>
+              {subAgents.map((agent) => (
+                <option key={agent.id} value={agent.id}>{agent.name}</option>
+              ))}
+            </select>
+            <button type="button" className="ghost-button" onClick={refreshActivityScan} disabled={refreshingActivity}>
+              {refreshingActivity ? 'Scanning...' : 'Refresh Scan'}
+            </button>
+          </div>
+        </div>
+        {visibleSubAgentLeadRows.length ? (
+          <div className="table-wrapper">
+            <table className="data-table lead-pipeline-table">
+              <thead>
+                <tr>
+                  <th>Lead</th>
+                  <th>Sub-agent</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Interest</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleSubAgentLeadRows.map((lead) => (
+                  <tr key={lead.id} className="clickable-row" onClick={() => openLeadRow(lead)}>
+                    <td>
+                      <strong>{lead.firstName} {lead.lastName}</strong>
+                      <span className="table-subtext">{lead.creditGoal || 'No goal captured'}</span>
+                    </td>
+                    <td>
+                      <strong>{lead.subAgentName}</strong>
+                      <span className="table-subtext">{lead.subAgentCode}</span>
+                    </td>
+                    <td>{lead.email}</td>
+                    <td>{lead.phone || '—'}</td>
+                    <td>{lead.interest || '—'}</td>
+                    <td>{formatDateTime(lead.submittedAt)}</td>
+                    <td>
+                      <span className={lead.isPendingPayment ? 'status-pill status-pill--warning' : lead.isRegistered ? 'status-pill status-pill--ok' : 'status-pill'}>
+                        {lead.statusLabel}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state-card">
+            <strong>No new sub-agent leads in this view</strong>
+            <p>Click Refresh Scan after a test signup or switch back to all sub-agents.</p>
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Sub-agent roster</p>
+            <h2>Links ready to share</h2>
+            <p className="helper-text">Copy the link and give it to the sub-agent for their social profiles.</p>
+          </div>
+          <button type="button" className="ghost-button" onClick={refreshActivityScan} disabled={refreshingActivity}>
+            {refreshingActivity ? 'Scanning...' : 'Refresh Scan'}
+          </button>
+        </div>
+        {subAgents.length ? (
+          <div className="table-wrapper affiliate-roster-table">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Sub Agent</th>
+                  <th>Status</th>
+                  <th>ID / Code</th>
+                  <th>Clicks</th>
+                  <th>Signups</th>
+                  <th>IPs</th>
+                  <th>Last Event</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subAgents.map((agent) => {
+                  const stats = linkStats(agent);
+                  return (
+                    <React.Fragment key={agent.id}>
+                      <tr>
+                        <td>
+                          <strong>{agent.name}</strong>
+                          <span className="table-subtext">{agent.email || agent.phone || 'No contact info on file'}</span>
+                        </td>
+                        <td><span className={agent.status === 'ACTIVE' ? 'status-pill status-pill--ok' : 'status-pill status-pill--warning'}>{agent.status}</span></td>
+                        <td>
+                          <strong>{agent.affiliateId}</strong>
+                          <span className="table-subtext">{agent.referralCode}</span>
+                        </td>
+                        <td>{stats.clicks}</td>
+                        <td>
+                          {stats.registrations ? (
+                            <button type="button" className="link-button" onClick={() => showNewLeadList(agent.id)}>
+                              {stats.registrations}
+                            </button>
+                          ) : '0'}
+                        </td>
+                        <td>{stats.uniqueIps}</td>
+                        <td>{stats.lastActivityAt ? formatDate(stats.lastActivityAt) : 'No activity'}</td>
+                        <td>
+                          <div className="inline-actions affiliate-row-actions">
+                            <button type="button" className="ghost-button" aria-label={`Copy ${agent.name} affiliate link`} disabled={copyingAgentId === agent.id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); copyAgentLink(agent); }}>
+                              <span className="action-label-full">{copyingAgentId === agent.id ? 'Copying...' : copiedAgentId === agent.id ? 'Copied' : 'Copy'}</span><span className="action-label-short">{copiedAgentId === agent.id ? 'Done' : 'Copy'}</span>
+                            </button>
+                            <button type="button" className="ghost-button" aria-label={`Email ${agent.name} affiliate onboarding`} disabled={!agent.email || emailingAgentId === agent.id} title={!agent.email ? 'Add an email address before sending onboarding' : undefined} onClick={(event) => { event.preventDefault(); event.stopPropagation(); sendAffiliateOnboarding(agent); }}>
+                              <span className="action-label-full">{emailingAgentId === agent.id ? 'Sending...' : emailedAgentId === agent.id ? 'Sent' : 'Email'}</span><span className="action-label-short">{emailedAgentId === agent.id ? 'Sent' : 'Email'}</span>
+                            </button>
+                            <button type="button" className="ghost-button danger-button" aria-label={`Delete ${agent.name}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); deleteSubAgent(agent); }}>
+                              <span className="action-label-full">Delete</span><span className="action-label-short">Del</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className="affiliate-usage-row">
+                        <td colSpan={8}>
+                          <details className="link-usage-details">
+                            <summary>View link usage details ({stats.events.length})</summary>
+                            <code className="inline-copy-code affiliate-roster-link">{referralUrl(agent.referralCode)}</code>
+                            {agent.referredClients?.length ? (
+                              <div className="subagent-signup-list">
+                                <strong>Referred signups</strong>
+                                {agent.referredClients.slice(0, 8).map((client) => (
+                                  <button
+                                    type="button"
+                                    key={client.id}
+                                    className="subagent-signup-link"
+                                    onClick={() => openLeadRow({ clientId: client.id, email: client.user.email })}
+                                  >
+                                    <span>{client.user.firstName} {client.user.lastName}</span>
+                                    <span>{client.status.replace(/_/g, ' ')}</span>
+                                    <span>{formatDateTime(client.createdAt)}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                            {stats.events.length ? (
+                              <div className="table-wrapper link-usage-table">
+                                <table className="data-table">
+                                  <thead>
+                                    <tr>
+                                      <th>Date / Time</th>
+                                      <th>Source</th>
+                                      <th>Event</th>
+                                      <th>Location</th>
+                                      <th>IP</th>
+                                      <th>Device</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {stats.events.map((event) => (
+                                      <tr key={event.id}>
+                                        <td>{formatDateTime(event.createdAt)}</td>
+                                        <td>{sourceLabel(event)}</td>
+                                        <td><span className="status-pill">{event.status.replace(/_/g, ' ')}</span></td>
+                                        <td>{locationLabel(event)}</td>
+                                        <td>{event.ipAddress || 'Unknown'}</td>
+                                        <td>{deviceLabel(event)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="empty-state-card">No link events for this affiliate yet.</div>
+                            )}
+                          </details>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : <div className="empty-state-card">No sub-agents yet. Create one above to generate the first social link.</div>}
+      </section>
+    </div>
   );
 }
 
@@ -559,6 +1324,7 @@ const CLIENT_STATUS_FILTERS: Array<{ key: string; label: string }> = [
   { key: 'NEW', label: 'New Arrivals' },
   { key: 'LEAD', label: 'Leads' },
   { key: 'STUDENT', label: 'Students' },
+  { key: 'CONTRACT_SENT', label: 'Contract Sent' },
   { key: 'INTAKE_RECEIVED', label: 'Intake' },
   { key: 'ANALYSIS_READY', label: 'Analysis Ready' },
   { key: 'UPGRADE_OFFERED', label: 'Upgrade' },
@@ -570,10 +1336,15 @@ const CLIENT_STATUS_FILTERS: Array<{ key: string; label: string }> = [
 
 function Leads({ token, leads, clients }: { token: string; leads: LeadRecord[]; clients: ClientRecord[] }) {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [exportError, setExportError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const leadRows = useMemo(() => buildLeadPipelineRows(leads, clients), [leads, clients]);
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get('search') || '');
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return leadRows;
@@ -625,7 +1396,18 @@ function Leads({ token, leads, clients }: { token: string; leads: LeadRecord[]; 
             className="search-input"
             placeholder="Search name, email, phone…"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setSearchQuery(next);
+              const params = new URLSearchParams(searchParams);
+              if (next.trim()) {
+                params.set('search', next);
+              } else {
+                params.delete('search');
+                params.delete('focus');
+              }
+              setSearchParams(params, { replace: true });
+            }}
           />
           <button type="button" className="ghost-button" onClick={exportCompatibilityCsv} disabled={exporting}>
             {exporting ? 'Exporting...' : 'Export CSV'}
@@ -691,10 +1473,23 @@ function Leads({ token, leads, clients }: { token: string; leads: LeadRecord[]; 
   );
 }
 
-function Clients({ clients }: { clients: ClientRecord[] }) {
+function Clients({ clients, subAgents, token, onRefresh }: { clients: ClientRecord[]; subAgents: SubAgentRecord[]; token: string; onRefresh: () => Promise<void> }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [manualClient, setManualClient] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    serviceTier: 'ESSENTIAL',
+    status: 'LEAD',
+    subAgentId: ''
+  });
+  const [savingClient, setSavingClient] = useState(false);
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null);
+  const [clientFormNotice, setClientFormNotice] = useState<string | null>(null);
   const statusFilter = searchParams.get('status');
   const viewParam = searchParams.get('view');
   const activeView: 'all' | 'students' = viewParam === 'students' ? 'students' : 'all';
@@ -726,15 +1521,54 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
       client.user.firstName.toLowerCase().includes(query) ||
       client.user.lastName.toLowerCase().includes(query) ||
       client.user.email.toLowerCase().includes(query) ||
-      client.status.toLowerCase().includes(query)
+      client.status.toLowerCase().includes(query) ||
+      clientReferralLabel(client).toLowerCase().includes(query)
     );
   }, [displayedClients, searchQuery, statusFilter]);
+
+  const addManualClient = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSavingClient(true);
+    setClientFormNotice(null);
+    try {
+      await apiFetch<{ client: ClientRecord }>('/api/clients', token, {
+        method: 'POST',
+        body: JSON.stringify(manualClient)
+      });
+      setManualClient({ firstName: '', lastName: '', email: '', phone: '', serviceTier: 'ESSENTIAL', status: 'LEAD', subAgentId: '' });
+      setShowAddClient(false);
+      await onRefresh();
+      setClientFormNotice('Client added');
+    } catch (error) {
+      setClientFormNotice(error instanceof Error ? error.message : 'Unable to add client');
+    } finally {
+      setSavingClient(false);
+      window.setTimeout(() => setClientFormNotice(null), 2600);
+    }
+  };
 
   const clearFilters = () => {
     setSearchQuery('');
     const next = new URLSearchParams(searchParams);
     next.delete('status');
     setSearchParams(next);
+  };
+
+  const deleteClient = async (client: ClientRecord) => {
+    const fullName = `${client.user.firstName} ${client.user.lastName}`.trim();
+    if (!window.confirm(`Delete customer profile for ${fullName}?\n\nThis removes the customer login, profile, documents, agreements, payments, dispute records, tasks, and activity history. This cannot be undone.`)) return;
+    setDeletingClientId(client.id);
+    setClientFormNotice(null);
+    try {
+      await apiFetch(`/api/clients/${client.id}`, token, { method: 'DELETE' });
+      await onRefresh();
+      setClientFormNotice(`${fullName} deleted`);
+    } catch (error) {
+      setClientFormNotice(error instanceof Error ? error.message : 'Unable to delete customer');
+    } finally {
+      setDeletingClientId(null);
+      window.setTimeout(() => setClientFormNotice(null), 3200);
+    }
   };
 
   const setStatus = (status: string | null) => {
@@ -776,8 +1610,45 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            <button type="button" className="ghost-button" onClick={() => setShowAddClient((value) => !value)}>
+              {showAddClient ? 'Close' : 'Add Client'}
+            </button>
           </div>
         </div>
+
+        {showAddClient ? (
+          <form className="manual-client-form" onSubmit={addManualClient}>
+            <div className="field-grid">
+              <label><span>First name</span><input value={manualClient.firstName} onChange={(event) => setManualClient({ ...manualClient, firstName: event.target.value })} required /></label>
+              <label><span>Last name</span><input value={manualClient.lastName} onChange={(event) => setManualClient({ ...manualClient, lastName: event.target.value })} required /></label>
+              <label><span>Email</span><input type="email" value={manualClient.email} onChange={(event) => setManualClient({ ...manualClient, email: event.target.value })} required /></label>
+              <label><span>Phone</span><input value={manualClient.phone} onChange={(event) => setManualClient({ ...manualClient, phone: event.target.value })} /></label>
+              <label>
+                <span>Status</span>
+                <select value={manualClient.status} onChange={(event) => setManualClient({ ...manualClient, status: event.target.value })}>
+                  {CLIENT_STATUS_FILTERS.filter((status) => status.key !== 'NEW').map((status) => <option key={status.key} value={status.key}>{status.label}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Tier</span>
+                <select value={manualClient.serviceTier} onChange={(event) => setManualClient({ ...manualClient, serviceTier: event.target.value })}>
+                  <option value="ESSENTIAL">Essential</option>
+                  <option value="AGGRESSIVE">Aggressive</option>
+                  <option value="FAMILY">Family</option>
+                </select>
+              </label>
+              <label>
+                <span>Referral</span>
+                <select value={manualClient.subAgentId} onChange={(event) => setManualClient({ ...manualClient, subAgentId: event.target.value })}>
+                  <option value="">Manual / direct client</option>
+                  {subAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name} ({agent.affiliateId})</option>)}
+                </select>
+              </label>
+            </div>
+            <button type="submit" disabled={savingClient}>{savingClient ? 'Adding...' : 'Add Client'}</button>
+            {clientFormNotice ? <p className="helper-text">{clientFormNotice}</p> : null}
+          </form>
+        ) : clientFormNotice ? <p className="helper-text">{clientFormNotice}</p> : null}
 
         <div className="view-switcher">
           <button
@@ -824,6 +1695,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
             <thead>
               <tr>
                 <th>Client</th>
+                <th>Referral</th>
                 <th>Status</th>
                 <th>Tier</th>
                 <th>Reports / Uploads</th>
@@ -831,6 +1703,7 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
                 <th>Disputes</th>
                 <th>Last Activity</th>
                 {activeView === 'students' ? <th>Lesson Progress</th> : null}
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -840,8 +1713,9 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
                     <strong>{client.user.firstName} {client.user.lastName}</strong>
                     <div className="cell-subtext">{client.user.email}</div>
                   </td>
-                  <td><span className={statusClass(client.status)}>{client.status.replace('_', ' ')}</span></td>
-                  <td>{client.serviceTier}</td>
+                  <td>{clientReferralLabel(client)}</td>
+                  <td><span className={statusClass(client.status)}>{clientDisplayStatus(client)}</span></td>
+                  <td>{clientTierLabel(client)}</td>
                   <td>{client.documents.length} uploads</td>
                   <td>{client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} mo` : 'Pending'}</td>
                   <td>{client.disputes.length} items</td>
@@ -860,12 +1734,97 @@ function Clients({ clients }: { clients: ClientRecord[] }) {
                       })()}
                     </td>
                   ) : null}
+                  <td>
+                    <button
+                      type="button"
+                      className="ghost-button danger-button"
+                      disabled={deletingClientId === client.id}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        deleteClient(client);
+                      }}
+                    >
+                      {deletingClientId === client.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={activeView === 'students' ? 8 : 7} className="empty-row">
+                  <td colSpan={activeView === 'students' ? 10 : 9} className="empty-row">
                     {searchQuery ? 'No clients match your search.' : activeView === 'students' ? 'No masterclass students yet.' : 'No clients yet.'}
                   </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Employees({ users, currentUser }: { users: StaffUser[]; currentUser: User | null }) {
+  const staffUsers = users
+    .filter((staffUser) => staffUser.role === 'ADMIN' || staffUser.role === 'STAFF')
+    .sort((a, b) => {
+      if (a.id === currentUser?.id) return -1;
+      if (b.id === currentUser?.id) return 1;
+      if (a.role !== b.role) return a.role === 'ADMIN' ? -1 : 1;
+      return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+    });
+  const headAdmins = staffUsers.filter((staffUser) => staffUser.role === 'ADMIN');
+  const inHouseStaff = staffUsers.filter((staffUser) => staffUser.role === 'STAFF');
+
+  const staffTitle = (staffUser: StaffUser) => {
+    if (staffUser.role === 'ADMIN') return staffUser.id === currentUser?.id ? 'Head Admin' : 'Admin';
+    return 'In-house Staff';
+  };
+
+  const accessLabel = (staffUser: StaffUser) => staffUser.role === 'ADMIN'
+    ? 'Full access'
+    : 'Staff access';
+
+  return (
+    <div className="page-grid">
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">In-house team</p>
+            <h2>Employees</h2>
+            <div className="filter-summary">
+              <span><strong>{headAdmins.length}</strong> head admin/admin</span>
+              <span>· <strong>{inHouseStaff.length}</strong> staff</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="table-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Position</th>
+                <th>Access</th>
+                <th>Phone</th>
+                <th>Added</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staffUsers.length ? staffUsers.map((staffUser) => (
+                <tr key={staffUser.id}>
+                  <td>
+                    <strong>{staffUser.firstName} {staffUser.lastName}</strong>
+                    <div className="cell-subtext">{staffUser.email}</div>
+                  </td>
+                  <td>{staffTitle(staffUser)}</td>
+                  <td><span className={staffUser.role === 'ADMIN' ? 'status-pill status-pill--ok' : 'status-pill status-pill--warning'}>{accessLabel(staffUser)}</span></td>
+                  <td>{staffUser.phone || '-'}</td>
+                  <td>{formatDate(staffUser.createdAt)}</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={5} className="empty-row">No in-house staff accounts yet.</td>
                 </tr>
               )}
             </tbody>
@@ -885,6 +1844,7 @@ function ClientDetailRoute({ token }: { token: string }) {
   const [client, setClient] = useState<ClientDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingClient, setDeletingClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestedTab = searchParams.get('tab') as ClientWorkspaceTab | null;
   const [activeTab, setActiveTab] = useState<ClientWorkspaceTab>(requestedTab || 'overview');
@@ -894,6 +1854,41 @@ function ClientDetailRoute({ token }: { token: string }) {
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const [profileForm, setProfileForm] = useState<ClientProfileForm>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    serviceTier: 'ESSENTIAL',
+    currentAddressLine1: '',
+    currentAddressLine2: '',
+    currentCity: '',
+    currentState: '',
+    currentPostalCode: '',
+    ssnFull: '',
+    dob: '',
+    portalRestricted: false
+  });
+
+  const hydrateProfileForm = (nextClient: ClientDetail) => {
+    setProfileForm({
+      firstName: nextClient.user.firstName || '',
+      lastName: nextClient.user.lastName || '',
+      email: nextClient.user.email || '',
+      phone: nextClient.user.phone || '',
+      serviceTier: nextClient.serviceTier || 'ESSENTIAL',
+      currentAddressLine1: nextClient.currentAddressLine1 || '',
+      currentAddressLine2: nextClient.currentAddressLine2 || '',
+      currentCity: nextClient.currentCity || '',
+      currentState: nextClient.currentState || '',
+      currentPostalCode: nextClient.currentPostalCode || '',
+      ssnFull: '',
+      dob: '',
+      portalRestricted: !!nextClient.portalRestricted
+    });
+  };
 
   useEffect(() => {
     if (requestedTab) setActiveTab(requestedTab);
@@ -925,7 +1920,7 @@ function ClientDetailRoute({ token }: { token: string }) {
       await apiUpload(`/api/progress/clients/${client.id}/docs/upload`, token, fd);
       setUploadFile(null);
       setUploadMessage(uploadType === 'credit_report'
-        ? 'Uploaded — analysis is running in the background. Refresh in a few seconds to see findings.'
+        ? 'Uploaded — analysis is running in the background. If it does not appear, open Analysis and use Generate from existing reports to retry this uploaded file.'
         : 'Uploaded.');
       await refetchClient();
     } catch (err) {
@@ -943,6 +1938,7 @@ function ClientDetailRoute({ token }: { token: string }) {
       .then((response) => {
         setClient(response.client);
         setStatusValue(response.client.status);
+        hydrateProfileForm(response.client);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -964,6 +1960,55 @@ function ClientDetailRoute({ token }: { token: string }) {
     }
   };
 
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!client) return;
+    setSaving(true);
+    setProfileNotice(null);
+    try {
+      const profilePayload = {
+        ...profileForm,
+        ssnFull: profileForm.ssnFull.replace(/\D/g, '').slice(0, 9)
+      } as ClientProfileForm & { dobEncrypted?: string; ssnFull: string };
+      if (profileForm.dob.trim()) {
+        profilePayload.dobEncrypted = profileForm.dob.trim();
+      }
+      if (!profilePayload.ssnFull) {
+        delete (profilePayload as Partial<typeof profilePayload>).ssnFull;
+      }
+      const response = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}/profile`, token, {
+        method: 'PATCH',
+        body: JSON.stringify(profilePayload)
+      });
+      setClient(response.client);
+      setStatusValue(response.client.status);
+      hydrateProfileForm(response.client);
+      setEditingProfile(false);
+      setProfileNotice('Profile updated');
+    } catch (err) {
+      setProfileNotice(err instanceof Error ? err.message : 'Unable to save profile');
+    } finally {
+      setSaving(false);
+      window.setTimeout(() => setProfileNotice(null), 3200);
+    }
+  };
+
+  const deleteClientProfile = async () => {
+    if (!client) return;
+    const fullName = `${client.user.firstName} ${client.user.lastName}`.trim();
+    if (!window.confirm(`Delete customer profile for ${fullName}?\n\nThis removes the customer login, profile, documents, agreements, payments, dispute records, tasks, and activity history. This cannot be undone.`)) return;
+    setDeletingClient(true);
+    setProfileNotice(null);
+    try {
+      await apiFetch(`/api/clients/${client.id}`, token, { method: 'DELETE' });
+      navigate('/clients');
+    } catch (err) {
+      setProfileNotice(err instanceof Error ? err.message : 'Unable to delete customer');
+    } finally {
+      setDeletingClient(false);
+    }
+  };
+
   if (loading) return <section className="panel"><p className="helper-text">Loading client workspace...</p></section>;
   if (error) return <section className="panel"><div className="error-banner">{error}</div></section>;
   if (!client) return <section className="panel"><p className="helper-text">Client not found.</p></section>;
@@ -972,7 +2017,13 @@ function ClientDetailRoute({ token }: { token: string }) {
   const disputeItems = client.disputeItems || [];
   const documents = client.documents || [];
   const activities = client.activities || [];
-  const scores = client.progress?.scores || {};
+  const progressScores = client.progress?.scores || {};
+  const scores = {
+    equifax: typeof progressScores.equifax === 'number' ? progressScores.equifax : bureauScoreFromAnalysis(client.progress?.analysis, 'EQUIFAX') ?? client.creditReports?.find((report) => report.bureau === 'EQUIFAX')?.score ?? null,
+    experian: typeof progressScores.experian === 'number' ? progressScores.experian : bureauScoreFromAnalysis(client.progress?.analysis, 'EXPERIAN') ?? client.creditReports?.find((report) => report.bureau === 'EXPERIAN')?.score ?? null,
+    transunion: typeof progressScores.transunion === 'number' ? progressScores.transunion : bureauScoreFromAnalysis(client.progress?.analysis, 'TRANSUNION') ?? client.creditReports?.find((report) => report.bureau === 'TRANSUNION')?.score ?? null
+  };
+  const reportProfile = reportProfileRows(client.progress?.analysis);
   const tabs: Array<{ key: ClientWorkspaceTab; label: string }> = [
     { key: 'overview', label: 'Overview' },
     { key: 'profile', label: 'Profile' },
@@ -1029,7 +2080,8 @@ function ClientDetailRoute({ token }: { token: string }) {
                 <h3>Account summary</h3>
                 <ul className="detail-list">
                   <li><strong>Email</strong><span>{client.user.email}</span></li>
-                  <li><strong>Tier</strong><span>{client.serviceTier}</span></li>
+                  <li><strong>Status</strong><span>{clientDisplayStatus(client)}</span></li>
+                  <li><strong>Tier</strong><span>{clientTierLabel(client)}</span></li>
                   <li><strong>Timeline</strong><span>{client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} months` : 'Pending'}</span></li>
                   <li><strong>Workflow</strong><span>{client.progress?.workflow?.stage || 'Not started'}</span></li>
                 </ul>
@@ -1059,20 +2111,87 @@ function ClientDetailRoute({ token }: { token: string }) {
                   <li><strong>Next queue</strong><span>{client.progress?.workflow?.next?.join(', ') || 'Pending update'}</span></li>
                 </ul>
               </div>
-              <MasterclassProgressPanel progress={client.progress || null} />
+              <MasterclassProgressPanel client={client} progress={client.progress || null} />
             </div>
           ) : null}
 
           {activeTab === 'profile' ? (
             <div className="client-section-stack">
               <div>
-                <h3>Profile details</h3>
+                <div className="profile-section-title">
+                  <h3>Profile details</h3>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => {
+                      if (client) hydrateProfileForm(client);
+                      setEditingProfile((value) => !value);
+                      setProfileNotice(null);
+                    }}
+                  >
+                    {editingProfile ? 'Cancel Edit' : 'Edit Profile'}
+                  </button>
+                </div>
                 <ul className="detail-list">
                   <li><strong>Name</strong><span>{fullName}</span></li>
                   <li><strong>Email</strong><span>{client.user.email}</span></li>
+                  <li><strong>Phone</strong><span>{client.user.phone || 'Not on file'}</span></li>
+                  <li><strong>SMS consent</strong><span>{client.progress?.onboarding?.smsConsent ? `Yes${client.progress.onboarding.smsConsentCapturedAt ? ` (${formatDate(client.progress.onboarding.smsConsentCapturedAt)})` : ''}` : 'No / not captured'}</span></li>
                   <li><strong>Address</strong><span>{[client.currentAddressLine1, client.currentAddressLine2, client.currentCity, client.currentState, client.currentPostalCode].filter(Boolean).join(', ') || 'Not on file'}</span></li>
-                  <li><strong>SSN last 4</strong><span>{client.ssnLast4 || 'Not on file'}</span></li>
+                  <li><strong>Social Security number</strong><span>{formatMaskedSsn(client.ssnLast4)}</span></li>
+                  <li><strong>Date of birth</strong><span>{client.dobEncrypted ? 'On file' : 'Not on file'}</span></li>
+                  <li><strong>Portal access</strong><span>{client.portalRestricted ? 'Restricted' : 'Open'}</span></li>
+                  <li><strong>Student tier</strong><span>{clientTierLabel(client)}</span></li>
+                  <li><strong>Student status</strong><span>{clientDisplayStatus(client)}</span></li>
                 </ul>
+                {reportProfile.length || scores.equifax || scores.experian || scores.transunion ? (
+                  <>
+                    <h3>Report details</h3>
+                    <ul className="detail-list">
+                      <li><strong>Equifax score</strong><span>{scores.equifax ?? '—'}</span></li>
+                      <li><strong>Experian score</strong><span>{scores.experian ?? '—'}</span></li>
+                      <li><strong>TransUnion score</strong><span>{scores.transunion ?? '—'}</span></li>
+                      {reportProfile.map((row) => (
+                        <li key={row.label}><strong>{row.label}</strong><span>{row.value}</span></li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+                {editingProfile ? (
+                  <form className="profile-edit-form" onSubmit={saveProfile}>
+                    <div className="field-grid">
+                      <label><span>First name</span><input value={profileForm.firstName} onChange={(event) => setProfileForm({ ...profileForm, firstName: event.target.value })} required /></label>
+                      <label><span>Last name</span><input value={profileForm.lastName} onChange={(event) => setProfileForm({ ...profileForm, lastName: event.target.value })} required /></label>
+                      <label><span>Email</span><input type="email" value={profileForm.email} onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })} required /></label>
+                      <label><span>Phone</span><input value={profileForm.phone} onChange={(event) => setProfileForm({ ...profileForm, phone: event.target.value })} /></label>
+                      <label>
+                        <span>Tier</span>
+                        <select value={profileForm.serviceTier} onChange={(event) => setProfileForm({ ...profileForm, serviceTier: event.target.value as ClientRecord['serviceTier'] })}>
+                          <option value="ESSENTIAL">Essential</option>
+                          <option value="AGGRESSIVE">Aggressive</option>
+                          <option value="FAMILY">Family</option>
+                        </select>
+                      </label>
+                      <label><span>Social Security number</span><input type="password" inputMode="numeric" maxLength={11} value={profileForm.ssnFull} onChange={(event) => setProfileForm({ ...profileForm, ssnFull: event.target.value.replace(/\D/g, '').slice(0, 9) })} placeholder={client.ssnLast4 ? formatMaskedSsn(client.ssnLast4) : '123456789'} autoComplete="off" /></label>
+                      <label><span>Date of birth</span><input type="date" value={profileForm.dob} onChange={(event) => setProfileForm({ ...profileForm, dob: event.target.value })} /></label>
+                      <label><span>Address line 1</span><input value={profileForm.currentAddressLine1} onChange={(event) => setProfileForm({ ...profileForm, currentAddressLine1: event.target.value })} /></label>
+                      <label><span>Address line 2</span><input value={profileForm.currentAddressLine2} onChange={(event) => setProfileForm({ ...profileForm, currentAddressLine2: event.target.value })} /></label>
+                      <label><span>City</span><input value={profileForm.currentCity} onChange={(event) => setProfileForm({ ...profileForm, currentCity: event.target.value })} /></label>
+                      <label><span>State</span><input value={profileForm.currentState} onChange={(event) => setProfileForm({ ...profileForm, currentState: event.target.value })} /></label>
+                      <label><span>ZIP</span><input value={profileForm.currentPostalCode} onChange={(event) => setProfileForm({ ...profileForm, currentPostalCode: event.target.value })} /></label>
+                      <label className="checkbox-field">
+                        <input type="checkbox" checked={profileForm.portalRestricted} onChange={(event) => setProfileForm({ ...profileForm, portalRestricted: event.target.checked })} />
+                        <span>Restrict portal access</span>
+                      </label>
+                    </div>
+                    <div className="client-workspace-actions">
+                      <button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Profile'}</button>
+                      <button type="button" className="ghost-button" onClick={() => { hydrateProfileForm(client); setEditingProfile(false); }}>Cancel</button>
+                    </div>
+                    <p className="helper-text">SSN and DOB are encrypted after save. Leave either blank unless adding or replacing it; saved SSNs display with the first five digits covered.</p>
+                  </form>
+                ) : null}
+                {profileNotice ? <p className="helper-text">{profileNotice}</p> : null}
               </div>
               <SignupIntakePanel onboarding={client.progress?.onboarding || null} />
               <MonitoringCredentialsPanel onboarding={client.progress?.onboarding || null} />
@@ -1095,7 +2214,7 @@ function ClientDetailRoute({ token }: { token: string }) {
                       className="ghost-button"
                       style={{ borderColor: '#22c55e', color: '#22c55e', fontWeight: 600 }}
                       onClick={async () => {
-                        if (!confirm(`Activate ${fullName} and generate Round 1 dispute letters? No payment is taken now — per CROA the fee is billed only after the letters are mailed with proof and the cancellation window has passed.`)) return;
+                        if (!confirm(`Activate ${fullName} and generate Round 1 dispute letters? No payment is taken now — the fee is billed only after the analysis review is completed and the cancellation window has passed.`)) return;
                         setSaving(true);
                         try {
                           const activateOnce = (override: boolean) =>
@@ -1112,7 +2231,7 @@ function ClientDetailRoute({ token }: { token: string }) {
                             }
                           }
                           if (res.success) {
-                            alert(`✅ ${fullName} is now ACTIVE. ${res.lettersGenerated} dispute letter(s) generated. Bill the setup fee after the letters are mailed with proof.`);
+                            alert(`✅ ${fullName} is now ACTIVE. ${res.lettersGenerated} dispute letter(s) generated. Bill the setup fee after the analysis review is completed and confirmed.`);
                             const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
                             setClient(updated.client);
                             setStatusValue('ACTIVE');
@@ -1144,7 +2263,7 @@ function ClientDetailRoute({ token }: { token: string }) {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ clientId: client.id, trackingNumber: trackingNumber.trim() || undefined })
                           });
-                          alert(`✅ Mailing proof recorded. The setup-fee bill is raised and becomes chargeable once the cancellation window has passed.`);
+                          alert(`✅ Mailing proof recorded.`);
                         } catch (err) {
                           alert(`Could not record mailing proof: ${err instanceof Error ? err.message : 'Unknown error'}`);
                         } finally {
@@ -1161,7 +2280,7 @@ function ClientDetailRoute({ token }: { token: string }) {
                       className="ghost-button"
                       style={{ borderColor: '#f59e0b', color: '#b45309', fontWeight: 600 }}
                       onClick={async () => {
-                        if (!confirm(`Mark the setup fee as PAID for ${fullName}? Only after the first round is mailed with proof and the CROA 3-business-day window has passed — the API refuses otherwise.`)) return;
+                        if (!confirm(`Mark the setup fee as PAID for ${fullName}? Only after the analysis review is completed and the CROA 3-business-day window has passed — the API refuses otherwise.`)) return;
                         setSaving(true);
                         try {
                           const res = await apiFetch<{ success: boolean; payment: any }>(`/api/clients/${client.id}/mark-paid-and-activate`, token, {
@@ -1208,6 +2327,31 @@ function ClientDetailRoute({ token }: { token: string }) {
                       disabled={saving}
                     >
                       🔄 Regenerate Letters
+                    </button>
+                  ) : null}
+                  {client.progress?.analysis ? (
+                    <button
+                      className="ghost-button"
+                      style={{ borderColor: '#7c3aed', color: '#6d28d9', fontWeight: 600 }}
+                      onClick={async () => {
+                        if (!confirm(`Generate a high-priority CFPB/FTC escalation packet for ${fullName}? This creates a draft packet only; it does not file anything externally.`)) return;
+                        setSaving(true);
+                        try {
+                          const res = await apiFetch<{ success: boolean; document: any; content: string; opportunities: number; lettersIncluded: number; client: ClientDetail }>(`/api/clients/${client.id}/escalation-packet`, token, { method: 'POST' });
+                          if (res.success) {
+                            setClient(res.client);
+                            openPrintDocument(`CFPB / FTC Escalation Packet - ${fullName}`, res.content, { preferDisputeLetter: false });
+                            alert(`✅ Escalation packet generated for ${res.opportunities} disputed account(s). ${res.lettersIncluded} high-level letter reference(s) included.`);
+                          }
+                        } catch (err) {
+                          alert(`Escalation packet failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving}
+                    >
+                      🧾 CFPB/FTC Packet
                     </button>
                   ) : null}
                   {client.disputeItems && client.disputeItems.length > 0 ? (
@@ -1302,6 +2446,13 @@ function ClientDetailRoute({ token }: { token: string }) {
                   </div>
                 );
               })()}
+              <div className="danger-zone">
+                <h3>Delete customer profile</h3>
+                <p className="helper-text">Removes this customer login, profile, documents, agreements, payments, dispute records, tasks, and activity history.</p>
+                <button type="button" className="ghost-button danger-button" onClick={deleteClientProfile} disabled={deletingClient}>
+                  {deletingClient ? 'Deleting...' : 'Delete Customer'}
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -1533,7 +2684,7 @@ function MonitoringCredentialsPanel({ onboarding }: { onboarding: OnboardingData
   );
 }
 
-function MasterclassProgressPanel({ progress }: { progress: ClientDetail['progress'] }) {
+function MasterclassProgressPanel({ client, progress }: { client: ClientDetail; progress: ClientDetail['progress'] }) {
   const education = progress?.education || {};
   if (!isMasterclassStudent(progress)) return null;
 
@@ -1542,6 +2693,7 @@ function MasterclassProgressPanel({ progress }: { progress: ClientDetail['progre
   const attempts = education.masterclassQuizAttempts || {};
   const totalDays = 6;
   const progressPct = Math.round((completedDays.length / totalDays) * 100);
+  const hasAnalysis = !!(client.analysisSummary || progress?.analysis);
 
   const dayLabels: Record<string, string> = {
     'day-1-credit-fundamentals': 'Day 1 - Credit Fundamentals',
@@ -1558,9 +2710,14 @@ function MasterclassProgressPanel({ progress }: { progress: ClientDetail['progre
         <h3 style={{ margin: 0 }}>Masterclass Progress</h3>
       </div>
       <ul className="detail-list">
+        <li><strong>Status</strong><span>{clientDisplayStatus(client)}</span></li>
+        <li><strong>Tier</strong><span>{clientTierLabel(client)}</span></li>
         <li><strong>Enrolled</strong><span>{education.enrolledAt ? formatDate(education.enrolledAt) : 'Yes'}</span></li>
         <li><strong>Days completed</strong><span>{completedDays.length} / {totalDays} ({progressPct}%)</span></li>
         <li><strong>Quizzes passed</strong><span>{passedQuizzes.length} / {totalDays}</span></li>
+        <li><strong>Uploads</strong><span>{client.documents.length}</span></li>
+        <li><strong>Analysis</strong><span>{hasAnalysis ? 'Ready' : 'Open if they opt in for intake review'}</span></li>
+        <li><strong>Disputes</strong><span>Blank placeholder for the Day 3 dispute builder</span></li>
       </ul>
       {completedDays.length > 0 ? (
         <div style={{ marginTop: '0.75rem' }}>
@@ -1609,7 +2766,7 @@ function buildAdminDisputeLetter(dispute: DisputeRecord, client?: ClientRecord) 
   const bureau = bureauLabel(dispute.bureau);
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const identityLine = client?.ssnLast4 ? `SSN: ***-**-${client.ssnLast4}` : 'SSN: [last four only]';
-  const disputeReason = dispute.reason || 'Account type is incorrect and not correctly displayed. Please delete.';
+  const disputeReason = dispute.reason || 'Account type may be inaccurate or incomplete. Please investigate and correct or delete any unsupported reporting.';
   return `${clientName}
 ${formatClientAddress(client)}
 ${identityLine}
@@ -1621,25 +2778,25 @@ ${today}
 
 ${dispute.creditorName}: Account number: [last four or partial account number only], ${disputeReason}
 
-I am writing to formally dispute the accuracy and validity of certain items appearing on my credit report in accordance with my rights under the Fair Credit Reporting Act (FCRA) (15 U.S.C. § 1681 et seq.) and the Fair Debt Collection Practices Act (FDCPA) (15 U.S.C. § 1692 et seq.). I demand the immediate removal of the following item due to its unlawful, inaccurate, incomplete, or unverifiable presence on my credit report.
+I am writing to formally dispute the accuracy and validity of certain items appearing on my credit report in accordance with my rights under the Fair Credit Reporting Act (FCRA) (15 U.S.C. § 1681 et seq.) and the Fair Debt Collection Practices Act (FDCPA) (15 U.S.C. § 1692 et seq.). I request investigation of the following item because it may be inaccurate, incomplete, unverifiable, or unauthorized.
 
 1. Unauthorized Third-Party Collections
-According to 15 U.S.C. § 1692e, it is illegal for a debt collector to report false or misleading information to the credit bureaus. I am requesting verification of the alleged debt, including:
+Under 15 U.S.C. § 1692e, false or misleading debt-collection reporting may violate federal law. I am requesting verification of the alleged debt, including:
 • A copy of the original signed contract proving my consent and liability for this debt.
 • A chain of custody showing how the debt was acquired.
 • Proof that this debt was lawfully assigned in compliance with 15 U.S.C. § 1692g (Validation of Debts).
 
-Failure to provide the above documentation within 30 days will constitute a violation of 15 U.S.C. § 1692k, making the reporting party liable for damages.
+If the above documentation cannot be provided, please update, correct, or delete any reporting that cannot be verified as accurate and complete.
 
 2. Unauthorized Inquiries
-Per 15 U.S.C. § 1681b, a company must have permissible purpose to conduct a hard inquiry on my credit report. I demand the immediate removal of any inquiry connected to this disputed item if it was not authorized by me.
+Per 15 U.S.C. § 1681b, a company must have permissible purpose to conduct a hard inquiry on my credit report. I dispute any inquiry connected to this item if it was not authorized by me.
 
 Under 15 U.S.C. § 1681n, any entity that unlawfully accesses my credit file without proper authorization is subject to statutory damages, attorney's fees, and punitive damages.
 
-Final Demand
-As required under 15 U.S.C. § 1681i (Procedure in Case of Disputed Accuracy), you have 30 days to conduct a thorough investigation and remove the inaccurate information. Failure to do so will result in a complaint being filed with the Consumer Financial Protection Bureau (CFPB), the Federal Trade Commission (FTC), and the Attorney General's Office.
+Request for Investigation and Response
+As required under 15 U.S.C. § 1681i (Procedure in Case of Disputed Accuracy), you have 30 days to conduct a reasonable investigation and correct or delete information that cannot be verified as accurate and complete. If the investigation does not address these concerns, I may consider appropriate follow-up options, including a complaint to the Consumer Financial Protection Bureau (CFPB), the Federal Trade Commission (FTC), or the Attorney General's Office.
 
-I expect a written response confirming the removal of this disputed account and any related inquiry. Any further attempt to report unverifiable or unauthorized information will be considered a willful violation of federal law.
+Please send a written response explaining the verification, corrections, deletions, or other updates made for this disputed account and any related inquiry.
 
 Please send all correspondence to my mailing address listed above.
 
@@ -2505,6 +3662,133 @@ function TasksRoute() {
   );
 }
 
+function AffiliateDashboard({ token, user, onLogout }: { token: string; user: User; onLogout: () => void }) {
+  const [subAgent, setSubAgent] = useState<SubAgentRecord | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ subAgent: SubAgentRecord }>('/api/sub-agents/me', token)
+      .then((response) => {
+        if (!cancelled) setSubAgent(response.subAgent);
+      })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Unable to load affiliate dashboard');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const events = [...(subAgent?.contacts || [])].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  const clicks = events.filter((event) => event.status === 'CLICKED').length;
+  const signups = events.filter((event) => event.status.includes('CLIENT')).length;
+  const uniqueIps = new Set(events.map((event) => event.ipAddress).filter(Boolean)).size;
+  const referralLink = subAgent ? `${window.location.origin}/api/sub-agents/track/${encodeURIComponent(subAgent.referralCode)}` : '';
+
+  const sourceLabel = (event: SubAgentContact) => event.sourceUrl || event.landingPath || 'Direct / unknown';
+  const deviceLabel = (event: SubAgentContact) => {
+    const agent = event.userAgent || '';
+    if (!agent) return 'Unknown';
+    const platform = /iPhone|iPad|iPod/i.test(agent) ? 'iOS' : /Android/i.test(agent) ? 'Android' : /Windows/i.test(agent) ? 'Windows' : /Macintosh|Mac OS/i.test(agent) ? 'Mac' : 'Device';
+    const browser = /Edg\//i.test(agent) ? 'Edge' : /Chrome\//i.test(agent) ? 'Chrome' : /Safari\//i.test(agent) ? 'Safari' : /Firefox\//i.test(agent) ? 'Firefox' : 'Browser';
+    return `${platform} / ${browser}`;
+  };
+
+  const copyLink = async () => {
+    if (!referralLink) return;
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setCopyNotice('Affiliate link copied');
+      window.setTimeout(() => setCopyNotice(null), 2200);
+    } catch {
+      setCopyNotice('Copy unavailable in this browser session');
+    }
+  };
+
+  return (
+    <div className="shell affiliate-admin-shell">
+      <main className="main">
+        <header className="topbar topbar--themed" style={{ ['--section-accent' as string]: '#00c6fb' } as React.CSSProperties}>
+          <div>
+            <h1 className="top-title">Affiliate dashboard</h1>
+            <p className="helper-text">Signed in as {user.email}</p>
+          </div>
+          <div className="topbar-actions">
+            <button className="ghost-button" onClick={onLogout}>Sign out</button>
+          </div>
+        </header>
+        {error ? <div className="error-banner">{error}</div> : null}
+        {!subAgent ? (
+          <section className="panel"><p className="helper-text">Loading affiliate dashboard...</p></section>
+        ) : (
+          <div className="page-grid subagent-page">
+            <section className="hero-card hero-card--compact subagent-hero">
+              <div>
+                <p className="eyebrow">CredX affiliate</p>
+                <h1>{subAgent.name}</h1>
+                <p>Use your link in posts, bios, messages, and campaigns. CredX tracks the activity back to your affiliate record.</p>
+              </div>
+              <div className="hero-stats">
+                <div className="stat-card"><span>Clicks</span><strong>{clicks}</strong></div>
+                <div className="stat-card"><span>Signups</span><strong>{signups}</strong></div>
+                <div className="stat-card"><span>Unique IPs</span><strong>{uniqueIps}</strong></div>
+                <div className="stat-card"><span>Affiliate ID</span><strong>{subAgent.affiliateId}</strong></div>
+              </div>
+            </section>
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Your link</p>
+                  <h2>Affiliate link</h2>
+                </div>
+                <button type="button" className="ghost-button" onClick={copyLink}>Copy link</button>
+              </div>
+              <code className="inline-copy-code">{referralLink}</code>
+              {copyNotice ? <p className="helper-text helper-text--success">{copyNotice}</p> : null}
+            </section>
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Tracking</p>
+                  <h2>Link usage details</h2>
+                </div>
+              </div>
+              {events.length ? (
+                <div className="table-wrapper link-usage-table">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Source</th>
+                        <th>Event</th>
+                        <th>IP</th>
+                        <th>Device</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {events.map((event) => (
+                        <tr key={event.id}>
+                          <td>{formatDate(event.createdAt)}</td>
+                          <td>{sourceLabel(event)}</td>
+                          <td><span className="status-pill">{event.status.replace(/_/g, ' ')}</span></td>
+                          <td>{event.ipAddress || 'Unknown'}</td>
+                          <td>{deviceLabel(event)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : <div className="empty-state-card">No link events yet.</div>}
+            </section>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -2519,12 +3803,15 @@ export default function App() {
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [leads, setLeads] = useState<LeadRecord[]>([]);
+  const [subAgents, setSubAgents] = useState<SubAgentRecord[]>([]);
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
 
   useEffect(() => {
     if (!token) return;
+    if (user?.role === 'AFFILIATE') return;
 
     let cancelled = false;
     setDataLoading(true);
@@ -2534,14 +3821,18 @@ export default function App() {
       apiFetch<{ clients: ClientRecord[] }>('/api/clients', token),
       apiFetch<{ disputes: DisputeRecord[] }>('/api/disputes', token),
       apiFetch<{ plans: Plan[] }>('/api/billing/plans', token),
-      apiFetch<{ leads: LeadRecord[] }>('/api/leads', token)
+      apiFetch<{ leads: LeadRecord[] }>('/api/leads', token),
+      apiFetch<{ subAgents: SubAgentRecord[] }>('/api/sub-agents', token),
+      apiFetch<StaffUser[]>('/api/users', token)
     ])
-      .then(([clientsResponse, disputesResponse, plansResponse, leadsResponse]) => {
+      .then(([clientsResponse, disputesResponse, plansResponse, leadsResponse, subAgentsResponse, usersResponse]) => {
         if (cancelled) return;
         setClients(clientsResponse.clients);
         setDisputes(disputesResponse.disputes);
         setPlans(plansResponse.plans);
         setLeads(leadsResponse.leads);
+        setSubAgents(subAgentsResponse.subAgents);
+        setStaffUsers(usersResponse);
       })
       .catch((fetchError) => {
         if (cancelled) return;
@@ -2558,7 +3849,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, user?.role]);
 
   const statsTitle = useMemo(() => {
     if (!user) return 'Staff Mode';
@@ -2572,10 +3863,20 @@ export default function App() {
     setError(null);
 
     try {
-      const response = await apiFetch<LoginResponse>('/api/auth/login', undefined, {
-        method: 'POST',
-        body: JSON.stringify({ email, password })
-      });
+      let response: LoginResponse;
+      try {
+        response = await apiFetch<LoginResponse>('/api/auth/login', undefined, {
+          method: 'POST',
+          body: JSON.stringify({ email, password })
+        });
+      } catch (primaryLoginError) {
+        response = await apiFetch<LoginResponse>('/api/sub-agents/login', undefined, {
+          method: 'POST',
+          body: JSON.stringify({ email, password })
+        }).catch(() => {
+          throw primaryLoginError;
+        });
+      }
 
       setToken(response.token);
       setUser(response.user);
@@ -2594,8 +3895,26 @@ export default function App() {
     setClients([]);
     setDisputes([]);
     setLeads([]);
+    setSubAgents([]);
+    setStaffUsers([]);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+  };
+
+  const refreshSubAgents = async () => {
+    if (!token) return;
+    const [subAgentsResponse, clientsResponse] = await Promise.all([
+      apiFetch<{ subAgents: SubAgentRecord[] }>('/api/sub-agents', token),
+      apiFetch<{ clients: ClientRecord[] }>('/api/clients', token)
+    ]);
+    setSubAgents(subAgentsResponse.subAgents);
+    setClients(clientsResponse.clients);
+  };
+
+  const refreshClients = async () => {
+    if (!token) return;
+    const response = await apiFetch<{ clients: ClientRecord[] }>('/api/clients', token);
+    setClients(response.clients);
   };
 
   if (!token) {
@@ -2612,6 +3931,10 @@ export default function App() {
     );
   }
 
+  if (user?.role === 'AFFILIATE') {
+    return <AffiliateDashboard token={token} user={user} onLogout={handleLogout} />;
+  }
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -2625,6 +3948,8 @@ export default function App() {
           <NavLink to="/disputes">Disputes</NavLink>
           <NavLink to="/print">Print Center</NavLink>
           <NavLink to="/tasks">Tasks</NavLink>
+          <NavLink to="/sub-agents">Sub Agents</NavLink>
+          <NavLink to="/employees">Employees</NavLink>
         </nav>
       </aside>
       <main className="main">
@@ -2636,10 +3961,12 @@ export default function App() {
               ? '#14b8a6'
             : path.startsWith('/clients')
               ? '#a855f7'
-              : path.startsWith('/leads')
-                ? '#22c55e'
+                : path.startsWith('/leads')
+                  ? '#22c55e'
                 : path.startsWith('/tasks')
                   ? '#22d3ee'
+                : path.startsWith('/sub-agents') || path.startsWith('/employees')
+                  ? '#f97316'
                   : '#00c6fb';
           const sectionLabel = path.startsWith('/disputes')
             ? 'Disputes operations'
@@ -2651,6 +3978,10 @@ export default function App() {
                 ? 'Lead pipeline'
                 : path.startsWith('/tasks')
                   ? 'Task checklist'
+                : path.startsWith('/employees')
+                  ? 'Employee tools'
+                : path.startsWith('/sub-agents')
+                  ? 'Sub agents'
                   : 'Operations dashboard';
           return (
             <header className="topbar topbar--themed" style={{ ['--section-accent' as string]: accent } as React.CSSProperties}>
@@ -2666,7 +3997,7 @@ export default function App() {
 
         <select
           className="mobile-nav-select"
-          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/print') ? '/print' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : '/'}
+          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/print') ? '/print' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : location.pathname.startsWith('/sub-agents') ? '/sub-agents' : location.pathname.startsWith('/employees') ? '/employees' : '/'}
           onChange={(e) => {
             const value = e.target.value;
             navigate(value);
@@ -2679,17 +4010,21 @@ export default function App() {
           <option value="/disputes">Disputes</option>
           <option value="/print">Print Center</option>
           <option value="/tasks">Tasks</option>
+          <option value="/sub-agents">Sub Agents</option>
+          <option value="/employees">Employees</option>
         </select>
 
         {error ? <div className="error-banner">{error}</div> : null}
         <Routes>
           <Route path="/" element={<Overview clients={clients} disputes={disputes} plans={plans} leadPipelineCount={leadPipelineRows.length} />} />
           <Route path="/leads" element={<Leads token={token} leads={leads} clients={clients} />} />
-          <Route path="/clients" element={<Clients clients={clients} />} />
+          <Route path="/clients" element={<Clients clients={clients} subAgents={subAgents} token={token} onRefresh={refreshClients} />} />
           <Route path="/clients/:id" element={<ClientDetailRoute token={token} />} />
           <Route path="/disputes" element={<DisputesRoute token={token} disputes={disputes} clients={clients} />} />
           <Route path="/print" element={<PrintCenterRoute token={token} clients={clients} disputes={disputes} />} />
           <Route path="/tasks" element={<TasksRoute />} />
+          <Route path="/sub-agents" element={<SubAgentsRoute token={token} subAgents={subAgents} leads={leads} clients={clients} onRefresh={refreshSubAgents} />} />
+          <Route path="/employees" element={<Employees users={staffUsers} currentUser={user} />} />
         </Routes>
         <SiteFooter />
       </main>

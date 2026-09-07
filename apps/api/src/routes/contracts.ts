@@ -7,9 +7,79 @@ import { cancellationWindowEnd } from '../lib/croaCompliance.js';
 export const contractsRouter = Router();
 
 const BUSINESS_NAME = process.env.BUSINESS_NAME || 'The Malloy Group Financial LLC d/b/a CredX';
-const BUSINESS_ADDRESS = process.env.BUSINESS_ADDRESS || 'New York, NY';
+const BUSINESS_ADDRESS = process.env.BUSINESS_ADDRESS || '1392 Madison Avenue, New York, NY 10029';
 
-const AGREEMENT_TEXT = `CREDX CREDIT REPAIR SERVICE AGREEMENT\n\nThis Agreement is between ${BUSINESS_NAME} ("CredX", "Company") and the undersigned client ("Client").\n\n1. SERVICES\nCredX provides credit education, onboarding, credit report review, dispute preparation support, financial rebuilding guidance, and related client workflow services. CredX is not a law firm and does not provide legal representation.\n\n2. REQUIRED DISCLOSURES\nYou have the right to dispute inaccurate information in your credit report by contacting the credit bureau directly. Neither you nor any credit repair organization has the right to remove accurate, current, and verifiable information from a credit report. You have the right to cancel this contract without penalty or obligation before midnight of the 3rd business day after signing.\n\n3. PAYMENT TERMS\nNo fees may be collected for services before those services are fully performed, except as otherwise permitted by law. Any service or payment terms presented to you must be reviewed and accepted in writing before active paid work begins.\n\n4. NO GUARANTEES\nCredX does not guarantee deletions, score increases, approvals, or any specific outcome.`;
+const AGREEMENT_TEXT = `CREDX CREDIT REPAIR SERVICE AGREEMENT
+
+This Credit Repair Service Agreement ("Agreement") is between ${BUSINESS_NAME} ("CredX", "Company", "we", "us") and the undersigned client ("Client", "you"). This Agreement governs credit education, onboarding, credit report review, dispute preparation support, financial rebuilding guidance, and related CredX client workflow services.
+
+1. SERVICES PROVIDED
+
+CredX may provide credit report review, education about consumer credit rights, identification of potentially inaccurate, incomplete, outdated, duplicate, inconsistent, or unverifiable reporting, dispute preparation support, dispute workflow organization, personal information review, client dashboard access, progress tracking, document handling, account review support, credit rebuilding guidance, and related communication support.
+
+CredX may use AI-assisted software and workflow tools to organize information, draft educational summaries, support document review, and assist internal operations. AI-assisted tools do not replace human review, do not provide legal advice, and do not make guaranteed credit, lending, approval, or deletion decisions.
+
+2. LIMITS OF SERVICES
+
+CredX is not a law firm, does not provide legal representation, and does not create an attorney-client relationship. Legal citations, consumer-rights explanations, dispute templates, and strategy notes are for education and service-support purposes only. You may consult an attorney for legal advice about your specific situation.
+
+CredX does not act as a credit bureau, lender, debt collector, creditor, government agency, or court. Third parties control their own investigation, reporting, approval, denial, collection, and account-update processes.
+
+3. CONSUMER CREDIT FILE RIGHTS
+
+You have the right to dispute inaccurate information in your credit report by contacting the credit bureau directly. Neither you nor any credit repair organization has the right to remove accurate, current, and verifiable information from a credit report. Accurate negative information may generally remain for the time allowed by law. Bankruptcy information may be reported for up to 10 years.
+
+You have the right to cancel this Agreement without penalty or obligation before midnight of the third business day after signing. You have the right to sue a credit repair organization that violates the Credit Repair Organizations Act.
+
+4. CLIENT RESPONSIBILITIES
+
+Client agrees to provide truthful and accurate information, provide requested reports and documents in a timely manner, review communications from CredX promptly, avoid submitting misleading or false information to creditors, furnishers, collectors, credit bureaus, or agencies, and notify CredX of material changes to address, email, phone number, report access, identity information, or account status.
+
+Client understands that disputes and supporting documents must be based on factual review. CredX will not advise fraud, identity misrepresentation, false police reports, false identity-theft claims, or other dishonest tactics.
+
+5. CREDIT REPORTS AND MONITORING
+
+Client may be asked to provide a recent credit report from an approved monitoring provider or upload a PDF or HTML credit report through the portal. If Client voluntarily provides monitoring login credentials, Client authorizes CredX to use those credentials only for service-related report access, review, and account support. Credentials are sensitive and should be changed by Client whenever Client wants to end access.
+
+6. SENSITIVE PERSONAL INFORMATION AUTHORIZATION
+
+Client authorizes CredX to collect, use, store, and process service-related personal information, including full legal name, address history, email address, phone number, date of birth, Social Security information or Social Security last four digits, credit reports, account-related records, identity verification documents, proof-of-address documents, signed agreements, payment records, and portal activity.
+
+CredX may use this information for onboarding, identity verification, contract fulfillment, client communication, credit report review, dispute preparation support, dashboard recordkeeping, service administration, billing administration, compliance documentation, and related vendor-supported operations.
+
+7. PRIVACY AND DATA USE
+
+CredX agrees to use reasonable administrative, technical, and physical safeguards to protect sensitive client information and to limit access to authorized personnel and service providers with a legitimate business need. Some data may be processed through secure third-party vendors used for hosting, email delivery, document handling, payment processing, AI-assisted workflow support, storage, analytics, and service operations.
+
+8. PAYMENT TERMS AND CROA POLICY
+
+CredX does not charge upfront fees for credit repair services before those services are fully performed. Any setup fee, first-work fee, monthly service fee, or other paid support term must be reviewed and accepted in writing before paid work begins and must follow the billing timing presented in the CredX checkout, payment authorization, or service plan confirmation.
+
+For the AI Assistance path, signup and initial review may occur before payment. Paid dispute assistance or plan execution begins only after the required agreement, analysis/review, payment authorization, and applicable compliance gates are satisfied. Pricing, plan details, refund terms, and cancellation terms may also be described in the CredX pricing page, payment authorization, refund policy, and cancellation policy.
+
+9. NO GUARANTEES
+
+CredX does not guarantee deletions, score increases, credit approvals, funding approvals, tradeline updates, response timelines, creditor actions, bureau actions, collector actions, or any specific outcome. Results vary by file, documentation, bureau response, furnisher response, collector response, client participation, and other facts outside CredX control.
+
+10. COMMUNICATIONS CONSENT
+
+Client agrees that CredX may contact Client by email, phone, text message, portal notification, or other service-related communication for onboarding, account updates, reminders, support, payment administration, document requests, and related CredX services, subject to applicable law and consent requirements.
+
+11. CLIENT PORTAL AND ELECTRONIC RECORDS
+
+Client agrees to receive this Agreement, notices, disclosures, cancellation information, service records, and related communications electronically through the CredX website, email, and client portal. Client should keep copies of all signed agreements, reports, notices, and service communications.
+
+12. CANCELLATION AND REFUND POLICY
+
+Client may cancel within the federal three-business-day cancellation window described in this Agreement and in the Notice of Cancellation. Additional cancellation or refund terms may be described in the CredX cancellation policy, refund policy, payment authorization, or plan confirmation. No provision in this Agreement waives a consumer right that cannot legally be waived.
+
+13. ENTIRE AGREEMENT
+
+This Agreement, together with any required disclosures, cancellation notice, privacy policy, refund policy, payment authorization, plan confirmation, and related onboarding forms, reflects the service terms between CredX and Client for the services described. If any provision is unenforceable, the remaining provisions remain in effect.
+
+14. SIGNATURE AND AUTHORIZATION
+
+By signing, Client confirms that Client has reviewed this Agreement, understands the services and limits described, authorizes CredX to provide the agreed service-related support, consents to the collection and use of sensitive personal information as described, understands CredX does not guarantee outcomes, and understands the three-business-day right to cancel.`;
 
 const MASTERCLASS_AGREEMENT_TEXT = `CREDX 5-DAY MASTERCLASS AGREEMENT\n\nThis Agreement is between ${BUSINESS_NAME} ("CredX", "Company") and the undersigned participant ("Participant").\n\n1. SERVICES\nCredX provides access to the 5-Day Masterclass education path, related worksheets, platform resources, and performance-based maintenance guidance. This is an education product and is not legal, financial, tax, or credit repair representation.\n\n2. EDUCATION-ONLY SCOPE\nThe Masterclass is designed to help participants understand credit reports, dispute concepts, documentation habits, and credit maintenance workflows. CredX does not guarantee credit-report changes, deletions, approvals, score increases, or any specific result.\n\n3. PAYMENT AND ACCESS\nMasterclass access may require payment before lessons or platform materials are unlocked. Any payment terms presented at checkout must be reviewed and accepted before access begins.\n\n4. RETURN POLICY\nThe 5-Day Masterclass has a 3-day return policy based on participant performance and maintenance standards, not based on results, deletions, score changes, or credit-report outcomes.`;
 

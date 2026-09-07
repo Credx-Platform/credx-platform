@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
 import { errorHandler } from './middleware/error.js';
+import { sanitizeJsonResponses } from './middleware/sanitize.js';
 import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
 import { contractsRouter } from './routes/contracts.js';
@@ -20,6 +21,10 @@ import { progressRouter } from './routes/progress.js';
 import { masterclassRouter } from './routes/masterclass.js';
 import { compatibilityRouter } from './routes/compatibility.js';
 import { cesarRouter } from './routes/cesar.js';
+import { subAgentsRouter } from './routes/subAgents.js';
+import { emailEventsRouter } from './routes/emailEvents.js';
+import { creditScoreRouter } from './routes/creditScore.js';
+import { orgRouter } from './routes/org.js';
 
 const app = express();
 
@@ -61,12 +66,19 @@ app.use(express.json({
   }
 }));
 
+app.use(sanitizeJsonResponses);
+
+app.use('/health', healthRouter);
+app.use('/api/health', healthRouter);
+app.use('/api/v1/health', healthRouter);
+
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false });
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true,
   message: { error: 'Too many auth attempts. Try again in a few minutes.' }
 });
 const cesarLimiter = rateLimit({
@@ -89,10 +101,6 @@ app.use(globalLimiter);
 app.get('/', (_req, res) => {
   res.json({ name: 'CredX API', status: 'running', version: '0.1.0' });
 });
-
-app.use('/health', healthRouter);
-app.use('/api/health', healthRouter);
-app.use('/api/v1/health', healthRouter);
 
 // Stricter limits on unauthenticated, abuse-prone endpoints. These are mounted
 // before the routers so they apply on top of the global limiter.
@@ -123,6 +131,10 @@ function mountAll(prefix: string) {
   app.use(`${prefix}/masterclass`, masterclassRouter);
   app.use(`${prefix}/compatibility`, compatibilityRouter);
   app.use(`${prefix}/cesar`, cesarRouter);
+  app.use(`${prefix}/sub-agents`, subAgentsRouter);
+  app.use(`${prefix}/email-events`, emailEventsRouter);
+  app.use(`${prefix}/credit-score`, creditScoreRouter);
+  app.use(`${prefix}/org`, orgRouter);
 }
 
 mountAll('/api');

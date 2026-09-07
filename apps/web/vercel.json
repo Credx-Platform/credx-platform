@@ -8,6 +8,12 @@
     { "source": "/portal/", "destination": "/portal", "permanent": true },
     { "source": "/portal/set-password/", "destination": "/portal/set-password", "permanent": true },
     { "source": "/adminportal/", "destination": "/adminportal", "permanent": true },
+    { "source": "/affiliate", "destination": "/affiliate-onboarding", "permanent": true },
+    { "source": "/affiliate/", "destination": "/affiliate-onboarding", "permanent": true },
+    { "source": "/employee", "destination": "/adminportal", "permanent": true },
+    { "source": "/employee/", "destination": "/adminportal", "permanent": true },
+    { "source": "/staff", "destination": "/adminportal", "permanent": true },
+    { "source": "/staff/", "destination": "/adminportal", "permanent": true },
     { "source": "/masterclass/", "destination": "/masterclass", "permanent": true }
   ],
   "rewrites": [
@@ -19,6 +25,8 @@
     { "source": "/contract/:path*", "destination": "/signup.html" },
     { "source": "/start", "destination": "/start.html" },
     { "source": "/start/:path*", "destination": "/start.html" },
+    { "source": "/affiliate-onboarding", "destination": "/portal.html" },
+    { "source": "/affiliate-onboarding/:path*", "destination": "/portal.html" },
     { "source": "/portal", "destination": "/portal.html" },
     { "source": "/portal/:path*", "destination": "/portal.html" },
     { "source": "/adminportal", "destination": "/adminportal.html" },

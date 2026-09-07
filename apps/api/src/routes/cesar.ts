@@ -11,6 +11,7 @@ export const cesarRouter = Router();
 // guarantee machine — this copy is the non-negotiable spine of every reply and
 // the system prompt for the LLM path.
 const GUARDRAILS = [
+  'Cesar and CredX analysis tools are AI-assisted education and workflow support, with human review available.',
   'CredX does not guarantee deletions, score increases, or approvals.',
   'Accurate, current, and verifiable information cannot be lawfully removed just because it is negative.',
   'CredX provides credit education and practical strategy, not legal advice or guaranteed outcomes.'
@@ -93,11 +94,11 @@ function nextOnboardingStep(client: {
         detail: 'I just need your date of birth, Social Security number, and full address so your file is ready for review. Everything is encrypted before it is saved.'
       };
     }
-    if (stage === 'application_completed') {
+    if (['application_completed', 'report_required'].includes(stage)) {
       return {
         key: 'choose_monitoring',
         label: 'choose a credit monitoring source',
-        detail: 'Pick a monitoring provider so we can see the same report you do — or skip it for now and add it later from the portal.'
+        detail: 'Pick IdentityIQ or MyFreeScoreNow so we can see the same report you do, or upload a PDF/HTML credit report.'
       };
     }
     if (['portal_unlocked', 'upload_credit_report'].includes(stage)) {
@@ -171,7 +172,7 @@ function rulesReply(message: string, ctx: CesarContext): CesarReply {
 
   // Public / pre-sales guidance.
   if (!text) {
-    return wrap('Ask me anything about the CredX program, the 5-Day Masterclass, disputes, financing readiness, or rebuilding your credit.');
+    return wrap('Ask me anything about the CredX program, the 5-Day Masterclass, disputes, financing readiness, or rebuilding your credit. I am AI-assisted support, not legal advice or a guaranteed-results service.');
   }
   if (/(portal|sign in|log ?in)/.test(text)) {
     return wrap(`If you already have portal access, sign in here: ${LINKS.portal}.<br><br>If you're new and want to get started first, use the sign-up page: ${LINKS.signup}.`);
@@ -186,7 +187,7 @@ function rulesReply(message: string, ctx: CesarContext): CesarReply {
     return wrap(`The CredX 5-Day Masterclass is <strong>$47 one time</strong>. It includes the 5-day curriculum, bonus wealth day, DIY roadmap, resource stack, and portal access. You can review it here: ${LINKS.masterclass}, or go straight to ${LINKS.masterclassCheckout}.`);
   }
   if (/(price|cost|pricing|how much)/.test(text)) {
-    return wrap(`Here are the current CredX prices:<br><br>• 5-Day Masterclass: <strong>$47 one time</strong><br>• Essential AI Assistance: <strong>$150 after the first round</strong><br>• Premium: <strong>$447 after delivery</strong><br>• Family: <strong>$300 after the first round</strong>, then monthly support based on family size<br><br>You can compare the options here: ${LINKS.pricing}.`);
+    return wrap(`Here are the current CredX prices:<br><br>• 5-Day Masterclass: <strong>$47 one time</strong><br>• Essential AI Assistance: <strong>$150 after analysis review</strong><br>• Premium: <strong>$447 after analysis review</strong><br>• Family: <strong>$300 after analysis review</strong>, then monthly support based on family size<br><br>You can compare the options here: ${LINKS.pricing}.`);
   }
   if (/(masterclass|diy)/.test(text)) {
     return wrap(`The 5-Day Masterclass is the DIY path inside CredX: credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. It is <strong>$47 one time</strong>. Start here: ${LINKS.masterclass}.`);
@@ -221,11 +222,12 @@ function llmEnabled(): boolean {
 function buildSystemPrompt(ctx: CesarContext): string {
   const lines = [
     'You are Cesar, the CredX guidance assistant. You are warm, plain-spoken, and encouraging — never pushy or intimidating.',
+    'Always be transparent that Cesar is AI-assisted CredX guidance and that human review is available.',
     'CredX is a credit education and guidance service (credit education, not credit repair).',
     'Hard compliance rules you must never break:',
     ...GUARDRAILS.map((g) => `- ${g}`),
     'Never give legal advice. Never promise outcomes or timelines.',
-    'Pricing facts: the 5-Day Masterclass is $47 one time; Essential AI Assistance is $150 after the first round; Premium is $447 after delivery; Family is $300 after the first round, then monthly support based on family size.',
+    'Pricing facts: the 5-Day Masterclass is $47 one time; Essential AI Assistance is $150 after analysis review; Premium is $447 after analysis review; Family is $300 after analysis review, then monthly support based on family size.',
     'Keep replies short (a few sentences). If the user seems stuck or reluctant, suggest they reply to their CredX welcome email to set up a human check-in rather than pushing.'
   ];
   if (ctx.user && ctx.stage) {

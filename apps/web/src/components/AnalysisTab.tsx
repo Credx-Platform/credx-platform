@@ -146,6 +146,50 @@ interface CreditAnalysis {
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
 
+type AffiliateLink = {
+  label: string;
+  url: string;
+  category: string;
+  reason?: string;
+};
+
+const DEFAULT_AFFILIATE_LINKS: AffiliateLink[] = [
+  { label: 'Self Lender', url: 'https://self.inc/refer/16452347', category: 'credit_builder' },
+  { label: 'Credit Strong', url: 'https://creditstrong.referralrock.com/l/3JAMES442/', category: 'credit_builder' },
+  { label: 'Rent Reporters', url: 'https://prf.hn/click/camref:1101l52pUS', category: 'rent_reporting' },
+  { label: 'Credit Builder Card', url: 'https://www.creditbuildercard.com/mgf.html', category: 'builder_card' },
+  { label: 'Grow Credit', url: 'https://growcredit.com/?kid=12BYTD', category: 'subscription_reporting' },
+  { label: 'Kovo', url: 'https://kovocredit.com/r/O6LDVXN7', category: 'credit_builder' },
+  { label: 'Ava', url: 'https://meetava.app.link/tdMaQUdV7Rb', category: 'rent_utility_reporting' }
+];
+
+function recommendedAffiliateLinks(analysis: CreditAnalysis): AffiliateLink[] {
+  const text = JSON.stringify(analysis).toLowerCase();
+  const selected = new Map<string, AffiliateLink>();
+  const add = (label: string, reason: string) => {
+    const link = DEFAULT_AFFILIATE_LINKS.find((item) => item.label === label);
+    if (link) selected.set(label, { ...link, reason });
+  };
+
+  if (/utilization|maxed|credit card|revolving|thin file|limited credit|no open positive/.test(text)) {
+    add('Self Lender', 'Credit-builder account option for adding positive installment history.');
+    add('Credit Strong', 'Credit-builder installment option when the file needs more positive reporting.');
+    add('Credit Builder Card', 'Revolving builder-card option when utilization or open-card depth is weak.');
+  }
+  if (/rent|rental|lease/.test(text)) {
+    add('Rent Reporters', 'Rent reporting option when rental history may help build positive payment data.');
+  }
+  if (/subscription|utility|phone|streaming|netflix|hulu|disney|spotify/.test(text)) {
+    add('Grow Credit', 'Subscription reporting option for adding eligible monthly payments.');
+    add('Ava', 'Rent and utility reporting option for clients with eligible monthly bills.');
+  }
+  if (selected.size === 0) {
+    add('Self Lender', 'General credit-builder option for rebuilding positive history.');
+    add('Kovo', 'Low-friction credit-builder education/reporting option.');
+  }
+  return Array.from(selected.values());
+}
+
 const BUREAU_LABEL: Record<BureauKey, string> = {
   experian: 'Experian',
   equifax: 'Equifax',
@@ -403,6 +447,12 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [referralSending, setReferralSending] = useState(false);
+  const [referralMessage, setReferralMessage] = useState<string | null>(null);
+  const [selectedReferralLabels, setSelectedReferralLabels] = useState<string[]>([]);
+  const [referralNote, setReferralNote] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUploadReport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -443,6 +493,9 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
           }
         }
       }
+      setUploadMessage((current) => current === 'Analysis updated from the uploaded report.'
+        ? current
+        : 'Upload saved. Analysis is still not ready; use Generate from existing reports to retry extraction from the uploaded file.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
@@ -465,6 +518,7 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
       }
       const data = await response.json();
       setAnalysis(data.analysis as CreditAnalysis);
+      setReferralMessage(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error loading analysis');
     } finally {
@@ -475,14 +529,19 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
   const generateAnalysis = async () => {
     setGenerating(true);
     setError(null);
+    setShareMessage(null);
     try {
       const response = await fetch(`${API_BASE}/api/clients/${clientId}/analysis/generate`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
-      if (!response.ok) throw new Error('Failed to generate analysis');
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Failed to generate analysis');
       setAnalysis(data.analysis as CreditAnalysis);
+      setReferralMessage(null);
+      if (data.extractedFromUpload) {
+        setUploadMessage('Analysis generated from the uploaded credit report.');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error generating analysis');
     } finally {
@@ -490,7 +549,55 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
     }
   };
 
+  const shareAnalysis = async () => {
+    setSharing(true);
+    setError(null);
+    setShareMessage(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/clients/${clientId}/analysis/share`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Failed to share analysis');
+      setShareMessage(`Analysis report emailed to ${data.email || 'the client email on file'}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error sharing analysis');
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const shareReferralLinks = async () => {
+    setReferralSending(true);
+    setError(null);
+    setReferralMessage(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/clients/${clientId}/referral-links/share`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          labels: selectedReferralLabels,
+          note: referralNote.trim()
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Failed to send referral links');
+      const labels = Array.isArray(data.links) ? data.links.map((link: AffiliateLink) => link.label).join(', ') : 'recommended links';
+      setReferralMessage(`Referral resources emailed to ${data.email || 'the client email on file'}: ${labels}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error sending referral links');
+    } finally {
+      setReferralSending(false);
+    }
+  };
+
   useEffect(() => { fetchAnalysis(); }, [clientId, token]);
+
+  const recommendedLinks = useMemo(() => analysis ? recommendedAffiliateLinks(analysis) : [], [analysis]);
+  useEffect(() => {
+    setSelectedReferralLabels(recommendedLinks.map((link) => link.label));
+  }, [recommendedLinks]);
 
   const inconsistencyCount = useMemo(() => {
     if (!analysis) return 0;
@@ -556,6 +663,9 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
           <button className="btn-secondary" onClick={triggerFilePick} disabled={uploading}>
             {uploading ? 'Uploading…' : '📄 Upload new report'}
           </button>
+          <button className="btn-secondary" onClick={shareAnalysis} disabled={sharing || uploading || generating}>
+            {sharing ? 'Sending…' : 'Share Analysis'}
+          </button>
           <button className="btn-secondary" onClick={() => window.print()}>Print / Save PDF</button>
           <button className="btn-primary" onClick={generateAnalysis} disabled={generating || uploading}>
             {generating ? 'Regenerating…' : 'Regenerate'}
@@ -564,7 +674,51 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
       </div>
 
       {uploadMessage && <div className="analysis-note" style={{ background: '#f0fdf4', color: '#166534', padding: '0.6rem 0.9rem', borderRadius: '6px', marginBottom: '0.75rem' }}>{uploadMessage}</div>}
+      {shareMessage && <div className="analysis-note" style={{ background: '#eff6ff', color: '#1d4ed8', padding: '0.6rem 0.9rem', borderRadius: '6px', marginBottom: '0.75rem' }}>{shareMessage}</div>}
+      {referralMessage && <div className="analysis-note" style={{ background: '#f0fdf4', color: '#166534', padding: '0.6rem 0.9rem', borderRadius: '6px', marginBottom: '0.75rem' }}>{referralMessage}</div>}
       {error && <div className="analysis-error">{error}</div>}
+
+      <section className="report-section referral-send-panel">
+        <div className="referral-send-header">
+          <div>
+            <h2 className="section-title referral-title">Referral Resources</h2>
+            <p className="section-sub referral-sub">Recommended from this analysis. Staff can adjust before sending.</p>
+          </div>
+          <button className="btn-primary" onClick={shareReferralLinks} disabled={referralSending || selectedReferralLabels.length === 0}>
+            {referralSending ? 'Sending...' : 'Send Referral Links'}
+          </button>
+        </div>
+        <div className="referral-link-grid">
+          {recommendedLinks.map((link) => (
+            <label className="referral-link-option" key={link.label}>
+              <input
+                type="checkbox"
+                checked={selectedReferralLabels.includes(link.label)}
+                onChange={(event) => {
+                  setSelectedReferralLabels((current) => event.target.checked
+                    ? Array.from(new Set([...current, link.label]))
+                    : current.filter((label) => label !== link.label));
+                }}
+              />
+              <span>
+                <strong>{link.label}</strong>
+                <small>{link.reason || link.category.replace(/_/g, ' ')}</small>
+              </span>
+            </label>
+          ))}
+        </div>
+        <label className="referral-note-field">
+          <span>Optional client note</span>
+          <textarea
+            value={referralNote}
+            onChange={(event) => setReferralNote(event.target.value)}
+            maxLength={600}
+            rows={3}
+            placeholder="Example: Review these before adding new accounts. We can discuss which one fits your current utilization plan."
+          />
+        </label>
+        <p className="referral-disclosure">Affiliate disclosure is included in the email. These resources are education and strategy support, not guaranteed approvals or score increases.</p>
+      </section>
 
       {/* COVER */}
       <section className="report-section cover-section">
@@ -573,6 +727,7 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
         <h1 className="cover-title">Credit Analysis Report For</h1>
         <h2 className="cover-name">{clientProfile.name}</h2>
         <p className="cover-tagline">This report provides an overview of which accounts are impacting your credit score.</p>
+        <p className="cover-disclosure">Prepared with AI-assisted software and CredX review. This is educational strategy support, not legal advice, a credit decision, or a guaranteed result.</p>
         <div className="cover-prepared">Prepared by</div>
         <div className="cover-prepared-name">{branding.companyName}</div>
         <div className="cover-date">{new Date(analysis.generatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
@@ -816,6 +971,18 @@ function AnalysisStyles() {
       .toolbar-actions { display: flex; gap: .5rem; }
       .muted { color: #64748b; font-weight: 400; }
 
+      .referral-send-panel { background: #f8fafc; border-color: #cbd5e1; }
+      .referral-send-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+      .referral-title, .referral-sub { text-align: left; }
+      .referral-link-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+      .referral-link-option { display: flex; align-items: flex-start; gap: .65rem; padding: .8rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; }
+      .referral-link-option input { margin-top: .2rem; }
+      .referral-link-option strong { display: block; color: #0f172a; font-size: .92rem; }
+      .referral-link-option small { display: block; margin-top: .2rem; color: #64748b; line-height: 1.45; }
+      .referral-note-field { display: grid; gap: .4rem; margin-top: .5rem; color: #334155; font-weight: 600; font-size: .86rem; }
+      .referral-note-field textarea { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; padding: .75rem; font: inherit; resize: vertical; color: #0f172a; background: #fff; }
+      .referral-disclosure { margin: .75rem 0 0; color: #64748b; font-size: .8rem; line-height: 1.5; }
+
       .report-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem 1.75rem; margin-bottom: 1.5rem; box-shadow: 0 6px 18px rgba(15, 23, 42, .04); }
       .section-title { margin: 0 0 .25rem; font-size: 1.4rem; color: #0f172a; text-align: center; }
       .section-sub { margin: 0 0 1.25rem; color: #64748b; text-align: center; font-size: .9rem; }
@@ -826,6 +993,7 @@ function AnalysisStyles() {
       .cover-title { font-size: 1.5rem; color: #334155; font-weight: 500; margin: 0; }
       .cover-name { font-size: 2.5rem; color: #0f172a; margin: .25rem 0 1rem; }
       .cover-tagline { color: #64748b; font-size: .95rem; margin-bottom: 3rem; }
+      .cover-disclosure { max-width: 620px; margin: -1.5rem auto 2.5rem; color: #475569; font-size: .86rem; line-height: 1.55; }
       .cover-prepared { color: #475569; font-size: 1rem; }
       .cover-prepared-name { font-size: 1.5rem; font-weight: 700; color: #0f172a; margin: .25rem 0; }
       .cover-date { color: #64748b; font-size: .95rem; }
@@ -919,6 +1087,7 @@ function AnalysisStyles() {
 
       @media print {
         .analysis-toolbar { display: none; }
+        .referral-send-panel { display: none; }
         .report-section { page-break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
         .account-block { page-break-inside: avoid; }
       }

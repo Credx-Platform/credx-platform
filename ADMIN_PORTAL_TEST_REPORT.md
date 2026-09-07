@@ -311,8 +311,8 @@ The DisputeManager is a 4-tab interface:
 PORT=3000
 APP_URL=https://credxme.com
 API_URL=https://api.credxme.com
-JWT_SECRET=<strong-random-secret>
-DATABASE_URL=postgresql://...
+JWT_SECRET=<strong-random-secret-here>
+DATABASE_URL=postgresql://[REDACTED — rotate via Railway dashboard]
 ```
 
 ---
@@ -536,15 +536,15 @@ NODE_ENV=production
 PORT=3000
 APP_URL=https://credxme.com
 API_URL=https://api.credxme.com
-JWT_SECRET=your-strong-secret-here
-DATABASE_URL=postgresql://...
+JWT_SECRET=<strong-random-secret-here>
+DATABASE_URL=postgresql://[REDACTED — rotate via Railway dashboard]
 FROM_EMAIL="CredX <contact@credxme.com>"
 LEAD_NOTIFICATION_EMAIL=contact@credxme.com
 SMTP_HOST=mail.privateemail.com
 SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=contact@credxme.com
-SMTP_PASS=<Namecheap private email password>
+SMTP_PASS=<REDACTED — use env var or secrets manager>
 SMTP_FROM_EMAIL="CredX <contact@credxme.com>"
 SMTP_REPLY_TO=contact@credxme.com
 

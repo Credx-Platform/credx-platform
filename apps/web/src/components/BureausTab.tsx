@@ -73,39 +73,39 @@ const LETTER_TEMPLATES: LetterTemplate[] = [
     id: 'mov_round2',
     name: 'Method of Verification (Round 2)',
     description: 'Second-round letter demanding the verification procedure under §611(a)(7).',
-    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nIn response to your prior verification of the item(s) listed below, I am invoking my right under FCRA §611(a)(7) to receive a description of the procedure used to determine the accuracy and completeness of the information, including the business name and address of any furnisher contacted in connection with the verification.\n\n{{accounts_list}}\n\nIf you cannot produce the requested description within 15 days, please delete the disputed item(s) and update my file accordingly.\n\nSincerely,\n{{client_name}}`
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nIn response to your prior verification of the item(s) listed below, I am invoking my right under FCRA §611(a)(7) to receive a description of the procedure used to determine the accuracy and completeness of the information, including the business name and address of any furnisher contacted in connection with the verification.\n\n{{accounts_list}}\n\nIf the requested description cannot support the accuracy and completeness of the reporting, please correct or delete any information that cannot be verified.\n\nSincerely,\n{{client_name}}`
   },
   {
     id: 'demand_15day',
     name: '15-day demand / failure to verify',
     description: 'Escalation when the bureau missed its statutory deadline.',
-    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nYou have failed to complete a reasonable reinvestigation of the disputed item(s) below within the time period required by FCRA §611(a)(1). Continued reporting of unverified information violates §611(a)(5)(A) and exposes you to liability under §616 and §617.\n\n{{accounts_list}}\n\nDelete the item(s) immediately and send written confirmation along with an updated free consumer report within 15 days of receipt of this letter.\n\nSincerely,\n{{client_name}}`
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nI previously disputed the item(s) below and am requesting confirmation that a reasonable reinvestigation was completed within the time period required by FCRA §611(a)(1). Continued reporting of information that cannot be verified as accurate and complete may raise concerns under §611(a)(5)(A).\n\n{{accounts_list}}\n\nPlease correct or delete any information that cannot be verified as accurate and complete, and send written confirmation along with an updated free consumer report if changes are made.\n\nSincerely,\n{{client_name}}`
   },
   {
     id: 'identity_theft_605b',
     name: 'Identity Theft Affidavit (FCRA §605B)',
     description: 'Identity-theft block request — auto-selects the Identity theft reason.',
     implicitReason: 'Identity theft',
-    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}} — Identity Theft Block Request\n{{client_address}}\n\nDear {{bureau_label}},\n\nI am a victim of identity theft. Pursuant to FCRA §605B, I demand that the following item(s) be blocked from my consumer report within four (4) business days of receipt of this notice. A copy of my FTC Identity Theft Report and proof of identity are enclosed.\n\n{{accounts_list}}\n\nPlease confirm in writing once the block is in place and that the furnisher(s) and any subsequent purchasers have been notified per §605B(b).\n\nSincerely,\n{{client_name}}`
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}} — Identity Theft Block Request\n{{client_address}}\n\nDear {{bureau_label}},\n\nI am a victim of identity theft. Pursuant to FCRA §605B, I request that the following item(s) be blocked from my consumer report after review of this notice. A copy of my FTC Identity Theft Report and proof of identity are enclosed.\n\n{{accounts_list}}\n\nPlease confirm in writing once the block is in place and that the furnisher(s) and any subsequent purchasers have been notified per §605B(b).\n\nSincerely,\n{{client_name}}`
   },
   {
     id: 'outdated_605',
     name: 'Outdated information (FCRA §605)',
     description: '7-year / 10-year reporting limit violations.',
-    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nThe item(s) listed below exceed the reporting period permitted by FCRA §605 and must be removed from my consumer file. Continued reporting of obsolete information is a violation that subjects you to liability under §616 and §617.\n\n{{accounts_list}}\n\nDelete the item(s) and send written confirmation along with an updated free consumer report within 30 days.\n\nSincerely,\n{{client_name}}`
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nThe item(s) listed below appear to exceed the reporting period permitted by FCRA §605. Please review the reporting dates and correct or delete any obsolete information that can no longer be reported.\n\n{{accounts_list}}\n\nPlease send written confirmation of the verification, correction, deletion, or other update made for each disputed item, along with an updated free consumer report if changes are made.\n\nSincerely,\n{{client_name}}`
   },
   {
     id: 'mixed_file',
     name: 'Mixed file dispute',
     description: 'Wrong-person reporting / file merging with another consumer.',
-    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}} — Mixed File\n{{client_address}}\n\nDear {{bureau_label}},\n\nMy consumer file contains information that does not belong to me. The account(s) below appear to be commingled from another consumer with a similar identifier. Please separate the files, remove the foreign data, and confirm in writing once corrected.\n\n{{accounts_list}}\n\nPursuant to FCRA §1681e(b), you are required to maintain reasonable procedures to assure maximum possible accuracy. Mixed-file reporting is per se inaccurate and must be resolved within the §611 timeframe.\n\nSincerely,\n{{client_name}}`
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}} — Mixed File\n{{client_address}}\n\nDear {{bureau_label}},\n\nMy consumer file appears to contain information that does not belong to me. The account(s) below may be commingled from another consumer with a similar identifier. Please review, separate any mixed-file information, correct or remove foreign data, and confirm in writing once corrected.\n\n{{accounts_list}}\n\nPursuant to FCRA §1681e(b), consumer reporting agencies must maintain reasonable procedures to assure maximum possible accuracy. Please conduct a reasonable investigation under the §611 process and explain the results in writing.\n\nSincerely,\n{{client_name}}`
   },
   {
     id: 'inaccurate_generic',
     name: 'Inaccurate reporting',
     description: 'Generic inaccuracy challenge — auto-selects the Inaccurate Reporting reason.',
     implicitReason: 'Inaccurate Reporting',
-    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nThe following item(s) on my consumer credit report are inaccurate and must be corrected or deleted under FCRA §611. Each entry below is being reported with information that does not match my records and cannot be substantiated by the furnisher.\n\n{{accounts_list}}\n\nReinvestigate, correct or delete the disputed item(s) within 30 days, and forward an updated free consumer report to the address above.\n\nSincerely,\n{{client_name}}`
+    body: `{{bureau_label}}\n{{bureau_address}}\n\nDate: {{date}}\n\nRe: {{client_name}}\n{{client_address}}\n\nDear {{bureau_label}},\n\nThe following item(s) on my consumer credit report appear inaccurate or incomplete and should be reviewed under FCRA §611. Each entry below is being disputed because the reporting does not match my records or has not been substantiated by the furnisher.\n\n{{accounts_list}}\n\nPlease reinvestigate, correct or delete any information that cannot be verified as accurate and complete, and forward an updated free consumer report to the address above if changes are made.\n\nSincerely,\n{{client_name}}`
   }
 ];
 
