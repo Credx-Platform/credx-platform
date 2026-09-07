@@ -1,4 +1,4 @@
-import type { Prisma, Subscription } from '@prisma/client';
+import { Prisma, type Subscription, type SubscriptionStatus } from '@prisma/client';
 import { prisma } from './prisma.js';
 import { planCodeFromSubscription, type SubscriptionPlanInput } from './entitlements.js';
 
@@ -10,11 +10,11 @@ import { planCodeFromSubscription, type SubscriptionPlanInput } from './entitlem
  * most recent row of any status so callers can surface dunning/canceled state.
  */
 
-const ACCESS_GRANTING = ['ACTIVE', 'TRIALING', 'PAST_DUE'] as const;
+const ACCESS_GRANTING: SubscriptionStatus[] = ['ACTIVE', 'TRIALING', 'PAST_DUE'];
 
 export async function getCurrentSubscription(clientId: string): Promise<Subscription | null> {
   const active = await prisma.subscription.findFirst({
-    where: { clientId, status: { in: ACCESS_GRANTING as unknown as Prisma.EnumSubscriptionStatusFilter['in'] } },
+    where: { clientId, status: { in: ACCESS_GRANTING } },
     orderBy: { updatedAt: 'desc' }
   });
   if (active) return active;
