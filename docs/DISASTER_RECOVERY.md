@@ -24,15 +24,17 @@
 | RPO | ≤ 24h (nightly logical dump) |
 | RTO | ~30–60 min (restore into a fresh DB + repoint `DATABASE_URL` + redeploy) |
 
-Point-in-time recovery: not configured (logical dumps only). If a tighter RPO is
-required, enable the Railway Postgres plugin's automated backups / PITR and
-record it here.
+Point-in-time recovery: **enabled and verified 2026-09-08**. Live Postgres logs
+showed a completed full backup, successful WAL uploads, zero archive failures,
+and zero WAL lag. Dashboard warnings must be checked against live archival
+evidence before credentials are regenerated.
 
 Remaining target improvements:
 
-- Off-host copy of the dumps (encrypted bucket) so a host loss does not also lose
-  the backups.
-- Automated monthly restore-test in cron with an alert on failure.
+- Complete the protected GPG/rclone setup described in
+  `docs/PRODUCTION_SAFETY.md`, then enable the supplied systemd timer.
+- Add failure notification delivery for the backup service and monthly recovery
+  drill.
 
 ### Backup runbook (to be confirmed against Railway settings by James)
 

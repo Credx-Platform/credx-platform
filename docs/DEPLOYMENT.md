@@ -10,6 +10,10 @@ CredX is configured for Railway deployment.
 
 ## SAFETY RULE
 
+Direct workstation/VPS production deployments are disabled. Production releases
+must use `.github/workflows/production-release.yml`, the protected GitHub
+`production` environment, and the controls in `PRODUCTION_SAFETY.md`.
+
 Before deploying API changes, make sure the active Railway manifest is API-shaped:
 
 - build command: `npm install --include=dev && npm run build:api`

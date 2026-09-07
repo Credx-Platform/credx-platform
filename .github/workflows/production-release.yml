@@ -1,0 +1,68 @@
+name: Production release
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DEPLOY_CREDX_PRODUCTION
+        required: true
+      backup_sha256:
+        description: SHA-256 of the restore-tested pre-release dump
+        required: true
+      backup_verified_at:
+        description: UTC ISO timestamp when that dump restore test passed
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: credx-production
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      CREDX_DATABASE_ENVIRONMENT: production
+      CREDX_PRODUCTION_CHANGE_APPROVAL: APPROVED
+      CREDX_VERIFIED_BACKUP_SHA256: ${{ inputs.backup_sha256 }}
+      CREDX_VERIFIED_BACKUP_AT: ${{ inputs.backup_verified_at }}
+      CREDX_PRODUCTION_DATABASE_FINGERPRINT: ${{ secrets.PRODUCTION_DATABASE_FINGERPRINT }}
+      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+    steps:
+      - name: Require exact confirmation and completed incident bridge
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          MIGRATION_BRIDGE_COMPLETE: ${{ vars.MIGRATION_BRIDGE_COMPLETE }}
+        run: |
+          test "$CONFIRMATION" = "DEPLOY_CREDX_PRODUCTION"
+          test "$MIGRATION_BRIDGE_COMPLETE" = "true"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:safety:check
+      - run: npm run test:db-safety
+      - run: npm test
+      - run: npm run build
+      - name: Apply guarded additive migrations
+        run: npm run db:migrate:deploy
+      - name: Install Railway CLI
+        run: npm install --global @railway/cli
+      - name: Deploy API first
+        run: railway up --ci --project "${{ vars.RAILWAY_PROJECT_ID }}" --environment production --service "@credx/api" --message "GitHub approved API release $GITHUB_SHA"
+      - name: Verify API
+        run: curl --fail --show-error --silent --retry 12 --retry-all-errors --retry-delay 10 "${{ vars.CREDX_API_URL }}/health"
+      - name: Select web service manifest
+        run: cp railway.web.json railway.json
+      - name: Deploy web second
+        run: railway up --ci --project "${{ vars.RAILWAY_PROJECT_ID }}" --environment production --service "@credx/web" --message "GitHub approved web release $GITHUB_SHA"
+      - name: Verify web
+        run: curl --fail --show-error --silent --retry 12 --retry-all-errors --retry-delay 10 "${{ vars.CREDX_WEB_URL }}/"

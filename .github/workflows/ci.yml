@@ -1,0 +1,50 @@
+name: CredX CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, saas-transformation]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: credx_ci
+          POSTGRES_PASSWORD: credx_ci_disposable
+          POSTGRES_DB: credx_ci
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U credx_ci -d credx_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://credx_ci:credx_ci_disposable@127.0.0.1:55432/credx_ci
+      TEST_DATABASE_URL: postgresql://credx_ci:credx_ci_disposable@127.0.0.1:55432/credx_ci
+      CREDX_DATABASE_ENVIRONMENT: local
+      CREDX_ALLOW_DESTRUCTIVE: DISPOSABLE_DATABASE_CONFIRMED
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:safety:check
+      - run: npm run test:db-safety
+      - run: npm run db:schema:push:disposable
+      - run: npm test
+        env:
+          TEST_DATABASE_URL: ""
+      - run: npm run test:integration
+      - run: npm run build
