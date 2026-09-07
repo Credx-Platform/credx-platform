@@ -1,5 +1,13 @@
 # Disaster Recovery
 
+> **Fresh evidence, September 7, 2026:** an existing 10:52 UTC dump restored
+> successfully into isolated PostgreSQL 18 (31 public tables; one completed
+> migration in that snapshot). PG16 restore tooling rejected format 1.16.
+> Current production has later migrations; take a fresh pre-migration backup.
+> This test does not independently verify scheduled execution, retention, or RTO.
+> See `LAUNCH_HARDENING_2026-09-07.md`; later-dated historical claims below
+> are not a substitute for current evidence.
+
 ## Database Failure
 
 **Status (verified 2026-09-08):**

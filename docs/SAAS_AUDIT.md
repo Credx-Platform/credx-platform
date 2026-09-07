@@ -6,7 +6,9 @@
 > scores. Live HTTP checks show the upgrade pages are not being served and the
 > new health endpoints return 404. See [launch audit](LAUNCH_AUDIT_2026-09-07.md)
 > for evidence, two locally fixed access defects, and remaining release gates.
-> Later-dated claims in previous reports have not been independently confirmed.
+> See also [hardening continuation](LAUNCH_HARDENING_2026-09-07.md): live schema
+> and configuration gaps confirmed, payment safety improved, 124 tests pass,
+> legal copy revised locally. Production and 9/10 remain unverified.
 
 Scores are current-state estimates from the repository, not marketing claims.
 Last revised 2026-09-08 (branch `saas-transformation`, sessions 3–4 / Phase C1–D —

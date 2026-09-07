@@ -9,9 +9,11 @@ export const contractsRouter = Router();
 const BUSINESS_NAME = process.env.BUSINESS_NAME || 'The Malloy Group Financial LLC d/b/a CredX';
 const BUSINESS_ADDRESS = process.env.BUSINESS_ADDRESS || '1392 Madison Avenue, New York, NY 10029';
 
-const AGREEMENT_TEXT = `CREDX CREDIT REPAIR SERVICE AGREEMENT
+const AGREEMENT_TEXT = `CREDX OPTIONAL CREDIT-RELATED SUPPORT SERVICE AGREEMENT
 
-This Credit Repair Service Agreement ("Agreement") is between ${BUSINESS_NAME} ("CredX", "Company", "we", "us") and the undersigned client ("Client", "you"). This Agreement governs credit education, onboarding, credit report review, dispute preparation support, financial rebuilding guidance, and related CredX client workflow services.
+This Optional Credit-Related Support Service Agreement ("Agreement") is between ${BUSINESS_NAME} ("CredX", "Company", "we", "us") and the undersigned client ("Client", "you"). This Agreement governs credit education, onboarding, credit report review, dispute preparation support, financial rebuilding guidance, and related CredX client workflow services.
+
+Platform software access is governed by the CredX platform Terms. This Agreement governs the specific optional support services you accept. Software access does not reclassify covered credit-repair services or waive consumer protections. No future service is earned merely because an analysis or consultation has been completed.
 
 1. SERVICES PROVIDED
 
@@ -55,7 +57,7 @@ CredX agrees to use reasonable administrative, technical, and physical safeguard
 
 CredX does not charge upfront fees for credit repair services before those services are fully performed. Any setup fee, first-work fee, monthly service fee, or other paid support term must be reviewed and accepted in writing before paid work begins and must follow the billing timing presented in the CredX checkout, payment authorization, or service plan confirmation.
 
-For the AI Assistance path, signup and initial review may occur before payment. Paid dispute assistance or plan execution begins only after the required agreement, analysis/review, payment authorization, and applicable compliance gates are satisfied. Pricing, plan details, refund terms, and cancellation terms may also be described in the CredX pricing page, payment authorization, refund policy, and cancellation policy.
+CredX completes the analysis and consultation/review with Client before requesting payment for credit-related support. Full performance of the specific agreed service being charged for, a signed agreement and expiration of the applicable cancellation period are required; an initial consultation does not authorize advance billing for future work. Covered services do not begin before the applicable statutory waiting period has ended. For the AI Assistance path, signup and initial review may occur before payment. Paid dispute assistance or plan execution begins only after the required agreement, analysis/review, payment authorization, and applicable compliance gates are satisfied. Pricing, plan details, refund terms, and cancellation terms may also be described in the CredX pricing page, payment authorization, refund policy, and cancellation policy.
 
 9. NO GUARANTEES
 
@@ -81,9 +83,30 @@ This Agreement, together with any required disclosures, cancellation notice, pri
 
 By signing, Client confirms that Client has reviewed this Agreement, understands the services and limits described, authorizes CredX to provide the agreed service-related support, consents to the collection and use of sensitive personal information as described, understands CredX does not guarantee outcomes, and understands the three-business-day right to cancel.`;
 
-const MASTERCLASS_AGREEMENT_TEXT = `CREDX 5-DAY MASTERCLASS AGREEMENT\n\nThis Agreement is between ${BUSINESS_NAME} ("CredX", "Company") and the undersigned participant ("Participant").\n\n1. SERVICES\nCredX provides access to the 5-Day Masterclass education path, related worksheets, platform resources, and performance-based maintenance guidance. This is an education product and is not legal, financial, tax, or credit repair representation.\n\n2. EDUCATION-ONLY SCOPE\nThe Masterclass is designed to help participants understand credit reports, dispute concepts, documentation habits, and credit maintenance workflows. CredX does not guarantee credit-report changes, deletions, approvals, score increases, or any specific result.\n\n3. PAYMENT AND ACCESS\nMasterclass access may require payment before lessons or platform materials are unlocked. Any payment terms presented at checkout must be reviewed and accepted before access begins.\n\n4. RETURN POLICY\nThe 5-Day Masterclass has a 3-day return policy based on participant performance and maintenance standards, not based on results, deletions, score changes, or credit-report outcomes.`;
+const MASTERCLASS_AGREEMENT_TEXT = `CREDX 5-DAY MASTERCLASS AGREEMENT\n\nThis Agreement is between ${BUSINESS_NAME} ("CredX", "Company") and the undersigned participant ("Participant").\n\n1. SERVICES\nCredX provides access to the 5-Day Masterclass education path, related worksheets, platform resources, and performance-based maintenance guidance. This is an education product and is not legal, financial, tax, or credit repair representation.\n\n2. EDUCATION-ONLY SCOPE\nThe Masterclass is designed to help participants understand credit reports, dispute concepts, documentation habits, and credit maintenance workflows. CredX does not guarantee credit-report changes, deletions, approvals, score increases, or any specific result.\n\n3. PAYMENT AND ACCESS\nMasterclass access may require payment before lessons or platform materials are unlocked. Any payment terms presented at checkout must be reviewed and accepted before access begins.\n\n4. RETURN POLICY\nThe current Masterclass is a one-time educational purchase. You may request a refund within seven calendar days of purchase by emailing contact@credxme.com. Requests are evaluated under the published Refund Policy, including content accessed and evidence of abuse, without limiting statutory rights or remedies for improper charges. No credit outcome is guaranteed. This purchase does not authorize recurring charges or enroll you in separate paid support.`;
 
-const DISCLOSURE_STATEMENT = `Consumer Credit File Rights Under State and Federal Law\n\nYou have a right to dispute inaccurate information in your credit report by contacting the credit bureau directly. However, neither you nor any credit repair company has the right to have accurate, current, and verifiable information removed from your credit report. The credit bureau must remove accurate negative information only if it is over 7 years old, and bankruptcy information can be reported for 10 years.\n\nYou have the right to sue a credit repair organization that violates the Credit Repair Organizations Act. You have the right to cancel your contract with any credit repair organization for any reason within 3 business days from the date you signed it.`;
+// Statutory text: 15 U.S.C. 1679c(a), checked September 7, 2026.
+const DISCLOSURE_STATEMENT = `Consumer Credit File Rights Under State and Federal Law
+
+You have a right to dispute inaccurate information in your credit report by contacting the credit bureau directly. However, neither you nor any 'credit repair' company or credit repair organization has the right to have accurate, current, and verifiable information removed from your credit report. The credit bureau must remove accurate, negative information from your report only if it is over 7 years old. Bankruptcy information can be reported for 10 years.
+
+You have a right to obtain a copy of your credit report from a credit bureau. You may be charged a reasonable fee. There is no fee, however, if you have been turned down for credit, employment, insurance, or a rental dwelling because of information in your credit report within the preceding 60 days. The credit bureau must provide someone to help you interpret the information in your credit file. You are entitled to receive a free copy of your credit report if you are unemployed and intend to apply for employment in the next 60 days, if you are a recipient of public welfare assistance, or if you have reason to believe that there is inaccurate information in your credit report due to fraud.
+
+You have a right to sue a credit repair organization that violates the Credit Repair Organization Act. This law prohibits deceptive practices by credit repair organizations.
+
+You have the right to cancel your contract with any credit repair organization for any reason within 3 business days from the date you signed it.
+
+Credit bureaus are required to follow reasonable procedures to ensure that the information they report is accurate. However, mistakes may occur.
+
+You may, on your own, notify a credit bureau in writing that you dispute the accuracy of information in your credit file. The credit bureau must then reinvestigate and modify or remove inaccurate or incomplete information. The credit bureau may not charge any fee for this service. Any pertinent information and copies of all documents you have concerning an error should be given to the credit bureau.
+
+If the credit bureau's reinvestigation does not resolve the dispute to your satisfaction, you may send a brief statement to the credit bureau, to be kept in your file, explaining why you think the record is inaccurate. The credit bureau must include a summary of your statement about disputed information with any report it issues about you.
+
+The Federal Trade Commission regulates credit bureaus and credit repair organizations. For more information contact:
+
+The Public Reference Branch
+Federal Trade Commission
+Washington, D.C. 20580`;
 
 function buildCancellationNotice(signedAtIso: string) {
   // CROA: "before midnight of the 3rd BUSINESS day" — weekends don't count
@@ -91,7 +114,11 @@ function buildCancellationNotice(signedAtIso: string) {
   const cancelBy = cancellationWindowEnd(new Date(signedAtIso));
   return {
     heading: 'Notice of Cancellation',
-    text: `You may cancel this contract, without penalty or obligation, at any time before midnight of ${cancelBy.toDateString()}. To cancel this contract, mail or deliver a signed, dated copy of this cancellation notice, or any other written notice, to ${BUSINESS_NAME} at ${BUSINESS_ADDRESS} before midnight of that date.`
+    text: `You may cancel this contract, without penalty or obligation, at any time before midnight of ${cancelBy.toDateString()}. To cancel this contract, mail or deliver a signed, dated copy of this cancellation notice, or any other written notice, to ${BUSINESS_NAME} at ${BUSINESS_ADDRESS} before midnight of that date.
+
+I hereby cancel this transaction.
+Date: ____________________
+Purchaser signature: ____________________`
   };
 }
 

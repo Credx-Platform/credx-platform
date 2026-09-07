@@ -1256,13 +1256,16 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
                 if (headingMatch) return <h3 key={`a-${idx}`}>{trimmed}</h3>;
                 return <p key={`a-${idx}`}>{trimmed}</p>;
               })}
-              <h3>Required Federal Disclosures</h3>
+              </div>
+            <div className="contract-body" tabIndex={0} aria-label="Separate consumer credit file rights disclosure">
+              <h3>Consumer Credit File Rights — Separate Disclosure</h3>
               {contractText.disclosure.split(/\n{2,}/).map((paragraph, idx) => (
                 <p key={`d-${idx}`}>{paragraph.trim()}</p>
               ))}
             </div>
             <div className="contract-actions">
               <div>
+                {contractText.contractType !== 'masterclass' ? <p><strong>You may cancel this contract without penalty or obligation at any time before midnight of the 3rd business day after the date on which you signed the contract. See the attached notice of cancellation form for an explanation of this right.</strong></p> : null}
                 <div className="signature-pad-label" style={{ marginBottom: 6 }}>Your signature</div>
                 <SignaturePad value={signatureData} onChange={setSignatureData} />
               </div>
@@ -1273,7 +1276,7 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
               <label className="contract-agree">
                 <input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} />
                 <span>{contractText.contractType === 'masterclass'
-                  ? 'I have read and agree to the CredX 5-Day Masterclass agreement and disclosures above. I understand the 3-day return policy is based on performance and maintenance standards, not guaranteed results or credit-report changes.'
+                  ? 'I have read and agree to the CredX 5-Day Masterclass agreement and disclosures above. I understand I may request a refund within seven calendar days under the Refund Policy, without limiting statutory rights. No credit outcome is guaranteed.'
                   : 'I have read and agree to the CredX service agreement and federal disclosures above. I understand I can cancel within 3 business days without penalty.'}</span>
               </label>
               <button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim() || !signatureData} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, padding: '12px 18px' }}>
