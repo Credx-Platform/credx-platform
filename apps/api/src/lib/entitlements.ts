@@ -1,4 +1,4 @@
-export type PlanCode = 'MASTERCLASS' | 'ESSENTIAL' | 'PREMIUM' | 'FAMILY';
+export type PlanCode = 'FREE' | 'MASTERCLASS' | 'ESSENTIAL' | 'PREMIUM' | 'FAMILY';
 
 export type EntitlementKey =
   | 'can_access_dashboard'
@@ -48,6 +48,20 @@ function withEntitlements(enabled: EntitlementKey[]): Entitlements {
 }
 
 export const PLAN_DEFINITIONS: Record<PlanCode, PlanDefinition> = {
+  FREE: {
+    code: 'FREE',
+    label: 'Free',
+    description: 'Free CredX account: dashboard, an introductory readiness view, basic tools, and Learning Center previews.',
+    setupFee: null,
+    oneTime: null,
+    monthly: 0,
+    billing: 'No charge.',
+    entitlements: withEntitlements([
+      'can_access_dashboard',
+      'can_use_basic_tools',
+      'can_use_learning_center'
+    ])
+  },
   MASTERCLASS: {
     code: 'MASTERCLASS',
     label: '5-Day Masterclass',
@@ -123,8 +137,60 @@ export function planCodeForServiceTier(tier?: string | null): PlanCode {
   return 'ESSENTIAL';
 }
 
+/**
+ * Central plan/entitlement resolution.
+ *
+ * Effective access is derived from the client's lifecycle state, not just the
+ * serviceTier field, so an unpaid lead never receives paid entitlements:
+ *   - masterclass/education student            -> MASTERCLASS
+ *   - activated + paying (ACTIVE / PAST_DUE)    -> serviceTier plan
+ *   - everyone else (LEAD, INTAKE, ANALYSIS...) -> FREE
+ *
+ * PAST_DUE keeps entitlements (soft dunning) but callers may choose to gate
+ * separately on `pastDue`.
+ */
+export type ClientPlanInputs = {
+  status?: string | null;
+  serviceTier?: string | null;
+  setupFeePaid?: boolean | null;
+  masterclassAccess?: boolean | null;
+};
+
+export type ResolvedEntitlements = {
+  plan: PlanCode;
+  entitlements: Entitlements;
+  pastDue: boolean;
+  paid: boolean;
+};
+
+const PAID_STATUSES = new Set(['ACTIVE', 'PAST_DUE']);
+
+export function resolveClientEntitlements(input: ClientPlanInputs): ResolvedEntitlements {
+  const status = String(input.status || '').trim().toUpperCase();
+  const pastDue = status === 'PAST_DUE';
+  const isMasterclass = status === 'STUDENT' || input.masterclassAccess === true;
+
+  let plan: PlanCode;
+  if (PAID_STATUSES.has(status)) {
+    plan = planCodeForServiceTier(input.serviceTier);
+  } else if (isMasterclass) {
+    plan = 'MASTERCLASS';
+  } else {
+    plan = 'FREE';
+  }
+
+  return {
+    plan,
+    entitlements: entitlementsForPlan(plan),
+    pastDue,
+    paid: PAID_STATUSES.has(status) || isMasterclass
+  };
+}
+
 export function publicPlanCatalog() {
-  return Object.values(PLAN_DEFINITIONS).map((plan) => ({
+  return Object.values(PLAN_DEFINITIONS)
+    .filter((plan) => plan.code !== 'FREE')
+    .map((plan) => ({
     code: plan.code,
     label: plan.label,
     description: plan.description,

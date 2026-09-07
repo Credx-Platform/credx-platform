@@ -12,7 +12,7 @@ import {
   verifyPaypalWebhookSignature
 } from '../lib/paypal.js';
 import { config } from '../config.js';
-import { entitlementsForPlan, planCodeForServiceTier, publicPlanCatalog } from '../lib/entitlements.js';
+import { entitlementsForPlan, planCodeForServiceTier, publicPlanCatalog, resolveClientEntitlements } from '../lib/entitlements.js';
 
 export const billingRouter = Router();
 
@@ -70,9 +70,18 @@ billingRouter.get('/entitlements/me', requireAuth, async (req, res, next) => {
     if (!client) return res.status(404).json({ error: 'Client profile not found' });
 
     const education = client.progress?.education as Record<string, unknown> | null;
-    const masterclassOnly = client.status === 'STUDENT' || education?.masterclassAccess === true;
-    const plan = masterclassOnly ? 'MASTERCLASS' : planCodeForServiceTier(client.serviceTier);
-    return res.json({ plan, entitlements: entitlementsForPlan(plan) });
+    const resolved = resolveClientEntitlements({
+      status: client.status,
+      serviceTier: client.serviceTier,
+      setupFeePaid: client.setupFeePaid,
+      masterclassAccess: education?.masterclassAccess === true
+    });
+    return res.json({
+      plan: resolved.plan,
+      entitlements: resolved.entitlements,
+      pastDue: resolved.pastDue,
+      paid: resolved.paid
+    });
   } catch (error) {
     next(error);
   }

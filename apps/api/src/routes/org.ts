@@ -4,8 +4,21 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { captureException } from '../lib/sentry.js';
+import { assertOrgAccess, TenantAccessError, type Membership } from '../lib/tenancy.js';
 
 export const orgRouter = Router();
+
+function toMemberships(orgId: string, members: Array<{ userId: string; role: string }>): Membership[] {
+  return members.map((m) => ({ organizationId: orgId, userId: m.userId, role: m.role as Membership['role'] }));
+}
+
+function handleTenantError(err: unknown, res: import('express').Response): boolean {
+  if (err instanceof TenantAccessError) {
+    res.status(err.status).json({ error: err.message, code: err.code });
+    return true;
+  }
+  return false;
+}
 
 /**
  * GET /api/org
@@ -49,12 +62,11 @@ orgRouter.get('/:slug', requireAuth, async (req: AuthedRequest, res, next) => {
 
     if (!org) return res.status(404).json({ error: 'Organization not found' });
 
-    // Check membership
-    const isMember = org.members.some((m: any) => m.userId === req.auth!.sub);
-    if (!isMember) return res.status(403).json({ error: 'Not a member of this organization' });
+    assertOrgAccess(toMemberships(org.id, org.members), req.auth!.sub, org.id);
 
     res.json(org);
   } catch (err) {
+    if (handleTenantError(err, res)) return;
     await captureException(err, { userId: req.auth?.sub, url: req.originalUrl, method: req.method });
     next(err);
   }
@@ -72,11 +84,8 @@ orgRouter.post('/:slug/invite', requireAuth, async (req: AuthedRequest, res, nex
     });
     if (!org) return res.status(404).json({ error: 'Organization not found' });
 
-    // Only OWNER or ADMIN can invite
-    const myMembership = org.members.find((m: any) => m.userId === req.auth!.sub);
-    if (!myMembership || !['OWNER', 'ADMIN'].includes(myMembership.role)) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
+    // Only ADMIN or OWNER can invite
+    assertOrgAccess(toMemberships(org.id, org.members), req.auth!.sub, org.id, 'ADMIN');
 
     // Check member limit
     if (org.members.length >= org.maxMembers) {
@@ -112,6 +121,7 @@ orgRouter.post('/:slug/invite', requireAuth, async (req: AuthedRequest, res, nex
 
     res.status(201).json({ invitation, inviteUrl: `/org/invite?token=${token}` });
   } catch (err) {
+    if (handleTenantError(err, res)) return;
     await captureException(err, { userId: req.auth?.sub, url: req.originalUrl, method: req.method });
     next(err);
   }
@@ -126,24 +136,34 @@ orgRouter.post('/accept-invite', requireAuth, async (req: AuthedRequest, res, ne
     const schema = z.object({ token: z.string().uuid() });
     const { token } = schema.parse(req.body);
 
-    // In production, hash the token and look it up. For now, simplified.
-    const invitation = await prisma.organizationInvitation.findFirst({
-      where: {
-        email: req.auth!.email ?? '',
-        expiresAt: { gt: new Date() },
-        acceptedAt: null
-      }
+    const tokenHash = await hashToken(token);
+    const invitation = await prisma.organizationInvitation.findUnique({
+      where: { tokenHash }
     });
 
-    if (!invitation) return res.status(400).json({ error: 'Invalid or expired invitation' });
+    if (
+      !invitation ||
+      invitation.acceptedAt ||
+      invitation.expiresAt <= new Date() ||
+      invitation.email.toLowerCase() !== (req.auth!.email ?? '').toLowerCase()
+    ) {
+      return res.status(400).json({ error: 'Invalid or expired invitation' });
+    }
 
     await prisma.$transaction(async (tx) => {
-      await tx.organizationMember.create({
-        data: {
+      await tx.organizationMember.upsert({
+        where: {
+          organizationId_userId: {
+            organizationId: invitation.organizationId,
+            userId: req.auth!.sub
+          }
+        },
+        create: {
           organizationId: invitation.organizationId,
           userId: req.auth!.sub,
           role: invitation.role
-        }
+        },
+        update: {}
       });
 
       await tx.organizationInvitation.update({

@@ -13,6 +13,7 @@
     "build:api": "node scripts/check-node-crypto-imports.mjs && npm run build --workspace @credx/api",
     "build:web": "npm run build --workspace @credx/web",
     "test:readiness": "node --import tsx --test apps/api/tests/readinessScore.test.ts",
+  "test": "node --import tsx --test apps/api/tests/*.test.ts",
     "start": "npm run start:api",
     "start:api": "npm run start --workspace @credx/api",
     "start:web": "npm run start --workspace @credx/web",
