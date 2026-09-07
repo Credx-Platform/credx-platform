@@ -109,6 +109,47 @@ export async function markFailed(eventId: string, error: string) {
   });
 }
 
+export type LedgerOutcome =
+  | { handled: true; duplicate: boolean; eventRowId: string; result?: unknown }
+  | { handled: false; duplicate: false; eventRowId: string; error: string };
+
+/**
+ * Run a webhook payload through the ledger: record it (dedup on externalEventId),
+ * short-circuit replays, then invoke `processor` exactly once and record the
+ * terminal status. `processor` should itself be idempotent for safety.
+ *
+ * Never throws — returns a discriminated outcome the route can map to a status
+ * code. A processing failure is recorded (RETRYING/DEAD_LETTER) so the provider
+ * can safely retry.
+ */
+export async function processWebhookWithLedger(
+  input: WebhookPayload,
+  processor: (ctx: { eventRowId: string; payload: Record<string, unknown> }) => Promise<unknown>
+): Promise<LedgerOutcome> {
+  let eventRowId = '';
+  try {
+    const { event, isDuplicate } = await recordWebhookEvent(input);
+    eventRowId = event.id;
+
+    if (isDuplicate && event.status === 'PROCESSED') {
+      return { handled: true, duplicate: true, eventRowId };
+    }
+    // Not-yet-terminal duplicate (RECEIVED/PROCESSING/RETRYING) falls through and
+    // is retried — safe because processors are idempotent.
+
+    await beginProcessing(eventRowId);
+    const result = await processor({ eventRowId, payload: input.payload });
+    await markProcessed(eventRowId);
+    return { handled: true, duplicate: isDuplicate, eventRowId, result };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    if (eventRowId) {
+      await markFailed(eventRowId, error).catch(() => undefined);
+    }
+    return { handled: false, duplicate: false, eventRowId, error };
+  }
+}
+
 /**
  * Idempotency key guard for any operation.
  */
