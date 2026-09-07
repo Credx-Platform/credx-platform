@@ -3112,3 +3112,27 @@ button:hover,
     white-space: normal;
   }
 }
+
+/* ---- Financial Readiness workspace (C2) ---- */
+.disclosure-box {
+  border: 1px solid rgba(250, 204, 21, .28);
+  background: rgba(250, 204, 21, .06);
+  color: #d8d2b8;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  margin: 12px 0 20px;
+}
+.tab-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.indicator-list, .check-list { list-style: none; padding: 0; display: grid; gap: 10px; }
+.indicator {
+  display: grid; gap: 4px; padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.08); border-radius: 10px; background: rgba(255,255,255,.02);
+}
+.indicator--strong { border-color: rgba(45,212,191,.3); }
+.indicator--attention { border-color: rgba(248,113,113,.3); }
+.indicator--fair { border-color: rgba(250,204,21,.26); }
+.indicator-status { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; }
+.indicator span { font-size: 13px; color: #cbd5e1; }
+.check-list li label { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+.check-list input[type="checkbox"] { margin-top: 3px; }

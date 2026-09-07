@@ -221,6 +221,8 @@ model Client {
   subscriptions           Subscription[]
   invoices                Invoice[]
   assignments             ClientAssignment[]       @relation("ClientAssignments")
+  fundingReadiness        FundingReadinessProfile?
+  businessCredit          BusinessCreditProfile?
   progress                ClientProgress?
   organizationId          String?
   organization            Organization?            @relation("OrganizationClients", fields: [organizationId], references: [id], onDelete: SetNull)
@@ -508,13 +510,13 @@ model CreditScore {
 }
 
 model ReadinessScoreSnapshot {
-  id              String   @id @default(uuid())
-  clientId        String
-  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  score           Int
-  label           String
-  dataQuality     String
-  categories      Json     @default("[]")
+  id                    String   @id @default(uuid())
+  clientId              String
+  client                Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  score                 Int
+  label                 String
+  dataQuality           String
+  categories            Json     @default("[]")
   strengths             Json     @default("[]")
   opportunities         Json     @default("[]")
   nextBestActions       Json     @default("[]")
@@ -840,4 +842,93 @@ model Invoice {
   @@index([clientId, status])
   @@index([subscriptionId])
   @@index([status, dueAt])
+}
+
+// ============================================================
+// SaaS Phase C2: Financial Readiness — Funding Readiness
+// ============================================================
+// CredX does NOT guarantee approval or funding. This module measures readiness
+// signals and organizes preparation; it is not an underwriting decision.
+
+model FundingReadinessProfile {
+  id                String    @id @default(uuid())
+  clientId          String    @unique
+  client            Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  objective         String? // personal_loan | auto | mortgage_prep | business_loc | debt_consolidation | other
+  targetAmount      Decimal?
+  targetTimeframe   String? // 3_months | 6_months | 12_months | exploring
+  monthlyIncome     Decimal?
+  incomeType        String? // w2 | self_employed | mixed | other
+  notes             String?
+  // User-maintained checklist state: [{ key, done, note }]
+  checklist         Json      @default("[]")
+  // Document checklist state: [{ key, provided }]
+  documentChecklist Json      @default("[]")
+  // Last computed measurement snapshot (see lib/fundingReadiness.ts)
+  lastAssessment    Json?
+  lastAssessedAt    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// ============================================================
+// SaaS Phase C2: Financial Readiness — Business Credit Workspace
+// ============================================================
+
+model BusinessCreditProfile {
+  id              String   @id @default(uuid())
+  clientId        String   @unique
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  legalName       String?
+  entityType      String? // LLC | S_CORP | C_CORP | SOLE_PROP | PARTNERSHIP | NONPROFIT | OTHER
+  formationState  String?
+  einStatus       String   @default("none") // none | applied | issued
+  einLast4        String?
+  dunsNumber      String?
+  businessPhone   String?
+  businessEmail   String?
+  businessAddress String?
+  businessDomain  String?
+  hasBankAccount  Boolean  @default(false)
+  // User-maintained foundation checklist: [{ key, done, note }]
+  checklist       Json     @default("[]")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vendorAccounts BusinessVendorAccount[]
+  tradelines     BusinessTradeline[]
+}
+
+model BusinessVendorAccount {
+  id          String                @id @default(uuid())
+  profileId   String
+  profile     BusinessCreditProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  vendorName  String
+  accountType String? // net_30 | net_60 | revolving | fleet | store_card | other
+  status      String                @default("PROSPECT") // PROSPECT | APPLIED | OPEN | DECLINED | CLOSED
+  reportsTo   String[]              @default([]) // ["dnb","experian_business","equifax_business"]
+  creditLimit Decimal?
+  openedAt    DateTime?
+  notes       String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([profileId, status])
+}
+
+model BusinessTradeline {
+  id           String                @id @default(uuid())
+  profileId    String
+  profile      BusinessCreditProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  creditorName String
+  accountType  String?
+  balance      Decimal?
+  creditLimit  Decimal?
+  status       String? // current | past_due | closed
+  reportedTo   String[]              @default([])
+  openedAt     DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@index([profileId])
 }

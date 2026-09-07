@@ -58,6 +58,7 @@ const staticPageRoutes = new Map([
   ['/portal', 'portal.html'],
   ['/adminportal', 'adminportal.html'],
   ['/team', 'team.html'],
+  ['/financial-readiness', 'readiness.html'],
   ['/masterclass', 'masterclass.html'],
   ['/masterclass-terms', 'masterclass-terms.html'],
   ['/masterclass-checkout', 'masterclass-checkout.html'],
@@ -85,6 +86,7 @@ const prefixPageRoutes = [
   ['/portal/', 'portal.html'],
   ['/adminportal/', 'adminportal.html'],
   ['/team/', 'team.html'],
+  ['/financial-readiness/', 'readiness.html'],
   ['/masterclass-checkout/', 'masterclass-checkout.html']
 ];
 

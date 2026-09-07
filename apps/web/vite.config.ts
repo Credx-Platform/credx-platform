@@ -15,7 +15,8 @@ export default defineConfig({
         adminportal: resolve(__dirname, 'adminportal.html'),
         portal: resolve(__dirname, 'portal.html'),
         start: resolve(__dirname, 'start.html'),
-        team: resolve(__dirname, 'team.html')
+        team: resolve(__dirname, 'team.html'),
+        readiness: resolve(__dirname, 'readiness.html')
       },
       output: {
         // Keep the heavy PDF stack in its own lazy chunks (loaded only when a

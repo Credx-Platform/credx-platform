@@ -21,6 +21,8 @@ data**, this directory now contains:
 | `20260907130000_add_subscription_invoice_models` | **New.** Persistent `Subscription` (recurring plan lifecycle, reconciled from Stripe/PayPal/manual) + `Invoice` (billing document history), both client-scoped. Fully additive, all statements idempotent, **no DROP / no column-type changes**. |
 | `20260907140000_readiness_next_best_action_details` | **New.** `ReadinessScoreSnapshot.nextBestActionDetails JSONB DEFAULT '[]'` — persists the structured/ranked next-best-action list. Single `ADD COLUMN IF NOT EXISTS`. |
 | `20260908120000_add_client_assignment` | **New.** `ClientAssignment` (professional ↔ client, `@@unique([clientId, userId])`) so an org member can be made responsible for specific clients. Fully additive, idempotent. |
+| `20260908130000_add_funding_readiness` | **New.** `FundingReadinessProfile` (objective, target, income, checklist state, last assessment). Additive, idempotent. |
+| `20260908140000_add_business_credit` | **New.** `BusinessCreditProfile` + `BusinessVendorAccount` + `BusinessTradeline`. Additive, idempotent. |
 
 The full chain was verified against a throwaway PostgreSQL 16 instance
 (`prisma migrate deploy` from empty → all nine apply cleanly, zero schema drift
