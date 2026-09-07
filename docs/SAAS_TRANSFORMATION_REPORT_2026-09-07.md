@@ -108,8 +108,11 @@ service-forward and need attorney-reviewed copy before broader repositioning.
 
 ## 9. SaaS Score
 
-Per `docs/SAAS_AUDIT.md`: **5.3 → 5.9 / 10**. Target 9.5+. This cycle was
-predominantly stabilization plus entitlement/tenancy/analytics foundations.
+Per `docs/SAAS_AUDIT.md`: **5.3 → 5.9 → 6.5 / 10**. Target 9.5+. The 5.9→6.5
+move is the Phase B continuation in §19 (persistent subscriptions, a real job
+queue runner, replay-safe webhook processing, DB-level isolation tests, ranked
+readiness actions). Still gated on infra provisioning + attorney review for the
+higher bands.
 
 ## 10. Remaining Gaps
 
@@ -216,3 +219,114 @@ New (all optional; features no-op when unset): `SENTRY_DSN`, `SENTRY_ENABLED`,
    subscription_*); add a `/api/monitoring/errors` admin view.
 10. Code-split the web bundle (lazy-load html2pdf and admin portal); re-run
     `build:web` to clear the chunk warning.
+
+Status after §19: **3, 4, 5, 7, 8 done** (8 partial — mapping done, cron
+scheduling still open). 1, 2, 9 remain James-gated infra. 6, 10 not started.
+
+## 19. Phase B continuation — "Next 10" items 3–8 (session 2, 2026-09-07)
+
+Branch `saas-transformation`, 5 additional commits, not pushed, not deployed.
+Small inspect→implement→typecheck→test→build→commit loops. All migrations
+additive + idempotent; verified against a throwaway PostgreSQL 16 (9-migration
+chain applies from empty with zero drift; new migrations re-run clean).
+
+**`3a3dc91` — persistent Subscription + Invoice models (Next-10 #3)**
+- Migration `20260907130000`: `Subscription` (provider, providerSubscriptionId,
+  planCode, `SubscriptionStatus`, period, cancelAtPeriodEnd, metadata) and
+  `Invoice` (amountDue/Paid, `InvoiceStatus`, period, hostedInvoiceUrl), both
+  client-scoped, unique on `(provider, providerId)`.
+- `resolveClientEntitlements()` takes an optional `subscription` input that wins
+  over the status/serviceTier heuristic: ACTIVE/TRIALING/PAST_DUE grant the
+  subscription's plan; UNPAID/PAUSED/CANCELED/INCOMPLETE fall back; unknown plan
+  codes fall back safely.
+- `lib/subscriptions.ts`: `getCurrentSubscription`, `toSubscriptionPlanInput`,
+  `upsertProviderSubscription` (status normalization, idempotent).
+- `/api/billing/entitlements/me` resolves against the current subscription and
+  echoes its state.
+
+**`4999477` — DB-backed job queue runner + producers (Next-10 #5)**
+- `lib/jobs.ts`: handler registry + `enqueueJob()` producer wrapper that never
+  throws into a request path — degrades to inline execution when the DB enqueue
+  fails or `QUEUE_MODE=inline`; can drop-and-log for safe-to-retry jobs.
+- `lib/queueRunner.ts`: `QueueRunner` poll loop — transactional claim
+  (multi-runner safe), exponential backoff, heartbeat, interruptible sleep,
+  bounded graceful stop. `startInProcessRunner()` runs it inside the API unless
+  `QUEUE_INPROCESS=0`.
+- `src/worker.ts`: standalone worker entrypoint (`npm run start:worker`) with
+  SIGTERM/SIGINT draining, for a future dedicated Railway service.
+- Producers: both auto-analysis email sites in `progress.ts` now enqueue instead
+  of blocking the upload request on PDF render + send.
+- `GET /health/queue`: backlog counts, dead-letter count, worker liveness; never 5xx.
+- Verified end-to-end on PG16: enqueue → claim → complete + heartbeat + retry.
+
+**`bb0ac44` — webhook ledger wired into Stripe + PayPal (Next-10 #4)**
+- `processWebhookWithLedger()`: record event (dedupe on `externalEventId`) →
+  short-circuit PROCESSED replays → run processor once → mark
+  PROCESSED / RETRYING / DEAD_LETTER. Never throws.
+- Stripe `/api/billing/webhook`: every event flows through the ledger keyed on
+  `event.id`; new `handleStripeEvent()` also reconciles persistent state
+  (`customer.subscription.*` → subscription upsert; `invoice.*` → Invoice
+  upsert). Payment settle path unchanged (settle-only, CROA gate respected).
+- PayPal `/api/billing/paypal/webhook`: same ledger wrapper keyed on the PayPal
+  event id; existing masterclass enrollment logic preserved.
+- `lib/billingWebhooks.ts`: defensive Stripe→CredX mapping (clientId from
+  metadata or stripeCustomerId/subscriptionId), optional `STRIPE_PRICE_*`
+  price→plan map, idempotent upserts; unresolvable objects no-op instead of
+  dead-lettering.
+- Verified on PG16: replay does not re-invoke the processor; subscription
+  upserts to a single row across events; events land PROCESSED.
+
+**`1acbefe` — DB-level tenant-isolation integration tests (Next-10 #7)**
+- `lib/tenantQueries.ts`: single source of truth for tenant-scoped reads —
+  `findClientDocumentForUser` (own-client only), `listOrgClientsForUser`
+  (membership asserted, scoped), `findOrgClientForUser` (OWNER/ADMIN see any org
+  client; a professional MEMBER only sees a client assigned via
+  `OrganizationMember.clientId`; cross-tenant + unassigned throw).
+- `clients.ts` `GET /me/documents/:id/print` refactored onto the helper.
+- `tests/tenantIsolation.integration.test.ts`: 9 tests hitting real Prisma —
+  user A cannot read user B docs, Org B owner cannot list Org A clients,
+  professional cannot read unassigned or cross-tenant clients, owner can.
+- Runs only with `TEST_DATABASE_URL` (`npm run test:integration`); the default
+  `npm test` reports them skipped so it never touches the app DATABASE_URL.
+
+**`0f1cf4a` — ranked readiness next-best-action mapping + history (Next-10 #8)**
+- `readinessScore.ts`: `nextBestActionDetails[]` — each active opportunity maps
+  to a scoring category, ranked by real point headroom (blocker categories
+  `creditData`/`derogatory` forced high), with `potentialPoints` and a portal
+  deep-link. Flat `nextBestActions`/`opportunities` derived from the same source;
+  wording unchanged.
+- Migration `20260907140000`: `ReadinessScoreSnapshot.nextBestActionDetails`
+  JSONB; persisted at all three snapshot write sites.
+- `/api/progress/readiness` history entries carry `topActions` so the portal
+  shows each past snapshot's focus.
+- `clientPortal.tsx`: ranked action list (priority pill, +pts, CTA link,
+  rationale) with graceful fallback; history bars get per-snapshot focus.
+- #8 remainder (cron-scheduled periodic snapshots) is still open —
+  `generateAllReadinessSnapshots` + the `analysis:readiness-snapshot-all` job
+  handler exist but nothing schedules them yet.
+
+### §19 test + build status
+
+- `npm run build:api` — clean. `npm run build:web` — clean (pre-existing
+  html2pdf chunk warning only).
+- `npm test` — **33 pass / 9 skipped / 0 fail** (`readinessScore` 4,
+  `entitlements` 11, `tenancy` 7, `analytics` 4, `jobs` 6, `tenantIsolation`
+  integration 9 skipped without `TEST_DATABASE_URL`).
+- `npm run test:integration` (against throwaway PG16) — **9 / 9 pass**.
+- Migration chain (9) — applies from empty with zero drift; `20260907130000`
+  and `20260907140000` re-run confirmed idempotent.
+- No running-instance HTTP smoke test; no deployment.
+
+### §19 new env vars (all optional, no-op when unset)
+
+`QUEUE_INPROCESS` (default on; set `0` when a dedicated worker is deployed),
+`QUEUE_MODE` (`inline` forces synchronous producers), `QUEUE_POLL_MS`,
+`QUEUE_HEARTBEAT_MS`, `QUEUE_STOP_TIMEOUT_MS`,
+`STRIPE_PRICE_ESSENTIAL` / `_PREMIUM` / `_FAMILY` / `_MASTERCLASS`
+(price-id → plan map for subscription webhooks; metadata `planCode` works without them).
+
+### §19 compliance
+
+No guarantee/deletion/bureau-approval language introduced. Readiness disclosure
+unchanged and still test-asserted. Dispute wording in the readiness actions
+retains "documented, lawful dispute or validation workflows" phrasing.
