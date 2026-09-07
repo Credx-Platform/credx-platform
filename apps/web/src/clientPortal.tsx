@@ -726,6 +726,92 @@ function NotificationBell({ token }: { token: string | null }) {
   );
 }
 
+type CheckInQuestion = { key: string; noteKey?: string; prompt: string };
+type CheckInState = {
+  weekKey: string;
+  due: boolean;
+  questions: CheckInQuestion[];
+  current: { changeSummary: string[]; answers: Record<string, unknown>; submittedAt: string } | null;
+  previous: { changeSummary: string[]; submittedAt: string } | null;
+};
+
+function WeeklyCheckInCard({ token, onSubmitted }: { token: string | null; onSubmitted: () => void }) {
+  const [state, setState] = useState<CheckInState | null>(null);
+  const [answers, setAnswers] = useState<Record<string, boolean | undefined>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [freeText, setFreeText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<CheckInState>('/api/checkin', token)
+      .then((s) => { setState(s); setExpanded(s.due); })
+      .catch(() => {});
+  }, [token]);
+
+  if (!token || !state) return null;
+
+  const submit = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const payload: Record<string, unknown> = { freeText: freeText || undefined };
+      for (const q of state.questions) {
+        payload[q.key] = answers[q.key] ?? null;
+        if (q.noteKey && notes[q.key]) payload[q.noteKey] = notes[q.key];
+      }
+      const res = await apiFetch<{ checkIn: any; changeSummary: string[] }>('/api/checkin', token, { method: 'POST', body: JSON.stringify(payload) });
+      setState({ ...state, due: false, current: { changeSummary: res.changeSummary, answers: {}, submittedAt: new Date().toISOString() } });
+      setExpanded(false);
+      onSubmitted();
+    } catch { /* surface nothing — non-critical */ }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <section className="panel checkin-card">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Weekly check-in · {state.weekKey}</p>
+          <h2>{state.due ? 'What changed this week?' : 'This week’s check-in is done'}</h2>
+        </div>
+        {!state.due && <button className="ghost-button" onClick={() => setExpanded((e) => !e)}>{expanded ? 'Hide' : 'Update'}</button>}
+      </div>
+
+      {!state.due && state.current && !expanded && (
+        <ul className="checkin-summary">
+          {state.current.changeSummary.map((s, i) => <li key={i}>{s}</li>)}
+        </ul>
+      )}
+
+      {(state.due || expanded) && (
+        <div className="checkin-form">
+          {state.questions.map((q) => (
+            <div key={q.key} className="checkin-q">
+              <span>{q.prompt}</span>
+              <div className="checkin-yesno">
+                <button type="button" className={answers[q.key] === true ? 'active' : ''} onClick={() => setAnswers((a) => ({ ...a, [q.key]: true }))}>Yes</button>
+                <button type="button" className={answers[q.key] === false ? 'active' : ''} onClick={() => setAnswers((a) => ({ ...a, [q.key]: false }))}>No</button>
+              </div>
+              {q.noteKey && answers[q.key] === true && (
+                <input
+                  className="checkin-note"
+                  placeholder="Add a detail (optional)"
+                  value={notes[q.key] || ''}
+                  onChange={(e) => setNotes((n) => ({ ...n, [q.key]: e.target.value }))}
+                />
+              )}
+            </div>
+          ))}
+          <textarea className="checkin-note" rows={2} placeholder="Anything else CredX should know?" value={freeText} onChange={(e) => setFreeText(e.target.value)} />
+          <button className="primary-button" disabled={busy} onClick={() => void submit()}>{busy ? 'Saving…' : 'Submit check-in'}</button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function CreditScoreGauge({ bureau, score }: { bureau: string; score: number | null }) {
   const hasScore = typeof score === 'number' && Number.isFinite(score);
   const pct = hasScore ? Math.max(0, Math.min(1, ((score as number) - 300) / 550)) : 0;
@@ -4298,6 +4384,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                   </section>
                 );
               })()}
+
+              <WeeklyCheckInCard token={token} onSubmitted={() => { void refreshAll(); }} />
 
               <ReadinessScorePanel readiness={readiness} onSaveSnapshot={handleSaveReadinessSnapshot} saving={readinessSaving} />
 

@@ -25,6 +25,7 @@
     "railway:dbpush": "npx prisma db push --schema packages/db/prisma/schema.prisma",
     "analysis:reprocess": "node scripts/reprocess-credit-report.mjs",
     "cron:readiness-snapshots": "node scripts/credx-ops-cron.mjs readiness-snapshots",
+    "cron:weekly-checkins": "node scripts/credx-ops-cron.mjs weekly-checkins",
     "loadtest": "node scripts/loadtest.mjs"
   },
   "dependencies": {

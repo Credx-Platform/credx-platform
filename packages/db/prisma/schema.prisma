@@ -224,6 +224,7 @@ model Client {
   fundingReadiness        FundingReadinessProfile?
   businessCredit          BusinessCreditProfile?
   notifications           Notification[]
+  checkIns                WeeklyCheckIn[]
   progress                ClientProgress?
   organizationId          String?
   organization            Organization?            @relation("OrganizationClients", fields: [organizationId], references: [id], onDelete: SetNull)
@@ -955,4 +956,35 @@ model Notification {
   @@unique([clientId, dedupeKey])
   @@index([clientId, createdAt])
   @@index([clientId, readAt])
+}
+
+// ============================================================
+// SaaS Phase D: Engagement — Weekly check-in (master spec §41)
+// ============================================================
+
+model WeeklyCheckIn {
+  id                 String   @id @default(uuid())
+  clientId           String
+  client             Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  weekKey            String // ISO week, e.g. "2026-W37"
+  balancesChanged    Boolean?
+  balancesNote       String?
+  creditLimitChanged Boolean?
+  creditLimitNote    String?
+  newAccountOpened   Boolean?
+  newAccountNote     String?
+  accountClosed      Boolean?
+  accountClosedNote  String?
+  incomeChanged      Boolean?
+  incomeNote         String?
+  hardInquiry        Boolean?
+  freeText           String?
+  // Derived "what changed since last check-in" bullets.
+  changeSummary      Json     @default("[]")
+  submittedAt        DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([clientId, weekKey])
+  @@index([clientId, submittedAt])
 }

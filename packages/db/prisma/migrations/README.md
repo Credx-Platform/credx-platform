@@ -24,6 +24,7 @@ data**, this directory now contains:
 | `20260908130000_add_funding_readiness` | **New.** `FundingReadinessProfile` (objective, target, income, checklist state, last assessment). Additive, idempotent. |
 | `20260908140000_add_business_credit` | **New.** `BusinessCreditProfile` + `BusinessVendorAccount` + `BusinessTradeline`. Additive, idempotent. |
 | `20260908150000_add_notifications` | **New.** `Notification` (in-app bell, `@@unique([clientId, dedupeKey])` for idempotent producers). Additive, idempotent. |
+| `20260908160000_add_weekly_checkin` | **New.** `WeeklyCheckIn` (§41 questions, `@@unique([clientId, weekKey])`). Additive, idempotent. |
 
 The full chain was verified against a throwaway PostgreSQL 16 instance
 (`prisma migrate deploy` from empty → all nine apply cleanly, zero schema drift

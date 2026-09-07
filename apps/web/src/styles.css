@@ -3163,3 +3163,19 @@ button:hover,
 .notif-item time { font-size: 11px; color: #6b7c91; }
 .notif-item--unread a { background: rgba(0,198,251,.06); }
 .notif-item--unread strong::before { content: '● '; color: #00c6fb; }
+
+/* ---- Weekly check-in card (Phase D) ---- */
+.checkin-summary { list-style: disc; padding-left: 20px; color: #cbd5e1; font-size: 13px; }
+.checkin-form { display: grid; gap: 14px; }
+.checkin-q { display: grid; gap: 6px; }
+.checkin-q > span { font-size: 14px; color: #dbe4ee; }
+.checkin-yesno { display: flex; gap: 8px; }
+.checkin-yesno button {
+  border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.03);
+  color: #cbd5e1; border-radius: 8px; padding: 6px 16px; cursor: pointer; font-weight: 700;
+}
+.checkin-yesno button.active { border-color: #00c6fb; color: #00c6fb; background: rgba(0,198,251,.1); }
+.checkin-note {
+  width: 100%; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px; padding: 8px 10px; color: #e6edf6; font-size: 13px; font-family: inherit;
+}

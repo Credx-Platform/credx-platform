@@ -254,10 +254,44 @@ async function readinessSnapshots() {
   formatJson({ status: 'generated', count: results.length });
 }
 
+/**
+ * For every active client without a check-in for the current ISO week, drop a
+ * WEEKLY_CHECKIN_READY notification. Idempotent via the notification dedupeKey.
+ * Suggested: 0 14 * * 1  (Monday 14:00)
+ */
+async function weeklyCheckins() {
+  const { isoWeekKey } = await import('../apps/api/dist/lib/checkin.js');
+  const { notify } = await import('../apps/api/dist/lib/notifications.js');
+  const weekKey = isoWeekKey();
+
+  const clients = await prisma.client.findMany({
+    where: {
+      status: { in: ['ACTIVE', 'ANALYSIS_READY', 'UPGRADE_OFFERED'] },
+      checkIns: { none: { weekKey } }
+    },
+    select: { id: true }
+  });
+
+  let created = 0;
+  for (const c of clients) {
+    const r = await notify(c.id, {
+      type: 'WEEKLY_CHECKIN_READY',
+      title: 'Your weekly check-in is ready',
+      body: 'Tell CredX what changed this week so your readiness stays accurate.',
+      href: '/portal',
+      metadata: { week: weekKey },
+      dedupeKey: `checkin:${weekKey}`
+    });
+    if (r.created) created += 1;
+  }
+  formatJson({ status: 'notified', weekKey, eligible: clients.length, created });
+}
+
 try {
   if (mode === 'signup-watch') await signupWatch();
   else if (mode === 'daily-report') await dailyReport();
   else if (mode === 'readiness-snapshots') await readinessSnapshots();
+  else if (mode === 'weekly-checkins') await weeklyCheckins();
   else throw new Error(`Unknown mode: ${mode}`);
 } finally {
   await prisma.$disconnect();
