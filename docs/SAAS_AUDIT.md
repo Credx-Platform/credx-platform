@@ -1,8 +1,8 @@
 # CredX SaaS Audit
 
 Scores are current-state estimates from the repository, not marketing claims.
-Last revised 2026-09-07 (branch `saas-transformation`, session 2 — see
-`SAAS_TRANSFORMATION_REPORT_2026-09-07.md` §19).
+Last revised 2026-09-08 (branch `saas-transformation`, session 3 / Phase C1 —
+see `SAAS_TRANSFORMATION_REPORT_2026-09-07.md` §19–§20).
 
 | Area | Current Score | Current State | Target |
 | --- | ---: | --- | ---: |
@@ -10,7 +10,7 @@ Last revised 2026-09-07 (branch `saas-transformation`, session 2 — see
 | Recurring Software Value | 7 | Persistent `Subscription`/`Invoice` objects exist and drive entitlements; portal, education, analysis, ranked readiness actions, workflows. No self-serve plan management UI or proration. | 9 |
 | User Accounts | 8 | JWT auth, users, roles, password setup, org memberships. | 9 |
 | Dashboard | 7 | Client + admin portals; readiness panel wired. | 9 |
-| Automation | 7 | DB-backed job queue with a runner (in-process by default + standalone worker), backoff, heartbeat, graceful stop; analysis-email producers moved onto it. Report/readiness handlers registered; cron scheduling of the batch job still open. | 9 |
+| Automation | 8 | DB-backed job queue + runner (in-process + standalone worker), backoff, heartbeat, graceful stop; analysis-email producers on it; readiness-snapshot batch schedulable via `cron:readiness-snapshots`. Still request-path for some AI/report work. | 9 |
 | Data Model | 9 | Single canonical Prisma schema; 9-migration chain, all additive + idempotent, verified zero-drift on PG16; org/webhook/job/error/readiness + `Subscription`/`Invoice` models. | 9 |
 | Analytics | 4 | Env-gated `analytics.ts` with PII stripping + 2 wired events; no provider provisioned, few call sites. | 8 |
 | Subscription Architecture | 7 | `resolveClientEntitlements()` derives the plan from a persistent `Subscription` row (ACTIVE/TRIALING/PAST_DUE) with lifecycle-status fallback; unpaid users get FREE. `Subscription`/`Invoice` reconciled from Stripe webhooks. No proration, dunning automation, or self-serve management. | 9 |
@@ -18,8 +18,8 @@ Last revised 2026-09-07 (branch `saas-transformation`, session 2 — see
 | AI Integration | 6 | Cesar + report extraction; provider abstraction partial; cost/usage controls incomplete. | 9 |
 | Progress Tracking | 8 | ClientProgress, activity, persisted readiness snapshots + history now including the ranked next-best-action detail per snapshot. | 9 |
 | Retention Mechanics | 5 | Masterclass/progress emails; notifications/check-ins not built. | 8 |
-| B2B Capability | 5 | Org/member/invitation models + read/invite/accept routes + role checks; no org-creation route or client-assignment UI. | 9 |
-| Multi-Tenant Architecture | 6 | `tenancy.ts` pure guards + `tenantQueries.ts` tenant-scoped data-access helpers (own-doc, org-scoped client lists, professional assignment) covered by 9 DB-level integration tests hitting real Prisma. Not yet applied to every org-bound resource; no org-creation route. | 9 |
+| B2B Capability | 7 | Org create + member role management (last-owner protected) + `ClientAssignment` + assign/unassign routes + a minimal `/team` professional workspace (create org, invite, roles, create + assign clients). No white-label / branding / org usage limits yet. | 9 |
+| Multi-Tenant Architecture | 7 | `tenancy.ts` guards + `tenantQueries.ts` data-access helpers scoping every org read (own-doc, org client lists, `ClientAssignment` professional scoping); 17 DB-level + route-level integration tests. Org-creation + member-role + assignment routes shipped. Not yet applied to disputes/documents write paths org-wide. | 9 |
 | Security | 6 | Helmet, rate limits, PII encryption, auth, response sanitizer; invitation token now verified by hash; monitoring/storage policy gaps remain. | 9 |
 | Compliance | 7 | CROA/FCRA-aware contracts + gates; readiness score carries the non-FICO disclosure; positioning changes still need attorney sign-off. | 9 |
 | Documentation | 6 | Phase 0 doc set + migration adoption runbook + this audit + 2026-09-07 report. | 9 |
@@ -29,13 +29,14 @@ Last revised 2026-09-07 (branch `saas-transformation`, session 2 — see
 | Reliability | 7 | `/health`, `/health/db`, `/health/queue`; graceful API + worker shutdown; replay-safe webhooks with dead-lettering; job backoff runtime; fail-soft optional providers; error ledger in global handler. | 9 |
 | Observability | 5 | ErrorEvent ledger + webhook-event ledger states + worker heartbeats queryable via `/health/queue`; still no external APM or dashboards. | 8 |
 | Disaster Recovery | 4 | `DISASTER_RECOVERY.md` + migration rollback runbook; provider backup schedule/retention still unverified. | 8 |
-| Performance | 5 | Rate limits, static serving; large React chunks + some sync external work remain. | 8 |
+| Performance | 6 | Rate limits, static serving; web PDF stack code-split into lazy vendor chunks (no >500 kB chunk); some sync external work in request paths remains. | 8 |
 
 ## Overall
 
 Before (2026-09-03): **5.3 / 10**
 After 09-07 session 1: **5.9 / 10**
 After 09-07 session 2: **6.5 / 10**
+After 09-08 session 3 (Phase C1): **6.8 / 10**
 
 Target: 9.5+/10 after phased implementation, verification, and infrastructure
 configuration. Session 2 delivered real recurring-software mechanics (persistent

@@ -22,7 +22,9 @@ Status legend: Completed · In Progress · Planned · Blocked · External Depend
 - Completed: central plan/entitlement resolution (`resolveClientEntitlements`) —
   effective plan derives from client lifecycle; unpaid users get FREE tier;
   `/api/billing/entitlements/me` wired; unit tested.
-- Planned: persistent `Subscription` / `Invoice` models + Stripe/PayPal reconcile.
+- Completed: persistent `Subscription` / `Invoice` models (migration 20260907130000);
+  `resolveClientEntitlements` derives the plan from live subscription state;
+  reconciled from Stripe webhooks.
 - Planned: SaaS onboarding path (account → goal → profile → readiness → action plan).
 
 ## Phase 2 - Intelligence Engine
@@ -31,8 +33,11 @@ Status legend: Completed · In Progress · Planned · Blocked · External Depend
   history model + focused tests + non-FICO disclosure.
 - Completed: Action Plan engine (`lib/actionPlan.ts`) generates prioritized tasks
   from readiness categories; build-blocking type errors fixed.
-- In Progress: deeper next-best-action mapping; automated periodic snapshots
-  (`lib/readinessSnapshots.ts` exists, not scheduled).
+- Completed: ranked next-best-action mapping (`nextBestActionDetails` — category,
+  priority, potential points, portal deep-link) persisted per snapshot.
+- Completed: periodic snapshot batch schedulable via
+  `scripts/credx-ops-cron.mjs readiness-snapshots` (enqueues
+  `analysis:readiness-snapshot-all`, drained by the queue runner).
 
 ## Phase 3 - Engagement
 
@@ -47,14 +52,23 @@ Status legend: Completed · In Progress · Planned · Blocked · External Depend
 - Completed: tenant-isolation authorization helpers (`lib/tenancy.ts`) + unit
   tests incl. cross-tenant rejection; org routes refactored to use them;
   invitation acceptance now verifies the token hash.
-- Planned: org creation route, roles UI, client assignments, white-label config.
-- Planned: DB-level tenant-isolation integration tests (needs a test DB harness).
+- Completed: org creation route; member role management (last-owner protected);
+  `ClientAssignment` model + assign/unassign routes; `tenantQueries.ts`
+  data-access helpers scoping every org-bound read.
+- Completed: DB-level tenant-isolation integration tests (`test:integration`,
+  TEST_DATABASE_URL-gated) — 17 tests hitting real Prisma / real HTTP.
+- Completed: minimal `/team` professional workspace (create org, invite, roles,
+  create + assign clients, client list).
+- Planned: white-label / branding config, partner dashboards, org usage limits.
 
 ## Phase 5 - Integrations & API
 
 - In Progress: payment, email, AI, blob, Lob, Turnstile integrations.
 - Completed: `WebhookEvent` + `IdempotencyKey` models + `lib/webhookLedger.ts`.
-- Planned: wire the ledger into Stripe/PayPal/DocuSign webhook handlers.
+- Completed: ledger wired into the Stripe + PayPal webhook handlers
+  (`processWebhookWithLedger` — dedupe, replay short-circuit, dead-lettering);
+  Stripe `customer.subscription.*` / `invoice.*` reconcile persistent state.
+- Planned: wire the ledger into DocuSign / other provider handlers.
 - Planned: internal API versioning + rate-limit policy; public API controls.
 
 ## Phase 6 - Enterprise / White Label
@@ -64,6 +78,9 @@ Status legend: Completed · In Progress · Planned · Blocked · External Depend
 ## Phase 7 - Scale & Ops
 
 - In Progress: env-gated product analytics (`lib/analytics.ts`) + error ledger.
-- Planned: job queue runner + producers; Redis only if/when justified.
+- Completed: DB-backed job queue runner (`lib/queueRunner.ts`) + producers +
+  standalone `worker.ts`; graceful shutdown; `/health/queue`. Redis not needed.
+- Completed: web chunk code-split — html2pdf ~985 kB blob replaced by lazy
+  vendor-jspdf / vendor-html2canvas chunks; no build warning.
 - Planned: load-testing suite execution; DB profiling; slow-endpoint optimization.
-- Planned: code-split large web chunks (html2pdf ~985 kB).
+- Planned: Sentry APM wiring; external dashboards.

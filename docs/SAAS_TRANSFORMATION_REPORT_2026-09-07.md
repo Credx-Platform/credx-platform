@@ -330,3 +330,47 @@ chain applies from empty with zero drift; new migrations re-run clean).
 No guarantee/deletion/bureau-approval language introduced. Readiness disclosure
 unchanged and still test-asserted. Dispute wording in the readiness actions
 retains "documented, lawful dispute or validation workflows" phrasing.
+
+## 20. Phase C1 — Phase B leftovers finished (session 3, 2026-09-08)
+
+Branch `saas-transformation`. Prod DB migration adoption was completed by James
+out-of-band (8 migrations applied, zero drift, Subscription/Invoice live, nightly
+backup cron installed, prod essentially empty / pre-launch). No prod deploy from
+this session.
+
+**`1dd98c5` — org creation + member roles + client assignment (Next-10 #6)**
+- `POST /api/org` (creator → OWNER, auto-unique slug); `GET /:slug/members`;
+  `PATCH`/`DELETE /:slug/members/:userId` (last-owner protected, only OWNER
+  grants OWNER, removal clears assignments); `GET /:slug/clients` (OWNER/ADMIN
+  all, professional only assigned); `POST /:slug/clients` (ADMIN+, real
+  password-setup stub user); `POST`/`DELETE /:slug/clients/:clientId/assignments`.
+- New model `ClientAssignment` (migration `20260908120000`, additive/idempotent);
+  `tenantQueries.ts` now scopes every org read through it.
+- `apps/api/src/app.ts` split out of `index.ts` (`createApp({ disableRateLimits })`)
+  so the server boots in-process for route tests.
+- Minimal `/team` web workspace (`team.html` + `TeamDashboard.tsx`): reuses the
+  portal token; create org, invite + role, create + assign clients, client list.
+- Tests: `org.integration.test.ts` — 8 route-level tests (real HTTP + real
+  Prisma). `tenantIsolation` seed updated to `ClientAssignment`.
+
+**`ebb7bb8` — readiness snapshot scheduling (Next-10 #8) + web code-split (Next-10 #10)**
+- `scripts/credx-ops-cron.mjs readiness-snapshots`: enqueues
+  `analysis:readiness-snapshot-all` (queue runner drains it), inline fallback if
+  `dist` is missing. `npm run cron:readiness-snapshots`. Existing cron modes
+  untouched.
+  Suggested crontab: `0 6 * * *  cd <repo> && node scripts/credx-ops-cron.mjs readiness-snapshots`
+- `html2pdf` dynamic import now targets `html2pdf.js/src/index.js`; vite
+  `manualChunks` splits `jspdf` (391 kB) / `html2canvas` (202 kB) / `dompurify`
+  into lazy vendor chunks. `build:web` no longer warns (largest chunk 391 kB,
+  all PDF code loads only on dispute-letter download).
+
+### §20 status
+
+- `npm run build` (api + web) — clean, **no warnings**.
+- `npm test` — **33 pass / 17 skipped / 0 fail** (skipped = the 2 integration
+  files without `TEST_DATABASE_URL`).
+- `npm run test:integration` — **17 / 17** (tenantIsolation 9 + org 8) on PG16.
+- Migration chain (10) — applies from empty with zero drift; new migration
+  re-run idempotent.
+- Next-10 after C1: **#3–#8, #10 done.** Remaining: #1/#2 (James — done
+  out-of-band), #9 (Sentry/PostHog provisioning — Sentry *code* is C3).
