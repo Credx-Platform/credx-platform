@@ -64,8 +64,9 @@ before(async () => {
 
   await p.organizationMember.create({ data: { organizationId: orgA.id, userId: ownerA.id, role: 'OWNER' } });
   await p.organizationMember.create({ data: { organizationId: orgB.id, userId: ownerB.id, role: 'OWNER' } });
-  // proA is a MEMBER of org A, assigned ONLY to clientA1.
-  await p.organizationMember.create({ data: { organizationId: orgA.id, userId: proA.id, role: 'MEMBER', clientId: clientA1.id } });
+  // proA is a MEMBER of org A, assigned ONLY to clientA1 (via ClientAssignment).
+  await p.organizationMember.create({ data: { organizationId: orgA.id, userId: proA.id, role: 'MEMBER' } });
+  await p.clientAssignment.create({ data: { organizationId: orgA.id, userId: proA.id, clientId: clientA1.id } });
 
   const docA1 = await p.document.create({
     data: { clientId: clientA1.id, type: 'OTHER', fileName: 'a1.pdf', s3Key: 'k/a1', content: 'A1 body' }

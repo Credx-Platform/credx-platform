@@ -94,6 +94,7 @@ model User {
   auditLogs           AuditLog[]
   passwordSetupTokens PasswordSetupToken[]
   orgMemberships      OrganizationMember[]
+  clientAssignments   ClientAssignment[]   @relation("UserClientAssignments")
 }
 
 model PasswordSetupToken {
@@ -219,6 +220,7 @@ model Client {
   readinessSnapshots      ReadinessScoreSnapshot[]
   subscriptions           Subscription[]
   invoices                Invoice[]
+  assignments             ClientAssignment[]       @relation("ClientAssignments")
   progress                ClientProgress?
   organizationId          String?
   organization            Organization?            @relation("OrganizationClients", fields: [organizationId], references: [id], onDelete: SetNull)
@@ -656,9 +658,28 @@ model Organization {
   members     OrganizationMember[]
   clients     Client[]                 @relation("OrganizationClients")
   invitations OrganizationInvitation[]
+  assignments ClientAssignment[]
 
   @@index([slug])
   @@index([stripeCustomerId])
+}
+
+/// Links a professional (org member) to a client they are responsible for.
+/// A client may be assigned to several members; a member may hold many clients.
+model ClientAssignment {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientId       String
+  client         Client       @relation("ClientAssignments", fields: [clientId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation("UserClientAssignments", fields: [userId], references: [id], onDelete: Cascade)
+  assignedById   String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([clientId, userId])
+  @@index([organizationId, userId])
+  @@index([clientId])
 }
 
 model OrganizationMember {

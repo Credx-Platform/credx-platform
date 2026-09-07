@@ -14,7 +14,8 @@ export default defineConfig({
       input: {
         adminportal: resolve(__dirname, 'adminportal.html'),
         portal: resolve(__dirname, 'portal.html'),
-        start: resolve(__dirname, 'start.html')
+        start: resolve(__dirname, 'start.html'),
+        team: resolve(__dirname, 'team.html')
       }
     }
   }

@@ -31,11 +31,20 @@ async function loadMemberships(userId: string): Promise<Membership[]> {
 /**
  * List the clients belonging to an organization, but only if the actor is a
  * member of that organization. Cross-tenant callers get a TenantAccessError.
+ *
+ * OWNER / ADMIN see every client in the org; a lower-role "professional" only
+ * sees the clients assigned to them (ClientAssignment).
  */
 export async function listOrgClientsForUser(userId: string, organizationId: string, minimumRole: OrgRole = 'VIEWER') {
   const memberships = await loadMemberships(userId);
-  assertOrgAccess(memberships, userId, organizationId, minimumRole);
-  return prisma.client.findMany({ where: { organizationId } });
+  const membership = assertOrgAccess(memberships, userId, organizationId, minimumRole);
+
+  if (hasAtLeastRole(membership.role, 'ADMIN')) {
+    return prisma.client.findMany({ where: { organizationId } });
+  }
+  return prisma.client.findMany({
+    where: { organizationId, assignments: { some: { userId } } }
+  });
 }
 
 /**
@@ -43,7 +52,7 @@ export async function listOrgClientsForUser(userId: string, organizationId: stri
  *
  * - OWNER / ADMIN see any client in their org.
  * - Lower roles (a "professional" MEMBER) only see a client explicitly assigned
- *   to them via OrganizationMember.clientId.
+ *   to them via ClientAssignment.
  *
  * Throws TenantAccessError for cross-tenant or unassigned access; returns null
  * when the client id simply does not exist in the org.
@@ -57,7 +66,7 @@ export async function findOrgClientForUser(userId: string, organizationId: strin
 
   if (hasAtLeastRole(membership.role, 'ADMIN')) return client;
 
-  const assignment = await prisma.organizationMember.findFirst({
+  const assignment = await prisma.clientAssignment.findFirst({
     where: { organizationId, userId, clientId }
   });
   if (!assignment) {
