@@ -514,3 +514,62 @@ Still not done (out of scope / owner-gated): PostHog + Sentry provisioning,
 white-label config, attorney review of positioning + Terms, PgBouncer, the
 seeded target-flow load scenarios, and rotating the old hardcoded DB credential
 if it was ever valid.
+
+## 24. Phase D — Engagement (session 4, 2026-09-08)
+
+Master spec §41–§43. Branch `saas-transformation`, no prod deploy/push.
+Housekeeping first: verified `npm run build` clean (api+web, no warnings),
+`npm test` and `npm run test:integration` green; gitignored the stray root
+debug scripts; recorded the verified prod backup posture
+(`docs/DISASTER_RECOVERY.md`, audit Disaster Recovery 4 → 7).
+
+**`cd931c0` — in-app notifications (§42)**
+- Model `Notification` (migration `20260908150000`), unique
+  `(clientId, dedupeKey)` for idempotent producers.
+- `lib/notifications.ts`: `notify()` + producers `notifyMilestone`,
+  `notifyReadinessChanged` (fires only past a 3-point delta),
+  `notifyNewRecommendedAction`, `notifyWeeklyCheckinReady`, `notifyReportReady`.
+- `routes/notifications.ts`: list (+ unread count, `?unreadOnly`), mark-one,
+  mark-all, dev-only `POST /test`.
+- Producers wired: readiness snapshots emit `READINESS_SCORE_CHANGED` +
+  `NEW_RECOMMENDED_ACTION` vs the previous snapshot; masterclass-day completion
+  emits `MILESTONE_REACHED`.
+- Portal: `<NotificationBell>` in the topbar (badge, dropdown, mark read, 60s poll).
+
+**`08d8cc1` — weekly check-in (§41)**
+- Model `WeeklyCheckIn` (migration `20260908160000`), unique `(clientId, weekKey)`.
+- `lib/checkin.ts`: `isoWeekKey()`, the §41 question set (balances / credit
+  limit / new account / closed account / income / hard inquiry),
+  `summarizeChanges()` → "what changed since last check-in" bullets.
+- `routes/checkin.ts`: GET current-week status + questions + previous,
+  GET history, POST (upsert per week → enqueue `analysis:readiness-snapshot`
+  for a queue-driven recompute → drop a milestone notification).
+- `scripts/credx-ops-cron.mjs weekly-checkins` notifies active clients with no
+  check-in for the current ISO week (idempotent). `npm run cron:weekly-checkins`.
+- Portal: `<WeeklyCheckInCard>` on the overview — yes/no + notes, "done" state
+  shows the change summary, triggers a full portal refresh.
+
+**`afe4ad5` — platform reports (§43)**
+- Model `PlatformReport` (migration `20260908170000`).
+- `lib/platformReports.ts`: `buildReadinessReport` + `buildCreditProfileSummary`
+  → structured, escaped, printable HTML with a per-report **data-source list**
+  and a fixed disclosure ("not a consumer credit report, a credit score, a loan
+  or funding decision, or a guarantee of any outcome"). Generated async by the
+  job handler `reports:generate-platform-report` (PENDING → GENERATING → READY +
+  `REPORT_READY` notification, or FAILED).
+- `routes/platformReports.ts`: POST (request, reuses a recent pending), GET list
+  (metadata), GET :id (full when READY), GET :id/view (HTML with a locked CSP).
+- Portal: `<PlatformReportsCard>` — request either report, poll while pending,
+  open a READY report in a new tab via an authed fetch + blob URL.
+
+### §24 status
+
+- `npm run build` (api + web) — clean, no warnings.
+- `npm test` — **51 pass / 49 skipped / 0 fail**.
+- `npm run test:integration` — **49 / 49** (notifications 7, checkin 5,
+  platformReports 7 new; org 8, tenantIsolation 9, funding 6, business 8).
+- 16-migration chain — applies from empty with zero drift; new migrations re-run
+  idempotent.
+- New env vars: none (all Phase D features use existing infra).
+- Compliance: readiness disclosure unchanged; platform-report disclosure is a
+  test-asserted constant; no guarantee / removal-promise / bureau-force language.

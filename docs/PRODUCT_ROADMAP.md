@@ -41,10 +41,18 @@ Status legend: Completed · In Progress · Planned · Blocked · External Depend
 
 ## Phase 3 - Engagement
 
-- In Progress: masterclass progress tracking.
-- Planned: weekly check-ins, in-app notifications, learning→dashboard recommendations.
-- Planned: `readiness_score_created` / `account_created` analytics events are wired;
-  remaining events (lesson_*, tool_used, subscription_*) pending.
+- Completed: masterclass progress tracking.
+- Completed: in-app notifications — `Notification` model, bell UI, producers
+  (milestone / readiness change / new action / report ready), mark read.
+- Completed: weekly check-in (§41) — `WeeklyCheckIn` model, portal card,
+  queue-driven readiness recompute, `weekly-checkins` cron nudge.
+- Completed: platform reports (§43) — `PlatformReport` model, async
+  Readiness Report + Credit Profile Summary (queue-generated HTML with
+  data-source + no-guarantee disclosures), portal card.
+- Planned: email digest of unread notifications; learning→dashboard
+  recommendation surfacing; `readiness_score_created` / `account_created`
+  analytics events are wired, remaining events (lesson_*, tool_used,
+  subscription_*) pending.
 
 ## Phase 4 - Professional Platform
 
