@@ -1,8 +1,10 @@
 import { prisma } from './prisma.js';
+import { forwardToSentry, scrubDeep, scrubText } from './sentryForward.js';
 
 /**
  * Lightweight Sentry-compatible error tracking.
- * Stores errors in PostgreSQL for CredX SaaS monitoring.
+ * Stores errors in PostgreSQL for CredX SaaS monitoring, and — when SENTRY_DSN
+ * is configured — also forwards a PII-scrubbed event to Sentry (no SDK).
  */
 
 export interface ErrorContext {
@@ -37,25 +39,37 @@ export async function captureException(
   try {
     const error = err instanceof Error ? err : new Error(String(err));
     const eventId = generateEventId();
+    const level = options.level ?? 'error';
+    const environment = options.environment ?? (process.env.NODE_ENV ?? 'development');
+    const release = options.release ?? (process.env.npm_package_version ?? null);
 
     await prisma.errorEvent.create({
       data: {
         eventId,
-        level: options.level ?? 'error',
-        environment: options.environment ?? (process.env.NODE_ENV ?? 'development'),
-        release: options.release ?? (process.env.npm_package_version ?? null),
+        level,
+        environment,
+        release,
         platform: 'node',
         exceptionType: error.name,
-        exceptionValue: error.message,
-        exceptionStack: error.stack ?? null,
+        exceptionValue: scrubText(error.message),
+        exceptionStack: error.stack ? scrubText(error.stack) : null,
         userId: context.userId ?? null,
         clientId: context.clientId ?? null,
-        url: context.url ?? null,
+        url: context.url ? scrubText(context.url) : null,
         method: context.method ?? null,
-        tags: (context.tags ?? {}) as any,
-        extra: (context.extra ?? {}) as any,
-        breadcrumbs: (context.breadcrumbs ?? []) as any
+        tags: scrubDeep(context.tags ?? {}) as any,
+        extra: scrubDeep(context.extra ?? {}) as any,
+        breadcrumbs: scrubDeep(context.breadcrumbs ?? []) as any
       }
+    });
+
+    void forwardToSentry({
+      eventId, level, environment, release, error,
+      userId: context.userId ?? null,
+      url: context.url ?? null,
+      method: context.method ?? null,
+      tags: context.tags ?? {},
+      extra: context.extra ?? {}
     });
 
     return eventId;
@@ -77,25 +91,37 @@ export async function captureMessage(
 ): Promise<string | null> {
   try {
     const eventId = generateEventId();
+    const level = options.level ?? 'info';
+    const environment = options.environment ?? (process.env.NODE_ENV ?? 'development');
+    const release = options.release ?? (process.env.npm_package_version ?? null);
 
     await prisma.errorEvent.create({
       data: {
         eventId,
-        level: options.level ?? 'info',
-        environment: options.environment ?? (process.env.NODE_ENV ?? 'development'),
-        release: options.release ?? (process.env.npm_package_version ?? null),
+        level,
+        environment,
+        release,
         platform: 'node',
         exceptionType: null,
-        exceptionValue: message,
+        exceptionValue: scrubText(message),
         exceptionStack: null,
         userId: context.userId ?? null,
         clientId: context.clientId ?? null,
-        url: context.url ?? null,
+        url: context.url ? scrubText(context.url) : null,
         method: context.method ?? null,
-        tags: (context.tags ?? {}) as any,
-        extra: (context.extra ?? {}) as any,
-        breadcrumbs: (context.breadcrumbs ?? []) as any
+        tags: scrubDeep(context.tags ?? {}) as any,
+        extra: scrubDeep(context.extra ?? {}) as any,
+        breadcrumbs: scrubDeep(context.breadcrumbs ?? []) as any
       }
+    });
+
+    void forwardToSentry({
+      eventId, level, environment, release, message,
+      userId: context.userId ?? null,
+      url: context.url ?? null,
+      method: context.method ?? null,
+      tags: context.tags ?? {},
+      extra: context.extra ?? {}
     });
 
     return eventId;
