@@ -87,70 +87,82 @@ export async function settleSetupPayment(
     throw new BillingGateError(gate.reasons);
   }
 
-  // Settle the existing pending bill, or create a paid record if none exists yet.
-  const pending = await prisma.payment.findFirst({
-    where: { clientId, type: 'SETUP_FEE', status: 'PENDING' },
-    orderBy: { createdAt: 'desc' }
-  });
-  const amount = opts?.amount ?? (pending ? Number(pending.amount) : setupFeeForTier(client.serviceTier));
-  const currency = opts?.currency ?? pending?.currency ?? 'USD';
-
-  if (pending) {
-    await prisma.payment.update({
-      where: { id: pending.id },
-      data: {
-        status: 'PAID',
-        paidAt: new Date(),
-        amount,
-        currency,
-        ...(opts?.stripePaymentIntentId ? { stripePaymentIntentId: opts.stripePaymentIntentId } : {})
-      }
-    });
-  } else {
-    await prisma.payment.create({
-      data: {
-        clientId,
-        amount,
-        currency,
-        type: 'SETUP_FEE',
-        status: 'PAID',
-        paidAt: new Date(),
-        stripePaymentIntentId: opts?.stripePaymentIntentId || null
-      }
-    });
-  }
-
-  if (!gate.eligible) {
-    // Money arrived before the CROA gate was satisfied — surface loudly for review/refund.
-    await prisma.activityEvent.create({
-      data: {
-        clientId,
-        type: 'EARLY_PAYMENT_FLAGGED',
-        message: `Setup payment of $${amount} ${currency} received BEFORE the CROA billing gate was satisfied. Review for refund/hold. ${gate.reasons.join(' ')}`,
-        metadata: { amount, currency, method: opts?.method || 'unknown', reasons: gate.reasons }
-      }
-    });
-  }
-
-  await prisma.activityEvent.create({
-    data: {
-      clientId,
-      type: 'PAYMENT_RECEIVED',
-      message: `Setup payment of $${amount} ${currency} received${opts?.method ? ` (${opts.method})` : ''}.`,
-      metadata: {
-        amount,
-        currency,
-        method: opts?.method || 'manual',
-        reference: opts?.reference || null,
-        gateEligible: gate.eligible
+  // Serialize local settlement per client; payment and audit effects commit
+  // together. This does not initiate a provider charge.
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${clientId}, 0))::text`;
+    if (opts?.stripePaymentIntentId) {
+      const existing = await tx.payment.findFirst({ where: { stripePaymentIntentId: opts.stripePaymentIntentId, status: 'PAID' } });
+      if (existing) {
+        if (existing.clientId !== clientId) throw new Error('Payment ownership mismatch');
+        return { payment: { amount: Number(existing.amount), currency: existing.currency, status: 'PAID' as const } };
       }
     }
-  });
+    // Settle the existing pending bill, or create a paid record if none exists yet.
+    const pending = await tx.payment.findFirst({
+      where: { clientId, type: 'SETUP_FEE', status: 'PENDING' },
+      orderBy: { createdAt: 'desc' }
+    });
+    const amount = opts?.amount ?? (pending ? Number(pending.amount) : setupFeeForTier(client.serviceTier));
+    const currency = opts?.currency ?? pending?.currency ?? 'USD';
 
-  return {
-    payment: { amount, currency, status: 'PAID' },
-    gateWarnings: gate.eligible ? undefined : gate.reasons
-  };
+    if (pending) {
+      await tx.payment.update({
+        where: { id: pending.id },
+        data: {
+          status: 'PAID',
+          paidAt: new Date(),
+          amount,
+          currency,
+          ...(opts?.stripePaymentIntentId ? { stripePaymentIntentId: opts.stripePaymentIntentId } : {})
+        }
+      });
+    } else {
+      await tx.payment.create({
+        data: {
+          clientId,
+          amount,
+          currency,
+          type: 'SETUP_FEE',
+          status: 'PAID',
+          paidAt: new Date(),
+          stripePaymentIntentId: opts?.stripePaymentIntentId || null
+        }
+      });
+    }
+
+    if (!gate.eligible) {
+      // Money arrived before the CROA gate was satisfied — surface loudly for review/refund.
+      await tx.activityEvent.create({
+        data: {
+          clientId,
+          type: 'EARLY_PAYMENT_FLAGGED',
+          message: `Setup payment of $${amount} ${currency} received BEFORE the CROA billing gate was satisfied. Review for refund/hold. ${gate.reasons.join(' ')}`,
+          metadata: { amount, currency, method: opts?.method || 'unknown', reasons: gate.reasons }
+        }
+      });
+    }
+
+    await tx.activityEvent.create({
+      data: {
+        clientId,
+        type: 'PAYMENT_RECEIVED',
+        message: `Setup payment of $${amount} ${currency} received${opts?.method ? ` (${opts.method})` : ''}.`,
+        metadata: {
+          amount,
+          currency,
+          method: opts?.method || 'manual',
+          reference: opts?.reference || null,
+          gateEligible: gate.eligible
+        }
+      }
+    });
+
+    return {
+      payment: { amount, currency, status: 'PAID' as const },
+      gateWarnings: gate.eligible ? undefined : gate.reasons
+    };
+  });
 }
 
 export async function recordMonthlySubscriptionPayment(

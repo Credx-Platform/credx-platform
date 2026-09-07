@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from './prisma.js';
 
 /**
@@ -28,17 +29,25 @@ export async function recordWebhookEvent(input: WebhookPayload) {
     }
   }
 
-  const event = await prisma.webhookEvent.create({
-    data: {
-      source: input.source,
-      eventType: input.eventType,
-      payload: input.payload as any,
-      externalEventId: input.externalEventId ?? null,
-      signature: input.signature ?? null,
-      status: 'RECEIVED'
-    }
-  });
+  let event;
+  try {
+    event = await prisma.webhookEvent.create({
+      data: {
+        source: input.source,
+        eventType: input.eventType,
+        payload: input.payload as any,
+        externalEventId: input.externalEventId ?? null,
+        signature: input.signature ?? null,
+        status: 'RECEIVED'
+      }
+    });
 
+  } catch (error) {
+    // Another delivery may have inserted the same event after our lookup.
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002' || !input.externalEventId) throw error;
+    const existing = await prisma.webhookEvent.findUniqueOrThrow({ where: { externalEventId: input.externalEventId } });
+    return { event: existing, isDuplicate: true };
+  }
   return { event, isDuplicate: false };
 }
 
@@ -51,7 +60,7 @@ export async function validateWebhookEvent(
 ): Promise<boolean> {
   const event = await prisma.webhookEvent.findUnique({ where: { id: eventId } });
   if (!event) return false;
-  if (event.status !== 'RECEIVED') return true; // already validated
+  if (event.status !== 'RECEIVED') return ['VALIDATED', 'PROCESSING', 'PROCESSED'].includes(event.status);
 
   try {
     const isValid = await validator(event.payload as Record<string, unknown>, event.signature ?? undefined);
@@ -73,8 +82,8 @@ export async function validateWebhookEvent(
  * Mark a webhook event as being processed.
  */
 export async function beginProcessing(eventId: string) {
-  return prisma.webhookEvent.update({
-    where: { id: eventId },
+  return prisma.webhookEvent.updateMany({
+    where: { id: eventId, status: { in: ['RECEIVED', 'VALIDATED', 'RETRYING'] }, retryCount: { lt: 5 } },
     data: { status: 'PROCESSING' }
   });
 }
@@ -115,7 +124,7 @@ export type LedgerOutcome =
 
 /**
  * Run a webhook payload through the ledger: record it (dedup on externalEventId),
- * short-circuit replays, then invoke `processor` exactly once and record the
+ * short-circuit replays, atomically claim one processor, and record the
  * terminal status. `processor` should itself be idempotent for safety.
  *
  * Never throws — returns a discriminated outcome the route can map to a status
@@ -127,23 +136,33 @@ export async function processWebhookWithLedger(
   processor: (ctx: { eventRowId: string; payload: Record<string, unknown> }) => Promise<unknown>
 ): Promise<LedgerOutcome> {
   let eventRowId = '';
+  let claimed = false;
   try {
     const { event, isDuplicate } = await recordWebhookEvent(input);
     eventRowId = event.id;
 
+    if (event.source !== input.source || event.eventType !== input.eventType) {
+      return { handled: false, duplicate: false, eventRowId, error: 'Webhook event identity mismatch' };
+    }
     if (isDuplicate && event.status === 'PROCESSED') {
       return { handled: true, duplicate: true, eventRowId };
     }
-    // Not-yet-terminal duplicate (RECEIVED/PROCESSING/RETRYING) falls through and
-    // is retried — safe because processors are idempotent.
-
-    await beginProcessing(eventRowId);
+    const claim = await beginProcessing(eventRowId);
+    if (claim.count !== 1) {
+      const current = await prisma.webhookEvent.findUniqueOrThrow({ where: { id: eventRowId } });
+      if (current.status === 'PROCESSED') return { handled: true, duplicate: true, eventRowId };
+      // Never ACK an unfinished event or steal a running processor. A crash in
+      // PROCESSING requires operator reconciliation before an explicit reset;
+      // automatic lease expiry could replay a payment with unknown side effects.
+      return { handled: false, duplicate: false, eventRowId, error: current.status === 'DEAD_LETTER' ? 'Webhook requires manual reconciliation' : 'Webhook is not available for processing' };
+    }
+    claimed = true;
     const result = await processor({ eventRowId, payload: input.payload });
     await markProcessed(eventRowId);
     return { handled: true, duplicate: isDuplicate, eventRowId, result };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    if (eventRowId) {
+    if (eventRowId && claimed) {
       await markFailed(eventRowId, error).catch(() => undefined);
     }
     return { handled: false, duplicate: false, eventRowId, error };

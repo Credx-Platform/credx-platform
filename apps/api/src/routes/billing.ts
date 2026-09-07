@@ -535,7 +535,16 @@ async function handleStripeEvent(event: any): Promise<Record<string, unknown>> {
       if (event.type === 'invoice.payment_succeeded') {
         const { handleStripeInvoice } = await import('../lib/billingWebhooks.js');
         outcome.invoice = await handleStripeInvoice(obj);
+        // A recurring invoice is not another setup-fee payment.
+        return outcome;
       }
+      if (event.type === 'checkout.session.completed' && (obj.mode !== 'payment' || obj.payment_status !== 'paid')) {
+        return { ...outcome, settled: false, reason: 'Checkout has not completed a one-time payment' };
+      }
+      const paymentIntentId = event.type === 'payment_intent.succeeded'
+        ? obj.id
+        : (typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id);
+      if (!paymentIntentId) return { ...outcome, settled: false, reason: 'Payment intent unavailable; reconciliation required' };
 
       const clientId = obj?.metadata?.clientId || obj?.client_reference_id;
       if (!clientId) {
@@ -545,10 +554,10 @@ async function handleStripeEvent(event: any): Promise<Record<string, unknown>> {
       const { settleSetupPayment } = await import('../lib/billingActivation.js');
       try {
         const result = await settleSetupPayment(String(clientId), {
-          amount: (obj.amount_received || obj.amount || 0) / 100,
+          amount: (event.type === 'checkout.session.completed' ? obj.amount_total : obj.amount_received ?? obj.amount ?? 0) / 100,
           currency: (obj.currency || 'usd').toUpperCase(),
-          stripePaymentIntentId: obj.id || undefined,
-          reference: obj.id || undefined,
+          stripePaymentIntentId: String(paymentIntentId),
+          reference: String(paymentIntentId),
           method: 'stripe',
           recordDespiteGate: true
         });

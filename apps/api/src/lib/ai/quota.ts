@@ -43,8 +43,8 @@ export interface AiQuota {
 
 /**
  * Check whether `clientId` may make another AI call under `plan`'s budget.
- * Fails open (allowed) on any lookup error — cost protection must never be the
- * reason a user request 500s.
+ * Fails closed for paid AI calls on lookup errors. Callers retain their
+ * deterministic fallback, so accounting failure does not cause a user 500.
  */
 export async function checkAiQuota(clientId: string | null | undefined, plan: string | null | undefined): Promise<AiQuota> {
   const planKey = String(plan || 'FREE').toUpperCase();
@@ -67,7 +67,7 @@ export async function checkAiQuota(clientId: string | null | undefined, plan: st
     const remainingTokens = Math.max(0, budgetTokens - usedTokens);
     return { ...base, usedTokens, remainingTokens, allowed: usedTokens < budgetTokens };
   } catch (err) {
-    console.error('[ai] checkAiQuota failed (failing open)', (err as Error)?.message);
-    return base;
+    console.error('[ai] quota accounting unavailable; using deterministic fallback');
+    return { ...base, allowed: false, remainingTokens: 0 };
   }
 }

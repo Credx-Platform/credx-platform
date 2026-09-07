@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma.js';
 import { runChat, aiConfigured, type AiMessage } from '../lib/ai/index.js';
 import { getPrompt, CESAR_GUARDRAILS } from '../lib/ai/prompts.js';
 import { checkAiQuota } from '../lib/ai/quota.js';
+import { getCurrentSubscription, toSubscriptionPlanInput } from '../lib/subscriptions.js';
 import { resolveClientEntitlements } from '../lib/entitlements.js';
 
 export const cesarRouter = Router();
@@ -298,7 +299,8 @@ async function loadContext(authHeader: string | undefined): Promise<CesarContext
       ? resolveClientEntitlements({
           status: user.client.status,
           serviceTier: user.client.serviceTier,
-          masterclassAccess: education.masterclassAccess === true
+          masterclassAccess: education.masterclassAccess === true,
+          subscription: toSubscriptionPlanInput(await getCurrentSubscription(user.client.id))
         }).plan
       : null;
     return {
