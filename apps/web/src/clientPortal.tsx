@@ -1592,7 +1592,9 @@ function downloadLetter(letter: DisputeLetter) {
 }
 
 async function downloadPdfLetter(letter: DisputeLetter): Promise<void> {
-  const mod = await import('html2pdf.js');
+  // Import the unbundled source so Rollup can code-split jspdf / html2canvas
+  // into their own lazy chunks instead of one ~985 kB blob.
+  const mod = await import('html2pdf.js/src/index.js');
   const html2pdf = (mod as { default?: any }).default ?? (mod as any);
   const container = document.createElement('div');
   container.innerHTML = letter.html;

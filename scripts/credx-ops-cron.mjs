@@ -231,9 +231,33 @@ async function dailyReport() {
   });
 }
 
+/**
+ * Enqueue (or, if the queue/runner is unavailable, directly run) the batch that
+ * regenerates every active client's CredX Readiness Score snapshot. Intended to
+ * run on a schedule, e.g. crontab:
+ *   0 6 * * *  cd /path/to/credx-platform && node scripts/credx-ops-cron.mjs readiness-snapshots
+ */
+async function readinessSnapshots() {
+  // Preferred path: drop a job row; the API's in-process queue runner drains it.
+  try {
+    const { enqueue } = await import('../apps/api/dist/lib/queue.js');
+    const job = await enqueue('analysis', 'readiness-snapshot-all', { source: 'cron' });
+    formatJson({ status: 'enqueued', jobId: job.id, queue: 'analysis', job: 'readiness-snapshot-all' });
+    return;
+  } catch (enqueueErr) {
+    // Fall through to running it inline.
+    formatJson({ status: 'enqueue_failed_running_inline', reason: String(enqueueErr?.message || enqueueErr) });
+  }
+
+  const { generateAllReadinessSnapshots } = await import('../apps/api/dist/lib/readinessSnapshots.js');
+  const results = await generateAllReadinessSnapshots();
+  formatJson({ status: 'generated', count: results.length });
+}
+
 try {
   if (mode === 'signup-watch') await signupWatch();
   else if (mode === 'daily-report') await dailyReport();
+  else if (mode === 'readiness-snapshots') await readinessSnapshots();
   else throw new Error(`Unknown mode: ${mode}`);
 } finally {
   await prisma.$disconnect();
