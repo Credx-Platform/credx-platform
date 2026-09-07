@@ -61,6 +61,20 @@ Status legend: Completed · In Progress · Planned · Blocked · External Depend
   create + assign clients, client list).
 - Planned: white-label / branding config, partner dashboards, org usage limits.
 
+## Phase 4b - Financial Readiness
+
+- Completed: Funding Readiness module — `FundingReadinessProfile` model,
+  `lib/fundingReadiness.ts` (utilization / inquiry / derogatory / profile-depth /
+  income indicators + preparation + document checklists + readiness band),
+  `/api/funding-readiness` routes, `/financial-readiness` portal UI. Carries the
+  "CredX does not guarantee approval or funding" disclosure on every result.
+- Completed: Business Credit Workspace — `BusinessCreditProfile` +
+  `BusinessVendorAccount` + `BusinessTradeline` models, 9-item foundation
+  assessment, `/api/business-credit` routes (profile + vendor + tradeline CRUD,
+  ownership-checked), Business Credit tab in the portal UI.
+- Planned: connect readiness/business-credit signals into the action plan and
+  cron reminders; optional D&B / business-bureau data integrations.
+
 ## Phase 5 - Integrations & API
 
 - In Progress: payment, email, AI, blob, Lob, Turnstile integrations.

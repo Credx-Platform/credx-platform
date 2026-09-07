@@ -1,13 +1,13 @@
 # CredX SaaS Audit
 
 Scores are current-state estimates from the repository, not marketing claims.
-Last revised 2026-09-08 (branch `saas-transformation`, session 3 / Phase C1 —
-see `SAAS_TRANSFORMATION_REPORT_2026-09-07.md` §19–§20).
+Last revised 2026-09-08 (branch `saas-transformation`, session 3 / Phase C1–C2 —
+see `SAAS_TRANSFORMATION_REPORT_2026-09-07.md` §19–§21).
 
 | Area | Current Score | Current State | Target |
 | --- | ---: | --- | ---: |
 | Product Identity | 5 | Homepage/product page lead with "Credit Intelligence & Financial Readiness Platform"; app + README still mix in credit-service language. Legal review pending. | 9 |
-| Recurring Software Value | 7 | Persistent `Subscription`/`Invoice` objects exist and drive entitlements; portal, education, analysis, ranked readiness actions, workflows. No self-serve plan management UI or proration. | 9 |
+| Recurring Software Value | 8 | Subscriptions drive entitlements; portal, education, analysis, ranked readiness actions, plus two new persistent software modules — Funding Readiness and Business Credit Workspace (models + API + `/financial-readiness` UI). No self-serve plan management UI or proration. | 9 |
 | User Accounts | 8 | JWT auth, users, roles, password setup, org memberships. | 9 |
 | Dashboard | 7 | Client + admin portals; readiness panel wired. | 9 |
 | Automation | 8 | DB-backed job queue + runner (in-process + standalone worker), backoff, heartbeat, graceful stop; analysis-email producers on it; readiness-snapshot batch schedulable via `cron:readiness-snapshots`. Still request-path for some AI/report work. | 9 |
@@ -37,6 +37,7 @@ Before (2026-09-03): **5.3 / 10**
 After 09-07 session 1: **5.9 / 10**
 After 09-07 session 2: **6.5 / 10**
 After 09-08 session 3 (Phase C1): **6.8 / 10**
+After 09-08 session 3 (Phase C2): **7.1 / 10**
 
 Target: 9.5+/10 after phased implementation, verification, and infrastructure
 configuration. Session 2 delivered real recurring-software mechanics (persistent

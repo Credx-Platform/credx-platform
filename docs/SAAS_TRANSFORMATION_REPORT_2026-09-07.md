@@ -374,3 +374,48 @@ this session.
   re-run idempotent.
 - Next-10 after C1: **#3–#8, #10 done.** Remaining: #1/#2 (James — done
   out-of-band), #9 (Sentry/PostHog provisioning — Sentry *code* is C3).
+
+## 21. Phase C2 — Financial Readiness (session 3, 2026-09-08)
+
+Master-spec Phase 4. Branch `saas-transformation`, no prod deploy.
+
+**`d586d4e` — Funding Readiness + Business Credit**
+
+Funding Readiness (item 4):
+- `FundingReadinessProfile` (migration `20260908130000`).
+- `lib/fundingReadiness.ts` — 5 indicators (utilization, hard inquiries,
+  derogatory marks, credit-profile depth, income) derived from the client's own
+  data; preparation checklist + document checklist (stored state merged over
+  defaults); readiness band + 0–100 score; ranked next steps. Fixed disclosure
+  **"CredX does not guarantee approval or funding."** on every result.
+- `routes/fundingReadiness.ts` — `GET` (lazy create + assess + persist),
+  `PUT` (objective / target amount / timeframe / income), `PATCH /checklist`,
+  `PATCH /documents`. All client-scoped by `userId`.
+
+Business Credit Workspace (item 5):
+- `BusinessCreditProfile` + `BusinessVendorAccount` + `BusinessTradeline`
+  (migration `20260908140000`). EIN stored as `einLast4` + `einStatus` only —
+  no full EIN.
+- `lib/businessCredit.ts` — 9-item foundation assessment (entity formed, EIN
+  issued, business address, business phone, business email on a domain, bank
+  account, D-U-N-S, 3+ starter vendors, 2+ reporting vendors) → stage + score +
+  next steps + no-guarantee disclosure.
+- `routes/businessCredit.ts` — profile `GET`/`PUT`, `PATCH /checklist`, vendor
+  accounts + tradelines full CRUD. Every mutation ownership-checked
+  (cross-client → 404).
+
+Web:
+- New `/financial-readiness` workspace (`readiness.html` +
+  `FinancialReadinessWorkspace.tsx` + `BusinessCreditWorkspace.tsx`): tabbed UI,
+  disclosures rendered prominently, checklist toggles, entity form, vendor +
+  tradeline tables. Reuses the portal token.
+
+### §21 status
+
+- `npm run build` (api + web) — clean, no warnings.
+- `npm test` — **42 pass / 30 skipped / 0 fail** (+ `fundingReadiness` 5,
+  `businessCredit` 4).
+- `npm run test:integration` — **30 / 30** (+ funding 6, business 8).
+- Migration chain (12) — zero drift; both new migrations re-run idempotent.
+- Compliance: no guarantee / approval / deletion / bureau-force language;
+  disclosures are test-asserted constants.
