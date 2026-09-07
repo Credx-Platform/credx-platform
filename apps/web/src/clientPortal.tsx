@@ -107,9 +107,25 @@ type ReadinessScore = {
   strengths: string[];
   opportunities: string[];
   nextBestActions: string[];
+  nextBestActionDetails?: ReadinessAction[];
   generatedAt: string;
-  history?: Array<{ id: string; score: number; pulledAt: string }>;
+  history?: Array<{
+    id: string;
+    score: number;
+    pulledAt: string;
+    topActions?: Array<{ title: string; priority: string; category: string | null }>;
+  }>;
   snapshot?: { id: string; score: number; pulledAt: string };
+};
+
+type ReadinessAction = {
+  id: string;
+  title: string;
+  rationale: string;
+  category: string;
+  priority: 'high' | 'medium' | 'low';
+  potentialPoints: number;
+  href: string;
 };
 
 type LoginResponse = {
@@ -669,6 +685,7 @@ function ReadinessScorePanel({
   if (!readiness) return null;
 
   const pct = Math.max(0, Math.min(100, Math.round((readiness.score / readiness.maxScore) * 100)));
+  const actionDetails = (readiness.nextBestActionDetails || []).slice(0, 4);
   const topActions = readiness.nextBestActions.slice(0, 3);
   const topCategories = [...readiness.categories]
     .sort((a, b) => (a.score / a.maxScore) - (b.score / b.maxScore))
@@ -711,19 +728,46 @@ function ReadinessScorePanel({
                 <span>{delta == null ? 'First saved snapshot' : `${delta >= 0 ? '+' : ''}${delta} since last snapshot`}</span>
               </div>
               <div className="readiness-bars" aria-label="Recent CredX Readiness Score snapshots">
-                {history.slice().reverse().map((entry) => (
-                  <div key={entry.id} title={`${entry.score} on ${new Date(entry.pulledAt).toLocaleDateString()}`}>
-                    <span style={{ height: `${Math.max(12, entry.score)}%` }} />
-                  </div>
-                ))}
+                {history.slice().reverse().map((entry) => {
+                  const focus = entry.topActions?.[0]?.title;
+                  const when = new Date(entry.pulledAt).toLocaleDateString();
+                  return (
+                    <div
+                      key={entry.id}
+                      title={focus ? `${entry.score} on ${when} — focus: ${focus}` : `${entry.score} on ${when}`}
+                    >
+                      <span style={{ height: `${Math.max(12, entry.score)}%` }} />
+                    </div>
+                  );
+                })}
               </div>
+              {newest?.topActions?.length ? (
+                <p className="readiness-history-focus">
+                  Last snapshot focus: {newest.topActions.map((a) => a.title).join(' · ')}
+                </p>
+              ) : null}
             </div>
           ) : null}
           <div>
             <h3>Next best actions</h3>
-            <ul>
-              {topActions.map((action) => <li key={action}>{action}</li>)}
-            </ul>
+            {actionDetails.length ? (
+              <ol className="readiness-action-list">
+                {actionDetails.map((action) => (
+                  <li key={action.id} className={`readiness-action readiness-action--${action.priority}`}>
+                    <div className="readiness-action-head">
+                      <span className={`status-pill status-pill--${action.priority}`}>{action.priority}</span>
+                      <a href={action.href}>{action.title}</a>
+                      <span className="readiness-action-points">up to +{action.potentialPoints} pts</span>
+                    </div>
+                    <span className="readiness-action-why">{action.rationale}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <ul>
+                {topActions.map((action) => <li key={action}>{action}</li>)}
+              </ul>
+            )}
           </div>
           <div>
             <h3>Lowest scoring areas</h3>

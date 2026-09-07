@@ -30,6 +30,20 @@ export type ReadinessCategory =
   | 'activity'
   | 'education';
 
+export type NextBestActionPriority = 'high' | 'medium' | 'low';
+
+export type NextBestAction = {
+  id: string;
+  title: string;
+  rationale: string;
+  category: ReadinessCategory;
+  priority: NextBestActionPriority;
+  /** Rough upside toward the 100-point scale if this area is fully addressed. */
+  potentialPoints: number;
+  /** Portal deep-link (hash route inside the client portal). */
+  href: string;
+};
+
 export type ReadinessScoreResult = {
   score: number;
   maxScore: 100;
@@ -46,7 +60,23 @@ export type ReadinessScoreResult = {
   strengths: string[];
   opportunities: string[];
   nextBestActions: string[];
+  /** Structured, ranked version of nextBestActions with category + impact. */
+  nextBestActionDetails: NextBestAction[];
   generatedAt: string;
+};
+
+const PRIORITY_RANK: Record<NextBestActionPriority, number> = { high: 0, medium: 1, low: 2 };
+
+// Categories where any gap is a hard blocker on trustworthy readiness output.
+const BLOCKER_CATEGORIES = new Set<ReadinessCategory>(['creditData', 'derogatory']);
+
+const ACTION_HREF: Record<ReadinessCategory, string> = {
+  profile: '#profile',
+  creditData: '#documents',
+  utilization: '#tools',
+  derogatory: '#disputes',
+  activity: '#action-plan',
+  education: '#learning'
 };
 
 const DISCLOSURE = 'CredX Readiness Score is a proprietary CredX readiness metric and is not a consumer credit score, FICO score, funding approval, legal opinion, or guarantee of any credit-report change.';
@@ -224,49 +254,127 @@ export function calculateReadinessScore(client: ScoreInputClient): ReadinessScor
   score = clamp(Math.round(score), 0, 100);
 
   const strengths: string[] = [];
-  const opportunities: string[] = [];
-  const nextBestActions: string[] = [];
 
   if (hasAnalysis) strengths.push('Credit analysis is available inside the CredX workspace.');
   if (onboardingComplete) strengths.push('Onboarding is complete, so the workflow can move forward.');
   if (educationProgress) strengths.push('Learning progress is already being tracked.');
   if (completedTasks) strengths.push('Some action-plan items have been completed.');
   if (averageScore != null) strengths.push(`Average available bureau score snapshot is ${averageScore}.`);
-
-  if (!hasAddress) {
-    opportunities.push('Complete address and profile details.');
-    nextBestActions.push('Finish profile setup so CredX can evaluate readiness with better context.');
-  }
-  if (!hasCreditReport) {
-    opportunities.push('Upload a current credit report.');
-    nextBestActions.push('Upload a current report before relying on readiness recommendations.');
-  }
-  if (!hasAnalysis) {
-    opportunities.push('Generate or review the CredX credit analysis.');
-    nextBestActions.push('Complete report analysis to identify accurate next-best actions.');
-  }
-  if (utilization != null && utilization > 0.3) {
-    opportunities.push('Lower revolving utilization toward 30%, then 10% if cash flow allows.');
-    nextBestActions.push('Use the utilization calculator before statement close to plan balance reductions.');
-  }
-  if (derogatoryCount > 0) {
-    opportunities.push('Review derogatory indicators for accuracy, completeness, age, and documentation gaps.');
-    nextBestActions.push('Prioritize documented, lawful dispute or validation workflows for unverifiable or inaccurate items.');
-  }
-  if (!taskTotal) {
-    opportunities.push('Create a prioritized action plan.');
-    nextBestActions.push('Turn analysis findings into dated action items.');
-  } else if (taskCompletionRate < 0.5) {
-    opportunities.push('Complete more tracked action items.');
-    nextBestActions.push('Focus on the top open action item before adding new tasks.');
-  }
-  if (!educationProgress) {
-    opportunities.push('Start the Learning Center path.');
-    nextBestActions.push('Complete the first education module to improve decision quality.');
-  }
-
   if (!strengths.length) strengths.push('CredX account foundation has started.');
-  if (!nextBestActions.length) nextBestActions.push('Keep monitoring profile changes and complete the next scheduled check-in.');
+
+  // ---- Next-best-action mapping -------------------------------------------
+  // Each candidate ties an opportunity + concrete action to a scoring category
+  // so we can rank by real point headroom and route the user to the right tool.
+  const headroomFor = (key: ReadinessCategory) => {
+    const cat = categories.find((c) => c.key === key)!;
+    return Math.max(0, cat.maxScore - cat.score);
+  };
+
+  type Candidate = {
+    id: string;
+    active: boolean;
+    category: ReadinessCategory;
+    opportunity: string;
+    title: string;
+    rationale: string;
+  };
+
+  const candidates: Candidate[] = [
+    {
+      id: 'complete-profile',
+      active: !hasAddress,
+      category: 'profile',
+      opportunity: 'Complete address and profile details.',
+      title: 'Complete your profile',
+      rationale: 'Finish profile setup so CredX can evaluate readiness with better context.'
+    },
+    {
+      id: 'upload-credit-report',
+      active: !hasCreditReport,
+      category: 'creditData',
+      opportunity: 'Upload a current credit report.',
+      title: 'Upload a current credit report',
+      rationale: 'Upload a current report before relying on readiness recommendations.'
+    },
+    {
+      id: 'complete-analysis',
+      active: !hasAnalysis,
+      category: 'creditData',
+      opportunity: 'Generate or review the CredX credit analysis.',
+      title: 'Review your credit analysis',
+      rationale: 'Complete report analysis to identify accurate next-best actions.'
+    },
+    {
+      id: 'reduce-utilization',
+      active: utilization != null && utilization > 0.3,
+      category: 'utilization',
+      opportunity: 'Lower revolving utilization toward 30%, then 10% if cash flow allows.',
+      title: 'Lower revolving utilization',
+      rationale: 'Use the utilization calculator before statement close to plan balance reductions.'
+    },
+    {
+      id: 'review-derogatory',
+      active: derogatoryCount > 0,
+      category: 'derogatory',
+      opportunity: 'Review derogatory indicators for accuracy, completeness, age, and documentation gaps.',
+      title: 'Review derogatory indicators',
+      rationale: 'Prioritize documented, lawful dispute or validation workflows for unverifiable or inaccurate items.'
+    },
+    {
+      id: 'build-action-plan',
+      active: !taskTotal,
+      category: 'activity',
+      opportunity: 'Create a prioritized action plan.',
+      title: 'Build a prioritized action plan',
+      rationale: 'Turn analysis findings into dated action items.'
+    },
+    {
+      id: 'advance-action-plan',
+      active: taskTotal > 0 && taskCompletionRate < 0.5,
+      category: 'activity',
+      opportunity: 'Complete more tracked action items.',
+      title: 'Advance your action plan',
+      rationale: 'Focus on the top open action item before adding new tasks.'
+    },
+    {
+      id: 'start-learning',
+      active: !educationProgress,
+      category: 'education',
+      opportunity: 'Start the Learning Center path.',
+      title: 'Start the Learning Center path',
+      rationale: 'Complete the first education module to improve decision quality.'
+    }
+  ];
+
+  const activeCandidates = candidates.filter((c) => c.active);
+
+  const nextBestActionDetails: NextBestAction[] = activeCandidates
+    .map((c) => {
+      const headroom = headroomFor(c.category);
+      const blocker = BLOCKER_CATEGORIES.has(c.category);
+      const priority: NextBestActionPriority =
+        blocker || headroom >= 12 ? 'high' : headroom >= 6 ? 'medium' : 'low';
+      const potentialPoints = clamp(headroom + (blocker ? 2 : 0), 1, 20);
+      return {
+        id: c.id,
+        title: c.title,
+        rationale: c.rationale,
+        category: c.category,
+        priority,
+        potentialPoints,
+        href: ACTION_HREF[c.category]
+      };
+    })
+    .sort((a, b) =>
+      PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
+      b.potentialPoints - a.potentialPoints
+    );
+
+  const opportunities = activeCandidates.map((c) => c.opportunity);
+  const nextBestActions = nextBestActionDetails.map((d) => d.rationale);
+  if (!nextBestActions.length) {
+    nextBestActions.push('Keep monitoring profile changes and complete the next scheduled check-in.');
+  }
 
   const dataSignals = [hasAddress, hasCreditReport, hasAnalysis, averageScore != null, taskTotal > 0].filter(Boolean).length;
   const dataQuality: ReadinessScoreResult['dataQuality'] = dataSignals >= 4 ? 'strong' : dataSignals >= 2 ? 'partial' : 'limited';
@@ -281,6 +389,7 @@ export function calculateReadinessScore(client: ScoreInputClient): ReadinessScor
     strengths,
     opportunities,
     nextBestActions,
+    nextBestActionDetails,
     generatedAt: now
   };
 }

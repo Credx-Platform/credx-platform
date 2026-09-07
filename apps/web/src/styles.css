@@ -1619,6 +1619,62 @@ button:hover,
   color: #2dd4bf;
   background: rgba(45,212,191,.08);
 }
+.status-pill--high {
+  border-color: rgba(248,113,113,.4);
+  color: #f87171;
+  background: rgba(248,113,113,.1);
+}
+.status-pill--medium {
+  border-color: rgba(250,204,21,.34);
+  color: #facc15;
+  background: rgba(250,204,21,.08);
+}
+.status-pill--low {
+  border-color: rgba(148,163,184,.34);
+  color: #94a3b8;
+  background: rgba(148,163,184,.08);
+}
+.readiness-action-list {
+  display: grid;
+  gap: 10px;
+  padding-left: 0;
+  list-style: none;
+}
+.readiness-action {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  background: rgba(255,255,255,.02);
+}
+.readiness-action--high { border-color: rgba(248,113,113,.28); }
+.readiness-action-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.readiness-action-head a {
+  font-weight: 700;
+  color: var(--cyan);
+  text-decoration: none;
+}
+.readiness-action-head a:hover { text-decoration: underline; }
+.readiness-action-points {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-left: auto;
+}
+.readiness-action-why {
+  font-size: 13px;
+  color: #cbd5e1;
+}
+.readiness-history-focus {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
 .readiness-layout {
   display: grid;
   grid-template-columns: minmax(180px, 240px) 1fr;

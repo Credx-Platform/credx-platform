@@ -14,6 +14,30 @@ describe('calculateReadinessScore', () => {
     assert.ok(result.nextBestActions.includes('Upload a current report before relying on readiness recommendations.'));
   });
 
+  it('maps next-best actions to a ranked, categorized structure', () => {
+    const result = calculateReadinessScore({});
+
+    assert.ok(result.nextBestActionDetails.length > 0);
+    // Blocker categories (creditData / derogatory) must rank first.
+    assert.equal(result.nextBestActionDetails[0].priority, 'high');
+    // Sorted by priority then potential points, non-increasing points within a tier.
+    const ranks = { high: 0, medium: 1, low: 2 } as const;
+    for (let i = 1; i < result.nextBestActionDetails.length; i += 1) {
+      const prev = result.nextBestActionDetails[i - 1];
+      const cur = result.nextBestActionDetails[i];
+      assert.ok(ranks[prev.priority] <= ranks[cur.priority], 'priority order');
+    }
+    for (const action of result.nextBestActionDetails) {
+      assert.match(action.href, /^#/);
+      assert.ok(action.potentialPoints >= 1 && action.potentialPoints <= 20);
+      assert.ok(result.nextBestActions.includes(action.rationale));
+    }
+    // The missing-credit-report action should point at the documents area.
+    const upload = result.nextBestActionDetails.find((a) => a.id === 'upload-credit-report');
+    assert.ok(upload);
+    assert.equal(upload!.category, 'creditData');
+  });
+
   it('rewards profile completion, credit data, low utilization, and task progress', () => {
     const result = calculateReadinessScore({
       currentAddressLine1: '123 Main St',

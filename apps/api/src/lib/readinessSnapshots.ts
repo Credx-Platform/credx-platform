@@ -20,6 +20,7 @@ export async function generateAllReadinessSnapshots() {
           strengths: readiness.strengths,
           opportunities: readiness.opportunities,
           nextBestActions: readiness.nextBestActions,
+          nextBestActionDetails: readiness.nextBestActionDetails,
           generatedAt: readiness.generatedAt
         }
       });
@@ -48,6 +49,7 @@ export async function generateClientReadinessSnapshot(clientId: string) {
       strengths: readiness.strengths,
       opportunities: readiness.opportunities,
       nextBestActions: readiness.nextBestActions,
+      nextBestActionDetails: readiness.nextBestActionDetails,
       generatedAt: readiness.generatedAt
     }
   });

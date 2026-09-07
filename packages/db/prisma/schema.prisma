@@ -513,11 +513,12 @@ model ReadinessScoreSnapshot {
   label           String
   dataQuality     String
   categories      Json     @default("[]")
-  strengths       Json     @default("[]")
-  opportunities   Json     @default("[]")
-  nextBestActions Json     @default("[]")
-  generatedAt     DateTime
-  createdAt       DateTime @default(now())
+  strengths             Json     @default("[]")
+  opportunities         Json     @default("[]")
+  nextBestActions       Json     @default("[]")
+  nextBestActionDetails Json     @default("[]")
+  generatedAt           DateTime
+  createdAt             DateTime @default(now())
 
   @@index([clientId, createdAt])
 }

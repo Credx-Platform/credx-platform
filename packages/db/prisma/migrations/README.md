@@ -19,10 +19,12 @@ data**, this directory now contains:
 | `20260717120000_add_masterclass_payment_provider` | Pre-existing. Idempotent. |
 | `20260907120000_saas_transformation_additive` | **New.** Org/team model, webhook ledger + idempotency, job queue + worker heartbeat, ErrorEvent, ReadinessScoreSnapshot, CreditScore, sub-agent/affiliate tables, Client org/referral columns. Fully additive, all statements idempotent, **no DROP / no column-type changes**. |
 | `20260907130000_add_subscription_invoice_models` | **New.** Persistent `Subscription` (recurring plan lifecycle, reconciled from Stripe/PayPal/manual) + `Invoice` (billing document history), both client-scoped. Fully additive, all statements idempotent, **no DROP / no column-type changes**. |
+| `20260907140000_readiness_next_best_action_details` | **New.** `ReadinessScoreSnapshot.nextBestActionDetails JSONB DEFAULT '[]'` — persists the structured/ranked next-best-action list. Single `ADD COLUMN IF NOT EXISTS`. |
 
 The full chain was verified against a throwaway PostgreSQL 16 instance
-(`prisma migrate deploy` from empty → all seven apply cleanly, zero schema drift
-vs `schema.prisma`; `20260907130000` re-run confirmed idempotent).
+(`prisma migrate deploy` from empty → all nine apply cleanly, zero schema drift
+vs `schema.prisma`; the new `20260907130000` / `20260907140000` migrations were
+re-run and confirmed idempotent).
 
 ## First-time production adoption (run once, owner-approved)
 

@@ -26,14 +26,25 @@ const ALLOWED_UPLOAD_EXTENSIONS = new Set(['.pdf', '.png', '.jpg', '.jpeg', '.we
 const ALLOWED_UPLOAD_MIME_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'text/html']);
 const CREDIT_REPORT_UPLOAD_EXTENSIONS = new Set(['.pdf', '.html', '.htm']);
 const CREDIT_REPORT_UPLOAD_MIME_TYPES = new Set(['application/pdf', 'text/html']);
-function serializeReadinessSnapshot(entry: Pick<ReadinessScoreSnapshot, 'id' | 'score' | 'label' | 'dataQuality' | 'generatedAt' | 'createdAt'>) {
+function serializeReadinessSnapshot(
+  entry: Pick<ReadinessScoreSnapshot, 'id' | 'score' | 'label' | 'dataQuality' | 'generatedAt' | 'createdAt'> &
+    Partial<Pick<ReadinessScoreSnapshot, 'nextBestActionDetails'>>
+) {
+  const details = Array.isArray(entry.nextBestActionDetails)
+    ? (entry.nextBestActionDetails as Array<{ title?: string; priority?: string; category?: string }>)
+    : [];
   return {
     id: entry.id,
     score: entry.score,
     label: entry.label,
     dataQuality: entry.dataQuality,
     generatedAt: entry.generatedAt.toISOString(),
-    pulledAt: entry.createdAt.toISOString()
+    pulledAt: entry.createdAt.toISOString(),
+    topActions: details.slice(0, 2).map((d) => ({
+      title: d.title ?? '',
+      priority: d.priority ?? 'medium',
+      category: d.category ?? null
+    }))
   };
 }
 
@@ -284,6 +295,7 @@ progressRouter.post('/readiness/snapshot', requireAuth, async (req: AuthedReques
         strengths: readiness.strengths,
         opportunities: readiness.opportunities,
         nextBestActions: readiness.nextBestActions,
+        nextBestActionDetails: readiness.nextBestActionDetails,
         generatedAt: readiness.generatedAt
       }
     });
