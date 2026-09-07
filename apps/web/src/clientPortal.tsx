@@ -645,6 +645,87 @@ function SectionHeader({ section }: { section: Exclude<PortalTab, 'overview'> })
   );
 }
 
+type PortalNotification = {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  read: boolean;
+  createdAt: string;
+};
+
+function NotificationBell({ token }: { token: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<PortalNotification[]>([]);
+  const [unread, setUnread] = useState(0);
+
+  const load = async () => {
+    if (!token) return;
+    const data = await apiFetch<{ notifications: PortalNotification[]; unreadCount: number }>('/api/notifications?limit=20', token).catch(() => null);
+    if (data) { setItems(data.notifications); setUnread(data.unreadCount); }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    void load();
+    const t = setInterval(() => { void load(); }, 60_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const markRead = async (id: string) => {
+    if (!token) return;
+    await apiFetch(`/api/notifications/${id}/read`, token, { method: 'POST' }).catch(() => {});
+    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    setUnread((u) => Math.max(0, u - 1));
+  };
+  const markAll = async () => {
+    if (!token) return;
+    await apiFetch('/api/notifications/read-all', token, { method: 'POST' }).catch(() => {});
+    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnread(0);
+  };
+
+  if (!token) return null;
+
+  return (
+    <div className="notif-bell">
+      <button
+        type="button"
+        className="ghost-button notif-bell-btn"
+        aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
+        onClick={() => { setOpen((o) => !o); if (!open) void load(); }}
+      >
+        🔔{unread > 0 && <span className="notif-badge">{unread > 9 ? '9+' : unread}</span>}
+      </button>
+      {open && (
+        <div className="notif-panel" role="dialog" aria-label="Notifications">
+          <div className="notif-panel-head">
+            <strong>Notifications</strong>
+            {unread > 0 && <button className="link-button" onClick={() => void markAll()}>Mark all read</button>}
+          </div>
+          <ul>
+            {items.length === 0 && <li className="notif-empty">You're all caught up.</li>}
+            {items.map((n) => (
+              <li key={n.id} className={n.read ? 'notif-item' : 'notif-item notif-item--unread'}>
+                <a
+                  href={n.href || '#'}
+                  onClick={() => { if (!n.read) void markRead(n.id); }}
+                >
+                  <strong>{n.title}</strong>
+                  {n.body && <span>{n.body}</span>}
+                  <time>{new Date(n.createdAt).toLocaleDateString()}</time>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CreditScoreGauge({ bureau, score }: { bureau: string; score: number | null }) {
   const hasScore = typeof score === 'number' && Number.isFinite(score);
   const pct = hasScore ? Math.max(0, Math.min(1, ((score as number) - 300) / 550)) : 0;
@@ -4139,6 +4220,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                 <h1 className="top-title">{tabLabel}</h1>
               </div>
               <div className="topbar-actions">
+                <NotificationBell token={token} />
                 <button className="ghost-button" onClick={handleLogout}>Sign out</button>
               </div>
             </header>

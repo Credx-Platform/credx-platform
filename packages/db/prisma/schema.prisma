@@ -223,6 +223,7 @@ model Client {
   assignments             ClientAssignment[]       @relation("ClientAssignments")
   fundingReadiness        FundingReadinessProfile?
   businessCredit          BusinessCreditProfile?
+  notifications           Notification[]
   progress                ClientProgress?
   organizationId          String?
   organization            Organization?            @relation("OrganizationClients", fields: [organizationId], references: [id], onDelete: SetNull)
@@ -931,4 +932,27 @@ model BusinessTradeline {
   updatedAt    DateTime              @updatedAt
 
   @@index([profileId])
+}
+
+// ============================================================
+// SaaS Phase D: Engagement — In-app notifications
+// ============================================================
+
+model Notification {
+  id        String    @id @default(uuid())
+  clientId  String
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type      String // MILESTONE_REACHED | READINESS_SCORE_CHANGED | NEW_RECOMMENDED_ACTION | WEEKLY_CHECKIN_READY | REPORT_READY | SYSTEM
+  title     String
+  body      String?
+  href      String?
+  metadata  Json      @default("{}")
+  readAt    DateTime?
+  // Optional idempotency key so producers don't create duplicates.
+  dedupeKey String?
+  createdAt DateTime  @default(now())
+
+  @@unique([clientId, dedupeKey])
+  @@index([clientId, createdAt])
+  @@index([clientId, readAt])
 }

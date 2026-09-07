@@ -27,6 +27,7 @@ import { creditScoreRouter } from './routes/creditScore.js';
 import { orgRouter } from './routes/org.js';
 import { fundingReadinessRouter } from './routes/fundingReadiness.js';
 import { businessCreditRouter } from './routes/businessCredit.js';
+import { notificationsRouter } from './routes/notifications.js';
 
 export interface CreateAppOptions {
   /** Disable rate limiters (tests / load harness). */
@@ -147,6 +148,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     app.use(`${prefix}/org`, orgRouter);
     app.use(`${prefix}/funding-readiness`, fundingReadinessRouter);
     app.use(`${prefix}/business-credit`, businessCreditRouter);
+    app.use(`${prefix}/notifications`, notificationsRouter);
   }
 
   mountAll('/api');

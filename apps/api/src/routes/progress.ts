@@ -8,6 +8,7 @@ import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { config } from '../config.js';
 import { CreditAnalysisService, deriveReportSubject } from '../lib/creditAnalysis.js';
 import { enqueueJob } from '../lib/jobs.js';
+import { notifyMilestone } from '../lib/notifications.js';
 import { extractReport } from '../lib/reportExtractor.js';
 import { uploadDocument } from '../lib/blob-storage.js';
 import { track } from '../lib/analytics.js';
@@ -358,6 +359,17 @@ progressRouter.post('/me', requireAuth, async (req: AuthedRequest, res, next) =>
       where: { clientId: client.id },
       data: { completedDays, passedQuizzes, scores, disputes, workflow, education }
     });
+
+    // Milestone: a masterclass day was just completed.
+    if (data.completedDay && !((client.progress as any).completedDays || []).includes(data.completedDay)) {
+      const dayNum = String(data.completedDay).replace(/\D/g, '') || completedDays.length;
+      notifyMilestone(client.id, {
+        key: `masterclass-day-${data.completedDay}`,
+        title: `Masterclass Day ${dayNum} complete`,
+        body: completedDays.length >= 5 ? 'You finished the 5-Day Masterclass — nice work.' : 'Keep the streak going.',
+        href: '/portal'
+      });
+    }
 
     return res.json(updated);
   } catch (error) {
