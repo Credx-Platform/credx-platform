@@ -419,3 +419,98 @@ Web:
 - Migration chain (12) — zero drift; both new migrations re-run idempotent.
 - Compliance: no guarantee / approval / deletion / bureau-force language;
   disclosures are test-asserted constants.
+
+## 22. Phase C3 — Observability & Scale (session 3, 2026-09-08)
+
+Master-spec Phase 6. Code-only, env-gated. Branch `saas-transformation`, no prod deploy.
+
+**`5aa4b31` — Sentry forwarding + browser error reporting (item 6)**
+- `apps/api/src/lib/sentryForward.ts`: no-SDK Sentry forwarder. No-op unless
+  `SENTRY_DSN` is set. Parses the DSN, POSTs a scrubbed event to the store
+  endpoint fire-and-forget (3s `AbortController` timeout).
+  `scrubText` / `scrubDeep` redact emails, SSNs, JWTs, `Bearer` tokens,
+  card-like numbers, and blocked keys (password / token / ssn / ein /
+  authorization / cookie / …), with length + recursion caps.
+- `lib/sentry.ts`: `captureException` / `captureMessage` now scrub the payload
+  written to the `ErrorEvent` ledger (defense-in-depth) **and** forward to
+  Sentry when configured. Unchanged when `SENTRY_DSN` is unset.
+- `apps/web/src/errorReporting.ts`: `initErrorReporting()` installs `error` +
+  `unhandledrejection` handlers that POST scrubbed events to Sentry. No-op
+  unless `VITE_SENTRY_DSN` is set at build time; capped at 10 events/session.
+  Wired into all four web entrypoints.
+- 6 unit tests (scrubbing + disabled no-op).
+
+**`797528d` — local load-testing harness (item 7)**
+- `scripts/loadtest.mjs`: zero-dependency (Node `fetch` + worker pool).
+  **Hard-refuses any non-local target** (localhost / 127.0.0.1 / RFC1918 only) —
+  no override. Scenarios `health` / `readonly` / `authed` / `mixed`, all
+  read-only endpoints. Reports p50/p90/p95/p99, RPS, error rate, status
+  histogram; exits non-zero above a 1% error rate. `npm run loadtest`.
+- `index.ts`: `DISABLE_RATE_LIMITS=1` disables rate limiters for local load
+  testing, honored **only** when `NODE_ENV !== production`.
+- `docs/LOAD_TESTING.md` rewritten with usage, a local run recipe, and a
+  measured single-process baseline: ~4,000 req/s, p95 ~53 ms, p99 ~82 ms, 0
+  errors over ~40k requests at 100 concurrent workers.
+
+### §22 status
+
+- `npm run build` (api + web) — clean, no warnings.
+- `npm test` — **47 pass / 30 skipped / 0 fail**.
+- `npm run test:integration` — **30 / 30**.
+- Migration chain (12) — zero drift.
+- New env vars (all optional, no-op when unset): `SENTRY_DSN` (API),
+  `VITE_SENTRY_DSN` (web build), `DISABLE_RATE_LIMITS` (local only).
+
+## 23. Merge & deploy readiness (end of session 3)
+
+**Branch `saas-transformation` — ready to merge to `main`.** 20 commits since
+`194f285`. No conflicts expected (branch is linear off `main`; `main` has not
+moved). No production deploy performed by any session.
+
+Pre-merge checklist (all green):
+- `npm run build` clean, no warnings.
+- `npm test` 47 pass / 30 skipped / 0 fail; `npm run test:integration` 30/30 on PG16.
+- 12-migration chain applies from empty with zero drift; every migration
+  additive + idempotent. Prod already carries migrations 1–8 (adopted by the
+  owner 2026-09-08); `9`–`12` (`20260907130000`, `20260907140000`,
+  `20260908120000`, `20260908130000`, `20260908140000`) are pending
+  `migrate deploy`.
+- Every new integration (queue runner, Sentry, analytics, Redis, Stripe price
+  map) is non-fatal when unconfigured.
+- Compliance guardrails intact; no guarantee / approval / deletion / bureau-force
+  language; disclosures test-asserted.
+
+### Railway deploy commands (DO NOT RUN — for the owner)
+
+```bash
+# 0. from the repo root, on `main` after the merge, with a fresh DB backup taken.
+
+# 1. API service — apply pending migrations (9–12 are additive/idempotent):
+railway run --service @credx/api --environment production -- \
+  npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+
+# 2. Deploy API:
+#    ensure railway.json is API-shaped (npm run build:api / npm run start:api /
+#    health /health) — see AGENTS.md CredX Deployments note — then:
+railway up --service @credx/api --environment production
+
+# 3. Deploy web:
+railway up --service @credx/web --environment production
+
+# 4. Verify:
+railway deployment list --service @credx/api --environment production --limit 3 --json
+curl -fsS https://credxapi-production.up.railway.app/health
+curl -fsS https://credxapi-production.up.railway.app/health/db
+curl -fsS https://credxapi-production.up.railway.app/health/queue
+```
+
+Optional env to set on the API service when ready (all no-op until set):
+`SENTRY_DSN`, `REDIS_URL` (not required — DB queue works without it),
+`POSTHOG_API_KEY` / `ANALYTICS_ENABLED`, `STRIPE_PRICE_ESSENTIAL|PREMIUM|FAMILY|MASTERCLASS`.
+Web build env: `VITE_SENTRY_DSN`. Deploy a dedicated worker service later with
+`npm run start:worker` + set `QUEUE_INPROCESS=0` on the API.
+
+Still not done (out of scope / owner-gated): PostHog + Sentry provisioning,
+white-label config, attorney review of positioning + Terms, PgBouncer, the
+seeded target-flow load scenarios, and rotating the old hardcoded DB credential
+if it was ever valid.

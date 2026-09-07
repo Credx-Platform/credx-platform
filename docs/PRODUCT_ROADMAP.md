@@ -96,5 +96,11 @@ Status legend: Completed · In Progress · Planned · Blocked · External Depend
   standalone `worker.ts`; graceful shutdown; `/health/queue`. Redis not needed.
 - Completed: web chunk code-split — html2pdf ~985 kB blob replaced by lazy
   vendor-jspdf / vendor-html2canvas chunks; no build warning.
-- Planned: load-testing suite execution; DB profiling; slow-endpoint optimization.
-- Planned: Sentry APM wiring; external dashboards.
+- Completed: env-gated Sentry forwarding (`lib/sentryForward.ts`) wired into the
+  API error path + a browser error hook (`errorReporting.ts`), both PII-scrubbed
+  and no-op without a DSN.
+- Completed: local load-testing harness (`scripts/loadtest.mjs`, `npm run
+  loadtest`) — refuses non-local targets; `docs/LOAD_TESTING.md` documents a
+  ~4k req/s single-process baseline.
+- Planned: seeded target-flow load scenarios; DB profiling; PgBouncer;
+  provision a Sentry/APM project + dashboards; dedicated worker service.
