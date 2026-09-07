@@ -12,6 +12,39 @@ Minimum target:
 - documented owner
 - documented RPO/RTO
 
+### Backup runbook (to be confirmed against Railway settings by James)
+
+1. **On-demand logical backup** (run before any migration or risky change):
+   ```bash
+   pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges \
+     --file "credx-$(date +%Y%m%dT%H%M%SZ).dump"
+   ```
+   Store off-Railway (e.g. encrypted bucket). Never commit dumps.
+2. **Scheduled backups**: Railway Postgres plugin provides automated backups —
+   confirm the schedule and retention window in the Railway dashboard and record
+   them here. If not enabled, enable daily + 7-day retention at minimum.
+3. **Restore to a scratch database** (verification / recovery):
+   ```bash
+   createdb credx_restore_test
+   pg_restore --no-owner --no-privileges --dbname credx_restore_test credx-<ts>.dump
+   ```
+4. **Restore to production** (owner-approved, last resort): put the API into
+   maintenance, restore into a fresh database, repoint `DATABASE_URL`, redeploy,
+   run `/health/db`.
+5. **Test cadence**: perform step 3 at least monthly and record the result.
+
+### Migration rollback
+
+Migrations added in the SaaS transformation are additive and idempotent
+(`20260907120000_saas_transformation_additive`). If a deploy that ran it must be
+reverted:
+
+- Application rollback (redeploy previous image) is sufficient — the new tables
+  and nullable columns are inert to old code.
+- Only if the new objects must be physically removed, hand-write a down-migration
+  that `DROP`s exactly the objects listed in that migration's header. Do not drop
+  pre-existing tables/columns.
+
 ## Deployment Failure
 
 Use Railway's previous successful deployment rollback/redeploy capability. Run `/health` for API and `/` for web after rollback.
