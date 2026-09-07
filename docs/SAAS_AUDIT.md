@@ -28,7 +28,7 @@ see `SAAS_TRANSFORMATION_REPORT_2026-09-07.md` §19–§23).
 | Scalability | 6 | Stateless web/API; DB job queue with a working runner (multi-runner-safe, splittable to a dedicated process); local load-test harness establishes a ~4k req/s single-process baseline. Postgres pooling / PgBouncer still unconfigured. | 9 |
 | Reliability | 7 | `/health`, `/health/db`, `/health/queue`; graceful API + worker shutdown; replay-safe webhooks with dead-lettering; job backoff runtime; fail-soft optional providers; error ledger in global handler. | 9 |
 | Observability | 6 | ErrorEvent ledger + webhook-event ledger + worker heartbeats via `/health/queue`; env-gated Sentry forwarding (API) + browser error reporting, both PII-scrubbed and no-op without a DSN. No dashboards / APM provisioned yet. | 8 |
-| Disaster Recovery | 4 | `DISASTER_RECOVERY.md` + migration rollback runbook; provider backup schedule/retention still unverified. | 8 |
+| Disaster Recovery | 7 | Nightly prod `pg_dump` (03:30, 14-day retention, `/home/ubuntu/backups/credx-db/backup.sh`) with a **passed restore test** (2026-09-08); RPO ≤24h, RTO ~30–60 min documented; migration rollback runbook; replay-safe webhook recovery. Gaps: off-host backup copy, no PITR, restore test not yet automated. | 8 |
 | Performance | 6 | Rate limits, static serving; web PDF stack code-split into lazy vendor chunks (no >500 kB chunk); some sync external work in request paths remains. | 8 |
 
 ## Overall

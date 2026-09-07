@@ -470,11 +470,10 @@ moved). No production deploy performed by any session.
 Pre-merge checklist (all green):
 - `npm run build` clean, no warnings.
 - `npm test` 47 pass / 30 skipped / 0 fail; `npm run test:integration` 30/30 on PG16.
-- 12-migration chain applies from empty with zero drift; every migration
-  additive + idempotent. Prod already carries migrations 1–8 (adopted by the
-  owner 2026-09-08); `9`–`12` (`20260907130000`, `20260907140000`,
-  `20260908120000`, `20260908130000`, `20260908140000`) are pending
-  `migrate deploy`.
+- Full migration chain applies from empty with zero drift; every migration
+  additive + idempotent. **All migrations are applied on production** (owner-run
+  2026-09-08, verified zero drift + healthy). Nightly prod backup cron + a passed
+  restore test are in place (`docs/DISASTER_RECOVERY.md`).
 - Every new integration (queue runner, Sentry, analytics, Redis, Stripe price
   map) is non-fatal when unconfigured.
 - Compliance guardrails intact; no guarantee / approval / deletion / bureau-force
@@ -485,9 +484,10 @@ Pre-merge checklist (all green):
 ```bash
 # 0. from the repo root, on `main` after the merge, with a fresh DB backup taken.
 
-# 1. API service — apply pending migrations (9–12 are additive/idempotent):
-railway run --service @credx/api --environment production -- \
-  npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+# 1. Migrations are ALREADY applied on production (owner-run 2026-09-08).
+#    Any future additive migration: take a fresh backup first, then
+#    railway run --service @credx/api --environment production -- \
+#      npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
 
 # 2. Deploy API:
 #    ensure railway.json is API-shaped (npm run build:api / npm run start:api /

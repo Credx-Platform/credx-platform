@@ -2,15 +2,29 @@
 
 ## Database Failure
 
-Current backup frequency, retention, and restore process are not documented in the repository. This is critical and must be verified in Railway/PostgreSQL provider settings.
+**Status (verified 2026-09-08):**
 
-Minimum target:
+| Item | Value |
+| --- | --- |
+| Automated backups | Nightly logical `pg_dump` (custom format) at **03:30 daily** via cron |
+| Script | `/home/ubuntu/backups/credx-db/backup.sh` (host cron, not in this repo) |
+| Retention | **14 days** (older dumps pruned automatically) |
+| Backup location | `/home/ubuntu/backups/credx-db/` on the ops host (off-Railway) |
+| Credentials | Pulled fresh from Railway at run time via `railway variables`; never stored |
+| Restore test | **Passed** — full `pg_restore` into a scratch DB verified 2026-09-08 |
+| Owner | James (OpenClaw owner) |
+| RPO | ≤ 24h (nightly logical dump) |
+| RTO | ~30–60 min (restore into a fresh DB + repoint `DATABASE_URL` + redeploy) |
 
-- automated daily backups
-- point-in-time recovery where available
-- tested restore procedure
-- documented owner
-- documented RPO/RTO
+Point-in-time recovery: not configured (logical dumps only). If a tighter RPO is
+required, enable the Railway Postgres plugin's automated backups / PITR and
+record it here.
+
+Remaining target improvements:
+
+- Off-host copy of the dumps (encrypted bucket) so a host loss does not also lose
+  the backups.
+- Automated monthly restore-test in cron with an alert on failure.
 
 ### Backup runbook (to be confirmed against Railway settings by James)
 
@@ -20,9 +34,10 @@ Minimum target:
      --file "credx-$(date +%Y%m%dT%H%M%SZ).dump"
    ```
    Store off-Railway (e.g. encrypted bucket). Never commit dumps.
-2. **Scheduled backups**: Railway Postgres plugin provides automated backups —
-   confirm the schedule and retention window in the Railway dashboard and record
-   them here. If not enabled, enable daily + 7-day retention at minimum.
+2. **Scheduled backups**: a host cron runs `/home/ubuntu/backups/credx-db/backup.sh`
+   at 03:30 daily — logical `pg_dump` (custom format) with 14-day retention,
+   connection string pulled fresh from Railway. Dumps land in
+   `/home/ubuntu/backups/credx-db/`. Verify `backup.log` for recent success.
 3. **Restore to a scratch database** (verification / recovery):
    ```bash
    createdb credx_restore_test
@@ -51,7 +66,11 @@ Use Railway's previous successful deployment rollback/redeploy capability. Run `
 
 ## Redis Failure
 
-Redis is not evident in the current architecture. Future queue-backed features should degrade by pausing background jobs, not by taking down web/API.
+Redis is not used. The job queue (`lib/queue.ts` / `lib/queueRunner.ts`) is
+Postgres-backed. If the DB is degraded the runner logs and retries with backoff;
+producers (`enqueueJob`) fall back to inline execution or drop-and-log and never
+fail the originating request. A future Redis addition must keep this degrade
+path — pause background jobs, never take down web/API.
 
 ## AI Provider Outage
 
@@ -67,4 +86,10 @@ Document upload/access may fail. Core app should remain online. Do not store cri
 
 ## Payment Webhook Failure
 
-Webhook processing must be idempotent and replay-safe. Payment reconciliation procedure still needs to be formalized.
+Stripe + PayPal webhooks flow through `processWebhookWithLedger` — every event is
+recorded in `WebhookEvent`, deduped on the provider event id, replays
+short-circuit, and processing failures are marked `RETRYING` / `DEAD_LETTER` so
+the provider can safely re-deliver. To recover a missed event: re-send it from
+the provider dashboard (idempotent), or inspect `WebhookEvent` rows with status
+`FAILED` / `DEAD_LETTER` and reprocess. Full payment reconciliation (comparing
+provider records to `Payment` / `Invoice`) still needs a formal procedure.
