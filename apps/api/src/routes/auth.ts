@@ -17,6 +17,7 @@ import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { writeAuditLog } from '../lib/audit.js';
 import { logTurnstileRejection, verifyTurnstileFromBody } from '../lib/turnstile.js';
 import { defaultAffiliateLinks } from '../lib/affiliateLinks.js';
+import { track } from '../lib/analytics.js';
 
 export const authRouter = Router();
 
@@ -220,6 +221,8 @@ authRouter.post('/register', async (req, res, next) => {
       }
     }
     const { passwordHash: _omitPasswordHash, ...safeUser } = user;
+
+    track('account_created', { distinctId: user.id, props: { role: user.role, referred: Boolean(activeSubAgent) } });
 
     return res.status(201).json({
       user: safeUser,

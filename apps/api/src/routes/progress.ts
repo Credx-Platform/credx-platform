@@ -10,6 +10,7 @@ import { CreditAnalysisService, deriveReportSubject } from '../lib/creditAnalysi
 import { dispatchAnalysisEmail } from '../lib/analysisEmailDispatch.js';
 import { extractReport } from '../lib/reportExtractor.js';
 import { uploadDocument } from '../lib/blob-storage.js';
+import { track } from '../lib/analytics.js';
 import { maybeSendPortalReadyEmail } from '../lib/portalReady.js';
 import { syncReportDerivedClientData } from '../lib/clientReportSync.js';
 import { calculateReadinessScore } from '../lib/readinessScore.js';
@@ -285,6 +286,11 @@ progressRouter.post('/readiness/snapshot', requireAuth, async (req: AuthedReques
         nextBestActions: readiness.nextBestActions,
         generatedAt: readiness.generatedAt
       }
+    });
+
+    track('readiness_score_created', {
+      distinctId: client.id,
+      props: { score: readiness.score, label: readiness.label, dataQuality: readiness.dataQuality }
     });
 
     const history = await prisma.readinessScoreSnapshot.findMany({
