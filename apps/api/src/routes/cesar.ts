@@ -3,19 +3,15 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { prisma } from '../lib/prisma.js';
-import { callAiGatewayChat, isAiGatewayConfigured, type AiChatMessage } from '../lib/aiGateway.js';
+import { runChat, aiConfigured, type AiMessage } from '../lib/ai/index.js';
+import { getPrompt, CESAR_GUARDRAILS } from '../lib/ai/prompts.js';
+import { checkAiQuota } from '../lib/ai/quota.js';
+import { resolveClientEntitlements } from '../lib/entitlements.js';
 
 export const cesarRouter = Router();
 
-// CredX compliance guardrails. Cesar is "credit education / guidance", never a
-// guarantee machine — this copy is the non-negotiable spine of every reply and
-// the system prompt for the LLM path.
-const GUARDRAILS = [
-  'Cesar and CredX analysis tools are AI-assisted education and workflow support, with human review available.',
-  'CredX does not guarantee deletions, score increases, or approvals.',
-  'Accurate, current, and verifiable information cannot be lawfully removed just because it is negative.',
-  'CredX provides credit education and practical strategy, not legal advice or guaranteed outcomes.'
-];
+// CredX compliance guardrails — the non-negotiable spine of every Cesar reply.
+const GUARDRAILS = CESAR_GUARDRAILS;
 
 function escapeHtml(value: string): string {
   return String(value)
@@ -60,6 +56,8 @@ const LINKS = {
 interface CesarContext {
   user: { id: string; firstName: string; lastName: string; role: string } | null;
   stage: OnboardingStep | null;
+  clientId: string | null;
+  plan: string | null;
 }
 
 interface OnboardingStep {
@@ -216,30 +214,19 @@ function rulesReply(message: string, ctx: CesarContext): CesarReply {
 
 function llmEnabled(): boolean {
   if (/^(0|false|no|off)$/i.test(String(process.env.CESAR_LLM_ENABLED || ''))) return false;
-  return isAiGatewayConfigured();
+  return aiConfigured();
 }
 
 function buildSystemPrompt(ctx: CesarContext): string {
-  const lines = [
-    'You are Cesar, the CredX guidance assistant. You are warm, plain-spoken, and encouraging — never pushy or intimidating.',
-    'Always be transparent that Cesar is AI-assisted CredX guidance and that human review is available.',
-    'CredX is a credit education and guidance service (credit education, not credit repair).',
-    'Hard compliance rules you must never break:',
-    ...GUARDRAILS.map((g) => `- ${g}`),
-    'Never give legal advice. Never promise outcomes or timelines.',
-    'Pricing facts: the 5-Day Masterclass is $47 one time; Essential AI Assistance is $150 after analysis review; Premium is $447 after analysis review; Family is $300 after analysis review, then monthly support based on family size.',
-    'Keep replies short (a few sentences). If the user seems stuck or reluctant, suggest they reply to their CredX welcome email to set up a human check-in rather than pushing.'
-  ];
+  const vars: Record<string, string> = {};
   if (ctx.user && ctx.stage) {
-    lines.push(
-      `The signed-in client is ${[ctx.user.firstName, ctx.user.lastName].filter(Boolean).join(' ') || 'a CredX client'}.`,
-      `Their next onboarding step is: ${ctx.stage.label}. Gently guide them toward it. Context: ${ctx.stage.detail}`,
-      'Portal tabs they can use: Progress, Analysis, Disputes, Documents, Profile.'
-    );
+    vars.clientLine = `The signed-in client is ${[ctx.user.firstName, ctx.user.lastName].filter(Boolean).join(' ') || 'a CredX client'}.`;
+    vars.stageLine = `Their next onboarding step is: ${ctx.stage.label}. Gently guide them toward it. Context: ${ctx.stage.detail}`;
+    vars.portalLine = 'Portal tabs they can use: Progress, Analysis, Disputes, Documents, Profile.';
   } else {
-    lines.push('This is a public visitor who has not signed up yet. Guide them toward /signup (guided program), /masterclass (DIY education), /pricing, or /portal to log in.');
+    vars.visitorLine = 'This is a public visitor who has not signed up yet. Guide them toward /signup (guided program), /masterclass (DIY education), /pricing, or /portal to log in.';
   }
-  return lines.join('\n');
+  return getPrompt('cesar_system', vars).text;
 }
 
 const historySchema = z.array(z.object({
@@ -252,22 +239,37 @@ const chatSchema = z.object({
   history: historySchema.optional().default([])
 });
 
-async function llmReply(message: string, history: z.infer<typeof historySchema>, ctx: CesarContext): Promise<CesarReply | null> {
-  const messages: AiChatMessage[] = [
+/**
+ * @returns a Cesar reply from the LLM, or a discriminated failure so the route
+ * can fall through to the deterministic reply (Cesar never hard-fails).
+ */
+async function llmReply(
+  message: string,
+  history: z.infer<typeof historySchema>,
+  ctx: CesarContext
+): Promise<{ reply: CesarReply } | { fail: 'quota' | 'provider' }> {
+  // Per-client AI budget check (cost protection).
+  if (ctx.clientId) {
+    const quota = await checkAiQuota(ctx.clientId, ctx.plan ?? null);
+    if (!quota.allowed) return { fail: 'quota' };
+  }
+
+  const messages: AiMessage[] = [
     { role: 'system', content: buildSystemPrompt(ctx) },
-    ...history.slice(-8).map((m) => ({ role: m.role, content: m.content })),
+    ...history.slice(-8).map((m) => ({ role: m.role as AiMessage['role'], content: m.content })),
     { role: 'user', content: message }
   ];
-  const result = await callAiGatewayChat({
+  const result = await runChat({
+    task: 'cesar_chat',
     messages,
-    model: process.env.CESAR_LLM_MODEL?.trim() || undefined,
-    maxTokens: 400,
-    temperature: 0.6,
-    timeoutMs: Number(process.env.CESAR_LLM_TIMEOUT_MS || 12_000)
+    promptVersion: getPrompt('cesar_system').version,
+    clientId: ctx.clientId ?? null,
+    userId: ctx.user?.id ?? null,
+    plan: ctx.plan ?? null
   });
-  if (!result) return null;
+  if (!result.ok) return { fail: 'provider' };
   // LLM output is untrusted; never return it as raw HTML — escape it.
-  return { source: 'llm', reply: result.text, html: textToHtml(result.text) };
+  return { reply: { source: 'llm', reply: result.text, html: textToHtml(result.text) } };
 }
 
 // ---------------------------------------------------------------------------
@@ -277,24 +279,36 @@ async function llmReply(message: string, history: z.infer<typeof historySchema>,
 // Optional auth: a valid Bearer token personalizes Cesar; without one he still
 // works as the public pre-sales assistant. A bad/expired token is ignored, not
 // rejected — the landing chat should never hard-fail on a stale token.
+const EMPTY_CTX: CesarContext = { user: null, stage: null, clientId: null, plan: null };
+
 async function loadContext(authHeader: string | undefined): Promise<CesarContext> {
-  if (!authHeader?.startsWith('Bearer ')) return { user: null, stage: null };
+  if (!authHeader?.startsWith('Bearer ')) return EMPTY_CTX;
   try {
     const decoded = jwt.verify(authHeader.slice(7), config.jwtSecret) as { sub: string };
     const user = await prisma.user.findUnique({
       where: { id: decoded.sub },
       include: { client: { include: { progress: true } } }
     });
-    if (!user) return { user: null, stage: null };
+    if (!user) return EMPTY_CTX;
     const stage = nextOnboardingStep(user.client
       ? { status: user.client.status, progress: user.client.progress }
       : null);
+    const education = (user.client?.progress?.education as Record<string, unknown> | undefined) ?? {};
+    const plan = user.client
+      ? resolveClientEntitlements({
+          status: user.client.status,
+          serviceTier: user.client.serviceTier,
+          masterclassAccess: education.masterclassAccess === true
+        }).plan
+      : null;
     return {
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, role: user.role },
-      stage
+      stage,
+      clientId: user.client?.id ?? null,
+      plan
     };
   } catch {
-    return { user: null, stage: null };
+    return EMPTY_CTX;
   }
 }
 
@@ -307,18 +321,25 @@ cesarRouter.post('/chat', async (req, res) => {
     const { message, history } = parsed.data;
     const ctx = await loadContext(req.headers.authorization);
 
+    let quotaNote: string | null = null;
     if (ctx.user && llmEnabled()) {
-      const result = await llmReply(message, history, ctx);
-      if (result) return res.json({ ...result, guardrails: GUARDRAILS });
-      // fall through to deterministic reply on gateway failure
+      const outcome = await llmReply(message, history, ctx);
+      if ('reply' in outcome) {
+        return res.json({ ...outcome.reply, guardrails: GUARDRAILS });
+      }
+      // Degrade to the deterministic reply. Tell the user why only if it's quota.
+      if (outcome.fail === 'quota') {
+        quotaNote = "You've reached this month's included AI assistance. Cesar's quick guidance still works, and your dashboard, analysis, and tools are unaffected — reply to your CredX welcome email if you'd like a human check-in.";
+      }
     }
 
     const result = rulesReply(message, ctx);
-    return res.json({ ...result, guardrails: GUARDRAILS });
+    const html = quotaNote ? `${escapeHtml(quotaNote)}<br><br>${result.html}` : result.html;
+    return res.json({ source: quotaNote ? 'quota_fallback' : result.source, html, reply: htmlToText(html), guardrails: GUARDRAILS });
   } catch (error) {
     // Cesar must always answer with something useful, even on unexpected errors.
     console.error('[cesar] chat error:', (error as Error).message);
-    const html = `I'm here to help you get started with CredX. You can ${LINKS.signup} or join the ${LINKS.masterclass}.`;
+    const html = `Cesar is temporarily unavailable, but your CredX dashboard, analysis, and tools still work. You can ${LINKS.signup} or join the ${LINKS.masterclass}.`;
     return res.status(200).json({ source: 'fallback', html, reply: htmlToText(html), guardrails: GUARDRAILS });
   }
 });

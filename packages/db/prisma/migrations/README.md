@@ -26,6 +26,7 @@ data**, this directory now contains:
 | `20260908150000_add_notifications` | **New.** `Notification` (in-app bell, `@@unique([clientId, dedupeKey])` for idempotent producers). Additive, idempotent. |
 | `20260908160000_add_weekly_checkin` | **New.** `WeeklyCheckIn` (§41 questions, `@@unique([clientId, weekKey])`). Additive, idempotent. |
 | `20260908170000_add_platform_reports` | **New.** `PlatformReport` (§43 async Readiness Report / Credit Profile Summary, queue-generated HTML). Additive, idempotent. |
+| `20260908180000_add_ai_usage_event` | **New.** `AiUsageEvent` (AI usage + cost ledger feeding per-plan quotas). Additive, idempotent. |
 
 The full chain was verified against a throwaway PostgreSQL 16 instance
 (`prisma migrate deploy` from empty → all nine apply cleanly, zero schema drift

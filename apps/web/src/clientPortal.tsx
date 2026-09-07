@@ -4704,7 +4704,7 @@ function CesarChatWidget({ token, user }: { token: string; user: User | null }) 
     } catch {
       setMessages((current) => [...current, {
         role: 'assistant',
-        content: "I couldn't reach the CredX server just now — give it a moment and try again, or use the portal tabs for your next step."
+        content: "Cesar is temporarily unavailable — your dashboard, analysis, and tools still work. Give it a moment and try again, or use the portal tabs for your next step."
       }]);
     } finally {
       setBusy(false);

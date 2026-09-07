@@ -191,3 +191,35 @@ monitoringRouter.post('/organizations', requireAuth, requireRole(['ADMIN']), asy
     next(err);
   }
 });
+
+// ============================================================
+// AI cost / usage (admin)
+// ============================================================
+
+monitoringRouter.get('/ai', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
+  try {
+    const days = Math.min(90, Math.max(1, Number(req.query.days) || 30));
+    const since = new Date(Date.now() - days * 86400_000);
+
+    const [byTask, byModel, totals, failures] = await Promise.all([
+      prisma.aiUsageEvent.groupBy({ by: ['task'], where: { createdAt: { gte: since } }, _sum: { totalTokens: true, costUsd: true }, _count: { _all: true } }),
+      prisma.aiUsageEvent.groupBy({ by: ['model'], where: { createdAt: { gte: since } }, _sum: { totalTokens: true, costUsd: true }, _count: { _all: true } }),
+      prisma.aiUsageEvent.aggregate({ where: { createdAt: { gte: since } }, _sum: { totalTokens: true, costUsd: true }, _count: { _all: true } }),
+      prisma.aiUsageEvent.count({ where: { createdAt: { gte: since }, ok: false } })
+    ]);
+
+    res.json({
+      windowDays: days,
+      totals: {
+        calls: totals._count._all,
+        failures,
+        totalTokens: totals._sum.totalTokens ?? 0,
+        costUsd: Number(totals._sum.costUsd ?? 0)
+      },
+      byTask: byTask.map((r) => ({ task: r.task, calls: r._count._all, tokens: r._sum.totalTokens ?? 0, costUsd: Number(r._sum.costUsd ?? 0) })),
+      byModel: byModel.map((r) => ({ model: r.model, calls: r._count._all, tokens: r._sum.totalTokens ?? 0, costUsd: Number(r._sum.costUsd ?? 0) }))
+    });
+  } catch (err) {
+    next(err);
+  }
+});

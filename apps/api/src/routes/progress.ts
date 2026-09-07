@@ -620,7 +620,7 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
 
     setImmediate(async () => {
       try {
-        const extracted = await extractReport({ buffer: fileBuffer, mimeType: fileMime, filename: safeName });
+        const extracted = await extractReport({ buffer: fileBuffer, mimeType: fileMime, filename: safeName, clientId });
         if (extracted) {
           const existingReports = await prisma.creditReport.findMany({ where: { clientId }, select: { id: true } });
           if (existingReports.length) {

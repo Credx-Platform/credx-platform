@@ -226,6 +226,7 @@ model Client {
   notifications           Notification[]
   checkIns                WeeklyCheckIn[]
   platformReports         PlatformReport[]
+  aiUsage                 AiUsageEvent[]
   progress                ClientProgress?
   organizationId          String?
   organization            Organization?            @relation("OrganizationClients", fields: [organizationId], references: [id], onDelete: SetNull)
@@ -1016,4 +1017,33 @@ model PlatformReport {
 
   @@index([clientId, kind, createdAt])
   @@index([status])
+}
+
+// ============================================================
+// SaaS Phase E: AI hardening — usage + cost ledger
+// ============================================================
+
+model AiUsageEvent {
+  id               String   @id @default(uuid())
+  task             String // cesar_chat | report_extraction | ...
+  provider         String   @default("ai-gateway")
+  model            String
+  promptVersion    String?
+  clientId         String?
+  client           Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  userId           String?
+  plan             String? // entitlement plan at call time
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  costUsd          Decimal  @default(0)
+  latencyMs        Int      @default(0)
+  attempts         Int      @default(1)
+  ok               Boolean  @default(true)
+  error            String?
+  createdAt        DateTime @default(now())
+
+  @@index([task, createdAt])
+  @@index([clientId, createdAt])
+  @@index([userId, createdAt])
 }

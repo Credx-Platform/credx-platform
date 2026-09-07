@@ -122,7 +122,8 @@ async function extractLatestUploadedCreditReport(clientId: string): Promise<{ bu
   const extracted = await extractReport({
     buffer: loaded.buffer,
     mimeType: document.contentType || loaded.mimeType,
-    filename: document.fileName || 'credit-report.pdf'
+    filename: document.fileName || 'credit-report.pdf',
+    clientId
   });
 
   if (!extracted || extracted.bureauReports.length === 0) {
