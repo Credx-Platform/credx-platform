@@ -29,6 +29,7 @@ import { fundingReadinessRouter } from './routes/fundingReadiness.js';
 import { businessCreditRouter } from './routes/businessCredit.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { checkinRouter } from './routes/checkin.js';
+import { platformReportsRouter } from './routes/platformReports.js';
 
 export interface CreateAppOptions {
   /** Disable rate limiters (tests / load harness). */
@@ -151,6 +152,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     app.use(`${prefix}/business-credit`, businessCreditRouter);
     app.use(`${prefix}/notifications`, notificationsRouter);
     app.use(`${prefix}/checkin`, checkinRouter);
+    app.use(`${prefix}/reports`, platformReportsRouter);
   }
 
   mountAll('/api');

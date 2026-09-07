@@ -812,6 +812,87 @@ function WeeklyCheckInCard({ token, onSubmitted }: { token: string | null; onSub
   );
 }
 
+type PlatformReport = {
+  id: string;
+  kind: string;
+  title: string;
+  status: string;
+  requestedAt: string;
+  generatedAt: string | null;
+};
+
+function PlatformReportsCard({ token }: { token: string | null }) {
+  const [reports, setReports] = useState<PlatformReport[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = async () => {
+    if (!token) return;
+    const data = await apiFetch<{ reports: PlatformReport[] }>('/api/reports', token).catch(() => null);
+    if (data) setReports(data.reports);
+  };
+  useEffect(() => {
+    if (!token) return;
+    void load();
+    const anyPending = reports.some((r) => r.status === 'PENDING' || r.status === 'GENERATING');
+    const t = setInterval(() => { void load(); }, anyPending ? 5000 : 45000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, reports.map((r) => r.status).join(',')]);
+
+  if (!token) return null;
+
+  const request = async (kind: string) => {
+    if (busy) return;
+    setBusy(kind);
+    try {
+      await apiFetch('/api/reports', token, { method: 'POST', body: JSON.stringify({ kind }) });
+      await load();
+    } catch { /* non-critical */ }
+    finally { setBusy(null); }
+  };
+
+  const open = async (id: string) => {
+    if (!token) return;
+    const full = await apiFetch<{ html: string | null }>(`/api/reports/${id}`, token).catch(() => null);
+    if (!full?.html) return;
+    const url = URL.createObjectURL(new Blob([full.html], { type: 'text/html' }));
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div><p className="eyebrow">Documents</p><h2>Platform reports</h2></div>
+      </div>
+      <p className="helper-text">Generate a shareable summary of your CredX data. These are not consumer credit reports or credit scores.</p>
+      <div className="report-actions">
+        <button className="ghost-button" disabled={!!busy} onClick={() => void request('READINESS_REPORT')}>
+          {busy === 'READINESS_REPORT' ? 'Requesting…' : 'CredX Readiness Report'}
+        </button>
+        <button className="ghost-button" disabled={!!busy} onClick={() => void request('CREDIT_PROFILE_SUMMARY')}>
+          {busy === 'CREDIT_PROFILE_SUMMARY' ? 'Requesting…' : 'Credit Profile Summary'}
+        </button>
+      </div>
+      {reports.length > 0 && (
+        <ul className="report-list">
+          {reports.slice(0, 8).map((r) => (
+            <li key={r.id}>
+              <span>{r.title}</span>
+              <span className={`report-status report-status--${r.status.toLowerCase()}`}>{r.status.toLowerCase()}</span>
+              {r.status === 'READY' ? (
+                <button className="link-button" onClick={() => void open(r.id)}>Open</button>
+              ) : (
+                <time>{new Date(r.requestedAt).toLocaleDateString()}</time>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function CreditScoreGauge({ bureau, score }: { bureau: string; score: number | null }) {
   const hasScore = typeof score === 'number' && Number.isFinite(score);
   const pct = hasScore ? Math.max(0, Math.min(1, ((score as number) - 300) / 550)) : 0;
@@ -4388,6 +4469,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
               <WeeklyCheckInCard token={token} onSubmitted={() => { void refreshAll(); }} />
 
               <ReadinessScorePanel readiness={readiness} onSaveSnapshot={handleSaveReadinessSnapshot} saving={readinessSaving} />
+
+              <PlatformReportsCard token={token} />
 
               {/* Tier 0: no report yet — guide them to pull + upload */}
               {!hasCreditReport && (

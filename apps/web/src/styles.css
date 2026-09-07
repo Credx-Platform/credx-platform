@@ -3179,3 +3179,13 @@ button:hover,
   width: 100%; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.12);
   border-radius: 8px; padding: 8px 10px; color: #e6edf6; font-size: 13px; font-family: inherit;
 }
+
+/* ---- Platform reports card (Phase D) ---- */
+.report-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.report-list { list-style: none; padding: 0; display: grid; gap: 6px; }
+.report-list li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #cbd5e1; }
+.report-list li span:first-child { flex: 1; }
+.report-status { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #94a3b8; }
+.report-status--ready { color: #2dd4bf; }
+.report-status--failed { color: #f87171; }
+.report-status--generating, .report-status--pending { color: #facc15; }

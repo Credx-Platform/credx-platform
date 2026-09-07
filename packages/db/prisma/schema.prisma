@@ -225,6 +225,7 @@ model Client {
   businessCredit          BusinessCreditProfile?
   notifications           Notification[]
   checkIns                WeeklyCheckIn[]
+  platformReports         PlatformReport[]
   progress                ClientProgress?
   organizationId          String?
   organization            Organization?            @relation("OrganizationClients", fields: [organizationId], references: [id], onDelete: SetNull)
@@ -987,4 +988,32 @@ model WeeklyCheckIn {
 
   @@unique([clientId, weekKey])
   @@index([clientId, submittedAt])
+}
+
+// ============================================================
+// SaaS Phase D: Engagement — Platform reports (master spec §43)
+// ============================================================
+// Generated asynchronously via the job queue. Every report carries an explicit
+// data-source list and a no-guarantee disclosure. Not a consumer credit report.
+
+model PlatformReport {
+  id          String    @id @default(uuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  kind        String // READINESS_REPORT | CREDIT_PROFILE_SUMMARY
+  status      String    @default("PENDING") // PENDING | GENERATING | READY | FAILED
+  format      String    @default("html")
+  title       String
+  html        String?   @db.Text
+  data        Json?
+  disclosure  String
+  dataSources Json      @default("[]")
+  error       String?
+  requestedAt DateTime  @default(now())
+  generatedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([clientId, kind, createdAt])
+  @@index([status])
 }

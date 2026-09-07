@@ -48,4 +48,16 @@ export function registerAllJobs(): void {
       return { ok: true, count: results.length };
     }
   });
+
+  // ---- reports -------------------------------------------------------------
+  registerJob({
+    queue: 'reports',
+    name: 'generate-platform-report',
+    handler: async (payload) => {
+      const { generatePlatformReport } = await import('./platformReports.js');
+      const reportId = String(payload.reportId || '');
+      if (!reportId) return { ok: false, reason: 'missing_reportId' };
+      return generatePlatformReport(reportId);
+    }
+  });
 }
