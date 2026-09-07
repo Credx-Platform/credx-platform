@@ -38,6 +38,14 @@ Status legend: Completed · In Progress · Planned · Blocked · External Depend
 - Completed: periodic snapshot batch schedulable via
   `scripts/credx-ops-cron.mjs readiness-snapshots` (enqueues
   `analysis:readiness-snapshot-all`, drained by the queue runner).
+- Completed: `lib/ai/` provider abstraction — per-task config, `runChat`/`runJson`
+  with retry + timeout + token limits, cost ledger (`AiUsageEvent`), versioned
+  prompt registry. Cesar + report extraction migrated onto it.
+- Completed: AI cost protection — per-plan token quotas wired to the entitlement
+  resolver, Cesar rate limit + graceful degrade, `/api/ai/usage` +
+  `/api/monitoring/ai`.
+- Planned: multi-provider failover + streaming; embeddings/RAG for the Learning
+  Center.
 
 ## Phase 3 - Engagement
 

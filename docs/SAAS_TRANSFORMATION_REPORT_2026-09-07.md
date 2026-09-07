@@ -573,3 +573,53 @@ debug scripts; recorded the verified prod backup posture
 - New env vars: none (all Phase D features use existing infra).
 - Compliance: readiness disclosure unchanged; platform-report disclosure is a
   test-asserted constant; no guarantee / removal-promise / bureau-force language.
+
+## 25. Phase E — AI hardening (session 4, 2026-09-08)
+
+Master spec §16–§18. Branch `saas-transformation`, no prod deploy/push.
+
+**`a74534f` — AI provider abstraction + cost protection**
+
+E4 — `apps/api/src/lib/ai/` (single layer; `lib/aiGateway.ts` deleted):
+- `config.ts` — per-task defaults (`cesar_chat`, `report_extraction`): model,
+  output-token cap, input-char cap, timeout, retry count. All env-overridable
+  (`CESAR_LLM_*`, `AI_EXTRACTION_*`, `AI_GATEWAY_MODEL`).
+- `client.ts` — `runChat()` / `runJson()`, the only AI entrypoint. Input
+  clamping, bounded retry with exponential backoff + jitter (429 / 5xx /
+  network / timeout), provider-usage token accounting with a ~4 char/token
+  fallback, cost estimation, usage-ledger write. Never throws — returns a
+  discriminated result.
+- `pricing.ts` — `$ / 1M-token` table + `AI_PRICE_<MODEL>_IN/_OUT` overrides.
+- `prompts.ts` — versioned prompt registry (`cesar_system@2`,
+  `report_extraction_system@1`); every call records its prompt version.
+- `costLog.ts` + model `AiUsageEvent` (migration `20260908180000`) —
+  task / model / promptVersion / client / plan / tokens / costUsd / latency /
+  attempts / ok. Fire-and-forget writes.
+- Cesar and credit-report extraction migrated onto `runChat` / `runJson`.
+
+E5 — cost protection:
+- `quota.ts` — per-plan rolling-30-day token budgets (`FREE` 60k, `MASTERCLASS`
+  120k, `ESSENTIAL` 600k, `PREMIUM` 2M, `FAMILY` 2.5M; `AI_BUDGET_<PLAN>`
+  overrides; `AI_QUOTA_ENABLED=0` disables). `checkAiQuota()` fails **open** on
+  any error.
+- Cesar: per-client quota check before the LLM call; on quota-exceeded or
+  provider failure it degrades to the deterministic reply (friendly note only
+  for quota). The route always returns 200; an unexpected error returns
+  "Cesar is temporarily unavailable, but your CredX dashboard, analysis, and
+  tools still work."
+- Report extraction: skips the paid LLM call when the client is over budget —
+  the upload still succeeds and analysis is retriable.
+- `GET /api/ai/usage` (own budget + rolling usage), `GET /api/monitoring/ai`
+  (admin cost summary by task + model). Cesar's per-IP rate limit unchanged.
+
+### §25 status
+
+- `npm run build` (api + web) — clean, no warnings.
+- `npm test` — **59 pass / 53 skipped / 0 fail** (+ `ai` 9 unit).
+- `npm run test:integration` — **53 / 53** (+ `ai` 4).
+- 18-migration chain — zero drift; new migration re-run idempotent.
+- New env (all optional): `AI_GATEWAY_MODEL`, `CESAR_LLM_MODEL` / `_MAX_TOKENS` /
+  `_TIMEOUT_MS` / `_MAX_ATTEMPTS` / `_MAX_INPUT_CHARS`, `AI_EXTRACTION_*`
+  (same set), `AI_PRICE_<MODEL>_IN/_OUT`, `AI_BUDGET_<PLAN>`, `AI_QUOTA_ENABLED`.
+- Compliance: Cesar guardrails centralized in `prompts.ts`, wording unchanged,
+  still returned on every reply; no new guarantee/outcome language.
