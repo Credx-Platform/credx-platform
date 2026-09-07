@@ -24,7 +24,8 @@
     "prisma:migrate": "npm run prisma:migrate --workspace @credx/db",
     "railway:dbpush": "npx prisma db push --schema packages/db/prisma/schema.prisma",
     "analysis:reprocess": "node scripts/reprocess-credit-report.mjs",
-    "cron:readiness-snapshots": "node scripts/credx-ops-cron.mjs readiness-snapshots"
+    "cron:readiness-snapshots": "node scripts/credx-ops-cron.mjs readiness-snapshots",
+    "loadtest": "node scripts/loadtest.mjs"
   },
   "dependencies": {
     "imapflow": "^1.4.6"

@@ -4,7 +4,10 @@ import { prisma } from './lib/prisma.js';
 import { registerAllJobs } from './lib/jobHandlers.js';
 import { startInProcessRunner } from './lib/queueRunner.js';
 
-const app = createApp();
+// DISABLE_RATE_LIMITS=1 is for LOCAL load testing only — never set in production.
+const app = createApp({
+  disableRateLimits: config.nodeEnv !== 'production' && process.env.DISABLE_RATE_LIMITS === '1'
+});
 
 const server = app.listen(config.port, () => {
   console.log(`CredX API listening on port ${config.port}`);
