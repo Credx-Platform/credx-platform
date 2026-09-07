@@ -4,8 +4,10 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { assessBusinessCreditFoundation } from '../lib/businessCredit.js';
+import { requireEntitlement } from '../middleware/entitlement.js';
 
 export const businessCreditRouter = Router();
+businessCreditRouter.use(requireAuth, requireEntitlement('can_use_business_credit'));
 
 async function clientIdFor(userId: string): Promise<string | null> {
   const c = await prisma.client.findUnique({ where: { userId }, select: { id: true } });

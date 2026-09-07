@@ -206,7 +206,14 @@ export function resolveClientEntitlements(input: ClientPlanInputs): ResolvedEnti
     };
   }
 
-  // 2. Fall back to the lifecycle-status heuristic.
+  // An explicit non-entitled subscription must not regain access through a
+  // stale ACTIVE client record. Preserve separately purchased education access.
+  if (input.subscription && !SUBSCRIPTION_ENTITLED_STATUSES.has(subStatus)) {
+    const plan = isMasterclass ? 'MASTERCLASS' : 'FREE';
+    return { plan, entitlements: entitlementsForPlan(plan), pastDue: false, paid: isMasterclass };
+  }
+
+  // 2. Fall back to the lifecycle-status heuristic for legacy clients.
   const pastDue = status === 'PAST_DUE';
   let plan: PlanCode;
   if (PAID_STATUSES.has(status)) {

@@ -4,8 +4,10 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { assessFundingReadiness } from '../lib/fundingReadiness.js';
+import { requireEntitlement } from '../middleware/entitlement.js';
 
 export const fundingReadinessRouter = Router();
+fundingReadinessRouter.use(requireAuth, requireEntitlement('can_use_funding_readiness'));
 
 async function loadClient(userId: string) {
   return prisma.client.findUnique({

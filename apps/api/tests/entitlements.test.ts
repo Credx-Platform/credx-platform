@@ -110,3 +110,20 @@ test('entitlementsForPlan returns a fresh object each call', () => {
   a.can_use_cesar = false;
   assert.equal(entitlementsForPlan('ESSENTIAL').can_use_cesar, true);
 });
+
+
+test('terminated subscriptions cannot regain paid access from stale client lifecycle', () => {
+  for (const status of ['CANCELED', 'UNPAID', 'PAUSED', 'INCOMPLETE', 'INCOMPLETE_EXPIRED']) {
+    for (const lifecycle of ['ACTIVE', 'PAST_DUE']) {
+      const result = resolveClientEntitlements({ status: lifecycle, serviceTier: 'AGGRESSIVE', subscription: { status, planCode: 'PREMIUM' } });
+      assert.equal(result.plan, 'FREE');
+      assert.equal(result.paid, false);
+    }
+  }
+});
+
+test('cancellation preserves a separately granted education purchase', () => {
+  const result = resolveClientEntitlements({ status: 'ACTIVE', masterclassAccess: true, subscription: { status: 'CANCELED', planCode: 'PREMIUM' } });
+  assert.equal(result.plan, 'MASTERCLASS');
+  assert.equal(result.entitlements.can_use_business_credit, false);
+});

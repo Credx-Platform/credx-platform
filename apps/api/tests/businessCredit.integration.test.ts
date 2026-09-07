@@ -38,8 +38,8 @@ before(async () => {
   await p.client.deleteMany({ where: { user: { email: { in: ['biz@test.com', 'biz2@test.com'] } } } });
   await p.user.deleteMany({ where: { email: { in: ['biz@test.com', 'biz2@test.com'] } } });
 
-  const u1 = await p.user.create({ data: { email: 'biz@test.com', passwordHash: 'x', firstName: 'B', lastName: 'One', client: { create: { status: 'ACTIVE' } } } });
-  const u2 = await p.user.create({ data: { email: 'biz2@test.com', passwordHash: 'x', firstName: 'B', lastName: 'Two', client: { create: { status: 'ACTIVE' } } } });
+  const u1 = await p.user.create({ data: { email: 'biz@test.com', passwordHash: 'x', firstName: 'B', lastName: 'One', client: { create: { status: 'ACTIVE', serviceTier: 'AGGRESSIVE' } } } });
+  const u2 = await p.user.create({ data: { email: 'biz2@test.com', passwordHash: 'x', firstName: 'B', lastName: 'Two', client: { create: { status: 'ACTIVE', serviceTier: 'AGGRESSIVE' } } } });
   ctx.token = jwt.sign({ sub: u1.id, email: 'biz@test.com', role: 'CLIENT' }, config.jwtSecret);
   ctx.otherToken = jwt.sign({ sub: u2.id, email: 'biz2@test.com', role: 'CLIENT' }, config.jwtSecret);
 });
@@ -108,4 +108,19 @@ test('tradelines: create + delete', { skip }, async () => {
 test('no auth token is rejected', { skip }, async () => {
   const res = await fetch(`${ctx.base}/api/business-credit`);
   assert.equal(res.status, 401);
+});
+
+
+test('paid module rejects free clients on reads and writes', { skip }, async () => {
+  const client = await ctx.prisma.client.findFirstOrThrow({ where: { user: { email: 'biz@test.com' } } });
+  await ctx.prisma.client.update({ where: { id: client.id }, data: { status: 'LEAD' } });
+  try {
+    for (const method of ['GET', 'PUT']) {
+      const result = await apiReq('/api/business-credit', { method, ...(method === 'PUT' ? { body: '{}' } : {}) });
+      assert.equal(result.status, 403);
+      assert.equal(result.body.code, 'ENTITLEMENT_REQUIRED');
+    }
+  } finally {
+    await ctx.prisma.client.update({ where: { id: client.id }, data: { status: 'ACTIVE' } });
+  }
 });

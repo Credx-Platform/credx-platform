@@ -36,7 +36,7 @@ before(async () => {
   await p.client.deleteMany({ where: { user: { email: 'fund@test.com' } } });
   await p.user.deleteMany({ where: { email: 'fund@test.com' } });
   const user = await p.user.create({
-    data: { email: 'fund@test.com', passwordHash: 'x', firstName: 'F', lastName: 'U', client: { create: { status: 'ACTIVE' } } }
+    data: { email: 'fund@test.com', passwordHash: 'x', firstName: 'F', lastName: 'U', client: { create: { status: 'ACTIVE', serviceTier: 'AGGRESSIVE' } } }
   });
   ctx.clientId = (await p.client.findUniqueOrThrow({ where: { userId: user.id } })).id;
   ctx.token = jwt.sign({ sub: user.id, email: 'fund@test.com', role: 'CLIENT' }, config.jwtSecret);
@@ -90,4 +90,19 @@ test('PATCH /documents marks a document provided', { skip }, async () => {
 test('no auth token is rejected', { skip }, async () => {
   const res = await fetch(`${ctx.base}/api/funding-readiness`);
   assert.equal(res.status, 401);
+});
+
+
+test('paid module rejects free clients on reads and writes', { skip }, async () => {
+  const client = await ctx.prisma.client.findFirstOrThrow({ where: { user: { email: 'fund@test.com' } } });
+  await ctx.prisma.client.update({ where: { id: client.id }, data: { status: 'LEAD' } });
+  try {
+    for (const method of ['GET', 'PUT']) {
+      const result = await apiReq('/api/funding-readiness', { method, ...(method === 'PUT' ? { body: '{}' } : {}) });
+      assert.equal(result.status, 403);
+      assert.equal(result.body.code, 'ENTITLEMENT_REQUIRED');
+    }
+  } finally {
+    await ctx.prisma.client.update({ where: { id: client.id }, data: { status: 'ACTIVE' } });
+  }
 });

@@ -1,5 +1,13 @@
 # CredX SaaS Audit
 
+> **Independent launch review — 2026-09-07:** the 24 category scores below total
+> 168/240, or **7.0/10 unweighted**, not 7.9. The progression figures below are
+> historical estimates without a documented weighting method, not verified launch
+> scores. Live HTTP checks show the upgrade pages are not being served and the
+> new health endpoints return 404. See [launch audit](LAUNCH_AUDIT_2026-09-07.md)
+> for evidence, two locally fixed access defects, and remaining release gates.
+> Later-dated claims in previous reports have not been independently confirmed.
+
 Scores are current-state estimates from the repository, not marketing claims.
 Last revised 2026-09-08 (branch `saas-transformation`, sessions 3–4 / Phase C1–D —
 see `SAAS_TRANSFORMATION_REPORT_2026-09-07.md` §19–§25).
