@@ -154,7 +154,32 @@ export type ClientPlanInputs = {
   serviceTier?: string | null;
   setupFeePaid?: boolean | null;
   masterclassAccess?: boolean | null;
+  /**
+   * Current persistent subscription state, when one exists. Takes precedence
+   * over the `status`/`serviceTier` heuristic so entitlements track the real
+   * billing lifecycle reconciled from Stripe/PayPal/manual records.
+   */
+  subscription?: SubscriptionPlanInput | null;
 };
+
+export type SubscriptionPlanInput = {
+  status?: string | null;
+  planCode?: string | null;
+};
+
+// Subscription lifecycle states that still grant plan entitlements.
+// ACTIVE/TRIALING are fully current; PAST_DUE is soft dunning (keeps access,
+// flagged). Everything else (UNPAID, PAUSED, CANCELED, INCOMPLETE...) does not.
+const SUBSCRIPTION_ENTITLED_STATUSES = new Set(['ACTIVE', 'TRIALING', 'PAST_DUE']);
+
+export function planCodeFromSubscription(planCode?: string | null): PlanCode | null {
+  const normalized = String(planCode || '').trim().toUpperCase();
+  if (normalized === 'PREMIUM' || normalized === 'AGGRESSIVE') return 'PREMIUM';
+  if (normalized === 'FAMILY') return 'FAMILY';
+  if (normalized === 'ESSENTIAL') return 'ESSENTIAL';
+  if (normalized === 'MASTERCLASS') return 'MASTERCLASS';
+  return null;
+}
 
 export type ResolvedEntitlements = {
   plan: PlanCode;
@@ -167,9 +192,22 @@ const PAID_STATUSES = new Set(['ACTIVE', 'PAST_DUE']);
 
 export function resolveClientEntitlements(input: ClientPlanInputs): ResolvedEntitlements {
   const status = String(input.status || '').trim().toUpperCase();
-  const pastDue = status === 'PAST_DUE';
   const isMasterclass = status === 'STUDENT' || input.masterclassAccess === true;
 
+  // 1. Persistent subscription state wins when it grants entitlements.
+  const subStatus = String(input.subscription?.status || '').trim().toUpperCase();
+  const subPlan = planCodeFromSubscription(input.subscription?.planCode);
+  if (subPlan && SUBSCRIPTION_ENTITLED_STATUSES.has(subStatus)) {
+    return {
+      plan: subPlan,
+      entitlements: entitlementsForPlan(subPlan),
+      pastDue: subStatus === 'PAST_DUE',
+      paid: true
+    };
+  }
+
+  // 2. Fall back to the lifecycle-status heuristic.
+  const pastDue = status === 'PAST_DUE';
   let plan: PlanCode;
   if (PAID_STATUSES.has(status)) {
     plan = planCodeForServiceTier(input.serviceTier);

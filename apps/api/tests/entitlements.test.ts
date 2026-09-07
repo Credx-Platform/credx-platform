@@ -57,6 +57,54 @@ test('masterclass student resolves to MASTERCLASS regardless of serviceTier', ()
   assert.equal(byFlag.entitlements.can_manage_dispute_workflows, false);
 });
 
+test('active subscription drives the plan even if the client status lags behind', () => {
+  const resolved = resolveClientEntitlements({
+    status: 'ANALYSIS_READY',
+    serviceTier: 'ESSENTIAL',
+    subscription: { status: 'ACTIVE', planCode: 'PREMIUM' }
+  });
+  assert.equal(resolved.plan, 'PREMIUM');
+  assert.equal(resolved.paid, true);
+  assert.equal(resolved.pastDue, false);
+  assert.equal(resolved.entitlements.can_use_business_credit, true);
+});
+
+test('past-due subscription keeps entitlements and flags pastDue', () => {
+  const resolved = resolveClientEntitlements({
+    status: 'LEAD',
+    subscription: { status: 'PAST_DUE', planCode: 'ESSENTIAL' }
+  });
+  assert.equal(resolved.plan, 'ESSENTIAL');
+  assert.equal(resolved.paid, true);
+  assert.equal(resolved.pastDue, true);
+});
+
+test('canceled/incomplete subscription does not grant a paid plan', () => {
+  for (const status of ['CANCELED', 'INCOMPLETE', 'UNPAID', 'PAUSED']) {
+    const resolved = resolveClientEntitlements({
+      status: 'LEAD',
+      serviceTier: 'PREMIUM',
+      subscription: { status, planCode: 'PREMIUM' }
+    });
+    assert.equal(resolved.plan, 'FREE', `status ${status}`);
+    assert.equal(resolved.paid, false, `status ${status}`);
+  }
+});
+
+test('subscription with an unrecognized plan code falls back to status heuristic', () => {
+  const resolved = resolveClientEntitlements({
+    status: 'ACTIVE',
+    serviceTier: 'FAMILY',
+    subscription: { status: 'ACTIVE', planCode: 'GOLD_TIER_XYZ' }
+  });
+  assert.equal(resolved.plan, 'FAMILY');
+});
+
+test('no subscription input preserves the original status-only behavior', () => {
+  const resolved = resolveClientEntitlements({ status: 'ACTIVE', serviceTier: 'ESSENTIAL', subscription: null });
+  assert.equal(resolved.plan, 'ESSENTIAL');
+});
+
 test('entitlementsForPlan returns a fresh object each call', () => {
   const a = entitlementsForPlan('ESSENTIAL');
   a.can_use_cesar = false;

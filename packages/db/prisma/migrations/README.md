@@ -18,10 +18,11 @@ data**, this directory now contains:
 | `20260616131600_mark_existing_masterclass_leads_as_students` | Pre-existing data backfill. |
 | `20260717120000_add_masterclass_payment_provider` | Pre-existing. Idempotent. |
 | `20260907120000_saas_transformation_additive` | **New.** Org/team model, webhook ledger + idempotency, job queue + worker heartbeat, ErrorEvent, ReadinessScoreSnapshot, CreditScore, sub-agent/affiliate tables, Client org/referral columns. Fully additive, all statements idempotent, **no DROP / no column-type changes**. |
+| `20260907130000_add_subscription_invoice_models` | **New.** Persistent `Subscription` (recurring plan lifecycle, reconciled from Stripe/PayPal/manual) + `Invoice` (billing document history), both client-scoped. Fully additive, all statements idempotent, **no DROP / no column-type changes**. |
 
 The full chain was verified against a throwaway PostgreSQL 16 instance
-(`prisma migrate deploy` from empty → all six apply cleanly, zero schema drift
-vs `schema.prisma`).
+(`prisma migrate deploy` from empty → all seven apply cleanly, zero schema drift
+vs `schema.prisma`; `20260907130000` re-run confirmed idempotent).
 
 ## First-time production adoption (run once, owner-approved)
 

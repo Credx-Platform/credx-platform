@@ -13,6 +13,7 @@ import {
 } from '../lib/paypal.js';
 import { config } from '../config.js';
 import { entitlementsForPlan, planCodeForServiceTier, publicPlanCatalog, resolveClientEntitlements } from '../lib/entitlements.js';
+import { getCurrentSubscription, toSubscriptionPlanInput } from '../lib/subscriptions.js';
 
 export const billingRouter = Router();
 
@@ -70,17 +71,28 @@ billingRouter.get('/entitlements/me', requireAuth, async (req, res, next) => {
     if (!client) return res.status(404).json({ error: 'Client profile not found' });
 
     const education = client.progress?.education as Record<string, unknown> | null;
+    const subscription = await getCurrentSubscription(client.id);
     const resolved = resolveClientEntitlements({
       status: client.status,
       serviceTier: client.serviceTier,
       setupFeePaid: client.setupFeePaid,
-      masterclassAccess: education?.masterclassAccess === true
+      masterclassAccess: education?.masterclassAccess === true,
+      subscription: toSubscriptionPlanInput(subscription)
     });
     return res.json({
       plan: resolved.plan,
       entitlements: resolved.entitlements,
       pastDue: resolved.pastDue,
-      paid: resolved.paid
+      paid: resolved.paid,
+      subscription: subscription
+        ? {
+            status: subscription.status,
+            planCode: subscription.planCode,
+            provider: subscription.provider,
+            currentPeriodEnd: subscription.currentPeriodEnd,
+            cancelAtPeriodEnd: subscription.cancelAtPeriodEnd
+          }
+        : null
     });
   } catch (error) {
     next(error);

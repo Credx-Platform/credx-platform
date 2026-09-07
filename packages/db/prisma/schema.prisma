@@ -217,6 +217,8 @@ model Client {
   activities              ActivityEvent[]
   creditScores            CreditScore[]
   readinessSnapshots      ReadinessScoreSnapshot[]
+  subscriptions           Subscription[]
+  invoices                Invoice[]
   progress                ClientProgress?
   organizationId          String?
   organization            Organization?            @relation("OrganizationClients", fields: [organizationId], references: [id], onDelete: SetNull)
@@ -729,4 +731,91 @@ model ErrorEvent {
   @@index([environment, release])
   @@index([userId, occurredAt])
   @@index([resolved, occurredAt])
+}
+
+// ============================================================
+// SaaS Upgrade: Persistent Subscription + Invoice objects
+// ============================================================
+// Recurring-software value: entitlements derive from real subscription
+// lifecycle state (reconciled from Stripe/PayPal/manual payment records),
+// not from a free-text serviceTier field. Fully additive.
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  UNPAID
+  PAUSED
+  CANCELED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+model Subscription {
+  id                     String             @id @default(uuid())
+  clientId               String
+  client                 Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  // Optional org owner for future B2B seat billing (unused for now)
+  organizationId         String?
+  // Which provider is the source of truth for this subscription
+  provider               String             @default("manual") // stripe, paypal, paymentcloud, manual
+  providerSubscriptionId String?
+  providerCustomerId     String?
+  // Plan the subscription grants — one of the PlanCode values
+  planCode               String             @default("ESSENTIAL")
+  status                 SubscriptionStatus @default(INCOMPLETE)
+  quantity               Int                @default(1)
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean            @default(false)
+  canceledAt             DateTime?
+  startedAt              DateTime?
+  endedAt                DateTime?
+  metadata               Json               @default("{}")
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  invoices Invoice[]
+
+  @@unique([provider, providerSubscriptionId])
+  @@index([clientId, status])
+  @@index([status, currentPeriodEnd])
+  @@index([organizationId])
+}
+
+model Invoice {
+  id                String        @id @default(uuid())
+  clientId          String
+  client            Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  subscriptionId    String?
+  subscription      Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  provider          String        @default("manual") // stripe, paypal, paymentcloud, manual
+  providerInvoiceId String?
+  number            String?
+  amountDue         Decimal       @default(0)
+  amountPaid        Decimal       @default(0)
+  currency          String        @default("USD")
+  status            InvoiceStatus @default(DRAFT)
+  description       String?
+  hostedInvoiceUrl  String?
+  periodStart       DateTime?
+  periodEnd         DateTime?
+  dueAt             DateTime?
+  paidAt            DateTime?
+  metadata          Json          @default("{}")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([provider, providerInvoiceId])
+  @@index([clientId, status])
+  @@index([subscriptionId])
+  @@index([status, dueAt])
 }
