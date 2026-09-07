@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import { z } from 'zod';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
-import { pullCreditScore, getCreditScoreHistory } from '../lib/creditScoreAPI.js';
+import { pullCreditScore, getCreditScoreHistory, CreditReportImportUnavailableError } from '../lib/creditScoreAPI.js';
 import { prisma } from '../lib/prisma.js';
 
 export const creditScoreRouter = Router();
@@ -29,6 +28,9 @@ creditScoreRouter.post('/pull', requireAuth, async (req: AuthedRequest, res, nex
       timestamp: new Date().toISOString()
     });
   } catch (error) {
+    if (error instanceof CreditReportImportUnavailableError) {
+      return res.status(503).json({ error: error.message, code: error.code });
+    }
     next(error);
   }
 });

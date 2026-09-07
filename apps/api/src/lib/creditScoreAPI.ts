@@ -1,81 +1,23 @@
 import { prisma } from './prisma.js';
 
-interface CreditScoreResponse {
-  score: number;
-  bureau?: string;
-  timestamp: number;
+/**
+ * Direct imports are unavailable until the provider's documented member binding,
+ * consumer authorization and full-report retrieval contract are implemented.
+ * An API key alone is not evidence that a generic score belongs to this client.
+ */
+export class CreditReportImportUnavailableError extends Error {
+  readonly code = 'DIRECT_REPORT_IMPORT_UNAVAILABLE';
+  constructor() {
+    super('Direct report import is not available yet. Upload your report for analysis or use the provided report-provider links.');
+    this.name = 'CreditReportImportUnavailableError';
+  }
 }
 
-const MYFREEESCORENOW_API_KEY = process.env.MYFREESCORENOW_API_KEY;
-const MYFREEESCORENOW_BASE_URL = 'https://api.myfreescorenow.com';
-const SCORE_PULL_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-async function callMyFreeScoreNowAPI(endpoint: string): Promise<CreditScoreResponse> {
-  if (!MYFREEESCORENOW_API_KEY) {
-    throw new Error('MYFREESCORENOW_API_KEY not configured');
-  }
-
-  const url = `${MYFREEESCORENOW_BASE_URL}${endpoint}`;
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${MYFREEESCORENOW_API_KEY}`,
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`MyFreeScoreNow API error: ${response.status} ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-export async function pullCreditScore(clientId: string): Promise<{ score: number; isFirstPull: boolean }> {
-  const client = await prisma.client.findUnique({
-    where: { id: clientId },
-    include: {
-      creditScores: {
-        orderBy: { createdAt: 'desc' },
-        take: 1
-      }
-    }
-  });
-
-  if (!client) {
-    throw new Error('Client not found');
-  }
-
-  const lastScore = client.creditScores[0];
-  const now = new Date();
-
-  if (lastScore && lastScore.lastPulledAt && (now.getTime() - lastScore.lastPulledAt.getTime()) < SCORE_PULL_COOLDOWN_MS) {
-    return {
-      score: lastScore.score,
-      isFirstPull: false
-    };
-  }
-
-  // Call MyFreeScoreNow API
-  const apiResponse = await callMyFreeScoreNowAPI('/credit-score');
-
-  // Store the new score
-  const creditScore = await prisma.creditScore.create({
-    data: {
-      clientId,
-      score: apiResponse.score,
-      bureau: apiResponse.bureau || 'transunion',
-      lastPulledAt: new Date()
-    }
-  });
-
-  // Trigger email notification on score pull
-  await triggerScoreNotificationEmail(client, apiResponse.score);
-
-  return {
-    score: creditScore.score,
-    isFirstPull: !lastScore
-  };
+export async function pullCreditScore(_clientId: string): Promise<{ score: number; isFirstPull: boolean }> {
+  // Do not call the former speculative /credit-score endpoint: it sent no
+  // consumer/member identifier and could attribute an unrelated score to a user.
+  // Existing stored score/history reads remain available.
+  throw new CreditReportImportUnavailableError();
 }
 
 export async function getCreditScoreHistory(clientId: string, limit = 12): Promise<Array<{ score: number; pulledAt: Date }>> {
@@ -90,9 +32,4 @@ export async function getCreditScoreHistory(clientId: string, limit = 12): Promi
   });
 
   return scores.reverse();
-}
-
-async function triggerScoreNotificationEmail(client: { userId: string }, score: number) {
-  // This would integrate with your email service
-  console.log(`[SCORE_PULL] Client ${client.userId} pulled score: ${score}`);
 }

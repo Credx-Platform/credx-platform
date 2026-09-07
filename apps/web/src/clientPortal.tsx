@@ -621,12 +621,12 @@ function SignaturePad({ onChange, value }: { onChange: (dataUrl: string | null) 
 
 const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
   profile: { title: 'Your Profile', desc: 'Personal info, secure documents, and identity verification details.', accent: '#a855f7' },
-  monitoring: { title: 'Credit Monitoring', desc: 'Now lives inside Analysis & Reports — upload, review, and connect monitoring in one place.', accent: '#00c6fb' },
+  monitoring: { title: 'Report Sources', desc: 'Now lives inside Analysis & Reports — upload a report or choose a third-party report provider.', accent: '#00c6fb' },
   disputes: { title: 'Disputes', desc: 'Track active dispute items, bureau status, and round progression.', accent: '#f59e0b' },
   activity: { title: 'Activity', desc: 'Timeline of what just happened on your file and what comes next.', accent: '#2dd4bf' },
   resources: { title: 'Credit Builders', desc: 'Partner tools and accounts to rebuild your credit profile.', accent: '#84cc16' },
   tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' },
-  analysis: { title: 'Analysis & Reports', desc: 'Upload your credit report, run analysis, and connect monitoring — all in one place.', accent: '#2563eb' },
+  analysis: { title: 'Analysis & Reports', desc: 'Upload a report for analysis or open a third-party report provider — all in one place.', accent: '#2563eb' },
   masterclass: { title: '5-Day Masterclass', desc: 'Your complete credit education curriculum — videos, slides, key terms, and action steps.', accent: '#00c6fb' }
 };
 
@@ -1065,7 +1065,7 @@ function ClientLogin({
         </div>
         <p className="eyebrow">CredX Client Access</p>
         <h1>Client Portal Login</h1>
-        <p className="helper-text">Sign in to see your credit monitoring, analysis, account activity, disputes, and profile.</p>
+        <p className="helper-text">Sign in to see your report analysis, credit-profile progress, account activity, disputes, and profile.</p>
         <p className="helper-text">If this is your first time signing in, enter your email and tap <strong>Reset password</strong> to get your secure setup link.</p>
         <label htmlFor="client-login-email">
           <span>Email</span>
@@ -1307,11 +1307,11 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
         ) : null}
         {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}>
           <div className="dispute-card-top">
-            <strong>Step 3, choose your credit monitoring</strong>
+            <strong>Step 3, choose a report source or upload below</strong>
             <span className="security-note-inline" aria-label="Encrypted">Encrypted</span>
           </div>
           <p className="helper-text" style={{ marginBottom: '0.75rem' }}>
-            Choose one of the two approved credit monitoring options below so CredX can review the right tri-merge report.
+            Already have a report? Upload it below. Otherwise, open a third-party provider to obtain your report. Provider signup does not automatically import a report into CredX; provider fees and terms apply separately.
           </p>
           <div className="monitoring-provider-grid" role="radiogroup" aria-label="Credit monitoring provider">
             {CREDIT_MONITORING_PROVIDERS.map((provider) => {
@@ -1334,15 +1334,15 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
               );
             })}
           </div>
-          <p className="helper-text monitoring-credential-copy">Please add your login credentials below.</p>
+          <p className="helper-text monitoring-credential-copy">Optional report-access assistance: save provider details only if you authorize your CredX team to assist. This does not activate automatic monitoring or report syncing.</p>
           <div className="field-grid monitoring-credential-grid">
             <input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" />
             <input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" />
-            <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}</button>
+            <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save provider details'}</button>
           </div>
           <p className="helper-text">Credentials are optional here. If you already downloaded your report, upload the PDF or HTML file below instead.</p>
         </form> : null}
-        {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Step 4, upload your credit report</strong></div><div className="field-grid"><input className="chat-input" type="file" accept=".pdf,.html,.htm" onChange={(e: ChangeEvent<HTMLInputElement>) => setDocUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} /><input className="chat-input" value="Credit report" readOnly /><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docUpload.file}>{busyStep === 'upload' ? 'Uploading...' : 'Upload securely'}</button></div><p className="helper-text">Upload the report as a PDF, HTML, or HTM file from IdentityIQ or MyFreeScoreNow.</p></form> : null}
+        {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Upload your report for analysis</strong></div><div className="field-grid"><input className="chat-input" type="file" accept=".pdf,.html,.htm" onChange={(e: ChangeEvent<HTMLInputElement>) => setDocUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} /><input className="chat-input" value="Credit report" readOnly /><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docUpload.file}>{busyStep === 'upload' ? 'Uploading...' : 'Upload for analysis'}</button></div><p className="helper-text">Upload a PDF, HTML, or HTM credit report. CredX starts extraction and analysis after upload; processing time and results depend on the file. Analysis and consultation/review take place before billing for credit-related support.</p></form> : null}
         {completedAt ? <div className="empty-state-card">Onboarding complete. Your file is now in review.</div> : null}
       </div>
     </section>
@@ -1391,9 +1391,9 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
     <div className="page-grid">
       <section className="hero-card">
         <div>
-          <p className="eyebrow">Credit Monitoring</p>
+          <p className="eyebrow">Report Sources &amp; Analysis</p>
           <h1>Report upload & analysis</h1>
-          <p>This area is dedicated to your monitoring connection, credit report uploads, and the analysis CredX prepares from your file.</p>
+          <p>Manage your report sources, upload credit reports, and review the analysis CredX prepares from the information provided. This is not a live bureau-monitoring feed.</p>
         </div>
         <div className="hero-stats">
           <div className="stat-card"><span>Workflow Stage</span><strong>{prettyStatus(progress?.workflow?.stage || client?.status)}</strong></div>
@@ -1477,7 +1477,7 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
             <div className="field-grid">
               <input className="chat-input" type="file" accept=".pdf,.html,.htm" onChange={(e: ChangeEvent<HTMLInputElement>) => setUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} />
               <input className="chat-input" value="Credit report" readOnly />
-              <button className="ghost-button" type="submit" disabled={saving || !upload.file}>{saving ? 'Saving...' : 'Upload securely'}</button>
+              <button className="ghost-button" type="submit" disabled={saving || !upload.file}>{saving ? 'Saving...' : 'Upload for analysis'}</button>
             </div>
           </form>
           <p className="helper-text">Upload credit reports as PDF, HTML, or HTM files. Use the profile tab for ID or proof-of-address images.</p>
@@ -2705,7 +2705,7 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
                 <option value="other">Other</option>
               </select>
               <button className="ghost-button" type="submit" disabled={portalDocBusy || !portalDocFile} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>
-                {portalDocBusy ? 'Uploading...' : 'Upload securely'}
+                {portalDocBusy ? 'Uploading...' : 'Upload for analysis'}
               </button>
             </div>
             <p className="helper-text" style={{ marginTop: '0.5rem' }}>Clients can upload credit reports, bureau letters, IDs, proof of address, and supporting files here without leaving the dispute workflow.</p>
@@ -2944,7 +2944,7 @@ function ProfileSection({ token, user, client, progress, refreshAll, onUserUpdat
                 <option value="proof_of_address">Proof of address</option>
                 <option value="other">Other verification</option>
               </select>
-              <button className="ghost-button" type="submit" disabled={saving || !verificationUpload}>{saving ? 'Saving...' : 'Upload securely'}</button>
+              <button className="ghost-button" type="submit" disabled={saving || !verificationUpload}>{saving ? 'Saving...' : 'Upload for analysis'}</button>
             </div>
           </form>
           <p className="helper-text">Sensitive verification files move through the same secured phase-two style flow as the protected onboarding details.</p>
@@ -3448,7 +3448,7 @@ function MonitoringConnectCard({ token, progress, refreshAll }: { token: string;
         body: JSON.stringify({ provider: form.provider, username: form.username, password: form.password })
       });
       setForm({ provider: form.provider, username: '', password: '' });
-      setMessage('Monitoring credentials saved.');
+      setMessage('Provider details saved. Automatic report import is not connected.');
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save credentials.');
@@ -3461,12 +3461,12 @@ function MonitoringConnectCard({ token, progress, refreshAll }: { token: string;
     <section className="panel">
       <div className="panel-header">
         <div>
-          <p className="eyebrow" style={{ color: hasCredentials ? '#22c55e' : '#94a3b8' }}>Credit Monitoring (optional)</p>
-          <h2>{hasCredentials ? `Connected · ${provider}` : 'Connect a provider to let CredX pull on your behalf'}</h2>
+          <p className="eyebrow" style={{ color: hasCredentials ? '#22c55e' : '#94a3b8' }}>Report-access assistance (optional)</p>
+          <h2>{hasCredentials ? `Details saved · ${provider}` : 'Choose a report provider or upload your report'}</h2>
         </div>
       </div>
       <p className="helper-text" style={{ marginTop: 0 }}>
-        Optional. Without this, you upload reports manually. With this, your CredX team can pull a fresh report and post the analysis without bothering you.
+        You can upload a report without saving provider credentials. These optional details support authorized team assistance; saving them does not establish an API connection, recurring refreshes, or automatic alerts. Provider purchases and cancellation are separate from CredX.
       </p>
       <form onSubmit={submit} className="field-grid" style={{ marginTop: '0.75rem' }}>
         <select className="chat-input" value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })}>
@@ -3734,7 +3734,7 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
 
     // 3. Monitoring (optional, but shows)
     if (intakeComplete && !hasMonitoring && !monitoringSkipped) {
-      tasks.push({ id: 'monitoring', title: '🔍 Connect your credit monitoring', desc: 'Link IdentityIQ or MyFreeScoreNow so we can pull reports on your behalf.', action: 'Connect monitoring', actionTab: 'analysis' as PortalTab, priority: 'medium', auto: true, currentStatus: null });
+      tasks.push({ id: 'monitoring', title: '🔍 Choose a report source', desc: 'Open IdentityIQ or MyFreeScoreNow to obtain a report, or upload one you already have. Provider signup does not automatically import it.', action: 'View report options', actionTab: 'analysis' as PortalTab, priority: 'medium', auto: true, currentStatus: null });
     }
 
     // 4. Upload credit report

@@ -121,13 +121,13 @@ function renderWelcomeLeadEmail(params: { firstName: string; contractLink: strin
     ? [
         'Open your secure CredX onboarding link.',
         'Review and sign your CredX agreement.',
-        'Complete your intake and choose your monitoring provider.',
+        'Complete your intake and upload a report or choose a third-party report provider.',
         'Unlock your masterclass lessons and affiliate tools inside the platform.'
       ]
     : [
         'Open your secure CredX onboarding link.',
         'Review and sign your CredX agreement.',
-        'Complete your intake and connect your monitoring provider.',
+        'Complete your intake and upload a report or choose a third-party report provider.',
         'Watch for your portal-ready email once onboarding is complete.'
       ];
   const valueProps = isMasterclass

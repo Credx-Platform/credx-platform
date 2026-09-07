@@ -96,8 +96,8 @@ function nextOnboardingStep(client: {
     if (['application_completed', 'report_required'].includes(stage)) {
       return {
         key: 'choose_monitoring',
-        label: 'choose a credit monitoring source',
-        detail: 'Pick IdentityIQ or MyFreeScoreNow so we can see the same report you do, or upload a PDF/HTML credit report.'
+        label: 'choose a credit report source',
+        detail: 'Upload a PDF/HTML credit report, or use the IdentityIQ or MyFreeScoreNow links to obtain one. Provider signup does not automatically import the report into CredX.'
       };
     }
     if (['portal_unlocked', 'upload_credit_report'].includes(stage)) {

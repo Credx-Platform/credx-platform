@@ -39,9 +39,9 @@ Client agrees to provide truthful and accurate information, provide requested re
 
 Client understands that disputes and supporting documents must be based on factual review. CredX will not advise fraud, identity misrepresentation, false police reports, false identity-theft claims, or other dishonest tactics.
 
-5. CREDIT REPORTS AND MONITORING
+5. CREDIT REPORT SOURCES AND OPTIONAL ACCESS ASSISTANCE
 
-Client may be asked to provide a recent credit report from an approved monitoring provider or upload a PDF or HTML credit report through the portal. If Client voluntarily provides monitoring login credentials, Client authorizes CredX to use those credentials only for service-related report access, review, and account support. Credentials are sensitive and should be changed by Client whenever Client wants to end access.
+After account signup, the applicable agreement and intake, Client may upload a PDF or HTML credit report or use the provided MyFreeScoreNow or IdentityIQ links to obtain a report. Provider subscriptions are separate from CredX. Saved provider details do not establish an automatic API import, continuous bureau monitoring or an alert service inside CredX. If Client voluntarily provides monitoring login credentials, Client authorizes CredX to use those credentials only for service-related report access, review, and account support. Credentials are sensitive and should be changed by Client whenever Client wants to end access.
 
 6. SENSITIVE PERSONAL INFORMATION AUTHORIZATION
 
