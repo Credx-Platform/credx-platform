@@ -16,6 +16,8 @@
   "test": "node --import tsx --test apps/api/tests/*.test.ts",
     "start": "npm run start:api",
     "start:api": "npm run start --workspace @credx/api",
+    "start:worker": "npm run start:worker --workspace @credx/api",
+    "dev:worker": "npm run dev:worker --workspace @credx/api",
     "start:web": "npm run start --workspace @credx/web",
     "prisma:generate": "npm run prisma:generate --workspace @credx/db",
     "prisma:migrate": "npm run prisma:migrate --workspace @credx/db",

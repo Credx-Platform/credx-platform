@@ -7,7 +7,7 @@ import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { config } from '../config.js';
 import { CreditAnalysisService, deriveReportSubject } from '../lib/creditAnalysis.js';
-import { dispatchAnalysisEmail } from '../lib/analysisEmailDispatch.js';
+import { enqueueJob } from '../lib/jobs.js';
 import { extractReport } from '../lib/reportExtractor.js';
 import { uploadDocument } from '../lib/blob-storage.js';
 import { track } from '../lib/analytics.js';
@@ -472,13 +472,15 @@ async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
             (workflowResult as any).analysisGenerated = true;
             (workflowResult as any).analysisFindings = analysis.keyFindings.length;
 
-            const emailResult = await dispatchAnalysisEmail({
+            // Offload the PDF render + send to the queue so the upload request
+            // returns fast. Falls back to inline execution if the enqueue fails.
+            const emailQueue = await enqueueJob('emails', 'analysis-email', {
               clientId: client.id,
-              analysis,
+              analysis: analysis as unknown as Record<string, unknown>,
               trigger: 'auto_doc_upload'
             });
-            (workflowResult as any).analysisEmailed = emailResult.sent;
-            if (!emailResult.sent) (workflowResult as any).analysisEmailSkippedReason = emailResult.reason;
+            (workflowResult as any).analysisEmailed = emailQueue.status === 'queued' ? 'queued' : emailQueue.status === 'inline';
+            (workflowResult as any).analysisEmailQueue = emailQueue.status;
           }
         }
       } catch (analysisErr) {
@@ -765,9 +767,9 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
             });
           }
 
-          await dispatchAnalysisEmail({
+          await enqueueJob('emails', 'analysis-email', {
             clientId,
-            analysis,
+            analysis: analysis as unknown as Record<string, unknown>,
             trigger: 'auto_secure_upload'
           });
         }
