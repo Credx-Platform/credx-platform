@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
+import { track } from '../lib/analytics.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { captureException } from '../lib/sentry.js';
 import { assertOrgAccess, TenantAccessError, type Membership, type OrgRole } from '../lib/tenancy.js';
@@ -105,6 +106,8 @@ orgRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => {
       return created;
     });
 
+    track('organization_created', { distinctId: req.auth!.sub, props: { organizationId: org.id } });
+
     res.status(201).json({ organization: org, role: 'OWNER' });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: 'Invalid organization details', details: err.issues });
@@ -187,6 +190,8 @@ orgRouter.post('/:slug/invite', requireAuth, async (req: AuthedRequest, res, nex
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
       }
     });
+
+    track('client_invited', { distinctId: req.auth!.sub, props: { organizationId: invitation.organizationId, role } });
 
     res.status(201).json({ invitation, inviteUrl: `/org/invite?token=${token}` });
   } catch (err) {

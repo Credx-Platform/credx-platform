@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
+import { track } from '../lib/analytics.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { CHECKIN_QUESTIONS, isoWeekKey, summarizeChanges, type CheckInAnswers } from '../lib/checkin.js';
 import { enqueueJob } from '../lib/jobs.js';
@@ -116,6 +117,11 @@ checkinRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => {
       title: 'Weekly check-in recorded',
       body: changeSummary[0],
       href: '/portal'
+    });
+
+    track('weekly_checkin_completed', {
+      distinctId: row.clientId,
+      props: { weekKey, changeCount: changeSummary.length }
     });
 
     res.status(201).json({ checkIn: serialize(row), changeSummary, readinessRecompute: queued.status });

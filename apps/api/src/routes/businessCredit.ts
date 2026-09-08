@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { assessBusinessCreditFoundation } from '../lib/businessCredit.js';
 import { requireEntitlement } from '../middleware/entitlement.js';
+import { track } from '../lib/analytics.js';
 
 export const businessCreditRouter = Router();
 businessCreditRouter.use(requireAuth, requireEntitlement('can_use_business_credit'));
@@ -88,6 +89,9 @@ businessCreditRouter.put('/', requireAuth, async (req: AuthedRequest, res, next)
       create: { clientId, ...data },
       update: data
     });
+
+    track('business_profile_completed', { distinctId: clientId });
+
     res.json(payload(await ensureProfile(clientId)));
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: 'Invalid input', details: err.issues });

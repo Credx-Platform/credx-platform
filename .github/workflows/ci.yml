@@ -48,3 +48,6 @@ jobs:
           TEST_DATABASE_URL: ""
       - run: npm run test:integration
       - run: npm run build
+      # Routing contract: proves each page is a distinct document and that
+      # unknown paths 404. Runs after the build because it serves apps/web/dist.
+      - run: npm run test:web

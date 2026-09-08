@@ -44,8 +44,20 @@ export function createApp(options: CreateAppOptions = {}): Express {
   // limiter sees the proxy IP for every request and the limit becomes global.
   app.set('trust proxy', 1);
 
+  // The API returns JSON and never renders a document, so it can carry the
+  // strictest possible policy: nothing is allowed to load, and no page may
+  // frame an API response. This costs nothing and removes the "CSP absent"
+  // finding on the API surface.
   app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        'default-src': ["'none'"],
+        'base-uri': ["'none'"],
+        'form-action': ["'none'"],
+        'frame-ancestors': ["'none'"]
+      }
+    },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: 'cross-origin' }
   }));

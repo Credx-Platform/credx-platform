@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { assessFundingReadiness } from '../lib/fundingReadiness.js';
 import { requireEntitlement } from '../middleware/entitlement.js';
+import { track } from '../lib/analytics.js';
 
 export const fundingReadinessRouter = Router();
 fundingReadinessRouter.use(requireAuth, requireEntitlement('can_use_funding_readiness'));
@@ -102,6 +103,12 @@ fundingReadinessRouter.put('/', requireAuth, async (req: AuthedRequest, res, nex
 
     const fresh = await loadClient(req.auth!.sub);
     const assessment = await assessAndPersist(client.id, fresh);
+
+    track('funding_readiness_completed', {
+      distinctId: client.id,
+      props: { objective: data.objective ?? null, band: (assessment as { band?: string } | null)?.band ?? null }
+    });
+
     res.json({ profile: serialize(fresh!.fundingReadiness), assessment });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: 'Invalid input', details: err.issues });

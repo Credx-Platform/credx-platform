@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './prisma.js';
 import { upsertProviderSubscription } from './subscriptions.js';
+import { track } from './analytics.js';
 
 /**
  * Stripe webhook → persistent Subscription/Invoice reconciliation.
@@ -54,9 +55,39 @@ function toDate(unixSeconds: unknown): Date | null {
   return Number.isFinite(n) && n > 0 ? new Date(n * 1000) : null;
 }
 
+/**
+ * Which lifecycle event a reconciliation represents.
+ *
+ * Derived from the transition we actually observe rather than from the Stripe
+ * event name: the same `customer.subscription.updated` carries cancellations,
+ * plan changes and no-op renewals, and Stripe may redeliver out of order. A
+ * `null` result means "nothing worth reporting" (e.g. an unchanged renewal).
+ */
+export function subscriptionLifecycleEvent(
+  prior: { status: string; planCode: string | null } | null,
+  next: { status: string; planCode: string | null }
+): 'subscription_started' | 'subscription_upgraded' | 'subscription_cancelled' | null {
+  const ENTITLED = ['active', 'trialing', 'past_due'];
+  const nextLive = ENTITLED.includes(next.status.toLowerCase());
+  const priorLive = prior ? ENTITLED.includes(prior.status.toLowerCase()) : false;
+
+  if (priorLive && !nextLive) return 'subscription_cancelled';
+  if (!priorLive && nextLive) return 'subscription_started';
+  if (priorLive && nextLive && prior!.planCode !== next.planCode) return 'subscription_upgraded';
+  return null;
+}
+
 export async function handleStripeSubscriptionChange(sub: StripeObject): Promise<{ ok: boolean; note?: string; subscriptionId?: string }> {
   const clientId = await resolveClientIdFromStripe(sub);
   if (!clientId) return { ok: false, note: 'no matching CredX client for Stripe subscription' };
+
+  // Read the pre-change state so the lifecycle event reflects a real transition.
+  const prior = await prisma.subscription
+    .findUnique({
+      where: { provider_providerSubscriptionId: { provider: 'stripe', providerSubscriptionId: String(sub.id) } },
+      select: { status: true, planCode: true }
+    })
+    .catch(() => null);
 
   const record = await upsertProviderSubscription({
     clientId,
@@ -79,6 +110,20 @@ export async function handleStripeSubscriptionChange(sub: StripeObject): Promise
   await prisma.client
     .update({ where: { id: clientId }, data: { stripeSubscriptionId: String(sub.id) } })
     .catch(() => undefined);
+
+  const lifecycle = subscriptionLifecycleEvent(prior, { status: record.status, planCode: record.planCode });
+  if (lifecycle) {
+    track(lifecycle, {
+      distinctId: clientId,
+      props: {
+        provider: 'stripe',
+        planCode: record.planCode,
+        priorPlanCode: prior?.planCode ?? null,
+        status: record.status,
+        cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end)
+      }
+    });
+  }
 
   return { ok: true, subscriptionId: record.id };
 }
