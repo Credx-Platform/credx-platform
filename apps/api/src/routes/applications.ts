@@ -1,7 +1,7 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
-import { maybeSendPortalReadyEmail } from '../lib/portalReady.js';
 import { encryptPII } from '../lib/encryption.js';
 import { writeAuditLog } from '../lib/audit.js';
 
@@ -9,8 +9,15 @@ export const applicationsRouter = Router();
 
 applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
-    const fullName = String(req.body?.full_name || '').trim();
-    const email = String(req.body?.email || '').trim().toLowerCase();
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.auth!.sub },
+      include: { client: { include: { progress: true } } }
+    });
+    if (!currentUser?.client || !currentUser.client.progress) return res.status(404).json({ error: 'Client not found' });
+
+    const fallbackName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim();
+    const fullName = String(req.body?.full_name || fallbackName || 'Client User').trim();
+    const email = String(req.body?.email || currentUser.email || '').trim().toLowerCase();
     const phone = String(req.body?.phone || '').trim();
     const address1 = String(req.body?.address_line1 || '').trim();
     const address2 = String(req.body?.address_line2 || '').trim();
@@ -20,8 +27,19 @@ applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) 
     const dob = String(req.body?.dob || '').trim();
     const ssn = String(req.body?.ssn || '').replace(/\D/g, '');
 
-    if (!fullName || !email || !address1 || !city || !state || !zip || !dob || !ssn) {
-      return res.status(400).json({ error: 'Missing required intake fields' });
+    const missing = [
+      !address1 && 'address line 1',
+      !city && 'city',
+      !state && 'state',
+      !zip && 'ZIP',
+      !dob && 'date of birth',
+      !ssn && 'SSN'
+    ].filter(Boolean);
+    if (missing.length) {
+      return res.status(400).json({ error: `Missing required intake fields: ${missing.join(', ')}. Address line 2 and phone are optional.` });
+    }
+    if (ssn.length !== 9) {
+      return res.status(400).json({ error: 'Full 9-digit Social Security number is required.' });
     }
 
     const parts = fullName.split(/\s+/).filter(Boolean);
@@ -35,31 +53,32 @@ applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) 
       },
       include: { client: { include: { progress: true } } }
     });
-
     if (!user.client || !user.client.progress) return res.status(404).json({ error: 'Client not found' });
+    const client = user.client;
 
-    const applicationId = crypto.randomUUID();
+    const applicationId = randomUUID();
     const submittedAt = new Date().toISOString();
-    const progress = user.client.progress as any;
+    const progress = client.progress as any;
 
     const updatedProgress = await prisma.clientProgress.update({
-      where: { clientId: user.client.id },
+      where: { clientId: client.id },
       data: {
         onboarding: {
           ...(progress.onboarding || {}),
-          status: 'application_completed'
+          status: 'report_required',
+          applicationSubmittedAt: submittedAt
         },
         workflow: {
           ...(progress.workflow || {}),
-          stage: 'application_completed',
+          stage: 'report_required',
           updatedAt: submittedAt,
-          next: ['select_credit_report_provider']
+          next: ['select_credit_report_provider', 'upload_credit_report_pdf_or_html']
         }
       }
     });
 
     await prisma.client.update({
-      where: { id: user.client.id },
+      where: { id: client.id },
       data: {
         currentAddressLine1: address1,
         currentAddressLine2: address2 || null,
@@ -77,14 +96,9 @@ applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) 
       userId: req.auth!.sub,
       action: 'INTAKE_SUBMITTED',
       entityType: 'Client',
-      entityId: user.client.id,
+      entityId: client.id,
       metadata: { ssnLast4: ssn.slice(-4), state, zip }
     });
-
-    // Monitoring is now optional — fire the portal-ready email as soon as
-    // contract + profile are both complete. Idempotent guard prevents
-    // duplicate sends if the user later submits or skips the monitoring step.
-    const portalEmail = await maybeSendPortalReadyEmail(user.client.id);
 
     return res.json({
       success: true,
@@ -100,8 +114,7 @@ applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) 
         submittedAt
       },
       progress: updatedProgress,
-      next_step: 'monitoring_optional',
-      portalEmail
+      next_step: 'monitoring_or_report_required'
     });
   } catch (error) {
     next(error);

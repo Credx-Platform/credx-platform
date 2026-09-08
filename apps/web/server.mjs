@@ -12,6 +12,11 @@ const canonicalHost = process.env.CANONICAL_HOST ?? 'www.credxme.com';
 const redirectHosts = new Set(
   (process.env.REDIRECT_HOSTS ?? 'credxme.com').split(',').map((h) => h.trim()).filter(Boolean)
 );
+const turnstileSiteKey = (
+  process.env.TURNSTILE_SITE_KEY ??
+  process.env.CLOUDFLARE_TURNSTILE_SITE_KEY ??
+  ''
+).trim();
 
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -36,20 +41,55 @@ const contentTypes = {
   '.webm': 'video/webm'
 };
 
+// Content Security Policy.
+//
+// Origins are derived from what the pages actually load: Google Fonts (styles +
+// font files), the PayPal JS SDK and its checkout frames, Cloudflare Turnstile,
+// YouTube lesson embeds, and the CredX API. Everything else the pages reference
+// (bureaus, credit-builder partners, statute links) is plain <a href> navigation,
+// which CSP does not restrict — so those origins deliberately do not appear here.
+//
+// `'unsafe-inline'` is still required: 4 public pages carry an inline <script>
+// and all 13 carry an inline <style>. It is retained knowingly — this policy's
+// value is that it blocks script loads and data exfiltration to attacker-chosen
+// origins, not that it stops inline injection. Replacing it with per-request
+// nonces is the tracked follow-up (see docs/SECURITY.md).
+const API_ORIGIN = process.env.CSP_API_ORIGIN ?? 'https://credxapi-production.up.railway.app';
+
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline' https://www.paypal.com https://www.paypalobjects.com https://challenges.cloudflare.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  `connect-src 'self' ${API_ORIGIN} https://www.paypal.com`,
+  "frame-src 'self' https://www.paypal.com https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
+  'upgrade-insecure-requests'
+].join('; ');
+
 const securityHeaders = {
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'SAMEORIGIN',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'permissions-policy': 'camera=(), microphone=(), geolocation=()',
-  'strict-transport-security': 'max-age=63072000; includeSubDomains; preload'
+  'strict-transport-security': 'max-age=63072000; includeSubDomains; preload',
+  'content-security-policy': contentSecurityPolicy
 };
 
 const staticPageRoutes = new Map([
+  ['/product', 'product.html'],
   ['/start', 'start.html'],
   ['/signup', 'signup.html'],
   ['/contract', 'signup.html'],
+  ['/affiliate-onboarding', 'portal.html'],
   ['/portal', 'portal.html'],
   ['/adminportal', 'adminportal.html'],
+  ['/team', 'team.html'],
+  ['/financial-readiness', 'readiness.html'],
   ['/masterclass', 'masterclass.html'],
   ['/masterclass-terms', 'masterclass-terms.html'],
   ['/masterclass-checkout', 'masterclass-checkout.html'],
@@ -61,15 +101,36 @@ const staticPageRoutes = new Map([
   ['/cancellation-policy', 'cancellation-policy.html']
 ]);
 
+const routeRedirects = new Map([
+  ['/affiliate', '/affiliate-onboarding'],
+  ['/employee', '/adminportal'],
+  ['/staff', '/adminportal']
+]);
+
 // Prefix routes serve their page for any subpath (client-side routing / promo slugs).
 const prefixPageRoutes = [
   ['/start/', 'start.html'],
+  ['/product/', 'product.html'],
   ['/signup/', 'signup.html'],
   ['/contract/', 'signup.html'],
+  ['/affiliate-onboarding/', 'portal.html'],
   ['/portal/', 'portal.html'],
   ['/adminportal/', 'adminportal.html'],
+  ['/team/', 'team.html'],
+  ['/financial-readiness/', 'readiness.html'],
   ['/masterclass-checkout/', 'masterclass-checkout.html']
 ];
+
+// Client-side routes owned by the admin SPA (src/App.tsx, mounted from
+// adminportal.html). These are reached by pushState during a session, so the
+// server only sees them on a hard refresh, a bookmark or a shared link. Without
+// an explicit mapping they fell through to the landing page, which silently
+// showed marketing copy to a signed-in admin instead of their workspace.
+const spaSectionRoots = ['/clients', '/disputes', '/leads', '/tasks', '/print', '/sub-agents', '/employees'];
+for (const root of spaSectionRoots) {
+  staticPageRoutes.set(root, 'adminportal.html');
+  prefixPageRoutes.push([`${root}/`, 'adminportal.html']);
+}
 
 // Response headers that describe the raw upstream body. fetch() already
 // decompressed it, so forwarding these corrupts the response for clients.
@@ -90,6 +151,54 @@ function serveFile(res, path) {
   }
   res.writeHead(200, headers);
   createReadStream(path).pipe(res);
+}
+
+const notFoundBody = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Page not found — CredX</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background:#0b1220; color:#e6edf7; }
+  main { text-align:center; padding:2rem; max-width:32rem; }
+  h1 { font-size:3rem; margin:0 0 .5rem; letter-spacing:-.02em; }
+  p { margin:0 0 1.5rem; color:#9fb0c9; }
+  a { display:inline-block; padding:.7rem 1.4rem; border-radius:.5rem;
+      background:#3b82f6; color:#fff; text-decoration:none; font-weight:600; }
+  a:hover { background:#2563eb; }
+</style>
+</head>
+<body>
+  <main>
+    <h1>404</h1>
+    <p>We couldn't find that page. It may have moved, or the link may be incomplete.</p>
+    <a href="/">Return to CredX</a>
+  </main>
+</body>
+</html>
+`;
+
+function serveNotFound(res) {
+  res.writeHead(404, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    ...securityHeaders
+  });
+  res.end(notFoundBody);
+}
+
+function serveTurnstileConfig(res) {
+  const body = `window.CREDX_TURNSTILE_SITE_KEY=${JSON.stringify(turnstileSiteKey)};\n`;
+  res.writeHead(200, {
+    'content-type': 'application/javascript; charset=utf-8',
+    'cache-control': 'public, max-age=0, must-revalidate',
+    ...securityHeaders
+  });
+  res.end(body);
 }
 
 async function proxyToApi(req, res) {
@@ -144,7 +253,8 @@ async function proxyToApi(req, res) {
 }
 
 const server = createServer(async (req, res) => {
-  const requestPath = new URL(req.url ?? '/', 'http://localhost').pathname;
+  const requestUrl = new URL(req.url ?? '/', 'http://localhost');
+  const requestPath = requestUrl.pathname;
 
   const host = (req.headers.host ?? '').split(':')[0].toLowerCase();
   if (canonicalHost && redirectHosts.has(host)) {
@@ -154,6 +264,19 @@ const server = createServer(async (req, res) => {
 
   if (requestPath === '/health' || requestPath.startsWith('/api/')) {
     return proxyToApi(req, res);
+  }
+
+  if (requestPath === '/turnstile-config.js') {
+    return serveTurnstileConfig(res);
+  }
+
+  const redirectKey = requestPath.endsWith('/') && requestPath !== '/'
+    ? requestPath.slice(0, -1)
+    : requestPath;
+  const redirectTarget = routeRedirects.get(redirectKey);
+  if (redirectTarget) {
+    res.writeHead(308, { location: `${redirectTarget}${requestUrl.search}`, ...securityHeaders });
+    return res.end();
   }
 
   if (requestPath === '/' || requestPath === '/index.html') {
@@ -190,13 +313,12 @@ const server = createServer(async (req, res) => {
     }
   }
 
-  const landingPath = join(rootDir, 'index.html');
-  if (existsSync(landingPath)) {
-    return serveFile(res, landingPath);
-  }
-
-  res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', ...securityHeaders });
-  res.end('Not found');
+  // Unknown paths must fail as 404. Serving index.html with a 200 here made
+  // every URL look healthy — that is what produced the false "the new pages are
+  // live" reading during the 2026-09-07 launch audit, and it hides real routing
+  // regressions from smoke tests and uptime checks. Every genuine page is
+  // matched above by staticPageRoutes, a real file, or prefixPageRoutes.
+  return serveNotFound(res);
 });
 
 server.listen(port, '0.0.0.0', () => {

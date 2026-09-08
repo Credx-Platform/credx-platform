@@ -1,0 +1,11 @@
+[Unit]
+Description=Run CredX encrypted off-site backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=credx-offsite-backup.service
+
+[Install]
+WantedBy=timers.target

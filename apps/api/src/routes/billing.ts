@@ -11,6 +11,10 @@ import {
   getPaypalOrder,
   verifyPaypalWebhookSignature
 } from '../lib/paypal.js';
+import { config } from '../config.js';
+import { entitlementsForPlan, planCodeForServiceTier, publicPlanCatalog, resolveClientEntitlements } from '../lib/entitlements.js';
+import { getCurrentSubscription, toSubscriptionPlanInput } from '../lib/subscriptions.js';
+import { processWebhookWithLedger } from '../lib/webhookLedger.js';
 
 export const billingRouter = Router();
 
@@ -54,14 +58,46 @@ function masterclassPriceForOffer(offer: MasterclassOffer | null) {
 }
 
 billingRouter.get('/plans', (_req, res) => {
-  res.json({
-    plans: [
-      { code: 'MASTERCLASS', oneTime: 47, monthly: null, note: '+ applicable taxes & processing fees.' },
-      { code: 'ESSENTIAL', setupFee: 150, monthly: 75 },
-      { code: 'PREMIUM', oneTime: 447, monthly: null, billing: 'Billed after first full dispute round is delivered. No guaranteed outcome.' },
-      { code: 'FAMILY', setupFee: 300, monthly: 95 }
-    ]
-  });
+  res.json({ plans: publicPlanCatalog() });
+});
+
+billingRouter.get('/entitlements/me', requireAuth, async (req, res, next) => {
+  try {
+    const authed = req as express.Request & { auth?: { sub: string; role: string } };
+    const client = await prisma.client.findUnique({
+      where: { userId: authed.auth!.sub },
+      include: { progress: true }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client profile not found' });
+
+    const education = client.progress?.education as Record<string, unknown> | null;
+    const subscription = await getCurrentSubscription(client.id);
+    const resolved = resolveClientEntitlements({
+      status: client.status,
+      serviceTier: client.serviceTier,
+      setupFeePaid: client.setupFeePaid,
+      masterclassAccess: education?.masterclassAccess === true,
+      subscription: toSubscriptionPlanInput(subscription)
+    });
+    return res.json({
+      plan: resolved.plan,
+      entitlements: resolved.entitlements,
+      pastDue: resolved.pastDue,
+      paid: resolved.paid,
+      subscription: subscription
+        ? {
+            status: subscription.status,
+            planCode: subscription.planCode,
+            provider: subscription.provider,
+            currentPeriodEnd: subscription.currentPeriodEnd,
+            cancelAtPeriodEnd: subscription.cancelAtPeriodEnd
+          }
+        : null
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================
@@ -254,77 +290,96 @@ billingRouter.post('/paypal/order/:orderId/capture', async (req, res, next) => {
 // PayPal webhook — backstop for captures that complete asynchronously (eChecks)
 // or where the browser died before our capture endpoint recorded the sale.
 billingRouter.post('/paypal/webhook', async (req, res) => {
-  try {
-    if (!paypalEnabled()) return res.status(503).json({ error: 'PayPal not configured' });
+  if (!paypalEnabled()) return res.status(503).json({ error: 'PayPal not configured' });
 
-    const rawBody: string = (req as any).rawBody
-      ? (req as any).rawBody.toString('utf8')
-      : JSON.stringify(req.body);
-    const verified = await verifyPaypalWebhookSignature(req.headers, rawBody);
-    if (!verified) return res.status(400).json({ error: 'Webhook signature verification failed' });
+  const rawBody: string = (req as any).rawBody
+    ? (req as any).rawBody.toString('utf8')
+    : JSON.stringify(req.body);
+  const verified = await verifyPaypalWebhookSignature(req.headers, rawBody);
+  if (!verified) return res.status(400).json({ error: 'Webhook signature verification failed' });
 
-    const event = req.body;
-    if (event?.event_type !== 'PAYMENT.CAPTURE.COMPLETED') {
-      return res.json({ received: true });
-    }
+  const event = req.body;
 
-    const capture = event.resource;
-    if (capture?.custom_id !== MASTERCLASS_CUSTOM_ID) {
-      // Only education payments run through PayPal by design; log anything else.
-      console.warn(`PayPal capture ${capture?.id} has unexpected custom_id ${capture?.custom_id}; not auto-processed.`);
-      return res.json({ received: true, processed: false });
-    }
+  const outcome = await processWebhookWithLedger(
+    {
+      source: 'paypal',
+      eventType: String(event?.event_type || 'unknown'),
+      payload: event as Record<string, unknown>,
+      externalEventId: event?.id ? String(event.id) : undefined,
+      signature: String(req.headers['paypal-transmission-sig'] || '')
+    },
+    () => handlePaypalEvent(event)
+  );
 
-    const captureId = String(capture.id || '');
-    const alreadyRecorded = captureId
-      ? await prisma.payment.findFirst({ where: { provider: 'paypal', providerRef: captureId, status: 'PAID' } })
-      : null;
-    if (alreadyRecorded) return res.json({ received: true, processed: true, duplicate: true });
-
-    // Pull the order to get the payer identity for enrollment.
-    const orderId = capture?.supplementary_data?.related_ids?.order_id;
-    if (!orderId) {
-      console.error(`PayPal webhook: capture ${captureId} completed but no related order id; manual review needed.`);
-      return res.json({ received: true, processed: false, reason: 'No order id on capture' });
-    }
-
-    const order = await getPaypalOrder(orderId);
-    const payerEmail = order?.payer?.email_address;
-    if (!payerEmail) {
-      console.error(`PayPal webhook: order ${orderId} has no payer email; manual review needed.`);
-      return res.json({ received: true, processed: false, reason: 'No payer email' });
-    }
-
-    const { enrollMasterclassStudent } = await import('../lib/masterclassEnrollment.js');
-    const enrollment = await enrollMasterclassStudent({
-      firstName: order?.payer?.name?.given_name || 'Student',
-      lastName: order?.payer?.name?.surname || '',
-      email: payerEmail,
-      source: 'masterclass-paypal-webhook'
-    });
-
-    await recordMasterclassPayment({
-      clientId: enrollment.clientId,
-      amount: Number(capture?.amount?.value ?? MASTERCLASS_PRICE_USD),
-      currency: capture?.amount?.currency_code || 'USD',
-      captureId,
-      status: 'PAID'
-    });
-
-    return res.json({ received: true, processed: true });
-  } catch (err: any) {
-    console.error('PayPal webhook processing failed:', err?.message);
-    return res.status(500).json({ received: true, error: err?.message });
+  if (!outcome.handled) {
+    console.error('PayPal webhook processing failed:', outcome.error);
+    return res.status(500).json({ received: true, error: outcome.error });
   }
+  return res.json({ received: true, duplicate: outcome.duplicate, result: outcome.result ?? null });
 });
 
-// Online payment confirmation — processor-agnostic (Authorize.Net / PaymentCloud).
-// Your processor's webhook (or a relay) POSTs here once a payment clears, and this
-// triggers the SAME settle-and-activate path as the manual "Mark Paid" button.
-// Secured with a shared secret (BILLING_CONFIRM_SECRET) sent as x-billing-secret
-// or in the body. The caller must include the clientId (e.g. mapped from the
-// Authorize.Net invoice/refId you set at checkout).
-billingRouter.post('/confirm', async (req, res, next) => {
+async function handlePaypalEvent(event: any): Promise<Record<string, unknown>> {
+  if (event?.event_type !== 'PAYMENT.CAPTURE.COMPLETED') {
+    return { processed: false, reason: `unhandled event_type ${event?.event_type}` };
+  }
+
+  const capture = event.resource;
+  if (capture?.custom_id !== MASTERCLASS_CUSTOM_ID) {
+    // Only education payments run through PayPal by design; log anything else.
+    console.warn(`PayPal capture ${capture?.id} has unexpected custom_id ${capture?.custom_id}; not auto-processed.`);
+    return { processed: false, reason: 'unexpected custom_id' };
+  }
+
+  const captureId = String(capture.id || '');
+  const alreadyRecorded = captureId
+    ? await prisma.payment.findFirst({ where: { provider: 'paypal', providerRef: captureId, status: 'PAID' } })
+    : null;
+  if (alreadyRecorded) return { processed: true, duplicate: true };
+
+  // Pull the order to get the payer identity for enrollment.
+  const orderId = capture?.supplementary_data?.related_ids?.order_id;
+  if (!orderId) {
+    console.error(`PayPal webhook: capture ${captureId} completed but no related order id; manual review needed.`);
+    return { processed: false, reason: 'No order id on capture' };
+  }
+
+  const order = await getPaypalOrder(orderId);
+  const payerEmail = order?.payer?.email_address;
+  if (!payerEmail) {
+    console.error(`PayPal webhook: order ${orderId} has no payer email; manual review needed.`);
+    return { processed: false, reason: 'No payer email' };
+  }
+
+  const { enrollMasterclassStudent } = await import('../lib/masterclassEnrollment.js');
+  const enrollment = await enrollMasterclassStudent({
+    firstName: order?.payer?.name?.given_name || 'Student',
+    lastName: order?.payer?.name?.surname || '',
+    email: payerEmail,
+    source: 'masterclass-paypal-webhook'
+  });
+
+  await recordMasterclassPayment({
+    clientId: enrollment.clientId,
+    amount: Number(capture?.amount?.value ?? MASTERCLASS_PRICE_USD),
+    currency: capture?.amount?.currency_code || 'USD',
+    captureId,
+    status: 'PAID'
+  });
+
+  return { processed: true };
+}
+
+const processorConfirmSchema = z.object({
+  clientId: z.string().min(1),
+  paymentType: z.enum(['SETUP_FEE', 'MONTHLY']).default('SETUP_FEE'),
+  amount: z.number().nonnegative().optional(),
+  currency: z.string().min(3).max(3).optional(),
+  reference: z.string().max(160).optional(),
+  provider: z.string().max(40).optional(),
+  secret: z.string().optional()
+});
+
+async function confirmProcessorPayment(req: express.Request, res: express.Response, next: express.NextFunction, defaultProvider: string) {
   try {
     const secret = process.env.BILLING_CONFIRM_SECRET || '';
     const provided = (req.headers['x-billing-secret'] as string | undefined) || req.body?.secret;
@@ -332,28 +387,45 @@ billingRouter.post('/confirm', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const clientId = String(req.body?.clientId || '');
-    if (!clientId) return res.status(400).json({ error: 'clientId is required' });
-
-    const amount = typeof req.body?.amount === 'number' ? req.body.amount : undefined;
-    const currency = typeof req.body?.currency === 'string' ? req.body.currency : undefined;
-    const reference = typeof req.body?.reference === 'string' ? req.body.reference : undefined;
+    const data = processorConfirmSchema.parse(req.body);
+    const provider = (data.provider || defaultProvider).toLowerCase();
 
     // Settle ONLY — payment never triggers dispute work (counsel, 2026-07-07).
     // The processor already captured the money, so an early payment is recorded
     // and flagged for review/refund rather than rejected.
-    const { settleSetupPayment } = await import('../lib/billingActivation.js');
-    const result = await settleSetupPayment(clientId, {
-      amount, currency, reference, method: 'online', recordDespiteGate: true
-    });
+    const { settleSetupPayment, recordMonthlySubscriptionPayment } = await import('../lib/billingActivation.js');
+    const result = data.paymentType === 'MONTHLY'
+      ? await recordMonthlySubscriptionPayment(data.clientId, {
+        amount: data.amount,
+        currency: data.currency,
+        reference: data.reference,
+        method: provider
+      })
+      : await settleSetupPayment(data.clientId, {
+        amount: data.amount,
+        currency: data.currency,
+        reference: data.reference,
+        method: provider,
+        recordDespiteGate: true
+      });
 
-    return res.json({ success: true, settled: true, ...result });
+    return res.json({ success: true, settled: true, provider, paymentType: data.paymentType, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (message === 'Client not found') return res.status(404).json({ error: message });
     next(error);
   }
-});
+}
+
+// Online payment confirmation — processor-agnostic (Authorize.Net / PaymentCloud).
+// Your processor's webhook (or a relay) POSTs here once a payment clears.
+// Secured with BILLING_CONFIRM_SECRET sent as x-billing-secret or in the body.
+// The caller must include clientId and should include reference. paymentType
+// defaults to SETUP_FEE; use MONTHLY for paid subscription renewals.
+billingRouter.post('/confirm', (req, res, next) => confirmProcessorPayment(req, res, next, 'online'));
+
+// Explicit PaymentCloud relay endpoint for production payment/subscription wiring.
+billingRouter.post('/paymentcloud/confirm', (req, res, next) => confirmProcessorPayment(req, res, next, 'paymentcloud'));
 
 billingRouter.get('/admin/aging', requireAuth, requireRole(['STAFF', 'ADMIN']), (_req, res) => {
   res.json({ message: 'Billing retry automation scaffold pending Stripe webhook + scheduler integration.' });
@@ -379,11 +451,18 @@ billingRouter.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'] as string | undefined;
   const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
+  const stripeConfigured = Boolean(stripeSecretKey && stripeWebhookSecret);
   
   let event: any;
   
   try {
-    if (stripeSecretKey && stripeWebhookSecret && sig) {
+    if (config.nodeEnv === 'production' && !stripeConfigured) {
+      return res.status(503).json({ error: 'Stripe webhook is not configured' });
+    }
+    if (config.nodeEnv === 'production' && !sig) {
+      return res.status(400).json({ error: 'Missing Stripe webhook signature' });
+    }
+    if (stripeConfigured && sig) {
       // Verify signature with Stripe SDK
       const stripe = new Stripe(stripeSecretKey, { apiVersion: '2026-05-27.dahlia' as any });
       // Stripe signs the raw request bytes — re-serializing the parsed body
@@ -396,7 +475,7 @@ billingRouter.post('/webhook', async (req, res) => {
         return res.status(400).send(`Webhook signature verification failed: ${verifyErr.message}`);
       }
     } else {
-      // No Stripe credentials configured — parse body directly (testing mode)
+      // No Stripe credentials configured — parse body directly in local/dev testing only.
       event = req.body;
     }
   } catch (err: any) {
@@ -404,39 +483,94 @@ billingRouter.post('/webhook', async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // Handle payment completion events
-  if (event.type === 'payment_intent.succeeded' || event.type === 'invoice.payment_succeeded' || event.type === 'checkout.session.completed') {
-    const paymentIntent = event.data?.object;
-    const clientId = paymentIntent?.metadata?.clientId || paymentIntent?.client_reference_id;
-    
-    if (!clientId) {
-      console.log('Payment webhook: no clientId in metadata, skipping auto-activation');
-      return res.json({ received: true, activated: false, reason: 'No clientId in payment metadata' });
-    }
+  // Record + de-duplicate every event through the webhook ledger, then process
+  // it exactly once. Replays (same event.id) short-circuit as { duplicate: true }.
+  const outcome = await processWebhookWithLedger(
+    {
+      source: 'stripe',
+      eventType: String(event?.type || 'unknown'),
+      payload: event as Record<string, unknown>,
+      externalEventId: event?.id ? String(event.id) : undefined,
+      signature: sig
+    },
+    () => handleStripeEvent(event)
+  );
 
-    try {
-      // Settle ONLY — payment never triggers dispute work (counsel, 2026-07-07).
-      // Stripe already captured the money, so an early payment is recorded and
-      // flagged for review/refund rather than rejected.
-      const { settleSetupPayment } = await import('../lib/billingActivation.js');
-      const result = await settleSetupPayment(clientId, {
-        amount: (paymentIntent.amount_received || paymentIntent.amount || 0) / 100,
-        currency: (paymentIntent.currency || 'usd').toUpperCase(),
-        stripePaymentIntentId: paymentIntent.id || undefined,
-        reference: paymentIntent.id || undefined,
-        method: 'stripe',
-        recordDespiteGate: true
-      });
-
-      return res.json({ received: true, settled: true, gateWarnings: result.gateWarnings, clientId });
-    } catch (err: any) {
-      if (err?.message === 'Client not found') {
-        return res.json({ received: true, settled: false, reason: 'Client not found' });
-      }
-      console.error('Payment settlement failed:', err);
-      return res.status(500).json({ received: true, settled: false, error: err.message });
-    }
+  if (!outcome.handled) {
+    // Recorded as RETRYING/DEAD_LETTER — 500 lets Stripe retry with backoff.
+    console.error('Stripe webhook processing failed:', outcome.error);
+    return res.status(500).json({ received: true, error: outcome.error });
   }
-
-  res.json({ received: true });
+  return res.json({ received: true, duplicate: outcome.duplicate, result: outcome.result ?? null });
 });
+
+async function handleStripeEvent(event: any): Promise<Record<string, unknown>> {
+  const obj = event?.data?.object ?? {};
+
+  switch (event?.type) {
+    case 'customer.subscription.created':
+    case 'customer.subscription.updated':
+    case 'customer.subscription.deleted':
+    case 'customer.subscription.paused':
+    case 'customer.subscription.resumed': {
+      const { handleStripeSubscriptionChange } = await import('../lib/billingWebhooks.js');
+      return { kind: 'subscription', ...(await handleStripeSubscriptionChange(obj)) };
+    }
+
+    case 'invoice.finalized':
+    case 'invoice.paid':
+    case 'invoice.payment_failed':
+    case 'invoice.marked_uncollectible':
+    case 'invoice.voided': {
+      const { handleStripeInvoice } = await import('../lib/billingWebhooks.js');
+      return { kind: 'invoice', ...(await handleStripeInvoice(obj)) };
+    }
+
+    case 'payment_intent.succeeded':
+    case 'invoice.payment_succeeded':
+    case 'checkout.session.completed': {
+      const outcome: Record<string, unknown> = { kind: 'payment' };
+
+      // invoice.payment_succeeded also carries billing-doc state — record it.
+      if (event.type === 'invoice.payment_succeeded') {
+        const { handleStripeInvoice } = await import('../lib/billingWebhooks.js');
+        outcome.invoice = await handleStripeInvoice(obj);
+        // A recurring invoice is not another setup-fee payment.
+        return outcome;
+      }
+      if (event.type === 'checkout.session.completed' && (obj.mode !== 'payment' || obj.payment_status !== 'paid')) {
+        return { ...outcome, settled: false, reason: 'Checkout has not completed a one-time payment' };
+      }
+      const paymentIntentId = event.type === 'payment_intent.succeeded'
+        ? obj.id
+        : (typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id);
+      if (!paymentIntentId) return { ...outcome, settled: false, reason: 'Payment intent unavailable; reconciliation required' };
+
+      const clientId = obj?.metadata?.clientId || obj?.client_reference_id;
+      if (!clientId) {
+        return { ...outcome, settled: false, reason: 'No clientId in payment metadata' };
+      }
+      // Settle ONLY — payment never triggers dispute work (counsel, 2026-07-07).
+      const { settleSetupPayment } = await import('../lib/billingActivation.js');
+      try {
+        const result = await settleSetupPayment(String(clientId), {
+          amount: (event.type === 'checkout.session.completed' ? obj.amount_total : obj.amount_received ?? obj.amount ?? 0) / 100,
+          currency: (obj.currency || 'usd').toUpperCase(),
+          stripePaymentIntentId: String(paymentIntentId),
+          reference: String(paymentIntentId),
+          method: 'stripe',
+          recordDespiteGate: true
+        });
+        return { ...outcome, settled: true, clientId, gateWarnings: result.gateWarnings ?? null };
+      } catch (err: any) {
+        if (err?.message === 'Client not found') {
+          return { ...outcome, settled: false, reason: 'Client not found' };
+        }
+        throw err;
+      }
+    }
+
+    default:
+      return { kind: 'ignored', type: String(event?.type || 'unknown') };
+  }
+}

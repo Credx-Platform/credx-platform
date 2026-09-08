@@ -65,5 +65,16 @@ export const config = {
   contractPath: process.env.CONTRACT_PATH ?? '/contract',
   businessEmail: defaultBusinessEmail,
   fromEmail: process.env.FROM_EMAIL ?? process.env.SENDGRID_FROM_EMAIL ?? defaultBusinessEmail,
-  leadNotificationEmail: process.env.LEAD_NOTIFICATION_EMAIL ?? process.env.ADMIN_ALERT_EMAIL ?? defaultBusinessEmail
+  leadNotificationEmail: process.env.LEAD_NOTIFICATION_EMAIL ?? process.env.ADMIN_ALERT_EMAIL ?? defaultBusinessEmail,
+  // SaaS Upgrade: Sentry / monitoring
+  sentryDsn: process.env.SENTRY_DSN,
+  sentryEnabled: process.env.SENTRY_ENABLED === 'true' || !!process.env.SENTRY_DSN,
+  // SaaS Upgrade: Redis / queue (optional — falls back to DB queue)
+  redisUrl: process.env.REDIS_URL,
+  // SaaS Upgrade: product analytics (optional — no-ops when unset)
+  analyticsEnabled: process.env.ANALYTICS_ENABLED === 'true' || !!process.env.POSTHOG_API_KEY,
+  posthogApiKey: process.env.POSTHOG_API_KEY,
+  posthogHost: process.env.POSTHOG_HOST ?? 'https://us.i.posthog.com',
+  // SaaS Upgrade: Worker identity
+  workerId: process.env.WORKER_ID ?? `worker-${Date.now()}`
 };

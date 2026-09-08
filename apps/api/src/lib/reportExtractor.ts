@@ -1,5 +1,7 @@
 import type { Bureau } from '@prisma/client';
-import { callAiGateway, extractJsonObject } from './aiGateway.js';
+import { runChat, extractJsonObject } from './ai/index.js';
+import { promptVersion } from './ai/prompts.js';
+import { checkAiQuota } from './ai/quota.js';
 
 // =====================================================================
 // Rich per-bureau tradeline shape (mirrors a MIG-style 3-bureau analysis).
@@ -326,6 +328,8 @@ export async function extractReport(input: {
   buffer: Buffer;
   mimeType: string;
   filename: string;
+  clientId?: string | null;
+  plan?: string | null;
 }): Promise<ExtractedReport | null> {
   const ext = input.filename.toLowerCase().split('.').pop() || '';
   const isPdf = input.mimeType === 'application/pdf' || ext === 'pdf';
@@ -354,18 +358,30 @@ export async function extractReport(input: {
     clippedLength: clipped.length,
     textPreview: clipped.slice(0, 400)
   });
-  const result = await callAiGateway({
-    systemPrompt: SYSTEM_PROMPT,
-    userPrompt: USER_PROMPT_TEMPLATE(clipped),
-    // Multi-bureau reports with full account + paymentHistory data routinely
-    // produce 30–40k chars of JSON (~10–13k tokens). 12k was too tight and
-    // truncated mid-object, which JSON.parse silently rejected.
-    maxTokens: 32000,
-    temperature: 0.1
+  // Cost protection: if this client is over their AI token budget, skip the
+  // paid extraction call. The upload still succeeds; analysis can be retried or
+  // completed with human review.
+  if (input.clientId) {
+    const quota = await checkAiQuota(input.clientId, input.plan ?? null);
+    if (!quota.allowed) {
+      console.warn('[reportExtractor] AI quota exhausted for client — skipping LLM extraction', { clientId: input.clientId, plan: quota.plan });
+      return null;
+    }
+  }
+
+  const result = await runChat({
+    task: 'report_extraction',
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: USER_PROMPT_TEMPLATE(clipped) }
+    ],
+    promptVersion: promptVersion('report_extraction_system'),
+    clientId: input.clientId ?? null,
+    plan: input.plan ?? null
   });
 
-  if (!result) {
-    console.warn('[reportExtractor] callAiGateway returned null (key/network/timeout)');
+  if (!result.ok) {
+    console.warn('[reportExtractor] AI extraction failed', { reason: result.reason, attempts: result.attempts });
     return null;
   }
 

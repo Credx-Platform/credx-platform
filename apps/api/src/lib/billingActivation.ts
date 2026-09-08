@@ -1,23 +1,32 @@
 import { prisma } from './prisma.js';
+import { monthlyFeeForPlan, planCodeForServiceTier, setupFeeForPlan } from './entitlements.js';
 
-// First-work fee by service tier. Charged only AFTER the analysis is delivered and
-// the dispute work begins (see /pricing). Single source of truth for the setup amount.
+// First-work fee by service tier. Charged only AFTER the analysis review is
+// delivered and confirmed (see /pricing). Single source of truth for the setup amount.
 export const TIER_SETUP_FEE: Record<string, number> = {
   ESSENTIAL: 150,
   AGGRESSIVE: 447, // "Premium" tier
   FAMILY: 300
 };
 
+export const TIER_MONTHLY_FEE: Record<string, number> = {
+  ESSENTIAL: 75,
+  AGGRESSIVE: 0, // Premium is one-time after analysis review
+  FAMILY: 95
+};
+
 export function setupFeeForTier(tier?: string | null): number {
-  return TIER_SETUP_FEE[(tier || 'ESSENTIAL').toUpperCase()] ?? 150;
+  return setupFeeForPlan(planCodeForServiceTier(tier));
+}
+
+export function monthlyFeeForTier(tier?: string | null): number {
+  return monthlyFeeForPlan(planCodeForServiceTier(tier));
 }
 
 /**
- * Create the pending "bill". Called when proof of mailing for the first dispute
- * round is recorded (Lob send or manual mail log) — NOT at analysis time; per
- * counsel (2026-07-07) the fee becomes chargeable only after the work is
- * performed. Idempotent: if a SETUP_FEE payment already exists for the client
- * (pending or paid), it is reused.
+ * Create the pending "bill". Called after the analysis review has been delivered
+ * and confirmed. Idempotent: if a SETUP_FEE payment already exists for the
+ * client (pending or paid), it is reused.
  */
 export async function createPendingSetupBill(clientId: string, tier?: string | null) {
   const existing = await prisma.payment.findFirst({
@@ -42,12 +51,16 @@ export type SettleResult = {
   gateWarnings?: string[];
 };
 
+export type MonthlyPaymentResult = {
+  payment: { amount: number; currency: string; status: 'PAID' };
+};
+
 /**
  * Settle the client's setup-fee bill. Settle ONLY — per counsel guidance
  * (2026-07-07), payment must never trigger dispute work; the sequence is
- * work → proof of mailing → cancellation window expired → then charge.
+ * analysis review delivered → cancellation window expired → then charge.
  * Dispute activation is a separate admin action (activateClientDisputeCampaign)
- * and the pending bill is raised when mailing proof is first recorded.
+ * and the pending bill is raised after analysis review.
  *
  * Throws BillingGateError when the CROA gate isn't satisfied, unless
  * opts.recordDespiteGate is set (online webhooks: the processor already moved
@@ -74,47 +87,119 @@ export async function settleSetupPayment(
     throw new BillingGateError(gate.reasons);
   }
 
-  // Settle the existing pending bill, or create a paid record if none exists yet.
-  const pending = await prisma.payment.findFirst({
-    where: { clientId, type: 'SETUP_FEE', status: 'PENDING' },
-    orderBy: { createdAt: 'desc' }
+  // Serialize local settlement per client; payment and audit effects commit
+  // together. This does not initiate a provider charge.
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${clientId}, 0))::text`;
+    if (opts?.stripePaymentIntentId) {
+      const existing = await tx.payment.findFirst({ where: { stripePaymentIntentId: opts.stripePaymentIntentId, status: 'PAID' } });
+      if (existing) {
+        if (existing.clientId !== clientId) throw new Error('Payment ownership mismatch');
+        return { payment: { amount: Number(existing.amount), currency: existing.currency, status: 'PAID' as const } };
+      }
+    }
+    // Settle the existing pending bill, or create a paid record if none exists yet.
+    const pending = await tx.payment.findFirst({
+      where: { clientId, type: 'SETUP_FEE', status: 'PENDING' },
+      orderBy: { createdAt: 'desc' }
+    });
+    const amount = opts?.amount ?? (pending ? Number(pending.amount) : setupFeeForTier(client.serviceTier));
+    const currency = opts?.currency ?? pending?.currency ?? 'USD';
+
+    if (pending) {
+      await tx.payment.update({
+        where: { id: pending.id },
+        data: {
+          status: 'PAID',
+          paidAt: new Date(),
+          amount,
+          currency,
+          ...(opts?.stripePaymentIntentId ? { stripePaymentIntentId: opts.stripePaymentIntentId } : {})
+        }
+      });
+    } else {
+      await tx.payment.create({
+        data: {
+          clientId,
+          amount,
+          currency,
+          type: 'SETUP_FEE',
+          status: 'PAID',
+          paidAt: new Date(),
+          stripePaymentIntentId: opts?.stripePaymentIntentId || null
+        }
+      });
+    }
+
+    if (!gate.eligible) {
+      // Money arrived before the CROA gate was satisfied — surface loudly for review/refund.
+      await tx.activityEvent.create({
+        data: {
+          clientId,
+          type: 'EARLY_PAYMENT_FLAGGED',
+          message: `Setup payment of $${amount} ${currency} received BEFORE the CROA billing gate was satisfied. Review for refund/hold. ${gate.reasons.join(' ')}`,
+          metadata: { amount, currency, method: opts?.method || 'unknown', reasons: gate.reasons }
+        }
+      });
+    }
+
+    await tx.activityEvent.create({
+      data: {
+        clientId,
+        type: 'PAYMENT_RECEIVED',
+        message: `Setup payment of $${amount} ${currency} received${opts?.method ? ` (${opts.method})` : ''}.`,
+        metadata: {
+          amount,
+          currency,
+          method: opts?.method || 'manual',
+          reference: opts?.reference || null,
+          gateEligible: gate.eligible
+        }
+      }
+    });
+
+    return {
+      payment: { amount, currency, status: 'PAID' as const },
+      gateWarnings: gate.eligible ? undefined : gate.reasons
+    };
   });
-  const amount = opts?.amount ?? (pending ? Number(pending.amount) : setupFeeForTier(client.serviceTier));
-  const currency = opts?.currency ?? pending?.currency ?? 'USD';
+}
 
-  if (pending) {
-    await prisma.payment.update({
-      where: { id: pending.id },
-      data: {
-        status: 'PAID',
-        paidAt: new Date(),
-        amount,
-        currency,
-        ...(opts?.stripePaymentIntentId ? { stripePaymentIntentId: opts.stripePaymentIntentId } : {})
-      }
-    });
-  } else {
-    await prisma.payment.create({
-      data: {
-        clientId,
-        amount,
-        currency,
-        type: 'SETUP_FEE',
-        status: 'PAID',
-        paidAt: new Date(),
-        stripePaymentIntentId: opts?.stripePaymentIntentId || null
-      }
-    });
+export async function recordMonthlySubscriptionPayment(
+  clientId: string,
+  opts?: {
+    amount?: number;
+    currency?: string;
+    reference?: string;
+    method?: string;
   }
+): Promise<MonthlyPaymentResult> {
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) throw new Error('Client not found');
 
-  if (!gate.eligible) {
-    // Money arrived before the CROA gate was satisfied — surface loudly for review/refund.
-    await prisma.activityEvent.create({
+  const amount = opts?.amount ?? monthlyFeeForTier(client.serviceTier);
+  const currency = opts?.currency ?? 'USD';
+  const method = opts?.method || 'paymentcloud';
+
+  await prisma.payment.create({
+    data: {
+      clientId,
+      amount,
+      currency,
+      type: 'MONTHLY',
+      status: 'PAID',
+      paidAt: new Date(),
+      provider: method,
+      providerRef: opts?.reference || null
+    }
+  });
+
+  if (client.status === 'PAST_DUE' || client.status === 'RESTRICTED' || client.portalRestricted) {
+    await prisma.client.update({
+      where: { id: clientId },
       data: {
-        clientId,
-        type: 'EARLY_PAYMENT_FLAGGED',
-        message: `Setup payment of $${amount} ${currency} received BEFORE the CROA billing gate was satisfied. Review for refund/hold. ${gate.reasons.join(' ')}`,
-        metadata: { amount, currency, method: opts?.method || 'unknown', reasons: gate.reasons }
+        status: 'ACTIVE',
+        portalRestricted: false
       }
     });
   }
@@ -123,19 +208,17 @@ export async function settleSetupPayment(
     data: {
       clientId,
       type: 'PAYMENT_RECEIVED',
-      message: `Setup payment of $${amount} ${currency} received${opts?.method ? ` (${opts.method})` : ''}.`,
+      message: `Monthly subscription payment of $${amount} ${currency} received (${method}).`,
       metadata: {
         amount,
         currency,
-        method: opts?.method || 'manual',
-        reference: opts?.reference || null,
-        gateEligible: gate.eligible
+        method,
+        reference: opts?.reference || null
       }
     }
   });
 
   return {
-    payment: { amount, currency, status: 'PAID' },
-    gateWarnings: gate.eligible ? undefined : gate.reasons
+    payment: { amount, currency, status: 'PAID' }
   };
 }

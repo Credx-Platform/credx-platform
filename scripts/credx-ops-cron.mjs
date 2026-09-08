@@ -49,6 +49,17 @@ function onboardingStep(client) {
   return 'intake';
 }
 
+function compactStatus(value) {
+  return String(value || '')
+    .replace(/_/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function contactName(contact) {
+  return [contact?.firstName, contact?.lastName].filter(Boolean).join(' ').trim() || contact?.email || contact?.phone || 'Unknown lead';
+}
+
 function shanghaiDayWindow(now = new Date()) {
   const shanghaiOffsetMs = 8 * 60 * 60 * 1000;
   const local = new Date(now.getTime() + shanghaiOffsetMs);
@@ -117,7 +128,7 @@ async function signupWatch() {
 
 async function dailyReport() {
   const { start, end } = shanghaiDayWindow();
-  const [newClients, updatedClients, leads, openTasks, completedTasks, activityEvents, auditLogs] = await Promise.all([
+  const [newClients, updatedClients, leads, subAgentContacts, openTasks, completedTasks, activityEvents, auditLogs] = await Promise.all([
     prisma.client.findMany({
       where: { createdAt: { gte: start, lte: end } },
       orderBy: { createdAt: 'asc' },
@@ -130,6 +141,12 @@ async function dailyReport() {
       include: { user: true, progress: true }
     }),
     prisma.lead.findMany({ where: { createdAt: { gte: start, lte: end } }, orderBy: { createdAt: 'asc' } }),
+    prisma.subAgentContact.findMany({
+      where: { createdAt: { gte: start, lte: end } },
+      orderBy: { createdAt: 'asc' },
+      take: 20,
+      include: { subAgent: true }
+    }),
     prisma.task.findMany({
       where: { completed: false },
       orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }],
@@ -155,14 +172,31 @@ async function dailyReport() {
     })
   ]);
 
-  const done = [
-    ...newClients.map((client) => `New client signup: ${fullName(client.user)} (${onboardingStep(client)})`),
-    ...leads.map((lead) => `New lead form: ${fullName(lead)} (${lead.offerInterest || 'program'})`),
+  const newClientIds = new Set(newClients.map((client) => client.id));
+  const updatedExistingClients = updatedClients.filter((client) => !newClientIds.has(client.id));
+  const clientAuditLogs = auditLogs.filter(
+    (log) => ['Client', 'Task', 'ActivityEvent'].includes(log.entityType) && !String(log.action).includes('DELETED')
+  );
+
+  const clientActivity = [
     ...activityEvents.map((event) => `${fullName(event.client.user)}: ${event.message}`),
-    ...completedTasks.map((task) => `Completed task: ${task.title} for ${fullName(task.client.user)}`)
+    ...completedTasks.map((task) => `Completed task: ${task.title} for ${fullName(task.client.user)}`),
+    ...updatedExistingClients.map(
+      (client) => `Updated client: ${fullName(client.user)} (${compactStatus(client.status)}; ${onboardingStep(client)})`
+    ),
+    ...clientAuditLogs.map((log) => `Admin activity: ${compactStatus(log.action)} on ${compactStatus(log.entityType)}`)
   ];
 
-  const tomorrow = [
+  const leadActivity = [
+    ...newClients.map((client) => `New client signup: ${fullName(client.user)} (${onboardingStep(client)})`),
+    ...leads.map((lead) => `New lead form: ${fullName(lead)} (${lead.offerInterest || 'program'})`),
+    ...subAgentContacts.map((contact) => {
+      const source = contact.subAgent?.name ? ` via ${contact.subAgent.name}` : '';
+      return `Sub-agent lead: ${contactName(contact)} (${compactStatus(contact.status) || 'tracked'}${source})`;
+    })
+  ];
+
+  const followUps = [
     ...openTasks.slice(0, 8).map((task) => `Follow up: ${task.title} for ${fullName(task.client.user)}`),
     ...updatedClients
       .filter((client) => onboardingStep(client).includes('pending'))
@@ -176,26 +210,88 @@ async function dailyReport() {
     counts: {
       newClientSignups: newClients.length,
       leadForms: leads.length,
+      subAgentContacts: subAgentContacts.length,
       updatedClients: updatedClients.length,
       activityEvents: activityEvents.length,
       openTasks: openTasks.length,
       auditLogs: auditLogs.length
     },
     message: [
-      'CredX daily report',
+      'CredX daily review',
       '',
-      'Done today:',
-      ...(done.length ? done.map((item) => `- ${item}`) : ['- No client-facing activity recorded in the database today.']),
+      'Client activity:',
+      ...(clientActivity.length ? clientActivity.map((item) => `- ${item}`) : ['- No client activity recorded today.']),
       '',
-      'Tomorrow:',
-      ...(tomorrow.length ? tomorrow.map((item) => `- ${item}`) : ['- Review new leads, onboarding stalls, and any manual follow-ups in the admin portal.'])
+      'Leads:',
+      ...(leadActivity.length ? leadActivity.map((item) => `- ${item}`) : ['- No new leads recorded today.']),
+      '',
+      'Next-day follow-ups:',
+      ...(followUps.length ? followUps.map((item) => `- ${item}`) : ['- Review new leads, onboarding stalls, and any manual follow-ups in the admin portal.'])
     ].join('\n')
   });
+}
+
+/**
+ * Enqueue (or, if the queue/runner is unavailable, directly run) the batch that
+ * regenerates every active client's CredX Readiness Score snapshot. Intended to
+ * run on a schedule, e.g. crontab:
+ *   0 6 * * *  cd /path/to/credx-platform && node scripts/credx-ops-cron.mjs readiness-snapshots
+ */
+async function readinessSnapshots() {
+  // Preferred path: drop a job row; the API's in-process queue runner drains it.
+  try {
+    const { enqueue } = await import('../apps/api/dist/lib/queue.js');
+    const job = await enqueue('analysis', 'readiness-snapshot-all', { source: 'cron' });
+    formatJson({ status: 'enqueued', jobId: job.id, queue: 'analysis', job: 'readiness-snapshot-all' });
+    return;
+  } catch (enqueueErr) {
+    // Fall through to running it inline.
+    formatJson({ status: 'enqueue_failed_running_inline', reason: String(enqueueErr?.message || enqueueErr) });
+  }
+
+  const { generateAllReadinessSnapshots } = await import('../apps/api/dist/lib/readinessSnapshots.js');
+  const results = await generateAllReadinessSnapshots();
+  formatJson({ status: 'generated', count: results.length });
+}
+
+/**
+ * For every active client without a check-in for the current ISO week, drop a
+ * WEEKLY_CHECKIN_READY notification. Idempotent via the notification dedupeKey.
+ * Suggested: 0 14 * * 1  (Monday 14:00)
+ */
+async function weeklyCheckins() {
+  const { isoWeekKey } = await import('../apps/api/dist/lib/checkin.js');
+  const { notify } = await import('../apps/api/dist/lib/notifications.js');
+  const weekKey = isoWeekKey();
+
+  const clients = await prisma.client.findMany({
+    where: {
+      status: { in: ['ACTIVE', 'ANALYSIS_READY', 'UPGRADE_OFFERED'] },
+      checkIns: { none: { weekKey } }
+    },
+    select: { id: true }
+  });
+
+  let created = 0;
+  for (const c of clients) {
+    const r = await notify(c.id, {
+      type: 'WEEKLY_CHECKIN_READY',
+      title: 'Your weekly check-in is ready',
+      body: 'Tell CredX what changed this week so your readiness stays accurate.',
+      href: '/portal',
+      metadata: { week: weekKey },
+      dedupeKey: `checkin:${weekKey}`
+    });
+    if (r.created) created += 1;
+  }
+  formatJson({ status: 'notified', weekKey, eligible: clients.length, created });
 }
 
 try {
   if (mode === 'signup-watch') await signupWatch();
   else if (mode === 'daily-report') await dailyReport();
+  else if (mode === 'readiness-snapshots') await readinessSnapshots();
+  else if (mode === 'weekly-checkins') await weeklyCheckins();
   else throw new Error(`Unknown mode: ${mode}`);
 } finally {
   await prisma.$disconnect();

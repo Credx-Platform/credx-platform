@@ -1,135 +1,37 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
-import { errorHandler } from './middleware/error.js';
-import { healthRouter } from './routes/health.js';
-import { authRouter } from './routes/auth.js';
-import { contractsRouter } from './routes/contracts.js';
-import { applicationsRouter } from './routes/applications.js';
-import { monitoringRouter } from './routes/monitoring.js';
-import { usersRouter } from './routes/users.js';
-import { leadsRouter } from './routes/leads.js';
-import { clientsRouter } from './routes/clients.js';
-import { disputesRouter } from './routes/disputes.js';
-import { lobRouter } from './routes/lob.js';
-import { responseIngestRouter } from './routes/responseIngest.js';
-import { billingRouter } from './routes/billing.js';
-import { progressRouter } from './routes/progress.js';
-import { masterclassRouter } from './routes/masterclass.js';
-import { compatibilityRouter } from './routes/compatibility.js';
-import { cesarRouter } from './routes/cesar.js';
+import { createApp } from './app.js';
+import { prisma } from './lib/prisma.js';
+import { registerAllJobs } from './lib/jobHandlers.js';
+import { startInProcessRunner } from './lib/queueRunner.js';
 
-const app = express();
-
-// Railway terminates TLS at its edge proxy; without trust proxy=1 the rate
-// limiter sees the proxy IP for every request and the limit becomes global.
-app.set('trust proxy', 1);
-
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
-}));
-
-const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? 'https://credxme.com,https://www.credxme.com')
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
-
-app.use(cors({
-  origin(origin, cb) {
-    if (!origin) return cb(null, true); // server-to-server, curl, mobile
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    if (config.nodeEnv !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-      return cb(null, true);
-    }
-    // Disallow without throwing — browser still blocks (no ACAO header) but
-    // the response stays a clean 204/200 instead of a noisy 500.
-    return cb(null, false);
-  },
-  credentials: true
-}));
-
-app.use(express.json({
-  limit: '2mb',
-  // Webhook signature verification (Stripe, PayPal) needs the raw bytes the
-  // processor signed — keep them alongside the parsed body.
-  verify: (req, _res, buf) => {
-    (req as any).rawBody = buf;
-  }
-}));
-
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false });
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many auth attempts. Try again in a few minutes.' }
-});
-const cesarLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { source: 'rate_limited', reply: "You're sending messages a little fast — give me a moment and try again.", html: "You're sending messages a little fast — give me a moment and try again." }
-});
-const leadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many submissions from this IP. Please slow down.' }
+// DISABLE_RATE_LIMITS=1 is for LOCAL load testing only — never set in production.
+const app = createApp({
+  disableRateLimits: config.nodeEnv !== 'production' && process.env.DISABLE_RATE_LIMITS === '1'
 });
 
-app.use(globalLimiter);
-
-app.get('/', (_req, res) => {
-  res.json({ name: 'CredX API', status: 'running', version: '0.1.0' });
-});
-
-app.use('/health', healthRouter);
-app.use('/api/health', healthRouter);
-app.use('/api/v1/health', healthRouter);
-
-// Stricter limits on unauthenticated, abuse-prone endpoints. These are mounted
-// before the routers so they apply on top of the global limiter.
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
-app.use('/api/auth/password-setup', authLimiter);
-app.use('/api/v1/auth/login', authLimiter);
-app.use('/api/v1/auth/register', authLimiter);
-app.use('/api/v1/auth/password-setup', authLimiter);
-app.use('/api/leads', leadLimiter);
-app.use('/api/v1/leads', leadLimiter);
-app.use('/api/cesar', cesarLimiter);
-app.use('/api/v1/cesar', cesarLimiter);
-
-function mountAll(prefix: string) {
-  app.use(`${prefix}/auth`, authRouter);
-  app.use(`${prefix}/contracts`, contractsRouter);
-  app.use(`${prefix}/applications`, applicationsRouter);
-  app.use(`${prefix}/monitoring`, monitoringRouter);
-  app.use(`${prefix}/users`, usersRouter);
-  app.use(`${prefix}/leads`, leadsRouter);
-  app.use(`${prefix}/clients`, clientsRouter);
-  app.use(`${prefix}/disputes`, disputesRouter);
-  app.use(`${prefix}/disputes/lob`, lobRouter);
-  app.use(`${prefix}/disputes/response`, responseIngestRouter);
-  app.use(`${prefix}/billing`, billingRouter);
-  app.use(`${prefix}/progress`, progressRouter);
-  app.use(`${prefix}/masterclass`, masterclassRouter);
-  app.use(`${prefix}/compatibility`, compatibilityRouter);
-  app.use(`${prefix}/cesar`, cesarRouter);
-}
-
-mountAll('/api');
-mountAll('/api/v1');
-
-app.use(errorHandler);
-
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`CredX API listening on port ${config.port}`);
 });
+
+// SaaS Upgrade: background job queue. Register handlers and (unless disabled)
+// run the poll loop in-process so queued email/report/readiness work is
+// actually drained even when no dedicated worker service is deployed.
+registerAllJobs();
+const queueRunner = startInProcessRunner();
+
+let shuttingDown = false;
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[api] ${signal} received, shutting down gracefully`);
+  server.close();
+  try {
+    await queueRunner?.stop();
+  } catch { /* noop */ }
+  try {
+    await prisma.$disconnect();
+  } catch { /* noop */ }
+  process.exit(0);
+}
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));

@@ -7,10 +7,15 @@ import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { config } from '../config.js';
 import { CreditAnalysisService, deriveReportSubject } from '../lib/creditAnalysis.js';
-import { dispatchAnalysisEmail } from '../lib/analysisEmailDispatch.js';
+import { enqueueJob } from '../lib/jobs.js';
+import { notifyMilestone } from '../lib/notifications.js';
 import { extractReport } from '../lib/reportExtractor.js';
 import { uploadDocument } from '../lib/blob-storage.js';
-import type { DocumentType } from '@prisma/client';
+import { track } from '../lib/analytics.js';
+import { maybeSendPortalReadyEmail } from '../lib/portalReady.js';
+import { syncReportDerivedClientData } from '../lib/clientReportSync.js';
+import { calculateReadinessScore } from '../lib/readinessScore.js';
+import type { DocumentType, ReadinessScoreSnapshot } from '@prisma/client';
 
 export const progressRouter = Router();
 const upload = multer({
@@ -20,6 +25,29 @@ const upload = multer({
 
 const ALLOWED_UPLOAD_EXTENSIONS = new Set(['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.html', '.htm']);
 const ALLOWED_UPLOAD_MIME_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'text/html']);
+const CREDIT_REPORT_UPLOAD_EXTENSIONS = new Set(['.pdf', '.html', '.htm']);
+const CREDIT_REPORT_UPLOAD_MIME_TYPES = new Set(['application/pdf', 'text/html']);
+function serializeReadinessSnapshot(
+  entry: Pick<ReadinessScoreSnapshot, 'id' | 'score' | 'label' | 'dataQuality' | 'generatedAt' | 'createdAt'> &
+    Partial<Pick<ReadinessScoreSnapshot, 'nextBestActionDetails'>>
+) {
+  const details = Array.isArray(entry.nextBestActionDetails)
+    ? (entry.nextBestActionDetails as Array<{ title?: string; priority?: string; category?: string }>)
+    : [];
+  return {
+    id: entry.id,
+    score: entry.score,
+    label: entry.label,
+    dataQuality: entry.dataQuality,
+    generatedAt: entry.generatedAt.toISOString(),
+    pulledAt: entry.createdAt.toISOString(),
+    topActions: details.slice(0, 2).map((d) => ({
+      title: d.title ?? '',
+      priority: d.priority ?? 'medium',
+      category: d.category ?? null
+    }))
+  };
+}
 
 function inferDocumentType(input = ''): string {
   const value = String(input || '').toLowerCase();
@@ -57,6 +85,12 @@ function getFileExtension(fileName = ''): string {
 function isAllowedUpload(file: Express.Multer.File): boolean {
   const extension = getFileExtension(file.originalname || '');
   return ALLOWED_UPLOAD_EXTENSIONS.has(extension) || ALLOWED_UPLOAD_MIME_TYPES.has(String(file.mimetype || '').toLowerCase());
+}
+
+function isAllowedCreditReportUpload(file: Express.Multer.File): boolean {
+  const extension = getFileExtension(file.originalname || '');
+  const mime = String(file.mimetype || '').toLowerCase();
+  return CREDIT_REPORT_UPLOAD_EXTENSIONS.has(extension) || CREDIT_REPORT_UPLOAD_MIME_TYPES.has(mime);
 }
 
 function buildOwnerOnboardingEmail(payload: {
@@ -132,13 +166,15 @@ async function completeOnboardingWorkflow(clientId: string, creditReportDoc: { n
   if (!client || !client.progress) return { alreadyCompleted: true };
 
   const onboarding = client.progress.onboarding as Record<string, any>;
-  if (onboarding?.completedAt) {
+  if (onboarding?.creditReportUploadedAt) {
     return { alreadyCompleted: true };
   }
 
   const nowIso = new Date().toISOString();
-  const updatedOnboarding = { status: 'completed', completedAt: nowIso, creditReportUploadedAt: creditReportDoc.uploadedAt || nowIso };
-  const updatedWorkflow = { stage: 'dispute_review_pending', updatedAt: nowIso, next: ['review_credit_report', 'prepare_analysis_report', 'establish_billing_arrangement'] };
+  const existingOnboarding = (client.progress.onboarding || {}) as Record<string, any>;
+  const existingWorkflow = (client.progress.workflow || {}) as Record<string, any>;
+  const updatedOnboarding = { ...existingOnboarding, status: 'completed', completedAt: existingOnboarding.completedAt || nowIso, creditReportUploadedAt: creditReportDoc.uploadedAt || nowIso };
+  const updatedWorkflow = { ...existingWorkflow, stage: 'dispute_review_pending', updatedAt: nowIso, next: ['review_credit_report', 'prepare_analysis_report', 'establish_billing_arrangement'] };
 
   await prisma.clientProgress.update({
     where: { clientId },
@@ -185,8 +221,9 @@ async function completeOnboardingWorkflow(clientId: string, creditReportDoc: { n
 
   const ownerEmail = await sendOwnerOnboardingEmail({ user: client.user, creditReport: creditReportDoc });
   const disputeManager = await notifyDisputeManager({ user: client.user, creditReport: creditReportDoc });
+  const portalEmail = await maybeSendPortalReadyEmail(clientId);
 
-  return { progress: { onboarding: updatedOnboarding, workflow: updatedWorkflow }, ownerEmail, disputeManager };
+  return { progress: { onboarding: updatedOnboarding, workflow: updatedWorkflow }, ownerEmail, disputeManager, portalEmail };
 }
 
 progressRouter.get('/me', requireAuth, async (req: AuthedRequest, res, next) => {
@@ -211,6 +248,74 @@ progressRouter.get('/me', requireAuth, async (req: AuthedRequest, res, next) => 
       disputeStrategy: (progress as any).disputeStrategy || null,
       tasks: client.tasks,
       activities: client.activities
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+progressRouter.get('/readiness', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const client = await prisma.client.findUnique({
+      where: { userId: req.auth!.sub },
+      include: { progress: true, tasks: true, creditReports: { include: { tradelines: true } } }
+    });
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const history = await prisma.readinessScoreSnapshot.findMany({
+      where: { clientId: client.id },
+      orderBy: { createdAt: 'desc' },
+      take: 12
+    });
+
+    return res.json({
+      ...calculateReadinessScore(client),
+      history: history.map(serializeReadinessSnapshot)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+progressRouter.post('/readiness/snapshot', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const client = await prisma.client.findUnique({
+      where: { userId: req.auth!.sub },
+      include: { progress: true, tasks: true, creditReports: { include: { tradelines: true } } }
+    });
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const readiness = calculateReadinessScore(client);
+    const snapshot = await prisma.readinessScoreSnapshot.create({
+      data: {
+        clientId: client.id,
+        score: readiness.score,
+        label: readiness.label,
+        dataQuality: readiness.dataQuality,
+        categories: readiness.categories,
+        strengths: readiness.strengths,
+        opportunities: readiness.opportunities,
+        nextBestActions: readiness.nextBestActions,
+        nextBestActionDetails: readiness.nextBestActionDetails,
+        generatedAt: readiness.generatedAt
+      }
+    });
+
+    track('readiness_score_created', {
+      distinctId: client.id,
+      props: { score: readiness.score, label: readiness.label, dataQuality: readiness.dataQuality }
+    });
+
+    const history = await prisma.readinessScoreSnapshot.findMany({
+      where: { clientId: client.id },
+      orderBy: { createdAt: 'desc' },
+      take: 12
+    });
+
+    return res.status(201).json({
+      ...readiness,
+      snapshot: serializeReadinessSnapshot(snapshot),
+      history: history.map(serializeReadinessSnapshot)
     });
   } catch (error) {
     next(error);
@@ -254,6 +359,17 @@ progressRouter.post('/me', requireAuth, async (req: AuthedRequest, res, next) =>
       where: { clientId: client.id },
       data: { completedDays, passedQuizzes, scores, disputes, workflow, education }
     });
+
+    // Milestone: a masterclass day was just completed.
+    if (data.completedDay && !((client.progress as any).completedDays || []).includes(data.completedDay)) {
+      const dayNum = String(data.completedDay).replace(/\D/g, '') || completedDays.length;
+      notifyMilestone(client.id, {
+        key: `masterclass-day-${data.completedDay}`,
+        title: `Masterclass Day ${dayNum} complete`,
+        body: completedDays.length >= 5 ? 'You finished the 5-Day Masterclass — nice work.' : 'Keep the streak going.',
+        href: '/portal'
+      });
+    }
 
     return res.json(updated);
   } catch (error) {
@@ -349,16 +465,14 @@ async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
               creditReports: clientWithReports.creditReports as any
             });
 
-            await prisma.clientProgress.update({
-              where: { clientId: client.id },
-              data: {
-                analysis: analysis as any,
-                workflow: {
-                  ...(workflow as any || {}),
-                  stage: 'analysis_ready',
-                  updatedAt: new Date().toISOString(),
-                  next: ['review_analysis', 'begin_disputes']
-                }
+            await syncReportDerivedClientData(prisma, {
+              client: clientWithReports as any,
+              analysis,
+              workflow: {
+                ...(workflow as any || {}),
+                stage: 'analysis_ready',
+                updatedAt: new Date().toISOString(),
+                next: ['review_analysis', 'begin_disputes']
               }
             });
 
@@ -382,13 +496,15 @@ async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
             (workflowResult as any).analysisGenerated = true;
             (workflowResult as any).analysisFindings = analysis.keyFindings.length;
 
-            const emailResult = await dispatchAnalysisEmail({
+            // Offload the PDF render + send to the queue so the upload request
+            // returns fast. Falls back to inline execution if the enqueue fails.
+            const emailQueue = await enqueueJob('emails', 'analysis-email', {
               clientId: client.id,
-              analysis,
+              analysis: analysis as unknown as Record<string, unknown>,
               trigger: 'auto_doc_upload'
             });
-            (workflowResult as any).analysisEmailed = emailResult.sent;
-            if (!emailResult.sent) (workflowResult as any).analysisEmailSkippedReason = emailResult.reason;
+            (workflowResult as any).analysisEmailed = emailQueue.status === 'queued' ? 'queued' : emailQueue.status === 'inline';
+            (workflowResult as any).analysisEmailQueue = emailQueue.status;
           }
         }
       } catch (analysisErr) {
@@ -504,7 +620,7 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
 
     setImmediate(async () => {
       try {
-        const extracted = await extractReport({ buffer: fileBuffer, mimeType: fileMime, filename: safeName });
+        const extracted = await extractReport({ buffer: fileBuffer, mimeType: fileMime, filename: safeName, clientId });
         if (extracted) {
           const existingReports = await prisma.creditReport.findMany({ where: { clientId }, select: { id: true } });
           if (existingReports.length) {
@@ -675,9 +791,9 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
             });
           }
 
-          await dispatchAnalysisEmail({
+          await enqueueJob('emails', 'analysis-email', {
             clientId,
-            analysis,
+            analysis: analysis as unknown as Record<string, unknown>,
             trigger: 'auto_secure_upload'
           });
         }
@@ -705,6 +821,10 @@ progressRouter.post('/me/docs/upload', requireAuth, upload.single('file'), async
     if (!isAllowedUpload(req.file)) {
       return res.status(400).json({ error: 'Unsupported file type. Upload PDF, HTML, JPG, PNG, or WEBP files.' });
     }
+    const requestedType = inferDocumentType(String(req.body?.type || req.file.originalname || ''));
+    if (requestedType === 'credit_report' && !isAllowedCreditReportUpload(req.file)) {
+      return res.status(400).json({ error: 'Credit reports must be uploaded as PDF or HTML files.' });
+    }
     const client = await prisma.client.findUnique({ where: { userId: req.auth!.sub }, include: { progress: true } });
     if (!client || !client.progress) return res.status(404).json({ error: 'Client progress not found' });
     return handleSecureDocUpload(client, req.file, String(req.body?.type || ''), res, next);
@@ -719,6 +839,10 @@ progressRouter.post('/clients/:id/docs/upload', requireAuth, requireRole(['STAFF
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     if (!isAllowedUpload(req.file)) {
       return res.status(400).json({ error: 'Unsupported file type. Upload PDF, HTML, JPG, PNG, or WEBP files.' });
+    }
+    const requestedType = inferDocumentType(String(req.body?.type || req.file.originalname || ''));
+    if (requestedType === 'credit_report' && !isAllowedCreditReportUpload(req.file)) {
+      return res.status(400).json({ error: 'Credit reports must be uploaded as PDF or HTML files.' });
     }
     const clientId = String(req.params.id);
     const client = await prisma.client.findUnique({ where: { id: clientId }, include: { progress: true } });

@@ -19,6 +19,10 @@ VISUAL_CONTENT_AUTOMATION.md
 apps/api/check_users.mjs
 apps/api/test_clients.js
 apps/api/test_clients.mjs
+check-docs.js
+check-duane.js
+check-report.js
+re-trigger-analysis.js
 
 # Generated working files
 social-drafts/

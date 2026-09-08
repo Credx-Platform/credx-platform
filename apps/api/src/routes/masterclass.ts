@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { sendMasterclassDayEmail, MASTERCLASS_EMAIL_DAYS } from '../lib/email.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { gradeSubmission, QUIZ_MAX_ATTEMPTS_BEFORE_COOLDOWN, QUIZ_COOLDOWN_MS, QUIZ_ANSWER_KEYS } from '../lib/masterclassQuizAnswers.js';
-import { verifyTurnstileFromBody } from '../lib/turnstile.js';
+import { logTurnstileRejection, verifyTurnstileFromBody } from '../lib/turnstile.js';
 
 export const masterclassRouter = Router();
 
@@ -27,7 +27,15 @@ const enrollSchema = z.object({
 masterclassRouter.post('/enroll', async (req, res, next) => {
   try {
     const captcha = await verifyTurnstileFromBody(req.body, req.ip);
-    if (!captcha.ok) return res.status(400).json({ error: captcha.reason || 'CAPTCHA verification failed' });
+    if (!captcha.ok) {
+      logTurnstileRejection('/api/masterclass/enroll', captcha, {
+        hasToken: Boolean(req.body?.turnstileToken || req.body?.['cf-turnstile-response']),
+        referer: req.headers.referer,
+        origin: req.headers.origin,
+        userAgent: req.headers['user-agent']
+      });
+      return res.status(400).json({ error: captcha.reason || 'CAPTCHA verification failed' });
+    }
     const data = enrollSchema.parse(req.body);
 
     const { enrollMasterclassStudent } = await import('../lib/masterclassEnrollment.js');

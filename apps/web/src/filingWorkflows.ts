@@ -94,7 +94,7 @@ export const CFPB_WORKFLOW: FilingWorkflow = {
   portalUrl: 'https://www.consumerfinance.gov/complaint/',
   portalLabel: 'consumerfinance.gov/complaint',
   estimatedMinutes: 10,
-  responseSla: 'Companies must respond through the CFPB portal within 15 days; the CFPB tracks the response publicly.',
+  responseSla: 'Companies generally respond through the CFPB portal, and the response is visible to the consumer.',
   prerequisites: [
     'Bureau dispute letters generated (the CFPB asks what you have already tried).',
     'At least one of: a bureau response that "verified" without proof, no response after 30 days, or continued inaccurate reporting.',
@@ -113,7 +113,7 @@ export const CFPB_WORKFLOW: FilingWorkflow = {
   ],
   whatHappensNext: [
     'CFPB forwards the complaint to each named company and assigns a tracking number.',
-    'Companies must respond within 15 days through the CFPB portal — the response is visible to you.',
+    'Companies generally respond through the CFPB portal, and the response is visible to you.',
     'CredX upload the CFPB response PDF into the Responses tab; the AI graders flag whether the bureau actually re-investigated.',
   ],
   steps: [
@@ -131,11 +131,11 @@ export const CFPB_WORKFLOW: FilingWorkflow = {
     {
       number: 3,
       title: 'Describe what happened',
-      detail: 'Paste the "What Happened" section from your CredX CFPB complaint. Mention the dates of your bureau letters, what response (or non-response) you received, and the specific FCRA sections violated.',
+      detail: 'Paste the "What Happened" section from your CredX CFPB complaint. Mention the dates of your bureau letters, what response (or non-response) you received, and the specific FCRA sections related to your concern.',
       fieldHints: [
         'Cite § 1681i (failure to reinvestigate within 30 days).',
-        'Cite § 1681s-2 (furnisher non-compliance) if a creditor / collector kept reporting after dispute.',
-        'State the remedy: "Remove the disputed items or produce verifiable proof within 15 days."',
+        'Cite § 1681s-2 concerns if a creditor / collector kept reporting after dispute.',
+        'State the requested remedy: review the disputed items and correct or delete any reporting that cannot be verified as accurate and complete.',
       ],
     },
     {

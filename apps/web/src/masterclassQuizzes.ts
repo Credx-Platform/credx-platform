@@ -209,12 +209,12 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
         prompt: 'What happens if a bureau cannot verify a disputed item within the FCRA window?',
         choices: [
           'It stays on the report with a "verified" flag',
-          'It must be deleted from the report',
+          'It should be corrected or deleted if it cannot be verified as accurate and complete',
           'It is moved to a separate disputes section for 12 months',
           'The bureau gets another 60 days to verify'
         ],
         correctIndex: 1,
-        rationale: 'No proof = required deletion. That is the consumer\'s leverage under § 1681i.'
+        rationale: 'If the bureau cannot verify disputed information as accurate and complete within the reinvestigation window, the item should be corrected or deleted under § 1681i.'
       },
       {
         id: 'd2q9',
@@ -264,12 +264,12 @@ export const MASTERCLASS_QUIZZES: DayQuiz[] = [
         prompt: 'If a furnisher cannot produce the proof a 609 letter requests, what should happen to the item?',
         choices: [
           'It stays but gets a "disputed" flag',
-          'It must be removed from your credit file',
+          'It should be corrected or deleted if it cannot be verified as accurate and complete',
           'It moves to a public-records section',
           'You have to file a CFPB complaint to force removal'
         ],
         correctIndex: 1,
-        rationale: 'No verification = required deletion under § 1681i. The 609 request creates that documented failure to verify.'
+        rationale: 'If requested documentation does not verify the disputed item as accurate and complete, the item should be corrected or deleted through the FCRA reinvestigation process.'
       },
       {
         id: 'd3q3',

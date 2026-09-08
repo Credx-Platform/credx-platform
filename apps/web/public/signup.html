@@ -154,6 +154,30 @@ h1 {
   outline: none;
   transition: border-color 0.15s, background 0.15s;
 }
+.field select option {
+  background: #f8fbff;
+  color: #07111f;
+}
+.field select option:checked {
+  background: #22d3ee;
+  color: #07111f;
+}
+.locked-referral {
+  padding: 13px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 800;
+}
+.locked-referral small {
+  display: block;
+  margin-top: 4px;
+  color: #9eeaff;
+  font-size: 12px;
+  font-weight: 700;
+}
 .field input::placeholder { color: #86a3c8; }
 .field input:focus, .field select:focus {
   border-color: var(--border-strong);
@@ -405,6 +429,11 @@ const API_BASE = '';
 const TOKEN_KEY = 'credx-client-token';
 const params = new URLSearchParams(window.location.search);
 const requestedOffer = params.get('offer') === 'masterclass' ? 'masterclass' : 'program';
+const subAgentReferralCode = params.get('agent') || '';
+const subAgentReferralName = params.get('agentName') || '';
+const subAgentClickAlreadyTracked = params.get('tracked') === '1';
+const affiliateReferralSource = subAgentReferralName || subAgentReferralCode;
+const smsConsentLanguage = 'I agree to receive CredX emails and text messages about my inquiry, onboarding, account updates, and offers. Message/data rates may apply. Reply STOP to opt out.';
 
 const els = {
   form: document.getElementById('signupForm'),
@@ -433,9 +462,10 @@ const state = {
   email: '',
   phone: '',
   offerInterest: requestedOffer,
-  referralSource: '',
-  referralDetail: '',
+  referralSource: affiliateReferralSource || '',
+  referralDetail: subAgentReferralCode || '',
   contactAuthConfirmed: false,
+  smsConsent: false,
   masterclassTimeline: '',
   specialistInterest: '',
   promoCode: '',
@@ -469,6 +499,21 @@ function clearError() {
   els.errorBanner.textContent = '';
 }
 
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs || 20000);
+  try {
+    return await fetch(url, { ...(options || {}), signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error('This is taking longer than normal. Your signup may still be processing. Check your email in a minute, then try again only if no CredX email arrives.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -490,8 +535,8 @@ function selectedPlanLabel() {
 
 function selectedAiPriceLabel() {
   if (state.offerInterest !== 'program') return 'Not applicable';
-  if (state.aiPlanScope === 'family') return `$300 after first round + $${familyMonthlyAmount()}/mo`;
-  return state.singleTier === 'aggressive' ? '$447 after delivery' : '$150 after first round';
+  if (state.aiPlanScope === 'family') return `$300 after analysis review + $${familyMonthlyAmount()}/mo`;
+  return state.singleTier === 'aggressive' ? '$447 after analysis review' : '$150 after analysis review';
 }
 
 const masterclassOffers = {
@@ -536,13 +581,43 @@ function signupIntake() {
     aiPlanScope: state.offerInterest === 'program' ? state.aiPlanScope : null,
     singleTier: state.offerInterest === 'program' && state.aiPlanScope === 'single' ? state.singleTier : null,
     familyMembers: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? Number(state.familyMembers || 2) : null,
-    quotedDeposit: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? '$300 family first-work fee (billed after first round)' : selectedAiPriceLabel(),
+    quotedDeposit: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? '$300 family first-work fee (billed after analysis review)' : selectedAiPriceLabel(),
     quotedMonthly: state.offerInterest === 'program' && state.aiPlanScope === 'family' ? `$${familyMonthlyAmount()}/mo` : null,
     masterclassPromoCode: state.offerInterest === 'masterclass' ? state.promoCode.trim() || null : null,
     masterclassPromoOffer: state.offerInterest === 'masterclass' ? state.promoOfferKey || null : null,
-    quotedMasterclassPrice: state.offerInterest === 'masterclass' ? selectedMasterclassPriceLabel() : null
+    quotedMasterclassPrice: state.offerInterest === 'masterclass' ? selectedMasterclassPriceLabel() : null,
+    subAgentReferralCode: subAgentReferralCode || null,
+    subAgentReferralName: subAgentReferralName || null,
+    smsConsent: Boolean(state.smsConsent),
+    smsConsentCapturedAt: state.smsConsent ? new Date().toISOString() : null,
+    smsConsentLanguage: state.smsConsent ? smsConsentLanguage : null
   };
 }
+
+async function recordSubAgentSignupLanding() {
+  if (!subAgentReferralCode || subAgentClickAlreadyTracked) return;
+  const storageKey = `credx-sub-agent-signup-landing:${subAgentReferralCode}:${window.location.pathname}${window.location.search}`;
+  try {
+    if (window.sessionStorage && sessionStorage.getItem(storageKey)) return;
+    if (window.sessionStorage) sessionStorage.setItem(storageKey, '1');
+  } catch {}
+
+  try {
+    await fetchWithTimeout(`${API_BASE}/api/sub-agents/${encodeURIComponent(subAgentReferralCode)}/contacts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'CLICKED',
+        sourceUrl: document.referrer || 'direct-signup-url',
+        landingPath: `${window.location.pathname}${window.location.search}`
+      })
+    }, 7000);
+  } catch {
+    try { if (window.sessionStorage) sessionStorage.removeItem(storageKey); } catch {}
+  }
+}
+
+recordSubAgentSignupLanding();
 
 function getSteps() {
   const steps = [
@@ -790,11 +865,11 @@ function getSteps() {
         <div class="choice-stack">
           <label class="choice ${state.singleTier === 'standard' ? 'active' : ''}">
             <input type="radio" name="singleTier" value="standard" ${state.singleTier === 'standard' ? 'checked' : ''}>
-            <span><strong>Standard</strong><small>$150 first work fee, billed after your first round of disputes is sent — nothing due today.</small></span>
+            <span><strong>Standard</strong><small>$150 first work fee, billed after your completed analysis review — nothing due today.</small></span>
           </label>
           <label class="choice ${state.singleTier === 'aggressive' ? 'active' : ''}">
             <input type="radio" name="singleTier" value="aggressive" ${state.singleTier === 'aggressive' ? 'checked' : ''}>
-            <span><strong>Aggressive</strong><small>$447 for the higher-touch path, billed after your first full dispute round is delivered — nothing due today.</small></span>
+            <span><strong>Aggressive</strong><small>$447 for the higher-touch path, billed after your completed analysis review — nothing due today.</small></span>
           </label>
         </div>
         <div class="price-note"><strong>Selected:</strong> ${escapeHtml(selectedAiPriceLabel())}</div>
@@ -819,7 +894,7 @@ function getSteps() {
           <span>Family members</span>
           <input id="familyMembers" type="number" min="2" max="5" inputmode="numeric" value="${escapeHtml(state.familyMembers)}">
         </label>
-        <div class="price-note"><strong>Family pricing:</strong> $300 first work fee billed after your first round, then $${familyMonthlyAmount()}/mo billed after each month's work — nothing due today. That is $75/mo base plus $20/mo for each additional family member.</div>
+        <div class="price-note"><strong>Family pricing:</strong> $300 first work fee billed after your completed analysis review, then $${familyMonthlyAmount()}/mo billed after each month's work — nothing due today. That is $75/mo base plus $20/mo for each additional family member.</div>
       `,
       bind: () => {
         const input = document.getElementById('familyMembers');
@@ -839,6 +914,17 @@ function getSteps() {
       label: 'Referral',
       title: 'How did you hear about CredX?',
       render: () => {
+        if (subAgentReferralCode) {
+          return `
+            <label class="field" for="referralSourceLocked">
+              <span>Source</span>
+              <div class="locked-referral" id="referralSourceLocked">
+                ${escapeHtml(affiliateReferralSource)}
+                <small>Affiliate referral applied automatically</small>
+              </div>
+            </label>
+          `;
+        }
         const options = referralOptions.map((option) => {
           const label = option || 'Select one';
           return `<option value="${escapeHtml(option)}" ${state.referralSource === option ? 'selected' : ''}>${escapeHtml(label)}</option>`;
@@ -861,6 +947,11 @@ function getSteps() {
         `;
       },
       bind: () => {
+        if (subAgentReferralCode) {
+          state.referralSource = affiliateReferralSource;
+          state.referralDetail = subAgentReferralCode;
+          return;
+        }
         const source = document.getElementById('referralSource');
         source.addEventListener('change', (event) => {
           setStateValue('referralSource', event.target.value);
@@ -890,10 +981,15 @@ function getSteps() {
           <input id="consent" type="checkbox" ${state.consent ? 'checked' : ''}>
           <span>I confirm the information I am submitting is accurate, and I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>. I have reviewed the <a href="/croa-disclosure" target="_blank">CROA Disclosure</a> and <a href="/cancellation-policy" target="_blank">Cancellation Policy</a>.</span>
         </label>
+        <label class="consent">
+          <input id="smsConsent" type="checkbox" ${state.smsConsent ? 'checked' : ''}>
+          <span>${escapeHtml(smsConsentLanguage)}</span>
+        </label>
         <div class="cf-turnstile-slot" style="margin:12px 0 0;"></div>
       `,
       bind: () => {
         document.getElementById('consent').addEventListener('change', (event) => setStateValue('consent', event.target.checked));
+        document.getElementById('smsConsent').addEventListener('change', (event) => setStateValue('smsConsent', event.target.checked));
         if (window.onCredXTurnstileLoad) window.onCredXTurnstileLoad();
       },
       validate: () => {
@@ -968,6 +1064,10 @@ function setSubmitting(value) {
 }
 
 function showSuccess(title, message) {
+  submitting = false;
+  clearError();
+  els.nextBtn.disabled = false;
+  els.backBtn.disabled = stepIndex === 0;
   els.fields.style.display = 'none';
   els.upgradeBanner.classList.remove('show');
   els.successTitle.textContent = title;
@@ -985,11 +1085,11 @@ async function submitSignup() {
     const offerInterest = state.offerInterest === 'masterclass' ? 'masterclass' : 'program';
 
     if (mode === 'upgrade' && existingToken) {
-      const res = await fetch(`${API_BASE}/api/auth/upgrade`, {
+      const res = await fetchWithTimeout(`${API_BASE}/api/auth/upgrade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', authorization: `Bearer ${existingToken}` },
         body: JSON.stringify({ offerInterest, phone, firstName, lastName, signupIntake: signupIntake() })
-      });
+      }, 20000);
       const body = await res.json().catch(() => null);
       if (!res.ok) throw new Error(body && body.error || 'Upgrade failed');
       if (body && body.token) localStorage.setItem(TOKEN_KEY, body.token);
@@ -1001,7 +1101,13 @@ async function submitSignup() {
       return;
     }
 
-    const res = await fetch(`${API_BASE}/api/auth/register`, {
+    const turnstileToken = (window.CredXTurnstile && window.CredXTurnstile.getToken()) || undefined;
+    const turnstileRequired = Boolean(String(window.CREDX_TURNSTILE_SITE_KEY || '').trim());
+    if (turnstileRequired && !turnstileToken) {
+      throw new Error('Please complete the security verification before submitting. If it does not appear, refresh the page or turn off browser content blocking for CredX.');
+    }
+
+    const res = await fetchWithTimeout(`${API_BASE}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1013,19 +1119,25 @@ async function submitSignup() {
         signupIntake: signupIntake(),
         referralSource: state.referralSource || undefined,
         referralDetail: state.referralDetail.trim() || undefined,
-        turnstileToken: (window.CredXTurnstile && window.CredXTurnstile.getToken()) || undefined
+        subAgentReferralCode: subAgentReferralCode || undefined,
+        turnstileToken
       })
-    });
+    }, 20000);
     const body = await res.json().catch(() => null);
     if (res.status === 409) {
       throw new Error("This email is already in our system. If it is yours, sign in to the portal or use reset password.");
     }
     if (!res.ok) throw new Error(body && body.error || 'Submission failed');
+    if (body && body.token) localStorage.setItem(TOKEN_KEY, body.token);
     showToast('Signup received. Check your email.');
     showSuccess(
       'Thank you for signing up',
-      'Please check your email for your secure onboarding link. You will sign your agreement first, complete intake, then receive your password setup email as the final step.'
+      'Your signup was received. Check your email inbox for the CredX onboarding link. The next screen will ask you to review and sign your service agreement first, then complete intake and upload your credit report.'
     );
+    setTimeout(() => {
+      const token = body && body.token ? `?token=${encodeURIComponent(body.token)}` : '';
+      window.location.assign(`/start${token}#onboarding`);
+    }, 1200);
   } catch (error) {
     showError(error.message || 'Submission failed.');
     setSubmitting(false);
@@ -1052,7 +1164,7 @@ async function tryAttachExistingSession() {
   const token = localStorage.getItem(TOKEN_KEY);
   if (!token) return;
   try {
-    const res = await fetch(`${API_BASE}/api/auth/me`, { headers: { authorization: `Bearer ${token}` } });
+    const res = await fetchWithTimeout(`${API_BASE}/api/auth/me`, { headers: { authorization: `Bearer ${token}` } }, 8000);
     if (!res.ok) {
       if (res.status === 401) localStorage.removeItem(TOKEN_KEY);
       return;
@@ -1075,6 +1187,7 @@ els.form.addEventListener('submit', (event) => {
 renderStep();
 tryAttachExistingSession();
 </script>
+<script src="/turnstile-config.js"></script>
 <script src="/turnstile-widget.js"></script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onCredXTurnstileLoad" async defer></script>
 </body>

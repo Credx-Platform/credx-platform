@@ -2,8 +2,9 @@
    Cloudflare Turnstile verification.
 
    Rollout-safe by design:
-   - If TURNSTILE_SECRET_KEY is unset, verification is SKIPPED (returns ok)
-     so existing flows and local dev keep working while you provision keys.
+   - If TURNSTILE_SECRET_KEY is unset outside production, verification is
+     SKIPPED (returns ok) so local/dev flows keep working.
+   - In production, a missing secret is a hard failure.
    - Once the secret is set, a missing or invalid token is REJECTED.
 
    The public site key lives in the frontend HTML (safe to commit). Only the
@@ -19,6 +20,21 @@ export interface TurnstileResult {
   reason?: string;
 }
 
+export function logTurnstileRejection(
+  route: string,
+  result: TurnstileResult,
+  context: { hasToken?: boolean; referer?: unknown; origin?: unknown; userAgent?: unknown }
+) {
+  console.warn('TURNSTILE_REJECTED', {
+    route,
+    reason: result.reason || 'CAPTCHA verification failed',
+    hasToken: Boolean(context.hasToken),
+    referer: typeof context.referer === 'string' ? context.referer.slice(0, 180) : undefined,
+    origin: typeof context.origin === 'string' ? context.origin.slice(0, 120) : undefined,
+    userAgent: typeof context.userAgent === 'string' ? context.userAgent.slice(0, 180) : undefined
+  });
+}
+
 export function isTurnstileEnabled(): boolean {
   return Boolean(process.env.TURNSTILE_SECRET_KEY?.trim());
 }
@@ -31,6 +47,9 @@ export function isTurnstileEnabled(): boolean {
 export async function verifyTurnstile(token: unknown, remoteIp?: string): Promise<TurnstileResult> {
   const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
   if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      return { ok: false, reason: 'CAPTCHA verification is not configured' };
+    }
     return { ok: true, skipped: true, reason: 'TURNSTILE_SECRET_KEY not set; verification skipped' };
   }
   if (typeof token !== 'string' || token.length === 0) {
@@ -66,7 +85,7 @@ export async function verifyTurnstile(token: unknown, remoteIp?: string): Promis
 /**
  * Express helper: pull the token from a parsed request body (under either
  * `turnstileToken` or the raw `cf-turnstile-response` field) and verify it.
- * Returns ok:true (skipped) when Turnstile is not configured.
+ * Returns ok:true (skipped) outside production when Turnstile is not configured.
  */
 export async function verifyTurnstileFromBody(
   body: Record<string, unknown> | undefined,

@@ -1,20 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+cat >&2 <<'EOF'
+Direct workstation/VPS production deployments are disabled.
 
-cp railway.json railway.web.json.runtime.bak
-cleanup() {
-  if [ -f railway.web.json.runtime.bak ]; then
-    mv railway.web.json.runtime.bak railway.json
-  fi
-}
-trap cleanup EXIT
+CredX releases must run through the protected GitHub production environment
+after CI passes, a restore-tested backup is attested, and a human approves the
+deployment. See docs/PRODUCTION_SAFETY.md.
+EOF
 
-cp railway.api.json railway.json
-railway up --service @credx/api --detach --message "CredX API deploy via standalone service config"
-
-cp railway.web.json railway.json
-railway up --service @credx/web --detach --message "CredX web deploy via standalone service config"
-
-echo "Triggered Railway deployments for @credx/api and @credx/web"
+exit 1

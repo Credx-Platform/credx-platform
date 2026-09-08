@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { captureException } from '../lib/sentry.js';
 
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
   if (err instanceof ZodError) {
@@ -19,5 +20,14 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     meta: (error as any).meta,
     stack: error.stack
   });
+
+  // SaaS Upgrade: Capture in Sentry-compatible error ledger
+  captureException(error, {
+    url: req.originalUrl,
+    method: req.method,
+    userId: (req as any).auth?.sub,
+    tags: { route: req.path, handler: 'errorHandler' }
+  }).catch(() => {}); // fire-and-forget
+
   return res.status(500).json({ error: 'Internal server error' });
 }

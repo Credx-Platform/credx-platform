@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: credx_staging
+      POSTGRES_PASSWORD: credx_staging_disposable
+      POSTGRES_DB: credx_staging
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U credx_staging -d credx_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - credx_staging_data:/var/lib/postgresql/data
+
+volumes:
+  credx_staging_data:

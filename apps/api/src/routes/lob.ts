@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 
 export const lobRouter = Router();
 
@@ -34,7 +34,7 @@ const sendSchema = z.object({
   metadata: z.record(z.string()).optional()
 });
 
-lobRouter.post('/send', requireAuth, async (req: AuthedRequest, res, next) => {
+lobRouter.post('/send', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req: AuthedRequest, res, next) => {
   try {
     const auth = lobAuthHeader();
     if (!auth) {
@@ -71,14 +71,9 @@ lobRouter.post('/send', requireAuth, async (req: AuthedRequest, res, next) => {
       return res.status(response.status).json({ error: body?.error?.message || 'Lob request failed', details: body });
     }
 
-    // Resolve the client this letter belongs to: the client's own auth for
-    // portal sends, or metadata.clientId for staff/admin-initiated sends.
-    let client = req.auth?.sub
-      ? await prisma.client.findUnique({ where: { userId: req.auth.sub } })
+    const client = payload.metadata?.clientId
+      ? await prisma.client.findUnique({ where: { id: payload.metadata.clientId } })
       : null;
-    if (!client && (req.auth?.role === 'STAFF' || req.auth?.role === 'ADMIN') && payload.metadata?.clientId) {
-      client = await prisma.client.findUnique({ where: { id: payload.metadata.clientId } });
-    }
     if (client) {
       await prisma.activityEvent.create({
         data: {

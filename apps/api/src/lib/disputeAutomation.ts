@@ -9,6 +9,22 @@ import path from 'path';
 // Consolidated Dispute Letter Template
 // ============================================================
 
+export const DISPUTE_LETTER_SETUPS = {
+  highLevel: {
+    id: 'high_level',
+    label: 'High Level',
+    description: 'FCRA 1681e(b) and 1681i(a)(5) bureau dispute letter with factual item explanations, correction requests, and client signature.'
+  },
+  lowLevel: {
+    id: 'low_level',
+    label: 'Low Level',
+    description: 'Legacy aggressive bureau dispute letter kept as a secondary option for manual/template selection.'
+  }
+} as const;
+
+export type DisputeLetterSetupId = (typeof DISPUTE_LETTER_SETUPS)[keyof typeof DISPUTE_LETTER_SETUPS]['id'];
+const DEFAULT_DISPUTE_LETTER_SETUP: DisputeLetterSetupId = DISPUTE_LETTER_SETUPS.highLevel.id;
+
 const bureauAddress = (bureau: string) => {
   if (bureau === 'Equifax') return 'P.O. Box 740256\nAtlanta, GA 30374-0256';
   if (bureau === 'Experian') return 'P.O. Box 4500\nAllen, TX 75013';
@@ -22,39 +38,97 @@ const clientMailingBlock = (data: ConsolidatedLetterData) => {
     .join('\n');
 };
 
-const CONSOLIDATED_DISPUTE_TEMPLATE = (data: ConsolidatedLetterData) => `${clientMailingBlock(data)}
+const accountIssueBlock = (account: ConsolidatedLetterData['accounts'][number], index: number) => {
+  const accountLabel = account.accountName.toLowerCase();
+  const disputeText = `${account.issue} ${account.reason}`.toLowerCase();
+  const isPersonalInfo = /\b(personal information|personal info|address|employer|name|alias|date of birth|dob|ssn)\b/.test(disputeText)
+    || /^(personal information|personal info|address|addresses|employer|employers|name|names|alias|aliases|date of birth|dob|ssn)$/i.test(accountLabel);
+  const requestedInvestigation = isPersonalInfo
+    ? 'Requested investigation: Please verify the disputed name, address, and employer identifiers against my current identifying documents and remove any inaccurate, outdated, incomplete, or unsupported personal information.'
+    : 'Requested investigation: Please verify the account number, ownership, balance, past-due amount, account status, payment status, date opened, date of first delinquency if applicable, date last reported, and any remarks or collection/charge-off coding.';
+  const requestedResult = isPersonalInfo
+    ? 'Requested result: Please correct or delete every personal identifier that cannot be verified as accurate, current, and complete.'
+    : 'Requested result: Please correct every inaccurate or incomplete field. If the item cannot be verified as accurate and complete, please delete it from my consumer report.';
+
+  return [
+    `${index + 1}. ${account.accountName}`,
+    isPersonalInfo ? null : `Account number: ${account.accountNumber || '[last four or partial account number only]'}`,
+    `Issue: ${account.issue || 'The reporting appears inaccurate, incomplete, inconsistent, or unverifiable.'}`,
+    `Reason for dispute: ${account.reason || 'Please verify the account-level reporting for accuracy, completeness, and current status.'}`,
+    requestedInvestigation,
+    requestedResult
+  ].filter(Boolean).join('\n');
+};
+
+const HIGH_LEVEL_CONSOLIDATED_DISPUTE_TEMPLATE = (data: ConsolidatedLetterData) => `${clientMailingBlock(data)}
 
 ${data.bureau}
 ${bureauAddress(data.bureau)}
 
 ${data.date}
 
-${data.accounts.map((account) => `${account.accountName}: Account number: ${account.accountNumber || '[last four or partial account number only]'}, ${account.reason || account.issue || 'Account type is incorrect and not correctly displayed. Please delete.'}`).join('\n')}
+Re: Dispute under 15 U.S.C. § 1681e(b) maximum possible accuracy and 15 U.S.C. § 1681i(a)(5) treatment of inaccurate or unverifiable information
 
-I am writing to formally dispute the accuracy and validity of certain items appearing on my credit report in accordance with my rights under the Fair Credit Reporting Act (FCRA) (15 U.S.C. § 1681 et seq.) and the Fair Debt Collection Practices Act (FDCPA) (15 U.S.C. § 1692 et seq.). I demand the immediate removal of the following items due to their unlawful, inaccurate, incomplete, or unverifiable presence on my credit report.
+Dear ${data.bureau},
+
+I recently reviewed my consumer credit report and noticed several reporting issues that appear inaccurate, incomplete, inconsistent, outdated, or unverifiable. I am writing to formally dispute the information listed below under the Fair Credit Reporting Act (FCRA), including 15 U.S.C. § 1681e(b) and 15 U.S.C. § 1681i.
+
+The disputed information is negatively affecting my creditworthiness and reputation, and I am requesting your prompt attention to this matter. The inaccurate or unverifiable information relates to the following item(s):
+
+${data.accounts.map(accountIssueBlock).join('\n\n')}
+
+Pursuant to 15 U.S.C. § 1681e(b), credit reporting agencies are required to follow reasonable procedures to assure maximum possible accuracy of the information they report. Based on my review, the information above should be reinvestigated for accuracy, completeness, current status, and support from the furnisher's records.
+
+Furthermore, under 15 U.S.C. § 1681i, I am exercising my right to dispute incomplete, inaccurate, or unverifiable information directly with the credit reporting agency. Please conduct a thorough reinvestigation of each disputed item and correct, update, or delete any information that cannot be verified as accurate and complete.
+
+I request that you correct all inaccuracies and violations on my credit report in accordance with the FCRA. Please notify me promptly of the actions taken, provide the written results of your reinvestigation, and send an updated copy of my credit report once the investigation is complete.
+
+If any disputed information remains verified, please provide the method of verification used and identify the furnisher or source relied upon to verify the information. I reserve all rights available to me under federal and state consumer protection laws if these disputed inaccuracies are not properly investigated and corrected.
+
+Please send all correspondence to my mailing address listed above.
+
+Sincerely yours,
+${data.clientName}`;
+
+const LOW_LEVEL_CONSOLIDATED_DISPUTE_TEMPLATE = (data: ConsolidatedLetterData) => `${clientMailingBlock(data)}
+
+${data.bureau}
+${bureauAddress(data.bureau)}
+
+${data.date}
+
+${data.accounts.map((account) => `${account.accountName}: Account number: ${account.accountNumber || '[last four or partial account number only]'}, ${account.reason || account.issue || 'Account type may be inaccurate or incomplete. Please investigate and correct or delete any unsupported reporting.'}`).join('\n')}
+
+I am writing to formally dispute the accuracy and validity of certain items appearing on my credit report in accordance with my rights under the Fair Credit Reporting Act (FCRA) (15 U.S.C. § 1681 et seq.) and the Fair Debt Collection Practices Act (FDCPA) (15 U.S.C. § 1692 et seq.). I request investigation of the following items because they may be inaccurate, incomplete, unverifiable, or unauthorized.
 
 1. Unauthorized Third-Party Collections
-According to 15 U.S.C. § 1692e, it is illegal for a debt collector to report false or misleading information to the credit bureaus. I am requesting verification of the following alleged debt(s), including:
+Under 15 U.S.C. § 1692e, false or misleading debt-collection reporting may violate federal law. I am requesting verification of the following alleged debt(s), including:
 • A copy of the original signed contract proving my consent and liability for this debt.
 • A chain of custody showing how the debt was acquired.
 • Proof that this debt was lawfully assigned in compliance with 15 U.S.C. § 1692g (Validation of Debts).
 
-Failure to provide the above documentation within 30 days will constitute a violation of 15 U.S.C. § 1692k, making the reporting party liable for damages.
+If the above documentation cannot be provided, please update, correct, or delete any reporting that cannot be verified as accurate and complete.
 
 2. Unauthorized Inquiries
-Per 15 U.S.C. § 1681b, a company must have permissible purpose to conduct a hard inquiry on my credit report. I demand the immediate removal of any inquiry connected to these disputed items if it was not authorized by me.
+Per 15 U.S.C. § 1681b, a company must have permissible purpose to conduct a hard inquiry on my credit report. I dispute any inquiry connected to these items if it was not authorized by me.
 
 Under 15 U.S.C. § 1681n, any entity that unlawfully accesses my credit file without proper authorization is subject to statutory damages, attorney's fees, and punitive damages.
 
-Final Demand
-As required under 15 U.S.C. § 1681i (Procedure in Case of Disputed Accuracy), you have 30 days to conduct a thorough investigation and remove the inaccurate information. Failure to do so will result in a complaint being filed with the Consumer Financial Protection Bureau (CFPB), the Federal Trade Commission (FTC), and the Attorney General's Office.
+Request for Investigation and Response
+As required under 15 U.S.C. § 1681i (Procedure in Case of Disputed Accuracy), you have 30 days to conduct a reasonable investigation and correct or delete information that cannot be verified as accurate and complete. If the investigation does not address these concerns, I may consider appropriate follow-up options, including a complaint to the Consumer Financial Protection Bureau (CFPB), the Federal Trade Commission (FTC), or the Attorney General's Office.
 
-I expect a written response confirming the removal of these disputed accounts and any related inquiries. Any further attempt to report unverifiable or unauthorized information will be considered a willful violation of federal law.
+Please send a written response explaining the verification, corrections, deletions, or other updates made for these disputed accounts and any related inquiries.
 
 Please send all correspondence to my mailing address listed above.
 
 Sincerely,
 ${data.clientName}`;
+
+function consolidatedDisputeTemplateFor(setupId: DisputeLetterSetupId = DEFAULT_DISPUTE_LETTER_SETUP) {
+  return setupId === DISPUTE_LETTER_SETUPS.lowLevel.id
+    ? LOW_LEVEL_CONSOLIDATED_DISPUTE_TEMPLATE
+    : HIGH_LEVEL_CONSOLIDATED_DISPUTE_TEMPLATE;
+}
 
 interface ConsolidatedLetterData {
   clientName: string;
@@ -155,7 +229,8 @@ interface LetterClientFields {
 export function buildConsolidatedLetterContent(
   client: LetterClientFields,
   analysis: CreditAnalysis,
-  bureauLabel: string
+  bureauLabel: string,
+  setupId: DisputeLetterSetupId = DEFAULT_DISPUTE_LETTER_SETUP
 ): string | null {
   // Normalize so a document storing either a label ("Equifax") or a code ("EFX")
   // both resolve to the same canonical bureau as the analysis opportunities.
@@ -190,7 +265,7 @@ export function buildConsolidatedLetterContent(
     }))
   };
 
-  return CONSOLIDATED_DISPUTE_TEMPLATE(letterData);
+  return consolidatedDisputeTemplateFor(setupId)(letterData);
 }
 
 // ============================================================
@@ -340,6 +415,180 @@ export async function generateDisputeLetters(
   };
 }
 
+function formatEscalationOpportunity(opp: DisputeOpportunity, index: number) {
+  return [
+    `### ${index + 1}. ${opp.accountName}`,
+    `Priority: HIGH`,
+    `Account number: ${opp.accountNumber || '[last four or partial account number only]'}`,
+    `Bureaus: ${(opp.bureaus || []).map(getBureauLabel).join(', ') || 'Not specified'}`,
+    `Issue: ${opp.issue || 'Reported information appears inaccurate, incomplete, inconsistent, or unverifiable.'}`,
+    `Factual basis: ${opp.reason || 'Review the supporting credit-report fields and dispute history before filing.'}`,
+    `Requested correction: Correct each inaccurate or incomplete field, or delete the item if it cannot be verified as accurate and complete.`
+  ].join('\n\n');
+}
+
+function buildEscalationPacketContent(
+  client: LetterClientFields,
+  analysis: CreditAnalysis,
+  highLevelLetters: Array<{ bureau: string; content: string }>
+) {
+  const clientName = `${client.user.firstName || ''} ${client.user.lastName || ''}`.trim() || 'Client';
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const opportunities = analysis.disputeOpportunities || [];
+  const actionPlan = analysis.actionPlan || [];
+
+  return `# CFPB / FTC Escalation Packet - HIGH Priority
+
+Client: ${clientName}
+
+Date prepared: ${date}
+
+Prepared by: CredX Admin Portal
+
+## Purpose
+
+This packet organizes the client's credit-analysis findings, high-priority disputed accounts, and high-level FCRA dispute letter language for admin/client review before any CFPB or FTC submission.
+
+This packet is not an automatic filing. The client should review the facts, confirm the information is true and accurate, and submit any CFPB/FTC complaint under their own name unless separate written authorization is collected.
+
+## Compliance Guardrails
+
+- Use CFPB escalation when prior dispute history, furnisher response, bureau response, or documented reporting inconsistencies support escalation.
+- Use FTC identity-theft reporting only when identity theft or fraud is actually true.
+- Do not promise deletion, score increase, approval, settlement, or agency action.
+- Do not submit speculative or unsupported allegations.
+- Keep all statements factual, specific, and evidence-based.
+
+## Analysis Summary
+
+${analysis.clientFacingSummary || 'No client-facing summary stored.'}
+
+## High-Priority Inaccurate / Unverifiable Accounts
+
+${opportunities.length ? opportunities.map(formatEscalationOpportunity).join('\n\n---\n\n') : 'No dispute opportunities are stored in the current analysis.'}
+
+## Suggested Escalation Routing
+
+1. Bureau reinvestigation or furnisher direct dispute first when no prior dispute history exists.
+2. Method-of-verification follow-up when a bureau verifies without addressing the evidence.
+3. CFPB complaint when the bureau or furnisher ignores evidence, contradicts itself, or fails to address the core reporting issue.
+4. FTC complaint only for unfair/deceptive conduct or identity-theft/fraud facts that are actually supported.
+
+## Evidence Checklist
+
+- Current credit report showing the disputed reporting.
+- Prior dispute letters and delivery proof, if available.
+- Bureau/furnisher responses, verification results, or no-response timeline.
+- Identification and address proof, if relevant.
+- Account statements, payoff letters, police report, identity-theft documents, or other proof only when applicable.
+- Client attestation: "The facts I am submitting are true and accurate to the best of my knowledge."
+
+## Existing Action Plan
+
+${actionPlan.length ? actionPlan.map((phase) => `### Phase ${phase.phase}: ${phase.title}
+
+${phase.description}
+
+Estimated timing: ${phase.estimatedWeeks} week(s)
+
+Tasks:
+${phase.tasks.map((task: string) => `- ${task}`).join('\n')}`).join('\n\n') : 'No action plan is stored in the current analysis.'}
+
+## High-Level Dispute Letter Reference
+
+${highLevelLetters.length ? highLevelLetters.map((letter) => `## ${letter.bureau} High-Level Dispute Letter
+
+\`\`\`text
+${letter.content}
+\`\`\``).join('\n\n') : 'No high-level dispute letter content could be generated from the current analysis.'}
+`;
+}
+
+export async function generateEscalationPacket(clientId: string): Promise<{
+  document: any;
+  content: string;
+  opportunities: number;
+  lettersIncluded: number;
+}> {
+  const client = await prisma.client.findUnique({
+    where: { id: clientId },
+    include: { user: true, progress: true }
+  });
+
+  if (!client) throw new Error('Client not found');
+  if (!client.progress?.analysis) throw new Error('No credit analysis found. Upload credit report and generate analysis first.');
+
+  const analysis = client.progress.analysis as unknown as CreditAnalysis;
+  const bureaus = ['Experian', 'Equifax', 'TransUnion'];
+  const highLevelLetters = bureaus
+    .map((bureau) => ({ bureau, content: buildConsolidatedLetterContent(client, analysis, bureau, DISPUTE_LETTER_SETUPS.highLevel.id) || '' }))
+    .filter((letter) => letter.content.trim().length > 0);
+  const content = buildEscalationPacketContent(client, analysis, highLevelLetters);
+
+  const packetDir = path.join('/tmp', 'credx-escalation-packets', clientId);
+  await fs.mkdir(packetDir, { recursive: true });
+  const safeLastName = (client.user.lastName || 'client').replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+  const fileName = `cfpb-ftc-escalation-${safeLastName}-${Date.now()}.md`;
+  const filePath = path.join(packetDir, fileName);
+  try {
+    await fs.writeFile(filePath, content, 'utf-8');
+  } catch (writeErr) {
+    console.warn(`[disputeAutomation] could not write escalation packet to ${filePath}:`, writeErr);
+  }
+
+  const document = await prisma.document.create({
+    data: {
+      clientId,
+      type: 'OTHER',
+      fileName,
+      s3Key: filePath,
+      content,
+      contentType: 'text/markdown',
+      roundNumber: 1,
+      letterType: 'CFPB_FTC_ESCALATION_PACKET',
+      bureau: 'ALL',
+      letterStatus: 'DRAFTED'
+    }
+  });
+
+  const taskTitle = 'Review CFPB/FTC escalation packet';
+  const existingTask = await prisma.task.findFirst({
+    where: { clientId, title: taskTitle, completed: false }
+  });
+  if (!existingTask) {
+    await prisma.task.create({
+      data: {
+        clientId,
+        title: taskTitle,
+        description: 'Review the high-priority CFPB/FTC escalation packet with the client before any external complaint is submitted.',
+        completed: false,
+        dueAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+      }
+    });
+  }
+
+  await prisma.activityEvent.create({
+    data: {
+      clientId,
+      type: 'CFPB_FTC_ESCALATION_PACKET_GENERATED',
+      message: `High-priority CFPB/FTC escalation packet generated for ${analysis.disputeOpportunities?.length || 0} disputed account(s).`,
+      metadata: {
+        documentId: document.id,
+        opportunities: analysis.disputeOpportunities?.length || 0,
+        lettersIncluded: highLevelLetters.length,
+        filingMode: 'admin_packet_only'
+      }
+    }
+  });
+
+  return {
+    document,
+    content,
+    opportunities: analysis.disputeOpportunities?.length || 0,
+    lettersIncluded: highLevelLetters.length
+  };
+}
+
 // ============================================================
 // Dispute Initiation Email
 // ============================================================
@@ -471,7 +720,7 @@ export async function sendDisputeInitiationEmail(
               Important Timeline Information
             </div>
             <p style="margin: 0; color: #cbd5e1; font-size: 13px; line-height: 1.6;">
-              Credit bureaus have <strong>30 days</strong> to investigate disputes under the Fair Credit Reporting Act (FCRA). Round 1 responses typically arrive in 4-6 weeks. If items are verified, we'll escalate to Round 2 or the CFPB. Total campaign duration varies based on creditor responses, but most clients see significant progress within 90-120 days.
+              Credit bureaus generally have <strong>30 days</strong> to investigate disputes under the Fair Credit Reporting Act (FCRA). Round 1 responses often arrive in 4-6 weeks. If items are verified and factual concerns remain, CredX can help prepare a human-reviewed next step such as Round 2 or a complaint package. Timelines and outcomes vary based on bureau and furnisher responses.
             </p>
           </div>
           

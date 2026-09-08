@@ -7,6 +7,8 @@ const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() ||
 
 const TOKEN_KEY = 'credx-client-token';
 const USER_KEY = 'credx-client-user';
+const ADMIN_TOKEN_KEY = 'credx-admin-token';
+const ADMIN_USER_KEY = 'credx-admin-user';
 
 type VerifyResponse = {
   valid: true;
@@ -17,7 +19,7 @@ type VerifyResponse = {
 };
 
 type CompleteResponse = {
-  user: { id: string; email: string; firstName: string; lastName: string; role: 'CLIENT' | 'STAFF' | 'ADMIN' };
+  user: { id: string; email: string; firstName: string; lastName: string; role: 'CLIENT' | 'AFFILIATE' | 'STAFF' | 'ADMIN' };
   token: string;
 };
 
@@ -36,6 +38,7 @@ export default function SetPassword() {
   const nextDestination = useMemo(() => {
     if (typeof window === 'undefined') return '/portal';
     const next = new URLSearchParams(window.location.search).get('next');
+    if (next === 'affiliate-admin') return '/adminportal';
     return next === 'masterclass' ? '/portal?welcome=masterclass' : '/portal';
   }, []);
 
@@ -105,15 +108,21 @@ export default function SetPassword() {
 
       const complete = body as CompleteResponse;
       const isMasterclassSetup = status.verify.purpose === 'setup' && nextDestination.includes('welcome=masterclass');
+      const isAffiliateAdminSetup = status.verify.purpose === 'setup' && nextDestination === '/adminportal';
       if (isMasterclassSetup) {
         localStorage.setItem(TOKEN_KEY, complete.token);
         localStorage.setItem(USER_KEY, JSON.stringify(complete.user));
+      } else if (isAffiliateAdminSetup) {
+        localStorage.setItem(ADMIN_TOKEN_KEY, complete.token);
+        localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(complete.user));
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
       } else {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
       }
       setStatus({ kind: 'success' });
-      window.location.assign(isMasterclassSetup ? nextDestination : '/portal?password=created');
+      window.location.assign(isMasterclassSetup || isAffiliateAdminSetup ? nextDestination : '/portal?password=created');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Could not set password.');
       setStatus({ kind: 'ready', verify: status.verify });

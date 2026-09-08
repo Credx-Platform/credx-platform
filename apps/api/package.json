@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:worker": "tsx watch src/worker.ts",
     "build": "prisma generate --schema ../../packages/db/prisma/schema.prisma && tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "start:worker": "node dist/worker.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -38,7 +40,7 @@
     "@types/pdf-parse": "^1.1.4",
     "@types/pdfkit": "^0.13.9",
     "prisma": "^5.22.0",
-    "tsx": "^4.19.1",
+    "tsx": "^4.23.8",
     "typescript": "^5.6.3"
   }
 }

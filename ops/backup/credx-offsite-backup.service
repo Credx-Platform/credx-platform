@@ -1,0 +1,16 @@
+[Unit]
+Description=CredX encrypted off-site PostgreSQL backup and restore test
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/.openclaw/workspace/credx-platform
+EnvironmentFile=/etc/credx/backup.conf
+ExecStart=/usr/bin/node /home/ubuntu/.openclaw/workspace/credx-platform/ops/backup/backup-and-verify.mjs
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/ubuntu/backups/credx-db

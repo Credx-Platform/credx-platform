@@ -22,9 +22,10 @@ function fingerprintAnalysis(analysis: CreditAnalysis): string {
 export async function dispatchAnalysisEmail(params: {
   clientId: string;
   analysis: CreditAnalysis;
-  trigger: 'auto_doc_upload' | 'auto_secure_upload' | 'admin_generate' | 'auto_endpoint';
+  trigger: 'auto_doc_upload' | 'auto_secure_upload' | 'admin_generate' | 'auto_endpoint' | 'manual_staff_share';
+  force?: boolean;
 }): Promise<{ sent: boolean; reason?: string; messageId?: string }> {
-  const { clientId, analysis, trigger } = params;
+  const { clientId, analysis, trigger, force = false } = params;
   try {
     const client = await prisma.client.findUnique({
       where: { id: clientId },
@@ -41,7 +42,7 @@ export async function dispatchAnalysisEmail(params: {
       ? (workflow[FINGERPRINT_KEY] as string)
       : null;
 
-    if (lastFingerprint === fingerprint) {
+    if (!force && lastFingerprint === fingerprint) {
       return { sent: false, reason: 'fingerprint_unchanged' };
     }
 

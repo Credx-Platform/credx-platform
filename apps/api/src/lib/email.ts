@@ -121,13 +121,13 @@ function renderWelcomeLeadEmail(params: { firstName: string; contractLink: strin
     ? [
         'Open your secure CredX onboarding link.',
         'Review and sign your CredX agreement.',
-        'Complete your intake and choose your monitoring provider.',
+        'Complete your intake and upload a report or choose a third-party report provider.',
         'Unlock your masterclass lessons and affiliate tools inside the platform.'
       ]
     : [
         'Open your secure CredX onboarding link.',
         'Review and sign your CredX agreement.',
-        'Complete your intake and connect your monitoring provider.',
+        'Complete your intake and upload a report or choose a third-party report provider.',
         'Watch for your portal-ready email once onboarding is complete.'
       ];
   const valueProps = isMasterclass
@@ -366,6 +366,89 @@ export async function sendWelcomeLeadEmail(params: { firstName: string; email: s
   return { ...email, delivery: result };
 }
 
+function renderAffiliateOnboardingEmail(params: {
+  name: string;
+  affiliateId: string;
+  referralCode: string;
+  referralLink: string;
+  onboardingLink: string;
+}) {
+  const subject = 'Welcome to the CredX Affiliate Program';
+  const steps = [
+    'Review the CredX affiliate policy and sign the acknowledgment.',
+    'After signing, create your secure sub-agent admin login.',
+    'Copy your affiliate link and use it in your social bio, stories, posts, texts, or direct messages.',
+    'Send prospects to the link. CredX tracks clicks, source, IP, device, signups, and referrals back to your affiliate record.'
+  ];
+  const bodyHtml = `
+    <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">Welcome to CredX, ${params.name || 'partner'}.</h1>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">CredX helps consumers understand their credit reports, identify inaccurate or unverifiable negative reporting, prepare lawful dispute strategy, and rebuild stronger financial habits through education, guided workflows, and credit improvement services.</p>
+    <div style="margin:18px 0;padding:16px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;">
+      <strong style="display:block;color:${EMAIL_TEXT};font-size:13px;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Your affiliate details</strong>
+      <div style="color:${EMAIL_TEXT_MUTED};font-size:14px;line-height:1.7;">Affiliate ID: <strong style="color:${EMAIL_CYAN};">${params.affiliateId}</strong><br />Referral code: <strong style="color:${EMAIL_CYAN};">${params.referralCode}</strong><br />Link: <span style="color:${EMAIL_TEXT};word-break:break-all;">${params.referralLink}</span></div>
+    </div>
+    <div style="margin:8px 0 6px;font-family:${EMAIL_FONT};font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${EMAIL_CYAN};">How to use your affiliate link</div>
+    ${emailNumberedSteps(steps)}
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:15px;line-height:1.7;">Use your link anywhere you are introducing people to CredX. Do not promise deletions, guaranteed score increases, legal representation, or guaranteed funding. Keep your message simple: CredX reviews credit-report issues, helps build lawful strategy, and supports the client journey.</p>
+    ${emailButton(params.onboardingLink, 'Review policy and set up login')}
+    <p style="margin:18px 0 0;color:${EMAIL_TEXT_DIM};font-size:12px;line-height:1.6;">If the button doesn't open, copy and paste this link into your browser:<br /><span style="color:${EMAIL_TEXT};word-break:break-all;font-size:12px;">${params.onboardingLink}</span></p>
+  `;
+  const html = renderEmailShell({
+    preheader: 'Review the CredX affiliate policy, sign it, and set up your sub-agent admin login.',
+    eyebrow: 'Affiliate · Onboarding',
+    bodyHtml
+  });
+  const text = `Welcome to the CredX Affiliate Program
+
+Hi ${params.name || 'partner'},
+
+CredX helps consumers understand their credit reports, identify inaccurate or unverifiable negative reporting, prepare lawful dispute strategy, and rebuild stronger financial habits through education, guided workflows, and credit improvement services.
+
+Affiliate ID: ${params.affiliateId}
+Referral code: ${params.referralCode}
+Referral link: ${params.referralLink}
+
+How to use your affiliate link:
+1. Review the CredX affiliate policy and sign the acknowledgment.
+2. After signing, create your secure sub-agent admin login.
+3. Copy your affiliate link and use it in your social bio, stories, posts, texts, or direct messages.
+4. Send prospects to the link. CredX tracks clicks, source, IP, device, signups, and referrals back to your affiliate record.
+
+Do not promise deletions, guaranteed score increases, legal representation, or guaranteed funding.
+
+Review policy and set up login:
+${params.onboardingLink}
+
+CredX`;
+
+  return { subject, html, text };
+}
+
+export async function sendAffiliateOnboardingEmail(params: {
+  to: string;
+  name: string;
+  affiliateId: string;
+  referralCode: string;
+  referralLink: string;
+  onboardingLink: string;
+}) {
+  const email = renderAffiliateOnboardingEmail(params);
+  const result = await sendEmail({
+    to: params.to,
+    subject: email.subject,
+    html: email.html,
+    text: email.text
+  });
+
+  console.log('AFFILIATE_ONBOARDING_EMAIL_SEND_RESULT', {
+    to: params.to,
+    affiliateId: params.affiliateId,
+    result
+  });
+
+  return { ...email, delivery: result };
+}
+
 export interface EmailAttachment {
   filename: string;
   content: Buffer;
@@ -385,6 +468,9 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
   const resendFrom = process.env.RESEND_FROM_EMAIL || process.env.FROM_EMAIL || defaultFrom;
   const sendgridApiKey = process.env.SENDGRID_API_KEY;
   const sendgridFrom = process.env.SENDGRID_FROM_EMAIL || process.env.FROM_EMAIL || defaultFrom;
+  const sendgridTimeoutMs = Number(process.env.SENDGRID_TIMEOUT_MS || 6000);
+  const resendTimeoutMs = Number(process.env.RESEND_TIMEOUT_MS || 6000);
+  const smtpTimeoutMs = Number(process.env.SMTP_TIMEOUT_MS || 4000);
 
   const parseFrom = (value: string) => {
     const email = value.includes('<') ? value.match(/<([^>]+)>/ )?.[1] || value : value;
@@ -392,15 +478,120 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
     return { email, name: name || 'CredX' };
   };
 
+  let sendgridFailure: string | null = null;
   let resendFailure: string | null = null;
   let smtpFailure: string | null = null;
 
-  if (smtpHost && smtpUser && smtpPass) {
+  const withTimeout = async <T>(label: string, timeoutMs: number, task: (signal: AbortSignal) => Promise<T>) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await task(controller.signal);
+    } catch (error) {
+      if (controller.signal.aborted) throw new Error(`${label} timed out after ${timeoutMs}ms`);
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  const sendViaResend = async () => {
+    if (!resendApiKey) return null;
+    try {
+      return await withTimeout('Resend', resendTimeoutMs, async () => {
+        const resend = new Resend(resendApiKey);
+        const from = parseFrom(resendFrom);
+        const result = await resend.emails.send({
+          from: from.name ? `${from.name} <${from.email}>` : from.email,
+          to: [params.to],
+          subject: params.subject,
+          headers: listUnsubscribeHeaders(),
+          ...(params.html ? { html: params.html } : {}),
+          ...(params.text ? { text: params.text } : { text: '' }),
+          ...(params.attachments?.length
+            ? {
+                attachments: params.attachments.map((a) => ({
+                  filename: a.filename,
+                  content: a.content,
+                  contentType: a.contentType
+                }))
+              }
+            : {})
+        });
+
+        if (!result.error) {
+          return { id: result.data?.id, provider: 'resend' };
+        }
+
+        throw new Error(`RESEND_SEND_FAILED:${JSON.stringify(result.error)}`);
+      });
+    } catch (error) {
+      resendFailure = error instanceof Error ? error.message : String(error);
+      console.warn(resendFailure.startsWith('RESEND_SEND_FAILED') ? 'RESEND_SEND_FAILED' : 'RESEND_EXCEPTION', resendFailure);
+      return null;
+    }
+  };
+
+  const sendViaSendGrid = async () => {
+    if (!sendgridApiKey) return null;
+    const from = parseFrom(sendgridFrom);
+
+    try {
+      return await withTimeout('SendGrid', sendgridTimeoutMs, async (signal) => {
+        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${sendgridApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: params.to }] }],
+            from: { email: from.email, name: from.name },
+            reply_to: { email: process.env.SMTP_REPLY_TO || businessEmail, name: 'CredX' },
+            subject: params.subject,
+            headers: listUnsubscribeHeaders(),
+            content: [
+              ...(params.text ? [{ type: 'text/plain', value: params.text }] : []),
+              ...(params.html ? [{ type: 'text/html', value: params.html }] : [])
+            ],
+            ...(params.attachments?.length
+              ? {
+                  attachments: params.attachments.map((a) => ({
+                    filename: a.filename,
+                    type: a.contentType || 'application/octet-stream',
+                    disposition: 'attachment',
+                    content: a.content.toString('base64')
+                  }))
+                }
+              : {})
+          }),
+          signal
+        });
+
+        if (!response.ok) {
+          const body = await response.text().catch(() => '');
+          throw new Error(`SENDGRID_SEND_FAILED:${response.status}:${body}`);
+        }
+
+        return { id: response.headers.get('x-message-id') || 'sendgrid-accepted', provider: 'sendgrid' };
+      });
+    } catch (error) {
+      sendgridFailure = error instanceof Error ? error.message : String(error);
+      console.warn(sendgridFailure.startsWith('SENDGRID_SEND_FAILED') ? 'SENDGRID_SEND_FAILED' : 'SENDGRID_EXCEPTION', sendgridFailure);
+      return null;
+    }
+  };
+
+  const sendViaSmtp = async () => {
+    if (!smtpHost || !smtpUser || !smtpPass) return null;
     try {
       const transporter = nodemailer.createTransport({
         host: smtpHost,
         port: smtpPort,
         secure: smtpSecure,
+        connectionTimeout: smtpTimeoutMs,
+        greetingTimeout: smtpTimeoutMs,
+        socketTimeout: smtpTimeoutMs,
         auth: {
           user: smtpUser,
           pass: smtpPass
@@ -430,96 +621,25 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
     } catch (error) {
       smtpFailure = error instanceof Error ? error.message : String(error);
       console.warn('SMTP_EXCEPTION', smtpFailure);
+      return null;
     }
+  };
+
+  // Resend is currently the healthy production provider. Try it before the
+  // legacy SMTP fallback so signup responses do not wait on SMTP timeouts.
+  for (const send of [sendViaResend, sendViaSendGrid, sendViaSmtp]) {
+    const result = await send();
+    if (result) return result;
   }
 
-  if (resendApiKey) {
-    try {
-      const resend = new Resend(resendApiKey);
-      const from = parseFrom(resendFrom);
-      const result = await resend.emails.send({
-        from: from.name ? `${from.name} <${from.email}>` : from.email,
-        to: [params.to],
-        subject: params.subject,
-        headers: listUnsubscribeHeaders(),
-        ...(params.html ? { html: params.html } : {}),
-        ...(params.text ? { text: params.text } : { text: '' }),
-        ...(params.attachments?.length
-          ? {
-              attachments: params.attachments.map((a) => ({
-                filename: a.filename,
-                content: a.content,
-                contentType: a.contentType
-              }))
-            }
-          : {})
-      });
-
-      if (!result.error) {
-        return { id: result.data?.id, provider: 'resend' };
-      }
-
-      resendFailure = `RESEND_SEND_FAILED:${JSON.stringify(result.error)}`;
-      console.warn('RESEND_SEND_FAILED', result.error);
-    } catch (error) {
-      resendFailure = error instanceof Error ? error.message : String(error);
-      console.warn('RESEND_EXCEPTION', resendFailure);
-    }
-  }
-
-  if (!sendgridApiKey) {
-    const providerFailures = [smtpFailure && `SMTP failed: ${smtpFailure}`, resendFailure && `Resend failed: ${resendFailure}`].filter(Boolean).join(' | ');
-    const reason = providerFailures ? `${providerFailures} | no SendGrid fallback is configured` : 'No email provider configured';
-    console.log('EMAIL_PREVIEW', { to: params.to, subject: params.subject, reason });
-    return { skipped: true, reason };
-  }
-
-  const from = parseFrom(sendgridFrom);
-
-  try {
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${sendgridApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        personalizations: [{ to: [{ email: params.to }] }],
-        from: { email: from.email, name: from.name },
-        subject: params.subject,
-        headers: listUnsubscribeHeaders(),
-        content: [
-          ...(params.text ? [{ type: 'text/plain', value: params.text }] : []),
-          ...(params.html ? [{ type: 'text/html', value: params.html }] : [])
-        ],
-        ...(params.attachments?.length
-          ? {
-              attachments: params.attachments.map((a) => ({
-                filename: a.filename,
-                type: a.contentType || 'application/octet-stream',
-                disposition: 'attachment',
-                content: a.content.toString('base64')
-              }))
-            }
-          : {})
-      })
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      const reason = `SENDGRID_SEND_FAILED:${response.status}:${body}`;
-      console.warn('SENDGRID_SEND_FAILED', response.status, body);
-      const priorFailure = [smtpFailure, resendFailure].filter(Boolean).join(' | ');
-      return { skipped: true, reason: priorFailure ? `${priorFailure} | ${reason}` : reason };
-    }
-
-    return { id: response.headers.get('x-message-id') || 'sendgrid-accepted', provider: 'sendgrid' };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    console.warn('SENDGRID_EXCEPTION', reason);
-    const priorFailure = [smtpFailure, resendFailure].filter(Boolean).join(' | ');
-    return { skipped: true, reason: priorFailure ? `${priorFailure} | ${reason}` : reason };
-  }
+  const providerFailures = [
+    sendgridFailure && `SendGrid failed: ${sendgridFailure}`,
+    smtpFailure && `SMTP failed: ${smtpFailure}`,
+    resendFailure && `Resend failed: ${resendFailure}`
+  ].filter(Boolean).join(' | ');
+  const reason = providerFailures || 'No email provider configured';
+  console.log('EMAIL_PREVIEW', { to: params.to, subject: params.subject, reason });
+  return { skipped: true, reason };
 }
 
 function renderPasswordSetupEmail(params: {
@@ -778,6 +898,80 @@ export async function sendCreditAnalysisEmail(params: {
     pdfBytes: params.pdf.length,
     findingCount: params.findingCount,
     disputeCount: params.disputeCount,
+    result
+  });
+
+  return { ...email, delivery: result };
+}
+
+function renderAffiliateReferralEmail(params: {
+  firstName: string;
+  links: Array<{ label: string; url: string; category: string; reason?: string }>;
+  note?: string | null;
+}) {
+  const subject = 'Your CredX recommended credit-building resources';
+  const linkRows = params.links.map((link) => `
+    <tr><td style="padding:0 0 10px;">
+      <div style="padding:14px 16px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;">
+        <div style="font-family:${EMAIL_FONT};font-size:16px;font-weight:700;color:${EMAIL_TEXT};">${escapeHtml(link.label)}</div>
+        ${link.reason ? `<div style="margin-top:5px;color:${EMAIL_TEXT_MUTED};font-family:${EMAIL_FONT};font-size:13px;line-height:1.55;">${escapeHtml(link.reason)}</div>` : ''}
+        <div style="margin-top:10px;">
+          <a href="${link.url}" style="color:${EMAIL_CYAN};font-family:${EMAIL_FONT};font-size:13px;font-weight:700;text-decoration:none;word-break:break-all;">Open resource</a>
+        </div>
+      </div>
+    </td></tr>`).join('');
+  const noteHtml = params.note
+    ? `<p style="margin:0 0 16px;color:${EMAIL_TEXT_SOFT};font-size:15px;line-height:1.7;">${escapeHtml(params.note)}</p>`
+    : '';
+  const bodyHtml = `
+    <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">Recommended resources for your credit plan</h1>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Hi ${params.firstName || 'there'},</p>
+    ${noteHtml}
+    <p style="margin:0 0 16px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Based on your CredX review, these resources may help with rebuilding positive payment history or adding useful reporting depth. Review each option carefully before opening any new account.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${linkRows}</table>
+    <p style="margin:18px 0 0;color:${EMAIL_TEXT_DIM};font-size:13px;line-height:1.6;">CredX may earn compensation from these links at no extra cost to you. This is education and strategy support, not a guarantee of approval, score increase, or deletion.</p>
+  `;
+  const html = renderEmailShell({
+    preheader: 'CredX recommended credit-building resources for your next step.',
+    eyebrow: 'Resources · Credit Building',
+    bodyHtml
+  });
+  const text = `Recommended resources for your credit plan
+
+Hi ${params.firstName || 'there'},
+
+${params.note ? `${params.note}\n\n` : ''}Based on your CredX review, these resources may help with rebuilding positive payment history or adding useful reporting depth. Review each option carefully before opening any new account.
+
+${params.links.map((link) => `- ${link.label}: ${link.url}${link.reason ? `\n  ${link.reason}` : ''}`).join('\n')}
+
+CredX may earn compensation from these links at no extra cost to you. This is education and strategy support, not a guarantee of approval, score increase, or deletion.
+
+CredX`;
+  return { subject, html, text };
+}
+
+export async function sendAffiliateReferralEmail(params: {
+  to: string;
+  firstName: string;
+  links: Array<{ label: string; url: string; category: string; reason?: string }>;
+  note?: string | null;
+}) {
+  const email = renderAffiliateReferralEmail({
+    firstName: params.firstName,
+    links: params.links,
+    note: params.note
+  });
+
+  const result = await sendEmail({
+    to: params.to,
+    subject: email.subject,
+    html: email.html,
+    text: email.text
+  });
+
+  console.log('AFFILIATE_REFERRAL_EMAIL_SEND_RESULT', {
+    to: params.to,
+    linkCount: params.links.length,
     result
   });
 

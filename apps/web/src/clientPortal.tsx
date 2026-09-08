@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import MasterclassDashboard from './components/MasterclassDashboard';
+import CreditScoreWidget from './components/CreditScoreWidget';
 import { MASTERCLASS_DAYS, type LessonDay } from './masterclassCurriculum';
 import { FILING_WORKFLOWS, type FilingWorkflow } from './filingWorkflows';
 import { renderBestPrintHtml } from './printing';
@@ -18,6 +19,7 @@ type Client = {
   id: string;
   status: string;
   serviceTier: string;
+  setupFeePaid?: boolean;
   analysisSummary?: string | null;
   disputePlanSummary?: string | null;
   estimatedTimelineMonths?: number | null;
@@ -30,6 +32,7 @@ type Client = {
   currentPostalCode?: string | null;
   dobEncrypted?: string | null;
   tasks?: Array<{ id: string; title: string; description?: string | null; completed: boolean; dueAt?: string | null }>;
+  payments?: Array<{ id: string; type: string; status: string; amount?: number | string; provider?: string | null; paidAt?: string | null; createdAt?: string }>;
   activities?: Array<{ id: string; message: string; createdAt: string; type?: string }>;
   disputes?: Array<{ id: string; creditorName: string; bureau: string; status: string; round: number; reason?: string | null; accountNumber?: string | null }>;
   documents?: Array<{
@@ -48,7 +51,16 @@ type Client = {
 
 type Progress = {
   uploadedDocs?: Array<{ name?: string; type?: string; uploadedAt?: string; fileName?: string; url?: string | null }>;
-  workflow?: { stage?: string; updatedAt?: string; next?: string[] };
+  workflow?: {
+    stage?: string;
+    updatedAt?: string;
+    next?: string[];
+    analysisReview?: {
+      readyAt?: string | null;
+      completedAt?: string | null;
+      method?: string | null;
+    };
+  };
   onboarding?: {
     status?: string;
     signupAt?: string | null;
@@ -83,6 +95,37 @@ type Progress = {
   };
   analysis?: { findings?: string[]; [key: string]: unknown } | null;
   disputeStrategy?: { objective?: string; phases?: string[]; [key: string]: unknown } | null;
+};
+
+type ReadinessScore = {
+  score: number;
+  maxScore: 100;
+  label: 'Needs Foundation' | 'Building' | 'Preparing' | 'Strong Readiness';
+  dataQuality: 'limited' | 'partial' | 'strong';
+  disclosure: string;
+  categories: Array<{ key: string; label: string; score: number; maxScore: number; explanation: string }>;
+  strengths: string[];
+  opportunities: string[];
+  nextBestActions: string[];
+  nextBestActionDetails?: ReadinessAction[];
+  generatedAt: string;
+  history?: Array<{
+    id: string;
+    score: number;
+    pulledAt: string;
+    topActions?: Array<{ title: string; priority: string; category: string | null }>;
+  }>;
+  snapshot?: { id: string; score: number; pulledAt: string };
+};
+
+type ReadinessAction = {
+  id: string;
+  title: string;
+  rationale: string;
+  category: string;
+  priority: 'high' | 'medium' | 'low';
+  potentialPoints: number;
+  href: string;
 };
 
 type LoginResponse = {
@@ -153,7 +196,7 @@ const DEFAULT_AFFILIATE_LINKS = [
   { label: 'IdentityIQ Credit Monitoring', url: 'https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4', category: 'monitoring' },
   { label: 'MyFreeScoreNow Credit Monitoring', url: 'https://app.myfreescorenow.com/enroll/B02B3064', category: 'monitoring' },
   { label: 'Self Lender', url: 'https://self.inc/refer/16452347', category: 'credit_builder' },
-  { label: 'Credit Strong', url: 'https://tracking.creditstrong.com/aff_c?aff_id=1491&offer_id=2&source=MGFinstagram', category: 'credit_builder' },
+  { label: 'Credit Strong', url: 'https://creditstrong.referralrock.com/l/3JAMES442/', category: 'credit_builder' },
   { label: 'Rent Reporters', url: 'https://prf.hn/click/camref:1101l52pUS', category: 'credit_builder' },
   { label: 'Credit Builder Card', url: 'https://www.creditbuildercard.com/mgf.html', category: 'credit_builder' },
   { label: 'Grow Credit', url: 'https://growcredit.com/?kid=12BYTD', category: 'credit_builder' },
@@ -176,7 +219,7 @@ const CARRD_CREDIT_BUILDER_LINKS: BuilderLink[] = [
   },
   {
     label: 'Credit Strong',
-    url: 'https://tracking.creditstrong.com/aff_c?aff_id=1491&offer_id=2&source=MGFinstagram',
+    url: 'https://creditstrong.referralrock.com/l/3JAMES442/',
     type: 'Credit builder loan',
     description: 'Choose a credit builder loan plan that fits your budget and reports payment activity designed to help establish or improve credit history.'
   },
@@ -328,6 +371,10 @@ function maskDob(value?: string | null) {
   return month && year ? `••/${month}/${year}` : 'Saved securely';
 }
 
+function maskStoredSsn(last4?: string | null) {
+  return last4 ? `•••-••-${last4}` : 'Not saved';
+}
+
 function maskSensitiveInput(value: string, mode: 'ssn' | 'dob') {
   if (!value) return '';
   if (mode === 'ssn') {
@@ -340,6 +387,30 @@ function maskSensitiveInput(value: string, mode: 'ssn' | 'dob') {
     return trimmed.length >= 7 ? `••/${trimmed.slice(5, 7)}/${trimmed.slice(0, 4)}` : 'Saved securely';
   }
   return value;
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isMasterclassProgress(progress?: Progress | null) {
+  const education = progress?.education;
+  if (education?.masterclassEnrolled === true || education?.masterclassAccess === true) return true;
+
+  const onboarding = progress?.onboarding;
+  if (!onboarding) return false;
+
+  const signupIntake = onboarding.signupIntake;
+  const lastSignupIntake = onboarding.lastSignupIntake;
+
+  return (
+    onboarding.initialOfferInterest === 'masterclass' ||
+    onboarding.lastOfferInterest === 'masterclass' ||
+    onboarding.status === 'masterclass' ||
+    onboarding.track === 'masterclass' ||
+    (isObjectRecord(signupIntake) && signupIntake.planPath === 'masterclass') ||
+    (isObjectRecord(lastSignupIntake) && lastSignupIntake.planPath === 'masterclass')
+  );
 }
 
 function normalizeDisputes(client: Client | null, progress: Progress | null) {
@@ -550,12 +621,12 @@ function SignaturePad({ onChange, value }: { onChange: (dataUrl: string | null) 
 
 const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
   profile: { title: 'Your Profile', desc: 'Personal info, secure documents, and identity verification details.', accent: '#a855f7' },
-  monitoring: { title: 'Credit Monitoring', desc: 'Now lives inside Analysis & Reports — upload, review, and connect monitoring in one place.', accent: '#00c6fb' },
+  monitoring: { title: 'Report Sources', desc: 'Now lives inside Analysis & Reports — upload a report or choose a third-party report provider.', accent: '#00c6fb' },
   disputes: { title: 'Disputes', desc: 'Track active dispute items, bureau status, and round progression.', accent: '#f59e0b' },
   activity: { title: 'Activity', desc: 'Timeline of what just happened on your file and what comes next.', accent: '#2dd4bf' },
   resources: { title: 'Credit Builders', desc: 'Partner tools and accounts to rebuild your credit profile.', accent: '#84cc16' },
   tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' },
-  analysis: { title: 'Analysis & Reports', desc: 'Upload your credit report, run analysis, and connect monitoring — all in one place.', accent: '#2563eb' },
+  analysis: { title: 'Analysis & Reports', desc: 'Upload a report for analysis or open a third-party report provider — all in one place.', accent: '#2563eb' },
   masterclass: { title: '5-Day Masterclass', desc: 'Your complete credit education curriculum — videos, slides, key terms, and action steps.', accent: '#00c6fb' }
 };
 
@@ -570,6 +641,254 @@ function SectionHeader({ section }: { section: Exclude<PortalTab, 'overview'> })
         <h1>{theme.title}</h1>
         <p>{theme.desc}</p>
       </div>
+    </section>
+  );
+}
+
+type PortalNotification = {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  read: boolean;
+  createdAt: string;
+};
+
+function NotificationBell({ token }: { token: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<PortalNotification[]>([]);
+  const [unread, setUnread] = useState(0);
+
+  const load = async () => {
+    if (!token) return;
+    const data = await apiFetch<{ notifications: PortalNotification[]; unreadCount: number }>('/api/notifications?limit=20', token).catch(() => null);
+    if (data) { setItems(data.notifications); setUnread(data.unreadCount); }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    void load();
+    const t = setInterval(() => { void load(); }, 60_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const markRead = async (id: string) => {
+    if (!token) return;
+    await apiFetch(`/api/notifications/${id}/read`, token, { method: 'POST' }).catch(() => {});
+    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    setUnread((u) => Math.max(0, u - 1));
+  };
+  const markAll = async () => {
+    if (!token) return;
+    await apiFetch('/api/notifications/read-all', token, { method: 'POST' }).catch(() => {});
+    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnread(0);
+  };
+
+  if (!token) return null;
+
+  return (
+    <div className="notif-bell">
+      <button
+        type="button"
+        className="ghost-button notif-bell-btn"
+        aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
+        onClick={() => { setOpen((o) => !o); if (!open) void load(); }}
+      >
+        🔔{unread > 0 && <span className="notif-badge">{unread > 9 ? '9+' : unread}</span>}
+      </button>
+      {open && (
+        <div className="notif-panel" role="dialog" aria-label="Notifications">
+          <div className="notif-panel-head">
+            <strong>Notifications</strong>
+            {unread > 0 && <button className="link-button" onClick={() => void markAll()}>Mark all read</button>}
+          </div>
+          <ul>
+            {items.length === 0 && <li className="notif-empty">You're all caught up.</li>}
+            {items.map((n) => (
+              <li key={n.id} className={n.read ? 'notif-item' : 'notif-item notif-item--unread'}>
+                <a
+                  href={n.href || '#'}
+                  onClick={() => { if (!n.read) void markRead(n.id); }}
+                >
+                  <strong>{n.title}</strong>
+                  {n.body && <span>{n.body}</span>}
+                  <time>{new Date(n.createdAt).toLocaleDateString()}</time>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type CheckInQuestion = { key: string; noteKey?: string; prompt: string };
+type CheckInState = {
+  weekKey: string;
+  due: boolean;
+  questions: CheckInQuestion[];
+  current: { changeSummary: string[]; answers: Record<string, unknown>; submittedAt: string } | null;
+  previous: { changeSummary: string[]; submittedAt: string } | null;
+};
+
+function WeeklyCheckInCard({ token, onSubmitted }: { token: string | null; onSubmitted: () => void }) {
+  const [state, setState] = useState<CheckInState | null>(null);
+  const [answers, setAnswers] = useState<Record<string, boolean | undefined>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [freeText, setFreeText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<CheckInState>('/api/checkin', token)
+      .then((s) => { setState(s); setExpanded(s.due); })
+      .catch(() => {});
+  }, [token]);
+
+  if (!token || !state) return null;
+
+  const submit = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const payload: Record<string, unknown> = { freeText: freeText || undefined };
+      for (const q of state.questions) {
+        payload[q.key] = answers[q.key] ?? null;
+        if (q.noteKey && notes[q.key]) payload[q.noteKey] = notes[q.key];
+      }
+      const res = await apiFetch<{ checkIn: any; changeSummary: string[] }>('/api/checkin', token, { method: 'POST', body: JSON.stringify(payload) });
+      setState({ ...state, due: false, current: { changeSummary: res.changeSummary, answers: {}, submittedAt: new Date().toISOString() } });
+      setExpanded(false);
+      onSubmitted();
+    } catch { /* surface nothing — non-critical */ }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <section className="panel checkin-card">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Weekly check-in · {state.weekKey}</p>
+          <h2>{state.due ? 'What changed this week?' : 'This week’s check-in is done'}</h2>
+        </div>
+        {!state.due && <button className="ghost-button" onClick={() => setExpanded((e) => !e)}>{expanded ? 'Hide' : 'Update'}</button>}
+      </div>
+
+      {!state.due && state.current && !expanded && (
+        <ul className="checkin-summary">
+          {state.current.changeSummary.map((s, i) => <li key={i}>{s}</li>)}
+        </ul>
+      )}
+
+      {(state.due || expanded) && (
+        <div className="checkin-form">
+          {state.questions.map((q) => (
+            <div key={q.key} className="checkin-q">
+              <span>{q.prompt}</span>
+              <div className="checkin-yesno">
+                <button type="button" className={answers[q.key] === true ? 'active' : ''} onClick={() => setAnswers((a) => ({ ...a, [q.key]: true }))}>Yes</button>
+                <button type="button" className={answers[q.key] === false ? 'active' : ''} onClick={() => setAnswers((a) => ({ ...a, [q.key]: false }))}>No</button>
+              </div>
+              {q.noteKey && answers[q.key] === true && (
+                <input
+                  className="checkin-note"
+                  placeholder="Add a detail (optional)"
+                  value={notes[q.key] || ''}
+                  onChange={(e) => setNotes((n) => ({ ...n, [q.key]: e.target.value }))}
+                />
+              )}
+            </div>
+          ))}
+          <textarea className="checkin-note" rows={2} placeholder="Anything else CredX should know?" value={freeText} onChange={(e) => setFreeText(e.target.value)} />
+          <button className="primary-button" disabled={busy} onClick={() => void submit()}>{busy ? 'Saving…' : 'Submit check-in'}</button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+type PlatformReport = {
+  id: string;
+  kind: string;
+  title: string;
+  status: string;
+  requestedAt: string;
+  generatedAt: string | null;
+};
+
+function PlatformReportsCard({ token }: { token: string | null }) {
+  const [reports, setReports] = useState<PlatformReport[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = async () => {
+    if (!token) return;
+    const data = await apiFetch<{ reports: PlatformReport[] }>('/api/reports', token).catch(() => null);
+    if (data) setReports(data.reports);
+  };
+  useEffect(() => {
+    if (!token) return;
+    void load();
+    const anyPending = reports.some((r) => r.status === 'PENDING' || r.status === 'GENERATING');
+    const t = setInterval(() => { void load(); }, anyPending ? 5000 : 45000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, reports.map((r) => r.status).join(',')]);
+
+  if (!token) return null;
+
+  const request = async (kind: string) => {
+    if (busy) return;
+    setBusy(kind);
+    try {
+      await apiFetch('/api/reports', token, { method: 'POST', body: JSON.stringify({ kind }) });
+      await load();
+    } catch { /* non-critical */ }
+    finally { setBusy(null); }
+  };
+
+  const open = async (id: string) => {
+    if (!token) return;
+    const full = await apiFetch<{ html: string | null }>(`/api/reports/${id}`, token).catch(() => null);
+    if (!full?.html) return;
+    const url = URL.createObjectURL(new Blob([full.html], { type: 'text/html' }));
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div><p className="eyebrow">Documents</p><h2>Platform reports</h2></div>
+      </div>
+      <p className="helper-text">Generate a shareable summary of your CredX data. These are not consumer credit reports or credit scores.</p>
+      <div className="report-actions">
+        <button className="ghost-button" disabled={!!busy} onClick={() => void request('READINESS_REPORT')}>
+          {busy === 'READINESS_REPORT' ? 'Requesting…' : 'CredX Readiness Report'}
+        </button>
+        <button className="ghost-button" disabled={!!busy} onClick={() => void request('CREDIT_PROFILE_SUMMARY')}>
+          {busy === 'CREDIT_PROFILE_SUMMARY' ? 'Requesting…' : 'Credit Profile Summary'}
+        </button>
+      </div>
+      {reports.length > 0 && (
+        <ul className="report-list">
+          {reports.slice(0, 8).map((r) => (
+            <li key={r.id}>
+              <span>{r.title}</span>
+              <span className={`report-status report-status--${r.status.toLowerCase()}`}>{r.status.toLowerCase()}</span>
+              {r.status === 'READY' ? (
+                <button className="link-button" onClick={() => void open(r.id)}>Open</button>
+              ) : (
+                <time>{new Date(r.requestedAt).toLocaleDateString()}</time>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -599,6 +918,119 @@ function CreditScoreGauge({ bureau, score }: { bureau: string; score: number | n
         <span>850</span>
       </div>
     </div>
+  );
+}
+
+function ReadinessScorePanel({
+  readiness,
+  onSaveSnapshot,
+  saving
+}: {
+  readiness: ReadinessScore | null;
+  onSaveSnapshot: () => Promise<void>;
+  saving: boolean;
+}) {
+  if (!readiness) return null;
+
+  const pct = Math.max(0, Math.min(100, Math.round((readiness.score / readiness.maxScore) * 100)));
+  const actionDetails = (readiness.nextBestActionDetails || []).slice(0, 4);
+  const topActions = readiness.nextBestActions.slice(0, 3);
+  const topCategories = [...readiness.categories]
+    .sort((a, b) => (a.score / a.maxScore) - (b.score / b.maxScore))
+    .slice(0, 3);
+  const history = (readiness.history || []).slice(0, 6);
+  const newest = history[0];
+  const previous = history[1];
+  const delta = newest && previous ? newest.score - previous.score : null;
+
+  return (
+    <section className="panel readiness-panel">
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">CredX Readiness Score</p>
+          <h2>{readiness.score}/{readiness.maxScore} - {readiness.label}</h2>
+        </div>
+        <div className="readiness-actions">
+          <span className={`status-pill status-pill--${readiness.dataQuality}`}>{readiness.dataQuality} data</span>
+          <button className="ghost-button" type="button" onClick={() => { void onSaveSnapshot(); }} disabled={saving}>
+            {saving ? 'Saving...' : 'Save snapshot'}
+          </button>
+        </div>
+      </div>
+      <div className="readiness-layout">
+        <div className="readiness-meter" aria-label={`CredX Readiness Score ${readiness.score} out of ${readiness.maxScore}`}>
+          <div className="readiness-ring" style={{ ['--readiness-pct' as string]: `${pct}%` }}>
+            <div>
+              <strong>{readiness.score}</strong>
+              <span>/100</span>
+            </div>
+          </div>
+          <p>{readiness.disclosure}</p>
+        </div>
+        <div className="readiness-details">
+          {history.length ? (
+            <div>
+              <h3>Score history</h3>
+              <div className="readiness-trend">
+                <strong>{newest?.score ?? readiness.score}</strong>
+                <span>{delta == null ? 'First saved snapshot' : `${delta >= 0 ? '+' : ''}${delta} since last snapshot`}</span>
+              </div>
+              <div className="readiness-bars" aria-label="Recent CredX Readiness Score snapshots">
+                {history.slice().reverse().map((entry) => {
+                  const focus = entry.topActions?.[0]?.title;
+                  const when = new Date(entry.pulledAt).toLocaleDateString();
+                  return (
+                    <div
+                      key={entry.id}
+                      title={focus ? `${entry.score} on ${when} — focus: ${focus}` : `${entry.score} on ${when}`}
+                    >
+                      <span style={{ height: `${Math.max(12, entry.score)}%` }} />
+                    </div>
+                  );
+                })}
+              </div>
+              {newest?.topActions?.length ? (
+                <p className="readiness-history-focus">
+                  Last snapshot focus: {newest.topActions.map((a) => a.title).join(' · ')}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <div>
+            <h3>Next best actions</h3>
+            {actionDetails.length ? (
+              <ol className="readiness-action-list">
+                {actionDetails.map((action) => (
+                  <li key={action.id} className={`readiness-action readiness-action--${action.priority}`}>
+                    <div className="readiness-action-head">
+                      <span className={`status-pill status-pill--${action.priority}`}>{action.priority}</span>
+                      <a href={action.href}>{action.title}</a>
+                      <span className="readiness-action-points">up to +{action.potentialPoints} pts</span>
+                    </div>
+                    <span className="readiness-action-why">{action.rationale}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <ul>
+                {topActions.map((action) => <li key={action}>{action}</li>)}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h3>Lowest scoring areas</h3>
+            <ul>
+              {topCategories.map((category) => (
+                <li key={category.key}>
+                  <strong>{category.label}</strong>
+                  <span>{category.score}/{category.maxScore} - {category.explanation}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -633,7 +1065,7 @@ function ClientLogin({
         </div>
         <p className="eyebrow">CredX Client Access</p>
         <h1>Client Portal Login</h1>
-        <p className="helper-text">Sign in to see your credit monitoring, analysis, account activity, disputes, and profile.</p>
+        <p className="helper-text">Sign in to see your report analysis, credit-profile progress, account activity, disputes, and profile.</p>
         <p className="helper-text">If this is your first time signing in, enter your email and tap <strong>Reset password</strong> to get your secure setup link.</p>
         <label htmlFor="client-login-email">
           <span>Email</span>
@@ -684,8 +1116,9 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
   const signatureRepairMode = Boolean(completedAt && !hasStoredSignature);
   const needsContract = signatureRepairMode || ['signup_received', 'contract_pending'].includes(stage);
   const needsApplication = !signatureRepairMode && ['contract_signed', 'application_pending'].includes(stage);
-  const needsMonitoring = stage === 'application_completed';
-  const needsUpload = ['portal_unlocked', 'upload_credit_report', 'credit_report_received'].includes(stage) && !completedAt;
+  const needsMonitoring = ['application_completed', 'report_required'].includes(stage);
+  const uploadedCreditReports = (progress?.uploadedDocs || []).filter((doc) => (doc.type || '').toLowerCase().includes('credit'));
+  const needsUpload = ['application_completed', 'report_required', 'portal_unlocked', 'upload_credit_report', 'credit_report_received'].includes(stage) && uploadedCreditReports.length === 0;
 
   async function refreshProgress() {
     const nextProgress = await apiFetch<Progress>('/api/progress/me', token);
@@ -713,21 +1146,51 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
   async function submitApplication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setWizardError(null);
+    const form = new FormData(event.currentTarget);
+    const intake = {
+      fullName: String(form.get('fullName') || wizardState.fullName || '').trim(),
+      email: String(form.get('email') || wizardState.email || '').trim(),
+      phone: String(form.get('phone') || wizardState.phone || '').trim(),
+      address1: String(form.get('address1') || wizardState.address1 || '').trim(),
+      address2: String(form.get('address2') || wizardState.address2 || '').trim(),
+      city: String(form.get('city') || wizardState.city || '').trim(),
+      state: String(form.get('state') || wizardState.state || '').trim(),
+      zip: String(form.get('zip') || wizardState.zip || '').trim(),
+      dob: String(form.get('dob') || wizardState.dob || '').trim(),
+      ssn: String(form.get('ssn') || wizardState.ssn || '').trim()
+    };
+    const missing = [
+      ['address1', 'address line 1'],
+      ['city', 'city'],
+      ['state', 'state'],
+      ['zip', 'ZIP'],
+      ['dob', 'date of birth'],
+      ['ssn', 'SSN']
+    ].filter(([key]) => !intake[key as keyof typeof intake]).map(([, label]) => label);
+    if (missing.length) {
+      setWizardError(`Missing required intake fields: ${missing.join(', ')}. Address line 2 and phone are optional.`);
+      return;
+    }
+    if (intake.ssn.replace(/\D/g, '').length !== 9) {
+      setWizardError('Full 9-digit Social Security number is required.');
+      return;
+    }
+    setWizardState((current) => ({ ...current, ...intake }));
     setBusyStep('application');
     try {
       await apiFetch('/api/applications', token, {
         method: 'POST',
         body: JSON.stringify({
-          full_name: wizardState.fullName,
-          email: wizardState.email,
-          phone: wizardState.phone,
-          address_line1: wizardState.address1,
-          address_line2: wizardState.address2,
-          city: wizardState.city,
-          state: wizardState.state,
-          zip: wizardState.zip,
-          dob: wizardState.dob,
-          ssn: wizardState.ssn
+          full_name: intake.fullName,
+          email: intake.email,
+          phone: intake.phone,
+          address_line1: intake.address1,
+          address_line2: intake.address2,
+          city: intake.city,
+          state: intake.state,
+          zip: intake.zip,
+          dob: intake.dob,
+          ssn: intake.ssn
         })
       });
       await refreshProgress();
@@ -750,19 +1213,6 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
       await refreshProgress();
     } catch (error) {
       setWizardError(error instanceof Error ? error.message : 'Unable to save monitoring');
-    } finally {
-      setBusyStep(null);
-    }
-  }
-
-  async function skipMonitoring() {
-    setWizardError(null);
-    setBusyStep('monitoring');
-    try {
-      await apiFetch('/api/monitoring/skip', token, { method: 'POST', body: '{}' });
-      await refreshProgress();
-    } catch (error) {
-      setWizardError(error instanceof Error ? error.message : 'Unable to skip monitoring step');
     } finally {
       setBusyStep(null);
     }
@@ -806,13 +1256,16 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
                 if (headingMatch) return <h3 key={`a-${idx}`}>{trimmed}</h3>;
                 return <p key={`a-${idx}`}>{trimmed}</p>;
               })}
-              <h3>Required Federal Disclosures</h3>
+              </div>
+            <div className="contract-body" tabIndex={0} aria-label="Separate consumer credit file rights disclosure">
+              <h3>Consumer Credit File Rights — Separate Disclosure</h3>
               {contractText.disclosure.split(/\n{2,}/).map((paragraph, idx) => (
                 <p key={`d-${idx}`}>{paragraph.trim()}</p>
               ))}
             </div>
             <div className="contract-actions">
               <div>
+                {contractText.contractType !== 'masterclass' ? <p><strong>You may cancel this contract without penalty or obligation at any time before midnight of the 3rd business day after the date on which you signed the contract. See the attached notice of cancellation form for an explanation of this right.</strong></p> : null}
                 <div className="signature-pad-label" style={{ marginBottom: 6 }}>Your signature</div>
                 <SignaturePad value={signatureData} onChange={setSignatureData} />
               </div>
@@ -823,7 +1276,7 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
               <label className="contract-agree">
                 <input type="checkbox" checked={contractAgreed} onChange={(e) => setContractAgreed(e.target.checked)} />
                 <span>{contractText.contractType === 'masterclass'
-                  ? 'I have read and agree to the CredX 5-Day Masterclass agreement and disclosures above. I understand the 3-day return policy is based on performance and maintenance standards, not guaranteed results or credit-report changes.'
+                  ? 'I have read and agree to the CredX 5-Day Masterclass agreement and disclosures above. I understand I may request a refund within seven calendar days under the Refund Policy, without limiting statutory rights. No credit outcome is guaranteed.'
                   : 'I have read and agree to the CredX service agreement and federal disclosures above. I understand I can cancel within 3 business days without penalty.'}</span>
               </label>
               <button className="ghost-button" type="submit" disabled={busyStep === 'contract' || !contractAgreed || !signatureName.trim() || !signatureData} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, padding: '12px 18px' }}>
@@ -833,14 +1286,32 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
             </div>
           </form>
         ) : null}
-        {needsApplication ? <form className="dispute-card-live" onSubmit={submitApplication}><div className="dispute-card-top"><strong>Step 2, complete intake</strong><span className="security-note-inline" aria-label="Encrypted">🔒 Encrypted</span></div><div className="field-grid"><input className="chat-input" value={wizardState.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Full name" /><input className="chat-input" value={wizardState.email} onChange={(e) => setField('email', e.target.value)} placeholder="Email" /><input className="chat-input" value={wizardState.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="Phone" /><input className="chat-input" value={wizardState.address1} onChange={(e) => setField('address1', e.target.value)} placeholder="Address line 1" /><input className="chat-input" value={wizardState.address2} onChange={(e) => setField('address2', e.target.value)} placeholder="Address line 2" /><input className="chat-input" value={wizardState.city} onChange={(e) => setField('city', e.target.value)} placeholder="City" /><input className="chat-input" value={wizardState.state} onChange={(e) => setField('state', e.target.value)} placeholder="State" /><input className="chat-input" value={wizardState.zip} onChange={(e) => setField('zip', e.target.value)} placeholder="ZIP" /><input className="chat-input" value={wizardState.dob} onChange={(e) => setField('dob', e.target.value)} placeholder="Date of birth (YYYY-MM-DD)" /><input className="chat-input" type="password" value={wizardState.ssn} onChange={(e) => setField('ssn', e.target.value)} placeholder="SSN" autoComplete="off" /><button className="ghost-button" type="submit" disabled={busyStep === 'application'}>{busyStep === 'application' ? 'Saving...' : 'Save intake'}</button></div><p className="helper-text" style={{ marginTop: '0.5rem' }}>SSN and date of birth are encrypted before they're saved. Only the last 4 digits of your SSN are ever shown back to you.</p></form> : null}
+        {needsApplication ? (
+          <form className="dispute-card-live" onSubmit={submitApplication}>
+            <div className="dispute-card-top"><strong>Step 2, complete intake</strong><span className="security-note-inline" aria-label="Encrypted">Encrypted</span></div>
+            <div className="field-grid">
+              <input className="chat-input" name="fullName" value={wizardState.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Full name" autoComplete="name" />
+              <input className="chat-input" name="email" value={wizardState.email} onChange={(e) => setField('email', e.target.value)} placeholder="Email" autoComplete="email" />
+              <input className="chat-input" name="phone" value={wizardState.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="Phone" autoComplete="tel" />
+              <input className="chat-input" name="address1" value={wizardState.address1} onChange={(e) => setField('address1', e.target.value)} placeholder="Address line 1 *" autoComplete="address-line1" required />
+              <input className="chat-input" name="address2" value={wizardState.address2} onChange={(e) => setField('address2', e.target.value)} placeholder="Address line 2 (optional)" autoComplete="address-line2" />
+              <input className="chat-input" name="city" value={wizardState.city} onChange={(e) => setField('city', e.target.value)} placeholder="City *" autoComplete="address-level2" required />
+              <input className="chat-input" name="state" value={wizardState.state} onChange={(e) => setField('state', e.target.value)} placeholder="State *" autoComplete="address-level1" required />
+              <input className="chat-input" name="zip" value={wizardState.zip} onChange={(e) => setField('zip', e.target.value)} placeholder="ZIP *" autoComplete="postal-code" required />
+              <input className="chat-input" name="dob" value={wizardState.dob} onChange={(e) => setField('dob', e.target.value)} placeholder="Date of birth (YYYY-MM-DD) *" autoComplete="bday" required />
+              <input className="chat-input" name="ssn" type="password" inputMode="numeric" maxLength={11} value={wizardState.ssn} onChange={(e) => setField('ssn', e.target.value)} placeholder="Full SSN *" autoComplete="off" required />
+              <button className="ghost-button" type="submit" disabled={busyStep === 'application'}>{busyStep === 'application' ? 'Saving...' : 'Save intake'}</button>
+            </div>
+            <p className="helper-text" style={{ marginTop: '0.5rem' }}>Fields marked * are required. Name and email use the login record if the browser does not submit them. Address line 2 and phone are optional. Full SSN is encrypted after save; only the last four are shown back.</p>
+          </form>
+        ) : null}
         {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}>
           <div className="dispute-card-top">
-            <strong>Step 3, choose your credit monitoring</strong>
+            <strong>Step 3, choose a report source or upload below</strong>
             <span className="security-note-inline" aria-label="Encrypted">Encrypted</span>
           </div>
           <p className="helper-text" style={{ marginBottom: '0.75rem' }}>
-            Choose one of the two approved credit monitoring options below so CredX can review the right tri-merge report.
+            Already have a report? Upload it below. Otherwise, open a third-party provider to obtain your report. Provider signup does not automatically import a report into CredX; provider fees and terms apply separately.
           </p>
           <div className="monitoring-provider-grid" role="radiogroup" aria-label="Credit monitoring provider">
             {CREDIT_MONITORING_PROVIDERS.map((provider) => {
@@ -863,16 +1334,15 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
               );
             })}
           </div>
-          <p className="helper-text monitoring-credential-copy">Please add your login credentials below.</p>
+          <p className="helper-text monitoring-credential-copy">Optional report-access assistance: save provider details only if you authorize your CredX team to assist. This does not activate automatic monitoring or report syncing.</p>
           <div className="field-grid monitoring-credential-grid">
             <input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" />
             <input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" />
-            <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save monitoring'}</button>
-            <button className="ghost-button" type="button" onClick={skipMonitoring} disabled={busyStep === 'monitoring'} style={{ background: 'transparent' }}>{busyStep === 'monitoring' ? 'Saving...' : 'Skip for now'}</button>
+            <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save provider details'}</button>
           </div>
-          <p className="helper-text">If you already have your report, add your credentials above.</p>
+          <p className="helper-text">Credentials are optional here. If you already downloaded your report, upload the PDF or HTML file below instead.</p>
         </form> : null}
-        {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Step 4, upload your credit report</strong></div><div className="field-grid"><input className="chat-input" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => setDocUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} /><select className="chat-input" value={docUpload.type} onChange={(e) => setDocUpload((current) => ({ ...current, type: e.target.value }))}><option value="credit_report">Credit report</option><option value="identity">Driver's license or ID</option><option value="proof_of_address">Proof of address</option><option value="other">Other</option></select><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docUpload.file}>{busyStep === 'upload' ? 'Uploading...' : 'Upload securely'}</button></div><p className="helper-text">Upload credit reports as PDF or HTML files. JPG, PNG, and WEBP are also accepted for screenshots and supporting images.</p></form> : null}
+        {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Upload your report for analysis</strong></div><div className="field-grid"><input className="chat-input" type="file" accept=".pdf,.html,.htm" onChange={(e: ChangeEvent<HTMLInputElement>) => setDocUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} /><input className="chat-input" value="Credit report" readOnly /><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docUpload.file}>{busyStep === 'upload' ? 'Uploading...' : 'Upload for analysis'}</button></div><p className="helper-text">Upload a PDF, HTML, or HTM credit report. CredX starts extraction and analysis after upload; processing time and results depend on the file. Analysis and consultation/review take place before billing for credit-related support.</p></form> : null}
         {completedAt ? <div className="empty-state-card">Onboarding complete. Your file is now in review.</div> : null}
       </div>
     </section>
@@ -921,9 +1391,9 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
     <div className="page-grid">
       <section className="hero-card">
         <div>
-          <p className="eyebrow">Credit Monitoring</p>
+          <p className="eyebrow">Report Sources &amp; Analysis</p>
           <h1>Report upload & analysis</h1>
-          <p>This area is dedicated to your monitoring connection, credit report uploads, and the analysis CredX prepares from your file.</p>
+          <p>Manage your report sources, upload credit reports, and review the analysis CredX prepares from the information provided. This is not a live bureau-monitoring feed.</p>
         </div>
         <div className="hero-stats">
           <div className="stat-card"><span>Workflow Stage</span><strong>{prettyStatus(progress?.workflow?.stage || client?.status)}</strong></div>
@@ -941,7 +1411,7 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
               <strong style={{ color: '#00c6fb', fontSize: '1.1rem' }}>📋 Upload Your Credit Report</strong>
               <p style={{ margin: '0.75rem 0', color: '#64748b' }}>
                 To generate your professional credit analysis, upload your credit report below.
-                We accept PDF, HTML, and screenshots.
+                We accept PDF and HTML credit reports from IdentityIQ or MyFreeScoreNow.
               </p>
               <p style={{ fontSize: '0.8rem', color: '#64748b' }}>
                 Your analysis will appear here within minutes of upload.
@@ -999,22 +1469,18 @@ function CreditMonitoringSection({ token, client, progress, refreshAll }: { toke
               </p>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '0.5rem' }}>
                 <a href="https://member.identityiq.com/help-you-to-save-money.aspx?offercode=431133V4" target="_blank" rel="noopener noreferrer sponsored" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>IdentityIQ ↗</a>
-                <a href="https://www.smartcredit.com" target="_blank" rel="noopener noreferrer" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>SmartCredit ↗</a>
-                <a href="https://www.privacyguard.com" target="_blank" rel="noopener noreferrer" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>PrivacyGuard ↗</a>
+                <a href="https://app.myfreescorenow.com/enroll/B02B3064" target="_blank" rel="noopener noreferrer sponsored" className="ghost-button" style={{ fontSize: '0.8rem', textDecoration: 'none' }}>MyFreeScoreNow ↗</a>
               </div>
             </div>
           )}
           <form className="dispute-card-live" onSubmit={submitDocument}>
             <div className="field-grid">
-              <input className="chat-input" type="file" accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp" onChange={(e: ChangeEvent<HTMLInputElement>) => setUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} />
-              <select className="chat-input" value={upload.type} onChange={(e) => setUpload((current) => ({ ...current, type: e.target.value }))}>
-                <option value="credit_report">Credit report</option>
-                <option value="other">Monitoring screenshot / other</option>
-              </select>
-              <button className="ghost-button" type="submit" disabled={saving || !upload.file}>{saving ? 'Saving...' : 'Upload securely'}</button>
+              <input className="chat-input" type="file" accept=".pdf,.html,.htm" onChange={(e: ChangeEvent<HTMLInputElement>) => setUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} />
+              <input className="chat-input" value="Credit report" readOnly />
+              <button className="ghost-button" type="submit" disabled={saving || !upload.file}>{saving ? 'Saving...' : 'Upload for analysis'}</button>
             </div>
           </form>
-          <p className="helper-text">Upload credit reports as PDF or HTML files. JPG, PNG, and WEBP are also accepted for screenshots and supporting images.</p>
+          <p className="helper-text">Upload credit reports as PDF, HTML, or HTM files. Use the profile tab for ID or proof-of-address images.</p>
           {message ? <div className="helper-text" style={{ marginTop: '10px' }}>{message}</div> : null}
           {error ? <div className="error-banner" style={{ marginTop: '10px' }}>{error}</div> : null}
           <div className="dispute-list" style={{ marginTop: '12px' }}>
@@ -1191,13 +1657,13 @@ function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | nu
   <p>I am writing to formally dispute the accuracy and validity of certain items appearing
   on my credit report in accordance with my rights under the Fair Credit Reporting Act
   (FCRA) (15 U.S.C. § 1681 et seq.) and the Fair Debt Collection Practices Act (FDCPA)
-  (15 U.S.C. § 1692 et seq.). I demand the immediate removal of the following items
-  due to their unlawful presence on my credit report:</p>
+  (15 U.S.C. § 1692 et seq.). I request investigation of the following items because
+  they may be inaccurate, incomplete, unverifiable, or unauthorized:</p>
 
   <h1>1. Unauthorized Third-Party Collections</h1>
 
-  <p>According to 15 U.S.C. § 1692e, it is illegal for a debt collector to report false
-  or misleading information to the credit bureaus. I am requesting verification of the
+  <p>Under 15 U.S.C. § 1692e, false or misleading debt-collection reporting may violate
+  federal law. I am requesting verification of the
   following alleged debt(s):</p>
 
   <table>
@@ -1212,26 +1678,26 @@ function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | nu
         <td>${escapeHtml(it.accountName || '')}${it.accountNumber ? `<br><span class="small">Acct ${escapeHtml(it.accountNumber)}</span>` : ''}</td>
         <td>${escapeHtml(it.issue || '')}</td>
         <td>${escapeHtml(it.reason || '')}</td>
-        <td>${escapeHtml(it.instruction || it.recommendation || 'Delete this item from my credit file.')}</td>
+        <td>${escapeHtml(it.instruction || it.recommendation || 'Investigate this item and correct or delete any reporting that cannot be verified as accurate and complete.')}</td>
       </tr>`).join('')}
     </tbody>
   </table>
 
-  <p>For each item above, I demand that the reporting party provide:</p>
+  <p>For each item above, please provide:</p>
   <ul>
     <li>A copy of the original signed contract proving my consent and liability for this debt.</li>
     <li>A chain of custody showing how the debt was acquired.</li>
     <li>Proof that this debt was lawfully assigned in compliance with 15 U.S.C. § 1692g (Validation of Debts).</li>
   </ul>
 
-  <p>Failure to provide the above documentation within 30 days will constitute a violation
-  of 15 U.S.C. § 1692k, making the reporting party liable for damages.</p>
+  <p>If the above documentation cannot be provided, please update, correct, or delete any
+  reporting that cannot be verified as accurate and complete.</p>
 
   <h1>2. Unauthorized Inquiries</h1>
 
   <p>Per 15 U.S.C. § 1681b, a company must have permissible purpose to conduct a hard
-  inquiry on my credit report. I demand the immediate removal of the following inquiries,
-  as I did not authorize them:</p>
+  inquiry on my credit report. I dispute the following inquiries because I do not
+  recognize authorizing them:</p>
 
   <table>
     <thead><tr>
@@ -1245,17 +1711,17 @@ function buildDisputeLetterHtml(bureauKey: string, items: any[], user: User | nu
   <p>Under 15 U.S.C. § 1681n, any entity that unlawfully accesses my credit file without
   proper authorization is subject to statutory damages, attorney's fees, and punitive damages.</p>
 
-  <h1>Final Demand</h1>
+  <h1>Request for Investigation and Response</h1>
 
   <p>As required under 15 U.S.C. § 1681i (Procedure in Case of Disputed Accuracy), you
-  have 30 days to conduct a thorough investigation and remove the inaccurate information.
-  Failure to do so will result in a complaint being filed with the Consumer Financial
-  Protection Bureau (CFPB), the Federal Trade Commission (FTC), and the Attorney
-  General's Office.</p>
+  have 30 days to conduct a reasonable investigation and correct or delete information
+  that cannot be verified as accurate and complete. If the investigation does not address
+  these concerns, I may consider appropriate follow-up options, including a complaint to
+  the Consumer Financial Protection Bureau (CFPB), the Federal Trade Commission (FTC), or
+  the Attorney General's Office.</p>
 
-  <p>I expect a written response confirming the removal of these disputed accounts and
-  inquiries. Any further attempt to report unverifiable or unauthorized information will
-  be considered a willful violation of federal law.</p>
+  <p>Please send a written response explaining the verification, corrections, deletions,
+  or other updates made for each disputed account and inquiry.</p>
 
   <p>Please send all correspondence to my mailing address listed above.</p>
 
@@ -1306,6 +1772,64 @@ function generateDisputeLettersFromAnalysis(progress: Progress | null, user: Use
   return out;
 }
 
+function bureauKeyFromLabel(value: string): string {
+  const key = String(value || '').toLowerCase();
+  if (key.includes('equifax')) return 'equifax';
+  if (key.includes('experian')) return 'experian';
+  if (key.includes('transunion') || key.includes('trans union')) return 'transunion';
+  return key;
+}
+
+function negativeAccountKey(item: NegativeAccountDetail): string {
+  return `${item.accountName.toLowerCase()}|${item.accountNumber || ''}|${item.issue.toLowerCase()}`;
+}
+
+function isRecommendedDisputeItem(item: NegativeAccountDetail): boolean {
+  const text = `${item.priority} ${item.accountType} ${item.status} ${item.issue} ${item.reason}`.toLowerCase();
+  return /critical|high|collection|charge.?off|repossession|late|past due|inconsisten|unverifiable|inaccurate|duplicate|outdated/.test(text);
+}
+
+function disputeOpFromNegativeAccount(item: NegativeAccountDetail) {
+  return {
+    accountName: item.accountName,
+    accountNumber: item.accountNumber || '',
+    issue: item.issue,
+    reason: item.reason,
+    priority: item.priority,
+    accountType: item.accountType,
+    status: item.status,
+    balance: item.balance,
+    dateOpened: item.dateOpened,
+    lastReported: item.lastReported,
+    bureaus: (item.bureaus.length ? item.bureaus : ['Equifax', 'Experian', 'TransUnion']).map(bureauKeyFromLabel),
+    instruction: 'Investigate this account for accuracy, completeness, and verifiability; delete or correct any unsupported reporting.'
+  };
+}
+
+function generateDisputeLettersFromNegativeAccounts(items: NegativeAccountDetail[], user: User | null, client: Client | null, progress: Progress | null): DisputeLetter[] {
+  const grouped = new Map<string, any[]>();
+  for (const detail of items) {
+    const op = disputeOpFromNegativeAccount(detail);
+    for (const bureauKey of op.bureaus) {
+      if (!BUREAU_ADDRESSES[bureauKey]) continue;
+      if (!grouped.has(bureauKey)) grouped.set(bureauKey, []);
+      grouped.get(bureauKey)!.push(op);
+    }
+  }
+  const out: DisputeLetter[] = [];
+  for (const [bureauKey, groupedItems] of grouped) {
+    const meta = BUREAU_ADDRESSES[bureauKey];
+    out.push({
+      bureau: bureauKey,
+      bureauLabel: meta?.name || bureauKey,
+      filename: `credx-dispute-${bureauKey}-${new Date().toISOString().slice(0, 10)}.html`,
+      html: buildDisputeLetterHtml(bureauKey, groupedItems, user, client, [], progress),
+      items: groupedItems
+    });
+  }
+  return out;
+}
+
 function downloadLetter(letter: DisputeLetter) {
   const blob = new Blob([letter.html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
@@ -1319,7 +1843,9 @@ function downloadLetter(letter: DisputeLetter) {
 }
 
 async function downloadPdfLetter(letter: DisputeLetter): Promise<void> {
-  const mod = await import('html2pdf.js');
+  // Import the unbundled source so Rollup can code-split jspdf / html2canvas
+  // into their own lazy chunks instead of one ~985 kB blob.
+  const mod = await import('html2pdf.js/src/index.js');
   const html2pdf = (mod as { default?: any }).default ?? (mod as any);
   const container = document.createElement('div');
   container.innerHTML = letter.html;
@@ -1467,10 +1993,10 @@ function buildCfpbReportHtml(user: User | null, client: Client | null, allItems:
   <p><strong>${escapeHtml(name)}</strong><br>${addr.map((l) => escapeHtml(String(l))).join(', ') || ''}<br>${escapeHtml(user?.email || '')} · ${escapeHtml(user?.phone || '')}</p>
 
   <h2>Subject</h2>
-  <p>Failure to investigate and remove inaccurate, unverified, or unauthorized items from my credit report following formal dispute under 15 U.S.C. § 1681i.</p>
+  <p>Request for review of disputed credit-report items that may be inaccurate, incomplete, unverified, or unauthorized following formal dispute under 15 U.S.C. § 1681i.</p>
 
   <h2>What Happened</h2>
-  <p>Pursuant to my rights under the Fair Credit Reporting Act (FCRA) and the Fair Debt Collection Practices Act (FDCPA), I sent formal dispute letters by certified mail to the credit bureaus listed below. The reporting parties failed to provide adequate verification, failed to respond within the 30-day window required by 15 U.S.C. § 1681i, and/or continued reporting items I have flagged as inaccurate or unauthorized.</p>
+  <p>Pursuant to my rights under the Fair Credit Reporting Act (FCRA) and the Fair Debt Collection Practices Act (FDCPA), I sent formal dispute letters by certified mail to the credit bureaus listed below. I am requesting review because the responses did not appear to adequately address the verification issues, timeliness concerns, and/or continued reporting of items I identified as inaccurate or unauthorized.</p>
 
   <h2>Disputed Items</h2>
   <table>
@@ -1480,9 +2006,9 @@ function buildCfpbReportHtml(user: User | null, client: Client | null, allItems:
 
   <h2>Resolution Requested</h2>
   <ul>
-    <li>CFPB to require each reporting bureau to remove the disputed items or produce verifiable proof under § 1681i within 15 days.</li>
-    <li>CFPB to investigate any furnisher non-compliance with § 1681s-2 obligations.</li>
-    <li>CFPB to confirm in writing that all required corrections have been transmitted to my credit file.</li>
+    <li>Review whether each reporting bureau reasonably investigated the disputed items under § 1681i.</li>
+    <li>Review whether any furnisher response raises concerns under § 1681s-2 obligations.</li>
+    <li>Request written confirmation of any verification, correction, deletion, or other update transmitted to my credit file.</li>
   </ul>
 
   <p>I declare under penalty of perjury that the foregoing is true and correct.</p>
@@ -1569,26 +2095,56 @@ type DisputesSectionProps = {
   setMailed: (mailed: Record<string, MailedRecord>) => void;
   responses: ClassifiedResponse[];
   setResponses: (responses: ClassifiedResponse[]) => void;
+  refreshAll: () => Promise<void>;
 };
 
-function DisputesSection({ token, user, client, progress, letters, setLetters, filings, setFilings, mailed, setMailed, responses, setResponses }: DisputesSectionProps) {
+function DisputesSection({ token, user, client, progress, letters, setLetters, filings, setFilings, mailed, setMailed, responses, setResponses, refreshAll }: DisputesSectionProps) {
   const disputes = normalizeDisputes(client, progress);
   const status = (client?.status || '').toUpperCase();
   const isActive = ['ACTIVE', 'PAST_DUE'].includes(status);
+  const analysis = progress?.analysis as any;
+  const negativeAccounts = collectNegativeAccountDetails(analysis);
+  const uploadedDocuments = progress?.uploadedDocs || [];
   const accountDocuments = (client?.documents || []).filter((doc) => {
     const haystack = `${doc.type || ''} ${doc.letterType || ''} ${doc.fileName || ''}`.toLowerCase();
     return haystack.includes('dispute');
   });
 
-  const [subTab, setSubTab] = useState<'active' | 'letters' | 'print' | 'ftc' | 'cfpb' | 'mail' | 'responses'>('active');
+  const [subTab, setSubTab] = useState<'accounts' | 'active' | 'letters' | 'print' | 'ftc' | 'cfpb' | 'mail' | 'responses' | 'documents'>('accounts');
+  const [selectedAccountKeys, setSelectedAccountKeys] = useState<string[]>([]);
   const [genMessage, setGenMessage] = useState<string | null>(null);
   const [mailingBureau, setMailingBureau] = useState<string | null>(null);
   const [mailError, setMailError] = useState<string | null>(null);
   const [docPrintBusy, setDocPrintBusy] = useState<string | null>(null);
   const [respBusy, setRespBusy] = useState(false);
   const [respError, setRespError] = useState<string | null>(null);
+  const [portalDocFile, setPortalDocFile] = useState<File | null>(null);
+  const [portalDocType, setPortalDocType] = useState('supporting_document');
+  const [portalDocBusy, setPortalDocBusy] = useState(false);
+  const [portalDocMessage, setPortalDocMessage] = useState<string | null>(null);
+  const [portalDocError, setPortalDocError] = useState<string | null>(null);
+
+  const negativeAccountKeys = useMemo(() => negativeAccounts.map(negativeAccountKey), [negativeAccounts]);
+  const recommendedKeys = useMemo(() => {
+    const recommended = negativeAccounts.filter(isRecommendedDisputeItem).map(negativeAccountKey);
+    return recommended.length ? recommended : negativeAccountKeys;
+  }, [negativeAccounts, negativeAccountKeys]);
+
+  useEffect(() => {
+    setSelectedAccountKeys((current) => {
+      const valid = current.filter((key) => negativeAccountKeys.includes(key));
+      if (valid.length) return valid;
+      return recommendedKeys;
+    });
+  }, [negativeAccountKeys.join('|'), recommendedKeys.join('|')]);
 
   const fromAddressReady = !!(client?.currentAddressLine1 && client?.currentCity && client?.currentState && client?.currentPostalCode);
+
+  const toggleNegativeAccount = (key: string) => {
+    setSelectedAccountKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+  };
+
+  const selectedNegativeAccounts = negativeAccounts.filter((item) => selectedAccountKeys.includes(negativeAccountKey(item)));
 
   const mailViaLob = async (letter: DisputeLetter) => {
     setMailError(null);
@@ -1704,13 +2260,39 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
   };
 
   const generate = () => {
-    const next = generateDisputeLettersFromAnalysis(progress, user, client);
+    const next = selectedNegativeAccounts.length
+      ? generateDisputeLettersFromNegativeAccounts(selectedNegativeAccounts, user, client, progress)
+      : generateDisputeLettersFromAnalysis(progress, user, client);
     setLetters(next);
     if (!next.length) {
-      setGenMessage('No negative items were found in your analysis. Once your analysis publishes dispute opportunities, you can generate letters from this button.');
+      setGenMessage('No negative accounts are selected yet. Select accounts from the Negative Accounts tab or wait for the analysis to publish dispute opportunities.');
     } else {
-      setGenMessage(`${next.length} bureau letter${next.length === 1 ? '' : 's'} generated and saved across your portal.`);
+      setGenMessage(`${next.length} bureau letter${next.length === 1 ? '' : 's'} generated from ${selectedNegativeAccounts.length || 'all available'} selected dispute item${selectedNegativeAccounts.length === 1 ? '' : 's'}.`);
       setSubTab('letters');
+    }
+  };
+
+  const uploadPortalDocument = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!portalDocFile) {
+      setPortalDocError('Choose a document first.');
+      return;
+    }
+    setPortalDocBusy(true);
+    setPortalDocError(null);
+    setPortalDocMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', portalDocFile);
+      formData.append('type', portalDocType);
+      await apiUpload('/api/progress/me/docs/upload', token, formData);
+      setPortalDocFile(null);
+      setPortalDocMessage('Document uploaded securely.');
+      await refreshAll();
+    } catch (err) {
+      setPortalDocError(err instanceof Error ? err.message : 'Document upload failed.');
+    } finally {
+      setPortalDocBusy(false);
     }
   };
 
@@ -1779,8 +2361,9 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
   return (
     <section className="panel">
       <div className="panel-header">
-        <div><p className="eyebrow">Disputes</p><h2>Bureau letters, FTC + CFPB filings, print queue</h2></div>
+        <div><p className="eyebrow">Disputes</p><h2>Negative accounts, bureau letters, filings, documents</h2></div>
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <button type="button" className={`tab ${subTab === 'accounts' ? 'active' : ''}`} onClick={() => setSubTab('accounts')}>Negative Accounts</button>
           <button type="button" className={`tab ${subTab === 'active' ? 'active' : ''}`} onClick={() => setSubTab('active')}>Active</button>
           <button type="button" className={`tab ${subTab === 'letters' ? 'active' : ''}`} onClick={() => setSubTab('letters')}>Letters</button>
           <button type="button" className={`tab ${subTab === 'print' ? 'active' : ''}`} onClick={() => setSubTab('print')}>Print</button>
@@ -1788,6 +2371,7 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
           <button type="button" className={`tab ${subTab === 'cfpb' ? 'active' : ''}`} onClick={() => setSubTab('cfpb')}>CFPB</button>
           <button type="button" className={`tab ${subTab === 'mail' ? 'active' : ''}`} onClick={() => setSubTab('mail')}>Mail · Lob</button>
           <button type="button" className={`tab ${subTab === 'responses' ? 'active' : ''}`} onClick={() => setSubTab('responses')}>Responses</button>
+          <button type="button" className={`tab ${subTab === 'documents' ? 'active' : ''}`} onClick={() => setSubTab('documents')}>Documents</button>
         </div>
       </div>
 
@@ -1797,10 +2381,50 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
         <button type="button" className="ghost-button" onClick={generate} style={{ background: '#a855f7', color: '#fff', border: 'none', fontWeight: 700 }}>
-          ✉ Generate Dispute Letters from Analysis
+          Generate Disputes from Selected Accounts
         </button>
-        <span className="helper-text" style={{ margin: 0, color: '#475569' }}>{genMessage || 'Pulls all negative items from your CredX analysis and groups them per bureau. Any letters CredX already generated for your account can be printed below.'}</span>
+        <span className="helper-text" style={{ margin: 0, color: '#475569' }}>{genMessage || `${selectedNegativeAccounts.length} selected · ${negativeAccounts.length} negative account${negativeAccounts.length === 1 ? '' : 's'} found from the analysis.`}</span>
       </div>
+
+      {subTab === 'accounts' ? (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+            <button type="button" className="ghost-button" onClick={() => setSelectedAccountKeys(recommendedKeys)} style={{ background: '#0ea5e9', color: '#fff', border: 'none', fontWeight: 700 }}>Select recommended</button>
+            <button type="button" className="ghost-button" onClick={() => setSelectedAccountKeys(negativeAccountKeys)} style={{ color: '#0f172a', fontWeight: 600 }}>Select all</button>
+            <button type="button" className="ghost-button" onClick={() => setSelectedAccountKeys([])} style={{ color: '#0f172a', fontWeight: 600 }}>Clear</button>
+            <span className="helper-text" style={{ margin: 0, color: '#475569' }}>Recommended items prioritize high-impact negatives, inconsistencies, collections, charge-offs, late payments, and unverifiable reporting.</span>
+          </div>
+          <div className="dispute-list">
+            {negativeAccounts.length ? negativeAccounts.map((account) => {
+              const key = negativeAccountKey(account);
+              const selected = selectedAccountKeys.includes(key);
+              const recommended = isRecommendedDisputeItem(account);
+              return (
+                <label key={key} className="dispute-card-live" style={{ display: 'block', borderColor: selected ? '#22c55e' : undefined, cursor: 'pointer' }}>
+                  <div className="dispute-card-top">
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                      <input type="checkbox" checked={selected} onChange={() => toggleNegativeAccount(key)} />
+                      <strong style={{ color: '#0f172a' }}>{account.accountName}</strong>
+                    </span>
+                    <span className="status-badge status-pending">{recommended ? 'Recommended' : prettyStatus(account.priority)}</span>
+                  </div>
+                  <div className="dispute-meta" style={{ color: '#334155' }}>
+                    <span>{account.accountType} · {account.status}</span>
+                    <span>{account.accountNumber ? `Acct ${account.accountNumber}` : 'No account number shown'}</span>
+                  </div>
+                  <div className="dispute-change-grid">
+                    <div className="change-chip"><span>Bureaus</span><strong>{account.bureaus.length ? account.bureaus.join(', ') : 'All bureaus'}</strong></div>
+                    <div className="change-chip"><span>Balance</span><strong>{account.balance == null || Number.isNaN(account.balance) ? 'Not listed' : `$${account.balance.toLocaleString()}`}</strong></div>
+                    <div className="change-chip"><span>Last reported</span><strong>{account.lastReported ? formatDate(account.lastReported) : 'Not listed'}</strong></div>
+                  </div>
+                  <div className="dispute-meta" style={{ color: '#475569', marginTop: '0.5rem' }}><span><strong>Issue:</strong> {account.issue}</span></div>
+                  <div className="dispute-meta" style={{ color: '#475569' }}><span><strong>Dispute angle:</strong> {account.reason}</span></div>
+                </label>
+              );
+            }) : <div className="empty-state-card">No negative accounts are available yet. Upload a credit report and wait for analysis to publish, then this area will list the negative accounts for selection.</div>}
+          </div>
+        </div>
+      ) : null}
 
       {subTab === 'active' ? (
         <div className="dispute-list">
@@ -2057,6 +2681,62 @@ function DisputesSection({ token, user, client, progress, letters, setLetters, f
           </div>
         </div>
       ) : null}
+
+      {subTab === 'documents' ? (
+        <div>
+          <form className="dispute-card-live" onSubmit={uploadPortalDocument} style={{ marginBottom: '0.85rem' }}>
+            <div className="dispute-card-top">
+              <strong style={{ color: '#0f172a' }}>Upload client document</strong>
+              <span className="security-note-inline" aria-label="Encrypted">Encrypted</span>
+            </div>
+            <div className="field-grid" style={{ marginTop: '0.65rem' }}>
+              <input
+                className="chat-input"
+                type="file"
+                accept=".pdf,.html,.htm,.png,.jpg,.jpeg,.webp"
+                onChange={(event: ChangeEvent<HTMLInputElement>) => setPortalDocFile(event.target.files?.[0] || null)}
+              />
+              <select className="chat-input" value={portalDocType} onChange={(event) => setPortalDocType(event.target.value)}>
+                <option value="supporting_document">Supporting document</option>
+                <option value="credit_report">Credit report</option>
+                <option value="bureau_response">Bureau response</option>
+                <option value="identity">Identity document</option>
+                <option value="proof_of_address">Proof of address</option>
+                <option value="other">Other</option>
+              </select>
+              <button className="ghost-button" type="submit" disabled={portalDocBusy || !portalDocFile} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700 }}>
+                {portalDocBusy ? 'Uploading...' : 'Upload for analysis'}
+              </button>
+            </div>
+            <p className="helper-text" style={{ marginTop: '0.5rem' }}>Clients can upload credit reports, bureau letters, IDs, proof of address, and supporting files here without leaving the dispute workflow.</p>
+            {portalDocMessage ? <p className="helper-text" style={{ color: '#22c55e', marginTop: '0.5rem' }}>{portalDocMessage}</p> : null}
+            {portalDocError ? <div className="error-banner" style={{ marginTop: '0.5rem' }}>{portalDocError}</div> : null}
+          </form>
+
+          <div className="dispute-list">
+            {uploadedDocuments.length || client?.documents?.length ? (
+              <>
+                {uploadedDocuments.map((doc, index) => (
+                  <div key={`${doc.fileName || doc.name || 'upload'}-${index}`} className="plan-card">
+                    <strong>{doc.fileName || doc.name || 'Uploaded document'}</strong>
+                    <span>{prettyStatus(doc.type || 'document')}</span>
+                    <small>{doc.uploadedAt ? `Uploaded ${formatDateTime(doc.uploadedAt)}` : 'Secure upload'}</small>
+                  </div>
+                ))}
+                {(client?.documents || []).map((doc) => (
+                  <div key={doc.id} className="plan-card">
+                    <strong>{doc.fileName || 'Client document'}</strong>
+                    <span>{prettyStatus(doc.type || 'document')}{doc.bureau ? ` · ${doc.bureau}` : ''}</span>
+                    <small>{doc.uploadedAt ? `Uploaded ${formatDateTime(doc.uploadedAt)}` : 'Secure document'}</small>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <div className="empty-state-card">No documents uploaded yet.</div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -2236,7 +2916,7 @@ function ProfileSection({ token, user, client, progress, refreshAll, onUserUpdat
               <input className="chat-input" value={profile.state} onChange={(e) => setProfile((c) => ({ ...c, state: e.target.value }))} placeholder="State" />
               <input className="chat-input" value={profile.zip} onChange={(e) => setProfile((c) => ({ ...c, zip: e.target.value }))} placeholder="ZIP" />
               <input className="chat-input" value={profile.dob} onChange={(e) => setProfile((c) => ({ ...c, dob: e.target.value }))} placeholder="Date of birth (YYYY-MM-DD)" />
-              <input className="chat-input" value={profile.ssn} onChange={(e) => setProfile((c) => ({ ...c, ssn: e.target.value.replace(/\D/g, '').slice(0, 9) }))} placeholder="Full SSN to replace stored value" />
+              <input className="chat-input" type="password" inputMode="numeric" value={profile.ssn} onChange={(e) => setProfile((c) => ({ ...c, ssn: e.target.value.replace(/\D/g, '').slice(0, 9) }))} placeholder={client?.ssnLast4 ? maskStoredSsn(client.ssnLast4) : 'Social Security number'} autoComplete="off" />
               <button className="ghost-button" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save profile'}</button>
             </div>
           </form>
@@ -2247,7 +2927,7 @@ function ProfileSection({ token, user, client, progress, refreshAll, onUserUpdat
         <div>
           <div className="panel-header"><div><p className="eyebrow">Secure File</p><h2>Verification and stored details</h2></div></div>
           <div className="plan-card"><strong>Email</strong><span>{user?.email || 'Not available'}</span></div>
-          <div className="plan-card"><strong>Stored SSN</strong><span>{client?.ssnLast4 ? `•••-••-${client.ssnLast4}` : 'Not saved'}</span></div>
+          <div className="plan-card"><strong>Social Security number</strong><span>{maskStoredSsn(client?.ssnLast4)}</span></div>
           <div className="plan-card"><strong>Stored DOB</strong><span>{maskDob(client?.dobEncrypted)}</span></div>
           <div className="plan-card"><strong>Address on file</strong><span>{[client?.currentAddressLine1, client?.currentAddressLine2, client?.currentCity, client?.currentState, client?.currentPostalCode].filter(Boolean).join(', ') || 'Not saved'}</span></div>
         </div>
@@ -2264,7 +2944,7 @@ function ProfileSection({ token, user, client, progress, refreshAll, onUserUpdat
                 <option value="proof_of_address">Proof of address</option>
                 <option value="other">Other verification</option>
               </select>
-              <button className="ghost-button" type="submit" disabled={saving || !verificationUpload}>{saving ? 'Saving...' : 'Upload securely'}</button>
+              <button className="ghost-button" type="submit" disabled={saving || !verificationUpload}>{saving ? 'Saving...' : 'Upload for analysis'}</button>
             </div>
           </form>
           <p className="helper-text">Sensitive verification files move through the same secured phase-two style flow as the protected onboarding details.</p>
@@ -2404,6 +3084,7 @@ function buildAnalysisReportHtml(user: User | null, client: Client | null, analy
     <div class="cover-eyebrow">Prepared For</div>
     <div class="cover-name">${escapeHtml(name)}</div>
     <p class="cover-tag">Comprehensive overview of your credit profile and factors impacting your credit score.</p>
+    <p class="cover-tag">Prepared with AI-assisted software and CredX review. This report is educational strategy support, not legal advice, a credit decision, or a guaranteed result.</p>
 
     <div class="cover-foot">
       <strong>Prepared by CredX</strong>
@@ -2767,7 +3448,7 @@ function MonitoringConnectCard({ token, progress, refreshAll }: { token: string;
         body: JSON.stringify({ provider: form.provider, username: form.username, password: form.password })
       });
       setForm({ provider: form.provider, username: '', password: '' });
-      setMessage('Monitoring credentials saved.');
+      setMessage('Provider details saved. Automatic report import is not connected.');
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save credentials.');
@@ -2780,12 +3461,12 @@ function MonitoringConnectCard({ token, progress, refreshAll }: { token: string;
     <section className="panel">
       <div className="panel-header">
         <div>
-          <p className="eyebrow" style={{ color: hasCredentials ? '#22c55e' : '#94a3b8' }}>Credit Monitoring (optional)</p>
-          <h2>{hasCredentials ? `Connected · ${provider}` : 'Connect a provider to let CredX pull on your behalf'}</h2>
+          <p className="eyebrow" style={{ color: hasCredentials ? '#22c55e' : '#94a3b8' }}>Report-access assistance (optional)</p>
+          <h2>{hasCredentials ? `Details saved · ${provider}` : 'Choose a report provider or upload your report'}</h2>
         </div>
       </div>
       <p className="helper-text" style={{ marginTop: 0 }}>
-        Optional. Without this, you upload reports manually. With this, your CredX team can pull a fresh report and post the analysis without bothering you.
+        You can upload a report without saving provider credentials. These optional details support authorized team assistance; saving them does not establish an API connection, recurring refreshes, or automatic alerts. Provider purchases and cancellation are separate from CredX.
       </p>
       <form onSubmit={submit} className="field-grid" style={{ marginTop: '0.75rem' }}>
         <select className="chat-input" value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })}>
@@ -3039,6 +3720,7 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
     const monitoringSkipped = progress?.onboarding?.monitoringSkippedAt;
     const creditDocs = (progress?.uploadedDocs || []).filter(d => (d.type || '').toLowerCase().includes('credit'));
     const hasAnalysis = client?.analysisSummary || progress?.analysis;
+    const analysisReviewCompleted = Boolean(progress?.workflow?.analysisReview?.completedAt);
 
     // 1. Contract
     if (!signed) {
@@ -3052,12 +3734,12 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
 
     // 3. Monitoring (optional, but shows)
     if (intakeComplete && !hasMonitoring && !monitoringSkipped) {
-      tasks.push({ id: 'monitoring', title: '🔍 Connect your credit monitoring', desc: 'Link IdentityIQ or MyFreeScoreNow so we can pull reports on your behalf.', action: 'Connect monitoring', actionTab: 'analysis' as PortalTab, priority: 'medium', auto: true, currentStatus: null });
+      tasks.push({ id: 'monitoring', title: '🔍 Choose a report source', desc: 'Open IdentityIQ or MyFreeScoreNow to obtain a report, or upload one you already have. Provider signup does not automatically import it.', action: 'View report options', actionTab: 'analysis' as PortalTab, priority: 'medium', auto: true, currentStatus: null });
     }
 
     // 4. Upload credit report
     if (intakeComplete && creditDocs.length === 0) {
-      tasks.push({ id: 'report', title: '📄 Upload your credit report', desc: 'Upload a PDF or HTML from your monitoring provider for free analysis.', action: 'Upload report', actionTab: 'analysis' as PortalTab, priority: 'high', auto: true, currentStatus: 'INTAKE_RECEIVED' });
+      tasks.push({ id: 'report', title: '📄 Upload your credit report', desc: 'Upload a PDF or HTML from your monitoring provider for intake review.', action: 'Upload report', actionTab: 'analysis' as PortalTab, priority: 'high', auto: true, currentStatus: 'INTAKE_RECEIVED' });
     }
 
     // 5. Analysis in progress
@@ -3065,10 +3747,18 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
       tasks.push({ id: 'analysis_wait', title: '⏳ Analysis in progress', desc: 'Your credit report is being reviewed. Check back shortly.', action: 'Check status', actionTab: 'analysis' as PortalTab, priority: 'medium', auto: true, currentStatus: 'ANALYSIS_READY' });
     }
 
-    // 6. Analysis ready — schedule interview (manual, needs admin verify)
-    if (hasAnalysis && (client.status === 'ANALYSIS_READY' || submittedTasks.has('interview'))) {
-      const isSubmitted = submittedTasks.has('interview');
-      tasks.push({ id: 'interview', title: '📊 Schedule your analysis interview', desc: isSubmitted ? 'Waiting for CredX team to confirm your interview.' : 'Your analysis is complete. Schedule a call with your CredX specialist to review findings.', action: isSubmitted ? 'Submitted for review' : 'Schedule interview', actionTab: 'overview' as PortalTab, priority: 'high', auto: false, currentStatus: 'UPGRADE_OFFERED', submitted: isSubmitted });
+    // 6. Analysis review gate — the completed review unlocks plan/payment.
+    if (hasAnalysis && !analysisReviewCompleted && client.status === 'ANALYSIS_READY') {
+      tasks.push({
+        id: 'analysis_review',
+        title: '📊 Review your completed credit analysis',
+        desc: 'Open your analysis, review the findings and recommended plan, then confirm you are ready to continue.',
+        action: 'Confirm review',
+        actionTab: 'analysis' as PortalTab,
+        priority: 'high',
+        auto: false,
+        currentStatus: 'UPGRADE_OFFERED'
+      });
     }
 
     // 7. Confirm plan (auto if payment detected, manual if upgrade offered)
@@ -3123,9 +3813,25 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
     setCompleting(null);
   };
 
-  const handleComplete = (taskId: string) => {
+  const handleComplete = async (taskId: string) => {
     const task = workflowTasks.find(t => t.id === taskId);
     if (!task) return;
+    if (taskId === 'analysis_review') {
+      onTabChange('analysis');
+      if (!confirm('Confirm that you reviewed your completed CredX credit analysis and are ready to choose a service plan?')) return;
+      setCompleting(taskId);
+      try {
+        await apiFetch('/api/clients/me/analysis-review/complete', token, { method: 'POST', body: '{}' });
+        setMessage('✅ Analysis review confirmed. Your plan and payment step is now ready.');
+        await refreshAll();
+        setTimeout(() => setMessage(null), 5000);
+      } catch (err) {
+        setMessage(`Could not confirm review: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      } finally {
+        setCompleting(null);
+      }
+      return;
+    }
     if (task.auto) {
       // Auto-advanceable — just navigate to the right tab
       onTabChange(task.actionTab);
@@ -3265,6 +3971,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const [password, setPassword] = useState('');
   const [client, setClient] = useState<Client | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
+  const [readinessSaving, setReadinessSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3280,11 +3988,13 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
       apiFetch<SessionResponse>('/api/auth/me', token),
       apiFetch<Progress>('/api/progress/me', token)
     ]);
+    const readinessResponse = await apiFetch<ReadinessScore>('/api/progress/readiness', token).catch(() => null);
     const { client: clientResponse, progress: authProgress, ...userResponse } = sessionResponse;
     setUser(userResponse);
     localStorage.setItem(USER_KEY, JSON.stringify(userResponse));
     setClient(clientResponse);
     setProgress(progressResponse ?? authProgress ?? null);
+    setReadiness(readinessResponse);
   }
 
   useEffect(() => {
@@ -3310,15 +4020,17 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
     Promise.all([
       apiFetch<SessionResponse>('/api/auth/me', token),
-      apiFetch<Progress>('/api/progress/me', token)
+      apiFetch<Progress>('/api/progress/me', token),
+      apiFetch<ReadinessScore>('/api/progress/readiness', token).catch(() => null)
     ])
-      .then(([sessionResponse, progressResponse]) => {
+      .then(([sessionResponse, progressResponse, readinessResponse]) => {
         if (cancelled) return;
         const { client: clientResponse, progress: authProgress, ...userResponse } = sessionResponse;
         setUser(userResponse);
         localStorage.setItem(USER_KEY, JSON.stringify(userResponse));
         setClient(clientResponse);
         setProgress(progressResponse ?? authProgress ?? null);
+        setReadiness(readinessResponse);
       })
       .catch((fetchError) => {
         if (cancelled) return;
@@ -3327,6 +4039,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         setUser(null);
         setClient(null);
         setProgress(null);
+        setReadiness(null);
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
       })
@@ -3507,10 +4220,11 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const analysisReady = hasCreditReport && hasAnalysis;
 
   const [activeMcDay, setActiveMcDay] = useState<LessonDay | null>(null);
-  const masterclassEnrolled = !!progress?.education?.masterclassEnrolled;
   const clientStatusUpper = (client?.status || '').toUpperCase();
-  const tier2 = ['ACTIVE', 'PAST_DUE'].includes(clientStatusUpper);
-  const masterclassOnly = masterclassEnrolled && !tier2 && !['RESTRICTED', 'CANCELLED'].includes(clientStatusUpper);
+  const masterclassEnrolled = isMasterclassProgress(progress) || clientStatusUpper === 'STUDENT';
+  const paidServicePayment = client?.setupFeePaid === true || (client?.payments || []).some((payment) => payment.status === 'PAID' && payment.type !== 'MASTERCLASS');
+  const tier2 = !masterclassEnrolled && (paidServicePayment || ['ACTIVE', 'PAST_DUE'].includes(clientStatusUpper));
+  const masterclassOnly = masterclassEnrolled && !paidServicePayment && !['RESTRICTED', 'CANCELLED'].includes(clientStatusUpper);
   const completedMasterclassDays = useMemo(
     () => (progress?.education?.masterclassProgress || []).filter((s): s is string => typeof s === 'string'),
     [progress?.education?.masterclassProgress]
@@ -3566,6 +4280,22 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     return result;
   };
 
+  const handleSaveReadinessSnapshot = async () => {
+    if (!token || readinessSaving) return;
+    setReadinessSaving(true);
+    try {
+      const next = await apiFetch<ReadinessScore>('/api/progress/readiness/snapshot', token, {
+        method: 'POST',
+        body: '{}'
+      });
+      setReadiness(next);
+    } catch (err) {
+      console.warn('Failed to save readiness snapshot', err);
+    } finally {
+      setReadinessSaving(false);
+    }
+  };
+
   // Progressive tier unlock:
   // Tier 0: paid client just landed in portal — Overview + Profile only.
   // Tier 1: report uploaded → Analysis tab unlocks.
@@ -3576,6 +4306,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     ? [
         { key: 'overview', label: 'Overview' },
         { key: 'profile', label: 'Profile' },
+        { key: 'analysis', label: 'Uploads & Analysis' },
+        { key: 'disputes', label: 'Disputes' },
         { key: 'masterclass', label: '5-Day Masterclass' },
         { key: 'resources', label: 'Credit Builders' }
       ]
@@ -3584,6 +4316,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           { key: 'overview', label: 'Overview' },
           ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
           { key: 'analysis', label: 'Analysis & Reports' },
+          { key: 'disputes', label: 'Dispute Workflow' },
           { key: 'profile', label: 'Profile' },
           { key: 'activity', label: 'Activity' },
           { key: 'resources', label: 'Credit Builders' },
@@ -3639,7 +4372,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             <div className="welcome-toast-content">
               <p className="eyebrow">CredX Portal</p>
               <strong>Welcome back, {user.firstName}</strong>
-              <span className="welcome-toast-tier">{client?.serviceTier || 'ESSENTIAL'} plan</span>
+              <span className="welcome-toast-tier">{masterclassOnly ? 'MASTERCLASS' : (client?.serviceTier || 'ESSENTIAL')} plan</span>
             </div>
             <button className="welcome-toast-close" onClick={dismissWelcome} aria-label="Dismiss welcome">×</button>
           </div>
@@ -3657,6 +4390,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                 <h1 className="top-title">{tabLabel}</h1>
               </div>
               <div className="topbar-actions">
+                <NotificationBell token={token} />
                 <button className="ghost-button" onClick={handleLogout}>Sign out</button>
               </div>
             </header>
@@ -3685,6 +4419,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             masterclassOnly ? (
               <MasterclassStudentOverview
                 user={user}
+                client={client}
                 progress={progress}
                 completedDays={completedMasterclassDays}
                 passedQuizzes={passedMasterclassQuizzes}
@@ -3734,13 +4469,19 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                 );
               })()}
 
+              <WeeklyCheckInCard token={token} onSubmitted={() => { void refreshAll(); }} />
+
+              <ReadinessScorePanel readiness={readiness} onSaveSnapshot={handleSaveReadinessSnapshot} saving={readinessSaving} />
+
+              <PlatformReportsCard token={token} />
+
               {/* Tier 0: no report yet — guide them to pull + upload */}
               {!hasCreditReport && (
                 <section className="panel" style={{ border: '2px dashed #00c6fb', background: 'rgba(0,198,251,0.03)' }}>
                   <div className="panel-header">
                     <div>
                       <p className="eyebrow" style={{ color: '#00c6fb' }}>Next Step</p>
-                      <h2>Pull your credit report for a free analysis</h2>
+                      <h2>Pull your credit report for intake review</h2>
                     </div>
                   </div>
                   <div style={{ padding: '0.25rem 0 0' }}>
@@ -3786,7 +4527,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                         onClick={() => setActiveTab('analysis')}
                         style={{ background: '#101a2b', border: '1px solid rgba(34,197,94,0.35)', color: '#f8fafc', justifyContent: 'center' }}
                       >
-                        Upload report for free analysis →
+                        Upload report for intake review →
                       </button>
                     </div>
                   </div>
@@ -3833,6 +4574,16 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                     >
                       📊 View Analysis Report
                     </button>
+                    {tier2 ? (
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => setActiveTab('disputes')}
+                        style={{ marginLeft: '0.5rem', background: '#f59e0b', color: '#111827', border: 'none', fontWeight: 700 }}
+                      >
+                        Open Dispute Workflow
+                      </button>
+                    ) : null}
                   </div>
                 </section>
               )}
@@ -3856,6 +4607,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             masterclassOnly ? (
               <MasterclassStudentProfile
                 user={user}
+                client={client}
                 progress={progress}
                 completedDays={completedMasterclassDays}
                 passedQuizzes={passedMasterclassQuizzes}
@@ -3867,17 +4619,41 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           {activeTab === 'activity' ? <ActivitySection client={client} progress={progress} /> : null}
           {activeTab === 'resources' ? <ResourcesSection progress={progress} /> : null}
           {activeTab === 'analysis' ? <AnalysisSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} /> : null}
+          {activeTab === 'disputes' ? (
+            masterclassOnly ? (
+              <MasterclassDisputesPlaceholder progress={progress} />
+            ) : (
+              <DisputesSection
+                token={token}
+                user={user}
+                client={client}
+                progress={progress}
+                letters={generatedLetters}
+                setLetters={persistLetters}
+                filings={filings}
+                setFilings={persistFilings}
+                mailed={mailed}
+                setMailed={persistMailed}
+                responses={responses}
+                setResponses={persistResponses}
+                refreshAll={refreshAll}
+              />
+            )
+          ) : null}
 
           {activeTab === 'masterclass' ? (
-            <MasterclassDashboard
-              firstName={user?.firstName || ''}
-              completedDays={completedMasterclassDays}
-              passedQuizzes={passedMasterclassQuizzes}
-              quizAttempts={masterclassQuizAttempts}
-              onMarkComplete={handleMarkMasterclassDay}
-              onSubmitQuiz={handleSubmitMasterclassQuiz}
-              onActiveDayChange={setActiveMcDay}
-            />
+            <>
+              <CreditScoreWidget authToken={token} />
+              <MasterclassDashboard
+                firstName={user?.firstName || ''}
+                completedDays={completedMasterclassDays}
+                passedQuizzes={passedMasterclassQuizzes}
+                quizAttempts={masterclassQuizAttempts}
+                onMarkComplete={handleMarkMasterclassDay}
+                onSubmitQuiz={handleSubmitMasterclassQuiz}
+                onActiveDayChange={setActiveMcDay}
+              />
+            </>
           ) : null}
 
           {activeTab === 'tasks' ? <ClientTasksSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} onTabChange={setActiveTab} /> : null}
@@ -3931,7 +4707,7 @@ function CesarChatWidget({ token, user }: { token: string; user: User | null }) 
     } catch {
       setMessages((current) => [...current, {
         role: 'assistant',
-        content: "I couldn't reach the CredX server just now — give it a moment and try again, or use the portal tabs for your next step."
+        content: "Cesar is temporarily unavailable — your dashboard, analysis, and tools still work. Give it a moment and try again, or use the portal tabs for your next step."
       }]);
     } finally {
       setBusy(false);
@@ -3959,7 +4735,7 @@ function CesarChatWidget({ token, user }: { token: string; user: User | null }) 
             <div style={{ width: 34, height: 34, borderRadius: '50%', background: `linear-gradient(135deg, ${cyan}, #0055cc)`, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>C</div>
             <div style={{ flex: 1 }}>
               <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: 14 }}>Cesar</div>
-              <div style={{ color: '#22c55e', fontSize: 11 }}>CredX guidance · online</div>
+              <div style={{ color: '#22c55e', fontSize: 11 }}>AI-assisted CredX guidance · human review available</div>
             </div>
             <button type="button" onClick={() => setOpen(false)} aria-label="Close Cesar chat" style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
           </div>
@@ -3998,12 +4774,14 @@ function CesarChatWidget({ token, user }: { token: string; user: User | null }) 
 
 function MasterclassStudentOverview({
   user,
+  client,
   progress,
   completedDays,
   passedQuizzes,
   onOpenMasterclass
 }: {
   user: User | null;
+  client: Client | null;
   progress: Progress | null;
   completedDays: string[];
   passedQuizzes: string[];
@@ -4011,6 +4789,8 @@ function MasterclassStudentOverview({
 }) {
   const completedSet = new Set(completedDays);
   const completionPct = Math.round((completedDays.length / MASTERCLASS_DAYS.length) * 100);
+  const uploadedCount = (progress?.uploadedDocs || []).length + (client?.documents || []).length;
+  const hasAnalysis = !!(client?.analysisSummary || progress?.analysis);
 
   return (
     <>
@@ -4029,6 +4809,16 @@ function MasterclassStudentOverview({
           <span>{completedDays.length}/{MASTERCLASS_DAYS.length} days complete</span>
           <div className="mc-progress-bar"><div className="mc-progress-fill" style={{ width: `${completionPct}%` }} /></div>
           <button type="button" className="mc-complete-btn" onClick={onOpenMasterclass}>Continue lessons</button>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Student Status</p><h2>Masterclass account snapshot</h2></div></div>
+        <div className="mc-profile-grid">
+          <div className="mc-profile-card"><span>Status</span><strong>Active</strong></div>
+          <div className="mc-profile-card"><span>Tier</span><strong>Masterclass</strong></div>
+          <div className="mc-profile-card"><span>Uploads</span><strong>{uploadedCount}</strong></div>
+          <div className="mc-profile-card"><span>Intake Review</span><strong>{hasAnalysis ? 'Ready' : 'Open'}</strong></div>
         </div>
       </section>
 
@@ -4060,18 +4850,20 @@ function MasterclassStudentOverview({
         </div>
       </section>
 
-      <MasterclassStudentProfile user={user} progress={progress} completedDays={completedDays} passedQuizzes={passedQuizzes} />
+      <MasterclassStudentProfile user={user} client={client} progress={progress} completedDays={completedDays} passedQuizzes={passedQuizzes} />
     </>
   );
 }
 
 function MasterclassStudentProfile({
   user,
+  client,
   progress,
   completedDays,
   passedQuizzes
 }: {
   user: User | null;
+  client: Client | null;
   progress: Progress | null;
   completedDays: string[];
   passedQuizzes: string[];
@@ -4079,6 +4871,9 @@ function MasterclassStudentProfile({
   const education = progress?.education;
   const completionPct = Math.round((completedDays.length / MASTERCLASS_DAYS.length) * 100);
   const enrolledDate = education?.enrolledAt ? formatDate(education.enrolledAt) : 'Active';
+  const uploadedCount = (progress?.uploadedDocs || []).length + (client?.documents || []).length;
+  const hasAnalysis = !!(client?.analysisSummary || progress?.analysis);
+  const score = progress?.scores || {};
   const lastQuizAttempt = Object.values(education?.masterclassQuizAttempts || {})
     .map((attempt) => attempt.lastAttemptAt)
     .filter(Boolean)
@@ -4091,11 +4886,33 @@ function MasterclassStudentProfile({
         <div className="mc-profile-card"><span>Name</span><strong>{`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Student'}</strong></div>
         <div className="mc-profile-card"><span>Email</span><strong>{user?.email || 'Not available'}</strong></div>
         <div className="mc-profile-card"><span>Phone</span><strong>{user?.phone || 'Not provided'}</strong></div>
+        <div className="mc-profile-card"><span>Status</span><strong>Active</strong></div>
+        <div className="mc-profile-card"><span>Tier</span><strong>Masterclass</strong></div>
         <div className="mc-profile-card"><span>Enrollment</span><strong>{enrolledDate}</strong></div>
         <div className="mc-profile-card"><span>Lesson Progress</span><strong>{completedDays.length}/{MASTERCLASS_DAYS.length}</strong></div>
         <div className="mc-profile-card"><span>Quizzes Passed</span><strong>{passedQuizzes.length}</strong></div>
         <div className="mc-profile-card"><span>Course Score</span><strong>{completionPct}%</strong></div>
         <div className="mc-profile-card"><span>Last Quiz Activity</span><strong>{lastQuizAttempt ? formatDate(lastQuizAttempt) : 'Not started'}</strong></div>
+        <div className="mc-profile-card"><span>Uploads</span><strong>{uploadedCount}</strong></div>
+        <div className="mc-profile-card"><span>Analysis</span><strong>{hasAnalysis ? 'Ready' : 'Open'}</strong></div>
+        <div className="mc-profile-card"><span>Experian</span><strong>{score.experian ?? 'Pending'}</strong></div>
+        <div className="mc-profile-card"><span>Equifax</span><strong>{score.equifax ?? 'Pending'}</strong></div>
+        <div className="mc-profile-card"><span>TransUnion</span><strong>{score.transunion ?? 'Pending'}</strong></div>
+        <div className="mc-profile-card"><span>Dispute Builder</span><strong>Day 3 placeholder</strong></div>
+      </div>
+    </section>
+  );
+}
+
+function MasterclassDisputesPlaceholder({ progress }: { progress: Progress | null }) {
+  const completedDays = progress?.education?.masterclassProgress || [];
+  const dayThreeReady = completedDays.includes('day-3-advanced-tactics');
+  return (
+    <section className="panel">
+      <div className="panel-header"><div><p className="eyebrow">Masterclass Disputes</p><h2>Dispute builder placeholder</h2></div></div>
+      <div className="empty-state-card">
+        <strong>{dayThreeReady ? 'Ready to connect the Day 3 dispute builder.' : 'This area is reserved for the Day 3 dispute builder.'}</strong>
+        <p>Masterclass students keep education separate from paid-service dispute work. When the Day 3 builder is connected, drafts and practice workflows will appear here without turning the student into a paid subscriber profile.</p>
       </div>
     </section>
   );

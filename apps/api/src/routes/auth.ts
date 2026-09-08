@@ -15,19 +15,11 @@ import {
 import { config } from '../config.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { writeAuditLog } from '../lib/audit.js';
-import { verifyTurnstileFromBody } from '../lib/turnstile.js';
+import { logTurnstileRejection, verifyTurnstileFromBody } from '../lib/turnstile.js';
+import { defaultAffiliateLinks } from '../lib/affiliateLinks.js';
+import { track } from '../lib/analytics.js';
 
 export const authRouter = Router();
-
-const defaultAffiliateLinks = [
-  { label: 'Self Lender', url: 'https://self.inc/refer/16452347', category: 'credit_builder' },
-  { label: 'Credit Strong', url: 'https://tracking.creditstrong.com/aff_c?aff_id=1491&offer_id=2&source=MGFinstagram', category: 'credit_builder' },
-  { label: 'Rent Reporters', url: 'https://prf.hn/click/camref:1101l52pUS', category: 'credit_builder' },
-  { label: 'Credit Builder Card', url: 'https://www.creditbuildercard.com/mgf.html', category: 'credit_builder' },
-  { label: 'Grow Credit', url: 'https://growcredit.com/?kid=12BYTD', category: 'credit_builder' },
-  { label: 'Kovo', url: 'https://kovocredit.com/r/O6LDVXN7', category: 'credit_builder' },
-  { label: 'Ava', url: 'https://meetava.app.link/tdMaQUdV7Rb', category: 'credit_builder' }
-];
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -38,8 +30,21 @@ const registerSchema = z.object({
   offerInterest: z.enum(['program', 'masterclass']).optional(),
   referralSource: z.string().max(80).optional(),
   referralDetail: z.string().max(160).optional(),
+  subAgentReferralCode: z.string().max(80).optional(),
   signupIntake: z.record(z.unknown()).optional()
 });
+
+const smsConsentLanguage = 'I agree to receive CredX emails and text messages about my inquiry, onboarding, account updates, and offers. Message/data rates may apply. Reply STOP to opt out.';
+
+function smsConsentFromSignupIntake(intake?: Record<string, unknown>) {
+  const consented = intake?.smsConsent === true;
+  return {
+    smsConsent: consented,
+    smsConsentCapturedAt: consented ? new Date().toISOString() : null,
+    smsConsentLanguage: consented ? smsConsentLanguage : null,
+    smsConsentSource: consented ? 'credx_signup' : null
+  };
+}
 
 function serviceTierFromSignupIntake(intake?: Record<string, unknown>) {
   if (!intake || intake.planPath !== 'ai_assistance') return 'ESSENTIAL' as const;
@@ -51,10 +56,23 @@ function serviceTierFromSignupIntake(intake?: Record<string, unknown>) {
 authRouter.post('/register', async (req, res, next) => {
   try {
     const captcha = await verifyTurnstileFromBody(req.body, req.ip);
-    if (!captcha.ok) return res.status(400).json({ error: captcha.reason || 'CAPTCHA verification failed' });
+    if (!captcha.ok) {
+      logTurnstileRejection('/api/auth/register', captcha, {
+        hasToken: Boolean(req.body?.turnstileToken || req.body?.['cf-turnstile-response']),
+        referer: req.headers.referer,
+        origin: req.headers.origin,
+        userAgent: req.headers['user-agent']
+      });
+      return res.status(400).json({ error: captcha.reason || 'CAPTCHA verification failed' });
+    }
     const data = registerSchema.parse(req.body);
     const existing = await prisma.user.findUnique({ where: { email: data.email.toLowerCase() } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
+    const subAgent = data.subAgentReferralCode
+      ? await prisma.subAgent.findUnique({ where: { referralCode: data.subAgentReferralCode } })
+      : null;
+    const activeSubAgent = subAgent?.status === 'ACTIVE' ? subAgent : null;
+    const smsConsent = smsConsentFromSignupIntake(data.signupIntake);
 
     const provisionalPassword = randomBytes(24).toString('base64url');
     const passwordHash = await bcrypt.hash(provisionalPassword, 10);
@@ -69,15 +87,22 @@ authRouter.post('/register', async (req, res, next) => {
           create: {
             status: data.offerInterest === 'masterclass' ? 'STUDENT' : 'LEAD',
             serviceTier: serviceTierFromSignupIntake(data.signupIntake),
+            customerType: activeSubAgent ? 'SUB_AGENT_REFERRAL' : 'DIRECT',
+            referralCodeAtSignup: activeSubAgent?.referralCode || null,
+            referredBySubAgentId: activeSubAgent?.id || null,
             progress: {
               create: {
                 onboarding: {
                   status: 'pending',
                   signupAt: new Date().toISOString(),
                   completedAt: null,
-                  referralSource: data.referralSource || null,
-                  referralDetail: data.referralDetail || null,
+                  referralSource: activeSubAgent?.name || data.referralSource || null,
+                  referralDetail: activeSubAgent?.referralCode || data.referralDetail || null,
+                  subAgentReferralCode: activeSubAgent?.referralCode || null,
+                  subAgentAffiliateId: activeSubAgent?.affiliateId || null,
+                  subAgentName: activeSubAgent?.name || null,
                   initialOfferInterest: data.offerInterest || null,
+                  ...smsConsent,
                   signupIntake: (data.signupIntake || null) as any
                 },
                 education: {
@@ -95,7 +120,24 @@ authRouter.post('/register', async (req, res, next) => {
       }
     });
 
-    await notifyNewClientSignup({
+    if (activeSubAgent) {
+      await prisma.subAgentContact.create({
+        data: {
+          subAgentId: activeSubAgent.id,
+          status: 'CLIENT_REGISTERED',
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phone: user.phone,
+          landingPath: '/signup',
+          sourceUrl: 'signup',
+          ipAddress: req.ip || null,
+          userAgent: String(req.headers['user-agent'] || '') || null
+        }
+      });
+    }
+
+    void notifyNewClientSignup({
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
@@ -112,7 +154,75 @@ authRouter.post('/register', async (req, res, next) => {
       contractLink,
       offerType: data.offerInterest
     });
+    if (data.offerInterest !== 'masterclass') {
+      const statusAt = new Date().toISOString();
+      const client = await prisma.client.update({
+        where: { userId: user.id },
+        data: { status: 'CONTRACT_SENT' },
+        include: { progress: true }
+      });
+      const onboarding = (client.progress?.onboarding || {}) as Record<string, unknown>;
+      const workflow = (client.progress?.workflow || {}) as Record<string, unknown>;
+      await prisma.clientProgress.update({
+        where: { clientId: client.id },
+        data: {
+          onboarding: {
+            ...onboarding,
+            status: 'contract_pending',
+            contractLinkIssuedAt: statusAt
+          },
+          workflow: {
+            ...workflow,
+            stage: 'contract_pending',
+            updatedAt: statusAt,
+            next: ['sign_service_agreement', 'complete_application']
+          }
+        }
+      });
+      await prisma.agreement.create({
+        data: {
+          clientId: client.id,
+          status: 'SENT',
+          sentAt: new Date(statusAt)
+        }
+      });
+      await prisma.activityEvent.create({
+        data: {
+          clientId: client.id,
+          type: 'CONTRACT_SENT',
+          message: 'Welcome email and service agreement link sent.',
+          metadata: {
+            contractLinkIssuedAt: statusAt,
+            referralCode: activeSubAgent?.referralCode || null,
+            emailProvider: welcomeEmail.delivery?.provider || null,
+            emailMessageId: welcomeEmail.delivery?.id || null,
+            emailSkippedReason: welcomeEmail.delivery?.reason || null,
+            smsConsent: smsConsent.smsConsent,
+            smsConsentCapturedAt: smsConsent.smsConsentCapturedAt,
+            smsConsentSource: smsConsent.smsConsentSource
+          }
+        }
+      });
+      if (activeSubAgent) {
+        await prisma.subAgentContact.create({
+          data: {
+            subAgentId: activeSubAgent.id,
+            status: 'CONTRACT_SENT',
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+            landingPath: '/signup',
+            sourceUrl: 'signup',
+            ipAddress: req.ip || null,
+            userAgent: String(req.headers['user-agent'] || '') || null
+          }
+        });
+      }
+    }
     const { passwordHash: _omitPasswordHash, ...safeUser } = user;
+
+    track('account_created', { distinctId: user.id, props: { role: user.role, referred: Boolean(activeSubAgent) } });
 
     return res.status(201).json({
       user: safeUser,
@@ -197,10 +307,13 @@ authRouter.get('/password-setup/verify', async (req, res, next) => {
 
     const record = await findActiveTokenRecord(token);
     if (!record) return res.status(410).json({ error: 'Token is invalid or expired' });
+    const affiliateProfile = record.user.role === 'AFFILIATE'
+      ? await prisma.subAgent.findUnique({ where: { adminUserId: record.user.id }, select: { email: true } })
+      : null;
 
     return res.json({
       valid: true,
-      email: record.user.email,
+      email: affiliateProfile?.email || record.user.email,
       firstName: record.user.firstName,
       purpose: record.purpose,
       expiresAt: record.expiresAt.toISOString()
@@ -237,7 +350,10 @@ authRouter.post('/password-setup/complete', async (req, res, next) => {
 
     const token = signToken({ sub: record.user.id, role: record.user.role });
     const { passwordHash: _omit, ...safeUser } = record.user;
-    return res.json({ user: safeUser, token });
+    const affiliateProfile = record.user.role === 'AFFILIATE'
+      ? await prisma.subAgent.findUnique({ where: { adminUserId: record.user.id }, select: { email: true } })
+      : null;
+    return res.json({ user: { ...safeUser, email: affiliateProfile?.email || safeUser.email }, token });
   } catch (error) {
     next(error);
   }
@@ -256,7 +372,18 @@ authRouter.post('/upgrade', requireAuth, async (req: AuthedRequest, res, next) =
     const data = upgradeSchema.parse(req.body);
     const user = await prisma.user.findUnique({
       where: { id: req.auth!.sub },
-      include: { client: { include: { progress: true } } }
+      include: {
+        client: {
+          include: {
+            progress: true,
+            payments: true,
+            documents: true,
+            disputes: true,
+            tasks: true,
+            activities: true
+          }
+        }
+      }
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (!user.client?.progress) return res.status(404).json({ error: 'Client progress not found' });
@@ -278,6 +405,7 @@ authRouter.post('/upgrade', requireAuth, async (req: AuthedRequest, res, next) =
 
     const education = (user.client.progress.education as Record<string, unknown>) || {};
     const onboarding = (user.client.progress.onboarding as Record<string, unknown>) || {};
+    const smsConsent = smsConsentFromSignupIntake(data.signupIntake);
     const upgradeHistory = Array.isArray((onboarding as any).upgradeHistory) ? [...(onboarding as any).upgradeHistory as any[]] : [];
     upgradeHistory.push({ at: new Date().toISOString(), to: data.offerInterest });
 
@@ -298,6 +426,7 @@ authRouter.post('/upgrade', requireAuth, async (req: AuthedRequest, res, next) =
           upgradeHistory,
           lastUpgradeAt: new Date().toISOString(),
           lastOfferInterest: data.offerInterest,
+          ...(smsConsent.smsConsent ? smsConsent : {}),
           lastSignupIntake: (data.signupIntake || null) as any
         } as any
       }
