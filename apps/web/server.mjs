@@ -4,6 +4,14 @@ import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// This file is the @credx/web entrypoint (`npm run start --workspace=@credx/web`).
+//
+// If production ever answers a static page with Express's "Cannot GET /pricing"
+// and API rate-limit/CORS headers, this server is not the process running: a
+// root-level railway.json/railway.api.json/railway.web.json has come back and
+// its `startCommand: npm run start:api` overrides the service-side config for
+// BOTH services. Delete those files; build/start config lives service-side via
+// the Railway API. (Happened 2026-09-08; previously in the reverse direction.)
 const rootDir = fileURLToPath(new URL('./dist', import.meta.url));
 const port = Number(process.env.PORT ?? 4173);
 const apiProxyTarget = (process.env.API_PROXY_TARGET ?? 'https://credxapi-production.up.railway.app').replace(/\/+$/, '');
