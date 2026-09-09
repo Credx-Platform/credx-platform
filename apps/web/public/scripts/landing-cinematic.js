@@ -25,7 +25,7 @@
   ['mid',83,87,160,-26,15,-12,.30],['front',52,42,260,18,12,-2,.42]
  ];
  trails.innerHTML=trailSpecs.map(([plane,left,top,length,angle,duration,delay,alpha],i)=>
-  `<span class="data-trail" data-plane="${plane}" style="--left:${left}%;--top:${top}%;--length:${length}px;--angle:${angle}deg;--duration:${duration}s;--delay:${delay}s;--alpha:${alpha};--trail-color:${i===6?'#a7a2f3':'#6ee2ff'}"><i></i></span>`).join('');
+  `<span class="data-trail" data-plane="${plane}" style="--left:${left}%;--top:${top}%;--length:${Math.round(length*.4)}px;--angle:${angle}deg;--duration:${duration}s;--delay:${delay}s;--alpha:${alpha};--trail-color:${i===6?'#a7a2f3':'#6ee2ff'}"><i></i></span>`).join('');
  // Desktop endpoints: perspective depth AND scale advance together.
  const depths=[
   {from:.62,to:1.10,z0:-180,z1:65,rx:3,ry:-8,x:0,y:-14,pointer:8},
@@ -75,12 +75,12 @@
    pointerX+=(targetX-pointerX)*.12;pointerY+=(targetY-pointerY)*.12;
    if(active){
     objects.forEach((el,i)=>{
-     const d=depths[i],travel=mobile?.5:1;
-     if(i===4)el.style.opacity=String((mobile?.75:.34)+approaching*(mobile?.25:.66));
+     const d=depths[i],travel=.5;
+     if(i===4)el.style.opacity=String(.75+approaching*.25);
      // Mobile keeps generous spacing; original aspect ratios remain untouched.
      const scale=d.from+(d.to-d.from)*approaching;
      const z=d.z0+(d.z1-d.z0)*approaching;
-     el.style.transform=`translate3d(${d.x*approaching*travel}px,${(i===4&&mobile?75:d.y)*approaching*travel}px,${z*travel}px) rotateX(${d.rx*(1-approaching)}deg) rotateY(${d.ry*(1-approaching*.65)}deg) scale(${scale})`;
+     el.style.transform=`translate3d(${d.x*approaching*travel}px,${(i===4?75:d.y)*approaching*travel}px,${z*travel}px) rotateX(${d.rx*(1-approaching)}deg) rotateY(${d.ry*(1-approaching*.65)}deg) scale(${scale})`;
      el.querySelector('.object-motion').style.transform=`translate3d(${pointerX*d.pointer}px,${pointerY*d.pointer}px,0)`;
     });
     copy.style.transform=`translate3d(0,${-departing*(mobile?12:28)}px,0)`;

@@ -43,6 +43,9 @@ try{
    expectedTop:parseFloat(getComputedStyle(document.querySelector('.hero')).top),
    cta:document.querySelector('.hero-btns').getBoundingClientRect().bottom
   }));
+  assert(await page.evaluate(()=>{const a=document.querySelector('.hero-art').getBoundingClientRect(),c=document.querySelector('.hero-copy').getBoundingClientRect();return a.top>=c.bottom-1}),'Artwork stays below copy at every width');
+  assert.equal(await page.locator('.light-sheen').count(),0,'No reflection overlays over content');
+  assert(await page.locator('.scroll-light-beam').evaluate(e=>e.offsetWidth<=140&&e.offsetHeight<=2),'Light is a short thin accent');
   const start=await metrics();assert(!start.overflow);assert(start.cta<(width<768?844:1000),'Primary CTAs visible at opening');
   await page.evaluate(y=>scrollTo({top:y,behavior:'instant'}),start.distance*.75);
   await page.waitForFunction(widths=>[...document.querySelectorAll('.scene-object img')].every((el,i)=>el.getBoundingClientRect().width>widths[i]*1.25),start.width,{timeout:5000});
@@ -53,18 +56,29 @@ try{
   assert.equal(await page.locator('.scroll-light').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
   // Light must follow either scroll direction and stop after input stops.
   const beamY=()=>page.locator('.scroll-light-beam').evaluate(e=>new DOMMatrix(getComputedStyle(e).transform).m42);
-  const beforeLight=await beamY();
-  await page.evaluate(()=>scrollBy({top:100,behavior:'instant'}));
-  await page.waitForFunction(y=>new DOMMatrix(getComputedStyle(document.querySelector('.scroll-light-beam')).transform).m42!==y,beforeLight);
-  const down=await beamY();
-  assert(await page.locator('.scroll-light').evaluate(e=>Number(getComputedStyle(e).opacity)>0),'Scroll activates light');
+  const lightFrame=await page.evaluate(()=>new Promise(resolve=>{
+   // Observe the first style update in-page; a short accent may have faded
+   // before another remote WebKit command or rendered frame can sample it.
+   const beam=document.querySelector('.scroll-light-beam');
+   const observer=new MutationObserver(()=>{
+    observer.disconnect();resolve({
+     y:new DOMMatrix(beam.style.transform).m42,
+     opacity:Number(document.querySelector('.scroll-light').style.opacity)
+    });
+   });
+   observer.observe(beam,{attributes:true,attributeFilter:['style']});
+   scrollBy({top:100,behavior:'instant'});
+  }));
+  const down=lightFrame.y;
+  assert(lightFrame.opacity>0,'Scroll activates light');
   await page.evaluate(()=>scrollBy({top:-20,behavior:'instant'}));
   await page.waitForFunction(y=>{
    const next=new DOMMatrix(getComputedStyle(document.querySelector('.scroll-light-beam')).transform).m42;
    const span=innerHeight+220,travel=((next-y)%span+span)%span;
    return Math.abs(travel-17)<1;
   },down);
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.scroll-light')).opacity==='0',{},{timeout:5000});
+  await page.waitForFunction(()=>[...document.querySelectorAll('.data-trail i')].every(e=>Number(getComputedStyle(e).opacity)===0)&&getComputedStyle(document.querySelector('.scroll-light')).opacity==='0', {}, {timeout:2000});
+  assert(await page.locator('.data-trail i').evaluateAll(els=>els.every(e=>Number(getComputedStyle(e).opacity)===0)),'Background trails fade out promptly when idle');
   assert.equal(await page.locator('.scroll-light').evaluate(e=>getComputedStyle(e).opacity),'0','Light stops when idle');
   for(const section of await page.locator('body>section').all()){
    await section.evaluate(e=>scrollTo({top:e.getBoundingClientRect().top+scrollY-100,behavior:'instant'}));
@@ -77,13 +91,13 @@ try{
   await page.locator('.hero-btns a[href="#how-it-works"]').click();
   await page.waitForFunction(()=>{const t=document.querySelector('#how-it-works').getBoundingClientRect().top;return t>=55&&t<160},{},{timeout:8000});
   await page.emulateMedia({reducedMotion:'reduce'});
-  await page.waitForFunction(()=>document.querySelectorAll('.light-sheen').length===0,{},{timeout:5000});
+  await page.waitForFunction(()=>!document.documentElement.classList.contains('cinematic-ready'),{},{timeout:5000});
   assert(await page.evaluate(()=>getComputedStyle(document.querySelector('.hero')).position==='relative'));
   assert.equal(await page.locator('.data-trails').evaluate(e=>getComputedStyle(e).display),'none');
   assert.equal(await page.locator('.light-sheen').count(),0,'Reduced motion cleans up reflections');
   assert(await page.evaluate(()=>Math.abs(document.querySelector('.hero-runway').offsetHeight-document.querySelector('.hero').offsetHeight)<2),'No pin spacer in reduced motion');
   await page.emulateMedia({reducedMotion:'no-preference'});
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.hero')).position==='sticky'&&document.querySelector('.light-sheen'),{},{timeout:5000});
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.hero')).position==='sticky',{},{timeout:5000});
   assert.equal(await page.locator('.hero').evaluate(e=>getComputedStyle(e).position),'sticky','Motion reinitialises without reload');
   assert.deepEqual(errors,[],'No page JavaScript errors');
   console.log(`PASS ${engine} ${width}px: assets, growth, pinning, reveals, overflow, FAQ, CTA anchor, reduced motion, cleanup`);
