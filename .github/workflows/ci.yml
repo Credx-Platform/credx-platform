@@ -46,6 +46,9 @@ jobs:
       - run: npm test
         env:
           TEST_DATABASE_URL: ""
+      # Runs serially (--test-concurrency=1 in the script). These files share one
+      # database and truncate whole tables in their before() hooks, so running
+      # files in parallel lets them delete each other's rows mid-assertion.
       - run: npm run test:integration
       - run: npm run build
       # Routing contract: proves each page is a distinct document and that
