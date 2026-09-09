@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 1000" fill="none">
+ <g stroke="#48cde6" stroke-width="1">
+  <ellipse cx="1050" cy="400" rx="530" ry="230" transform="rotate(-24 1050 400)" opacity=".18"/>
+  <ellipse cx="1050" cy="400" rx="650" ry="350" transform="rotate(-24 1050 400)" opacity=".09"/>
+  <path d="M-100 880C220 400 500 1050 830 500S1230 100 1550 250M-100 910C220 430 500 1080 830 530S1230 130 1550 280M-100 940C220 460 500 1110 830 560S1230 160 1550 310" opacity=".14"/>
+  <path d="M100 710L250 650L390 690L540 540L680 590L830 400L970 450L1130 290L1300 340" opacity=".22"/>
+  <path d="M250 600V710M239 630H261V672H239ZM540 490V595M529 517H551V560H529ZM830 350V460M819 380H841V424H819ZM1130 235V355M1119 267H1141V312H1119Z" opacity=".24"/>
+ </g>
+ <g fill="#9ceaf5">
+  <circle cx="100" cy="710" r="2"/><circle cx="390" cy="690" r="2"/><circle cx="680" cy="590" r="2"/><circle cx="970" cy="450" r="2"/><circle cx="1300" cy="340" r="2"/>
+  <circle cx="180" cy="140" r="1"/><circle cx="440" cy="230" r="1.5"/><circle cx="790" cy="110" r="1"/><circle cx="1210" cy="170" r="1.5"/><circle cx="1370" cy="670" r="1"/><circle cx="720" cy="830" r="1.5"/><circle cx="300" cy="890" r="1"/>
+ </g>
+</svg>

@@ -77,8 +77,97 @@ a{text-decoration:none;color:inherit}
 .nav-cta{height:34px;padding:0 18px;display:inline-flex;align-items:center;background:var(--cyan);color:var(--bg);font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:.4px;border-radius:6px;border:none;cursor:pointer;transition:all .2s}
 .nav-cta:hover{box-shadow:0 0 20px var(--cyan-glow);background:var(--cyan2)}
 .hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:100px clamp(16px,4vw,48px) 80px;overflow:hidden}
-.hero-bg{position:absolute;inset:0;background-image:url('/images/credx-hero-bg.jpg');background-size:cover;background-position:center right;background-repeat:no-repeat;opacity:.16;filter:saturate(.35) brightness(.75) contrast(1.05)}
-.hero-overlay{position:absolute;inset:0;background:radial-gradient(1100px 620px at 78% 42%,rgba(0,198,251,.13),transparent 62%),linear-gradient(90deg,var(--bg) 0%,rgba(6,10,18,.92) 46%,rgba(6,10,18,.80) 100%),linear-gradient(180deg,rgba(6,10,18,.55),rgba(6,10,18,.30) 45%,var(--bg))}
+/* Layered 3D hero backdrop (replaces the single flat credx-hero-bg.jpg plate).
+   Layers sit at different translateZ depths inside the hero perspective; .hb-in
+   carries the scroll-linked drift so the two transforms never fight. */
+/* The subjects ship as real RGBA cut-outs graded onto the favicon's material ramp
+   by scripts/style-hero-layers.py, so they composite normally and can carry the
+   soft contact shadow the logo render has. (They used to be black-matte JPEGs
+   knocked out with mix-blend-mode:screen; that only works over flat black, and
+   the hero backdrop now carries the favicon's charcoal studio wash.) */
+.hero-bg{position:absolute;inset:0;overflow:hidden;pointer-events:none;isolation:isolate;background:var(--bg);
+  perspective:1200px;perspective-origin:72% 44%}
+.hb-layer{position:absolute;z-index:1;transform-style:preserve-3d;will-change:transform;
+  transform:translateZ(var(--z,0px)) rotateY(var(--ry,0deg)) rotateX(var(--rx,0deg));
+  opacity:var(--op,.6)}
+.hb-in{transform-style:preserve-3d;will-change:transform}
+.hb-layer img{display:block;width:100%;height:auto}
+/* depth ordering: 1 = furthest, 4 = nearest */
+/* Four approved subjects frame both sides; scale is bounded, never full-screen. */
+/* Subjects sit directly behind the hero content, not in separate outer bands. */
+.hero{min-height:100svh;padding-top:130px;padding-bottom:100px;isolation:isolate}
+.hero-bg{perspective-origin:50% 50%;z-index:0}
+.hero-overlay{z-index:1}
+.hb-layer{filter:drop-shadow(0 10px 18px rgba(0,0,0,.55)) drop-shadow(0 2px 26px rgba(0,169,211,.12))}
+.hb-1{left:8%;top:8%;width:clamp(300px,42vw,760px);--z:-100px;--ry:7deg;--op:.42;--drift:44px;--dx:80px}
+.hb-2{right:6%;top:10%;width:clamp(300px,42vw,770px);--z:-40px;--ry:-6deg;--op:.42;--drift:52px;--dx:-80px}
+.hb-3{left:12%;bottom:6%;width:clamp(240px,32vw,570px);--z:0px;--ry:5deg;--op:.36;--drift:20px;--dx:60px}
+.hb-4{right:10%;bottom:8%;width:clamp(200px,27vw,470px);--z:30px;--ry:-8deg;--rx:3deg;--op:.32;--drift:24px;--dx:-60px}
+/* Fade each subject's inner edge so it dissolves toward the copy instead of
+   ending on a hard crop at the widths where the 1180px grid eats the margin.
+   The lower pair also fades downward so the hero's overflow clip does not slice
+   them with a straight line once they scale up on scroll. */
+.hb-1,.hb-3{-webkit-mask-image:linear-gradient(90deg,#000 46%,transparent 96%);mask-image:linear-gradient(90deg,#000 46%,transparent 96%)}
+.hb-2,.hb-4{-webkit-mask-image:linear-gradient(270deg,#000 46%,transparent 96%);mask-image:linear-gradient(270deg,#000 46%,transparent 96%)}
+.hb-3{-webkit-mask-image:linear-gradient(90deg,#000 46%,transparent 96%),linear-gradient(180deg,#000 58%,transparent 100%);mask-image:linear-gradient(90deg,#000 46%,transparent 96%),linear-gradient(180deg,#000 58%,transparent 100%)}
+/* The merch stack is bottom-heavy — cap and phone case sit at the base — so its
+   downward fade starts later than the cash layer's or it eats the subject. */
+.hb-4{-webkit-mask-image:linear-gradient(270deg,#000 46%,transparent 96%),linear-gradient(180deg,#000 82%,transparent 100%);mask-image:linear-gradient(270deg,#000 46%,transparent 96%),linear-gradient(180deg,#000 82%,transparent 100%)}
+.hb-3,.hb-4{-webkit-mask-composite:source-in;mask-composite:intersect}
+.hb-in{transform:scale(.64);transform-origin:center}
+@keyframes hbDrift{
+ from{transform:translate3d(0,0,0) scale(.64)}
+ to{transform:translate3d(var(--dx,0px),var(--drift,60px),0) scale(1)}
+}
+@supports (animation-timeline: scroll()){
+ @media (prefers-reduced-motion:no-preference){
+  .hb-in{animation:hbDrift linear both;animation-timeline:scroll(root);animation-range:0 55vh}
+ }
+}
+@media(max-width:960px){
+ .hero{padding-top:120px;padding-bottom:80px}
+ .hb-1,.hb-2{width:62%;min-width:230px;top:12%}
+ .hb-3,.hb-4{width:54%;min-width:200px;bottom:8%}
+ .hb-1{left:-2%}.hb-2{right:-2%}
+ .hb-3{left:-1%}.hb-4{right:-1%}
+ .hb-layer{--drift:30px;--op:.3}
+ .hb-1,.hb-3{--dx:70px}
+ .hb-2,.hb-4{--dx:-70px}
+}
+/* Below 768px the hero drops to min-height:auto and the copy runs nearly edge to
+   edge, so the subjects sit behind it at low opacity rather than beside it. */
+@media(max-width:768px){
+ .hb-1,.hb-2{width:72%;min-width:230px;top:10%}
+ .hb-3,.hb-4{width:64%;min-width:200px;bottom:10%}
+ .hb-1{left:-6%}.hb-2{right:-6%}
+ .hb-3{left:-5%}.hb-4{right:-5%}
+ .hb-layer{--drift:20px;--op:.24}
+ .hb-1,.hb-3{--dx:40px}
+ .hb-2,.hb-4{--dx:-40px}
+}
+@media(prefers-reduced-motion:reduce){.hb-in{animation:none;transform:scale(.82);will-change:auto}}
+/* Shooting-star beams. Each is a thin cyan streak that rotates first and then
+   travels along its own rotated axis, which is what gives the diagonal path.
+   They live inside .hero-bg so .hero-overlay dims them over the copy column. */
+.hb-beam{position:absolute;height:3px;width:var(--len,260px);pointer-events:none;border-radius:3px;
+  background:linear-gradient(90deg,transparent,rgba(0,198,251,.7) 40%,#dff4ff 88%,#fff 96%,transparent);
+  filter:drop-shadow(0 0 10px rgba(0,198,251,.85)) drop-shadow(0 0 22px rgba(0,198,251,.4));
+  opacity:0;transform:rotate(var(--ang,-32deg)) translate3d(-20vw,0,0);
+  animation:hbShoot var(--dur,6s) linear var(--delay,0s) infinite}
+/* Travel is deliberately short of a full crossing: most of the cycle should be
+   on-canvas, otherwise the streaks spend their time off-screen and the hero just
+   looks static. */
+@keyframes hbShoot{
+ 0%{opacity:0;transform:rotate(var(--ang,-32deg)) translate3d(-20vw,0,0) scaleX(.3)}
+ 12%{opacity:1}
+ 68%{opacity:1}
+ 100%{opacity:0;transform:rotate(var(--ang,-32deg)) translate3d(58vw,0,0) scaleX(1)}
+}
+@media(prefers-reduced-motion:reduce){.hb-beam{display:none}}
+/* "Invisible" 3D: cards stay flat until the pointer is near, then tilt into depth. */
+.tilt3d{transform-style:preserve-3d;transition:transform .4s cubic-bezier(.22,.61,.36,1)}
+@media(prefers-reduced-motion:reduce){.tilt3d{transition:none}}
+.hero-overlay{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(6,10,18,.12),rgba(6,10,18,.12) 20%,rgba(6,10,18,.36) 38%,rgba(6,10,18,.36) 65%,rgba(6,10,18,.12) 85%,var(--bg)),radial-gradient(ellipse at center,rgba(6,10,18,.55),transparent 72%)}
 .hero-inner{position:relative;z-index:2;max-width:720px}
 .hero-tag{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;background:var(--cyan-dim);border:1px solid var(--border-c);border-radius:100px;font-size:11px;font-weight:600;color:var(--cyan);letter-spacing:.6px;text-transform:uppercase;margin-bottom:24px}
 .hero-tag::before{content:'';width:6px;height:6px;background:var(--cyan);border-radius:50%;animation:pulse 2s infinite}
@@ -295,7 +384,8 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 @media(max-width:768px){
  .nav-links{display:none}
  section{padding:64px clamp(16px,4vw,48px)}
- .hero{padding:88px 16px 56px;min-height:auto}
+ /* Background stays behind the content on compact screens. */
+ .hero{padding:100px 16px 64px;min-height:auto}
  .hero-stats{flex-wrap:wrap;gap:18px 24px;margin-top:32px;padding-top:24px}
  .hs-num{font-size:24px}
  .hero-btns{gap:10px}
@@ -336,7 +426,13 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 
 /* ---- hero ---- */
 .hero-grid{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,520px);gap:56px;align-items:center;max-width:1180px;margin:0 auto;width:100%}
-.hero-copy{max-width:620px}
+.hero-copy{max-width:620px;position:relative}
+/* Now that the subjects run large and centred they pass behind the copy column,
+   so the text carries its own scrim rather than relying on the hero-wide overlay.
+   Sits at z-index -1 inside .hero-inner's stacking context: above the backdrop,
+   below the text. Bleeds well past the column so there is no visible edge. */
+.hero-copy::before{content:'';position:absolute;inset:-10% -20% -12% -24%;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse at 36% 52%,rgba(6,10,18,.86),rgba(6,10,18,.68) 42%,rgba(6,10,18,.25) 66%,transparent 82%)}
 .hero-note{margin-top:22px;font-size:11.5px;color:var(--muted2);max-width:520px;line-height:1.6}
 
 /* the floating readiness object */
@@ -487,6 +583,25 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
   .pl-item:hover,.md-card:hover{transform:none}
 }
 
+/* Financial-space atmosphere: decorative, no external runtime or canvas. */
+html{overflow-x:clip}
+body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),transparent 45%),url('/images/hero/financial-space.svg');background-size:100% 100%,1440px 1000px}
+/* Favicon studio wash: a charcoal key light off the upper left falling to the
+   page background, so the hero reads as the lit backdrop the logo sits against
+   rather than flat black. Kept under the existing cyan bloom and line art. */
+.hero-bg{background:radial-gradient(ellipse at 76% 35%,rgba(0,154,198,.16),transparent 62%),url('/images/hero/financial-space.svg') center/cover,radial-gradient(ellipse 110% 90% at 28% 12%,#2a323b,#141a22 45%,var(--bg) 78%),var(--bg)}
+.md-card,.pg-card,.pl-item{backdrop-filter:blur(12px);box-shadow:inset 0 1px rgba(153,231,255,.045),0 18px 48px rgba(0,0,0,.15)}
+@keyframes financialCardDrift{from{translate:0 42px;rotate:x 5deg}to{translate:0 -24px;rotate:x -2deg}}
+@supports(animation-timeline:view()){
+ @media(prefers-reduced-motion:no-preference){
+  .md-card,.pg-card,.pl-item{animation:financialCardDrift linear both;animation-timeline:view();animation-range:entry 0% exit 100%}
+  .md-card:nth-child(even),.pg-card:nth-child(even){animation-direction:reverse}
+ }
+}
+@media(max-width:700px){
+ @keyframes financialCardDrift{from{translate:0 14px}to{translate:0 -8px}}
+}
+@media(prefers-reduced-motion:reduce){.md-card,.pg-card,.pl-item{animation:none;translate:none;rotate:none}}
 </style>
 </head>
 <body>
@@ -504,7 +619,22 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
  <a href="/signup" class="nav-cta">Sign Up</a>
 </nav>
 <section class="hero section-fade">
- <div class="hero-bg"></div>
+ <!-- Layered 3D hero backdrop. Each subject sits at a different Z depth, so they
+      separate on scroll instead of reading as one flat plate. All four subjects are graded RGBA cut-out PNGs.
+      Decorative only: aria-hidden, empty alt, pointer-events none. -->
+ <div class="hero-bg scene" id="heroBg" aria-hidden="true">
+  <div class="hb-layer hb-1"><div class="hb-in"><img src="/images/hero/hero-house.png" alt="" loading="eager" decoding="async"></div></div>
+  <div class="hb-layer hb-2"><div class="hb-in"><img src="/images/hero/hero-car.png" alt="" loading="lazy" decoding="async"></div></div>
+  <div class="hb-layer hb-3"><div class="hb-in"><img src="/images/hero/hero-cash.png" alt="" loading="lazy" decoding="async"></div></div>
+  <div class="hb-layer hb-4"><div class="hb-in"><img src="/images/hero/hero-merch.png" alt="" loading="lazy" decoding="async"></div></div>
+  <!-- Positive angles so they fall right-and-down like meteors. Cross the hero
+       background beneath the copy scrim and foreground score card. -->
+  <i class="hb-beam" style="top:16%;left:-6%;--len:300px;--ang:29deg;--dur:6.5s;--delay:0s"></i>
+  <i class="hb-beam" style="top:8%;left:22%;--len:230px;--ang:34deg;--dur:8s;--delay:2.4s"></i>
+  <i class="hb-beam" style="top:26%;left:48%;--len:340px;--ang:26deg;--dur:7.2s;--delay:4.1s"></i>
+  <i class="hb-beam" style="top:60%;left:-8%;--len:200px;--ang:31deg;--dur:9s;--delay:1.3s"></i>
+  <i class="hb-beam" style="top:66%;left:38%;--len:260px;--ang:28deg;--dur:7.8s;--delay:5.6s"></i>
+ </div>
  <div class="hero-overlay"></div>
  <div class="hero-grid">
   <div class="hero-copy hero-inner">
@@ -952,6 +1082,79 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').match
     tx = ty = 0;
     if(!raf) raf = requestAnimationFrame(apply);
   }, { passive: true });
+})();
+
+/* If a backdrop cut-out is missing or fails to decode, drop that layer entirely
+   rather than leaving a broken-image box floating in the hero. */
+(function heroLayerGuard(){
+  document.querySelectorAll('#heroBg .hb-layer img').forEach(img => {
+    const hide = () => { const l = img.closest('.hb-layer'); if(l) l.style.display = 'none'; };
+    if(img.complete && img.naturalWidth === 0) hide();
+    img.addEventListener('error', hide, { once: true });
+  });
+})();
+
+/* Hero backdrop drift fallback. Browsers with scroll-driven CSS animations
+   (animation-timeline: scroll()) handle this off the main thread and this
+   function no-ops. Older engines get one passive, rAF-coalesced listener. */
+(function heroBackdropDrift(){
+  const bg = document.getElementById('heroBg');
+  if(!bg || reduceMotion) return;
+  if(CSS.supports && CSS.supports('animation-timeline', 'scroll()')) return;
+
+  const read = (el, name, fallback) => {
+    const v = parseFloat(getComputedStyle(el).getPropertyValue(name));
+    return Number.isFinite(v) ? v : fallback;
+  };
+  const layers = [...bg.querySelectorAll('.hb-in')].map(el => ({
+    el,
+    drift: read(el.parentElement, '--drift', -60),
+    dx: read(el.parentElement, '--dx', 0)
+  }));
+  if(!layers.length) return;
+
+  let raf = 0;
+  function apply(){
+    raf = 0;
+    const p = Math.min(1, Math.max(0, window.scrollY / (window.innerHeight * .55)));
+    for(const l of layers){
+      l.el.style.transform = `translate3d(${l.dx * p}px,${l.drift * p}px,0) scale(${.64 + .36 * p})`;
+    }
+  }
+  window.addEventListener('scroll', () => {
+    if(!raf) raf = requestAnimationFrame(apply);
+  }, { passive: true });
+  window.addEventListener('resize', () => { if(!raf) raf = requestAnimationFrame(apply); }, { passive: true });
+  apply();
+})();
+
+/* "Invisible" 3D on the module/feature boxes: flat until the pointer approaches,
+   then a small perspective tilt toward the cursor. Pointer-only, motion-gated. */
+(function cardTilt(){
+  if(reduceMotion) return;
+  if(window.matchMedia('(hover: none)').matches) return;
+
+  const cards = document.querySelectorAll('.md-card');
+  if(!cards.length) return;
+
+  cards.forEach(card => {
+    card.classList.add('tilt3d');
+    let raf = 0, rx = 0, ry = 0;
+    const apply = () => {
+      raf = 0;
+      card.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(6px)`;
+    };
+    card.addEventListener('pointermove', (e) => {
+      const r = card.getBoundingClientRect();
+      ry = ((e.clientX - r.left) / r.width - 0.5) * 9;
+      rx = -((e.clientY - r.top) / r.height - 0.5) * 7;
+      if(!raf) raf = requestAnimationFrame(apply);
+    }, { passive: true });
+    card.addEventListener('pointerleave', () => {
+      rx = ry = 0;
+      if(!raf) raf = requestAnimationFrame(apply);
+    }, { passive: true });
+  });
 })();
 
 /* Reveal-on-scroll for the added sections: stagger the factor cards, fill every
