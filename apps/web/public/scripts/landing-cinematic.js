@@ -26,13 +26,15 @@
  ];
  trails.innerHTML=trailSpecs.map(([plane,left,top,length,angle,duration,delay,alpha],i)=>
   `<span class="data-trail" data-plane="${plane}" style="--left:${left}%;--top:${top}%;--length:${Math.round(length*.4)}px;--angle:${angle}deg;--duration:${duration}s;--delay:${delay}s;--alpha:${alpha};--trail-color:${i===6?'#a7a2f3':'#6ee2ff'}"><i></i></span>`).join('');
- // Desktop endpoints: perspective depth AND scale advance together.
+ // Scene settles rather than zooms: objects open near their final size, so the
+ // page reads as ordinary scrolling. End values (to/z1) are unchanged, which
+ // keeps the approved final composition and relative sizing exactly as it was.
  const depths=[
-  {from:.62,to:1.10,z0:-180,z1:65,rx:3,ry:-8,x:0,y:-14,pointer:8},
-  {from:.64,to:1.06,z0:-90,z1:95,rx:-3,ry:9,x:14,y:12,pointer:14},
-  {from:.58,to:.97,z0:-300,z1:-50,rx:5,ry:10,x:-16,y:-16,pointer:3},
-  {from:.65,to:1.12,z0:-140,z1:85,rx:-4,ry:-5,x:0,y:-12,pointer:10},
-  {from:.55,to:.98,z0:-300,z1:30,rx:4,ry:10,x:-12,y:250,pointer:7}
+  {from:1.02,to:1.10,z0:10,z1:65,rx:3,ry:-8,x:0,y:-14,pointer:8},
+  {from:.99,to:1.06,z0:40,z1:95,rx:-3,ry:9,x:14,y:12,pointer:14},
+  {from:.90,to:.97,z0:-105,z1:-50,rx:5,ry:10,x:-16,y:-16,pointer:3},
+  {from:1.04,to:1.12,z0:30,z1:85,rx:-4,ry:-5,x:0,y:-12,pointer:10},
+  {from:.91,to:.98,z0:-25,z1:30,rx:4,ry:10,x:-12,y:250,pointer:7}
  ];
  function mount(){
   dispose();
