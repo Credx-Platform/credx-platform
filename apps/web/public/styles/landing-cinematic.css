@@ -134,10 +134,22 @@ section[id]{scroll-margin-top:78px}
 .section-opening[data-graphic="1"]::before{background:repeating-radial-gradient(ellipse at 0 0,transparent 0 58px,rgba(71,164,223,.2) 59px 60px,transparent 61px 115px);mask-image:linear-gradient(90deg,#000,transparent 60%)}
 .section-opening[data-graphic="2"]::before{background:linear-gradient(90deg,transparent,rgba(0,198,251,.3),transparent) center 20px/75% 1px no-repeat,radial-gradient(ellipse at 50% 0,rgba(71,104,225,.2),transparent 65%)}
 .section-opening>.container,.section-opening>.about-inner{position:relative;z-index:1}
+/* Titles pull back to size as they scroll in. Left origin plus a clip on the
+   content column means the oversized start can never widen the document. */
+.cinematic-ready .section-opening>.container,.cinematic-ready .section-opening>.about-inner{overflow-x:clip}
+.cinematic-ready .stitle,.cinematic-ready .about-inner>h2{transform-origin:0 50%;will-change:transform}
+@media(prefers-reduced-motion:reduce){
+ .cinematic-ready .stitle,.cinematic-ready .about-inner>h2{transform:none!important;will-change:auto!important}
+ .cinematic-ready .section-opening>.container,.cinematic-ready .section-opening>.about-inner{overflow-x:visible}
+}
 /* Short edge accents: no screen-wide band or content reflection overlays. */
 .scroll-light{position:fixed;inset:0;pointer-events:none;z-index:20;overflow:clip;opacity:0;contain:strict}
-.scroll-light-beam{position:absolute;left:10px;width:clamp(44px,5.5vw,88px);height:1.5px;top:0;background:linear-gradient(90deg,transparent,rgba(0,198,251,.62) 70%,#96f4ff);box-shadow:0 0 5px rgba(0,198,251,.3);transform:translate3d(0,-150px,0) rotate(-18deg)}
-@media(max-width:767px){.scroll-light-beam{left:5px;width:44px}.section-opening::before{opacity:.22}}
+/* Shooting stars: a bright head with a tapering tail behind it. They exist only
+   while the page is moving and travel at exactly scroll speed. */
+.scroll-light-beam{position:absolute;left:var(--x,10px);width:var(--len,88px);height:2px;top:0;transform:translate3d(0,-200px,0) rotate(-18deg);transform-origin:100% 50%}
+.scroll-light-beam::before{content:'';position:absolute;inset:0;border-radius:2px;background:linear-gradient(90deg,transparent,rgba(0,198,251,.16) 45%,var(--star,#7fe6ff));opacity:.8}
+.scroll-light-beam::after{content:'';position:absolute;right:-1px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:#e6fdff;box-shadow:0 0 7px 1.5px rgba(0,198,251,.8),0 0 14px rgba(90,220,255,.5)}
+@media(max-width:767px){.scroll-light-beam{--len:52px}.section-opening::before{opacity:.22}}
 @media(prefers-reduced-motion:reduce){.scroll-light{display:none!important}.object-cards{opacity:.85!important}.section-opening::before{opacity:.15}}
 
 .cinematic-hero .hero-btns .btn-outline{background:rgba(6,11,19,.88)}

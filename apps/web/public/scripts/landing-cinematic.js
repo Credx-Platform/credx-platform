@@ -43,6 +43,11 @@
   const sectionData=[...document.querySelectorAll('body>section')].map((el,i)=>({
    el,content:el.querySelector(':scope>.container,:scope>.about-inner'),pattern:el.id==='how-it-works'?3:i%3,top:0,done:false
   })).filter(s=>s.content);
+  // Section titles pull back from oversized to their true size as they arrive.
+  // Driven by scroll position, not a timer, so it tracks the wheel exactly.
+  // Selected from the sections themselves: the .section-opening class is not
+  // applied until further down this function, so it cannot be matched here.
+  const titles=sectionData.flatMap(s=>[...s.el.querySelectorAll('.stitle,.about-inner>h2')]);
   let raf=0,active=true,dirty=true,width=innerWidth,view=innerHeight,heroTop=0,heroHeight=0,distance=1;
   let pointerX=0,pointerY=0,targetX=0,targetY=0;
   let observer,resize;
@@ -51,6 +56,7 @@
    runway.style.removeProperty('--hero-height');runway.style.removeProperty('--pin-top');
    objects.forEach(o=>{o.style.removeProperty('transform');o.style.removeProperty('opacity');o.querySelector('.object-motion').style.removeProperty('transform')});
    cueRow.style.removeProperty('opacity');copy.style.removeProperty('transform');trails.style.removeProperty('transform');trails.style.removeProperty('opacity');
+   titles.forEach(el=>el.style.removeProperty('transform'));
    sectionData.forEach(s=>{s.el.classList.remove('section-opening');['transform','opacity','filter','clip-path','will-change'].forEach(p=>s.content.style.removeProperty(p))});
   };
   dispose=()=>{abort.abort();cancelAnimationFrame(raf);observer?.disconnect();resize?.disconnect();reset()};
@@ -110,6 +116,13 @@
     if(s.pattern===1){s.content.style.transform=`translate3d(0,${28*(1-e)}px,0) scale(${.96+.04*e})`;s.content.style.filter=`blur(${(mobile?2:6)*(1-e)}px)`;}
     if(s.pattern===2){s.content.style.clipPath=`inset(${(mobile?3:7)*(1-e)}% 0 ${8*(1-e)}% 0 round ${18*(1-e)}px)`;s.content.style.transform=`translate3d(0,${20*(1-e)}px,0)`;}
     if(s.pattern===3)s.content.style.transform=`perspective(1400px) translate3d(0,${32*(1-e)}px,${-80*(1-e)}px) rotateX(${(mobile?2:5)*(1-e)}deg)`;
+   });
+   titles.forEach(el=>{
+    const top=el.getBoundingClientRect().top;
+    if(top>view*1.05||top<-el.offsetHeight*2.2){el.style.removeProperty('transform');return;}
+    const t=ease(clamp((view*.9-top)/(view*.42)));
+    const scale=1.4-.4*t;
+    el.style.transform=scale>1.002?`scale(${scale.toFixed(4)})`:'';
    });
    if(active&&(Math.abs(targetX-pointerX)>.002||Math.abs(targetY-pointerY)>.002))schedule();
   }

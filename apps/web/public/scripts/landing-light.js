@@ -4,8 +4,12 @@
  const preference=matchMedia('(prefers-reduced-motion: reduce)');
  const sheet=document.createElement('div');
  sheet.className='scroll-light';sheet.setAttribute('aria-hidden','true');
- sheet.innerHTML='<div class="scroll-light-beam"></div>';document.body.append(sheet);
- const beam=sheet.firstElementChild;
+ // Three stars on their own lanes and offsets so they never read as one bar.
+ const starSpecs=[[10,88,0,'#7fe6ff'],[46,64,-260,'#a9e9ff'],[22,52,-520,'#8fd4ff']];
+ sheet.innerHTML=starSpecs.map(([x,len,off,color])=>
+  `<div class="scroll-light-beam" data-offset="${off}" style="--x:${x}px;--len:${len}px;--star:${color}"></div>`).join('');
+ document.body.append(sheet);
+ const stars=[...sheet.children];
  let dispose=()=>{};
  function mount(){
   dispose();if(preference.matches)return;
@@ -16,13 +20,19 @@
    cancelAnimationFrame(raf);raf=0;sheet.style.opacity='0';
    packets.forEach(el=>el.style.opacity='0');
   }
-  // Light exists only while the wheel is turning: it passes through with the
-  // scroll and is gone ~110ms after it stops, so it never sits over copy.
+  // Stars exist only while the wheel is turning: they travel at exactly scroll
+  // speed and are gone ~90ms after it stops, so nothing rests over the copy.
+  const span=()=>innerHeight+220;
   function draw(now){
    raf=0;
-   const fade=Math.max(0,1-(now-lastMove)/110);
-   sheet.style.opacity=String(fade*.22);
-   beam.style.transform=`translate3d(0,${position}px,0) rotate(-18deg)`;
+   const fade=Math.max(0,1-(now-lastMove)/90);
+   sheet.style.opacity=String(fade*.5);
+   const s=span();
+   stars.forEach(el=>{
+    const off=Number(el.dataset.offset)||0;
+    const y=((position+off+110)%s+s)%s-110;
+    el.style.transform=`translate3d(0,${y}px,0) rotate(-18deg)`;
+   });
    packets.forEach((el,i)=>{
     const phase=((lastY*.8+i*137)%(innerWidth+200))/(innerWidth+200);
     el.style.transform=`translate3d(${(phase-.5)*innerWidth}px,0,0)`;
@@ -32,9 +42,10 @@
   }
   function onScroll(){
    const delta=scrollY-lastY;lastY=scrollY;if(!delta)return;
-   position-=delta*1.3;
-   const span=innerHeight+220;
-   position=((position+110)%span+span)%span-110;
+   // 1:1 with the wheel: the stars move exactly as far as the page does.
+   position-=delta;
+   const s=span();
+   position=((position+110)%s+s)%s-110;
    lastMove=performance.now();if(!raf)raf=requestAnimationFrame(draw);
   }
   addEventListener('scroll',onScroll,{passive:true,signal:abort.signal});

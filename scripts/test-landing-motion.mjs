@@ -45,7 +45,13 @@ try{
   }));
   assert(await page.evaluate(()=>{const a=document.querySelector('.hero-art').getBoundingClientRect(),c=document.querySelector('.hero-copy').getBoundingClientRect();return a.top>=c.bottom-1}),'Artwork stays below copy at every width');
   assert.equal(await page.locator('.light-sheen').count(),0,'No reflection overlays over content');
-  assert(await page.locator('.scroll-light-beam').evaluate(e=>e.offsetWidth<=140&&e.offsetHeight<=2),'Light is a short thin accent');
+  assert(await page.locator('.scroll-light-beam').first().evaluate(e=>e.offsetWidth<=140&&e.offsetHeight<=2),'Light is a short thin accent');
+  assert.equal(await page.locator('.scroll-light-beam').count(),3,'Three shooting stars, not one bar');
+  // A shooting star is a bright head plus a tail that fades out behind it.
+  assert(await page.locator('.scroll-light-beam').first().evaluate(e=>{
+   const head=getComputedStyle(e,'::after'),tail=getComputedStyle(e,'::before');
+   return parseFloat(head.width)<=5&&head.borderTopLeftRadius==='50%'&&tail.backgroundImage.includes('gradient');
+  }),'Star has a small round head and a gradient tail');
   const start=await metrics();assert(!start.overflow);assert(start.cta<(width<768?844:1000),'Primary CTAs visible at opening');
   await page.evaluate(y=>scrollTo({top:y,behavior:'instant'}),start.distance*.75);
   // The scene settles, it does not zoom. Objects open near final size and gain
@@ -63,7 +69,7 @@ try{
   assert.equal(await page.locator('.data-trails').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
   assert.equal(await page.locator('.scroll-light').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
   // Light must follow either scroll direction and stop after input stops.
-  const beamY=()=>page.locator('.scroll-light-beam').evaluate(e=>new DOMMatrix(getComputedStyle(e).transform).m42);
+  const beamY=()=>page.locator('.scroll-light-beam').first().evaluate(e=>new DOMMatrix(getComputedStyle(e).transform).m42);
   const lightFrame=await page.evaluate(()=>new Promise(resolve=>{
    // Observe the first style update in-page; a short accent may have faded
    // before another remote WebKit command or rendered frame can sample it.
@@ -83,8 +89,8 @@ try{
   await page.waitForFunction(y=>{
    const next=new DOMMatrix(getComputedStyle(document.querySelector('.scroll-light-beam')).transform).m42;
    const span=innerHeight+220,travel=((next-y)%span+span)%span;
-   // 20px of scroll moves the accent 26px: it passes through with the page.
-   return Math.abs(travel-26)<1;
+   // Stars move 1:1 with the wheel: 20px of scroll moves them exactly 20px.
+   return Math.abs(travel-20)<1;
   },down);
   await page.waitForFunction(()=>[...document.querySelectorAll('.data-trail i')].every(e=>Number(getComputedStyle(e).opacity)===0)&&getComputedStyle(document.querySelector('.scroll-light')).opacity==='0', {}, {timeout:2000});
   assert(await page.locator('.data-trail i').evaluateAll(els=>els.every(e=>Number(getComputedStyle(e).opacity)===0)),'Background trails fade out promptly when idle');
@@ -95,6 +101,23 @@ try{
    assert(await section.evaluate(e=>{const c=e.querySelector(':scope>.container,:scope>.about-inner');return !c||getComputedStyle(c).opacity==='1'}),'Section fully reveals');
    assert(!(await metrics()).overflow);
   }
+  // Titles arrive oversized and pull back to their true size, driven by scroll.
+  const titleScale=()=>page.evaluate(()=>new DOMMatrix(getComputedStyle(document.querySelector('.section-opening .stitle')).transform).m11);
+  // Park by waiting for the title to actually reach the target band: WebKit does
+  // not always honour instant scrolling, so a fixed delay races the scroll.
+  const parkTitle=async f=>{
+   await page.evaluate(frac=>{const t=document.querySelector('.section-opening .stitle');
+    scrollTo({top:t.getBoundingClientRect().top+scrollY-innerHeight*frac,behavior:'instant'})},f);
+   await page.waitForFunction(frac=>Math.abs(document.querySelector('.section-opening .stitle').getBoundingClientRect().top-innerHeight*frac)<6,f,{timeout:5000});
+   await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  };
+  await parkTitle(.86);
+  const arriving=await titleScale();
+  await parkTitle(.2);
+  const settled=await titleScale();
+  assert(arriving>1.05,`Title arrives oversized (was ${arriving.toFixed(3)}x)`);
+  assert(Math.abs(settled-1)<.03,`Title settles to true size (was ${settled.toFixed(3)}x)`);
+  assert(!(await metrics()).overflow,'Title zoom never widens the document');
   await page.locator('.faq-q').first().click();assert(await page.locator('.faq-item').first().evaluate(e=>e.classList.contains('open')));
   await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
   await page.locator('.hero-btns a[href="#how-it-works"]').click();
@@ -104,6 +127,7 @@ try{
   assert(await page.evaluate(()=>getComputedStyle(document.querySelector('.hero')).position==='relative'));
   assert.equal(await page.locator('.data-trails').evaluate(e=>getComputedStyle(e).display),'none');
   assert.equal(await page.locator('.light-sheen').count(),0,'Reduced motion cleans up reflections');
+  assert(await page.locator('.stitle').evaluateAll(els=>els.every(e=>{const m=getComputedStyle(e).transform;return m==='none'||new DOMMatrix(m).m11===1})),'Reduced motion leaves titles at true size');
   assert(await page.evaluate(()=>Math.abs(document.querySelector('.hero-runway').offsetHeight-document.querySelector('.hero').offsetHeight)<2),'No pin spacer in reduced motion');
   await page.emulateMedia({reducedMotion:'no-preference'});
   await page.waitForFunction(()=>getComputedStyle(document.querySelector('.hero')).position==='sticky',{},{timeout:5000});
