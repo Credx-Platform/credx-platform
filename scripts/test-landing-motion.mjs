@@ -48,9 +48,17 @@ try{
   assert(await page.locator('.scroll-light-beam').evaluate(e=>e.offsetWidth<=140&&e.offsetHeight<=2),'Light is a short thin accent');
   const start=await metrics();assert(!start.overflow);assert(start.cta<(width<768?844:1000),'Primary CTAs visible at opening');
   await page.evaluate(y=>scrollTo({top:y,behavior:'instant'}),start.distance*.75);
-  await page.waitForFunction(widths=>[...document.querySelectorAll('.scene-object img')].every((el,i)=>el.getBoundingClientRect().width>widths[i]*1.25),start.width,{timeout:5000});
+  // The scene settles, it does not zoom. Objects open near final size and gain
+  // only a little as the page moves, so scrolling reads as ordinary scrolling.
+  // An upper bound is asserted deliberately: a large jump here is the zoom-out
+  // behaviour regressing, not an improvement.
+  await page.waitForFunction(widths=>[...document.querySelectorAll('.scene-object img')].every((el,i)=>el.getBoundingClientRect().width>widths[i]*1.03),start.width,{timeout:5000});
   const end=await metrics();assert(!end.overflow);assert(Math.abs(end.top-end.expectedTop)<2,'Hero remains sticky during scrub');
-  end.width.forEach((w,i)=>assert(w>start.width[i]*1.25,`Object ${i} grows with scroll`));
+  end.width.forEach((w,i)=>{
+   const ratio=w/start.width[i];
+   assert(ratio>1.03,`Object ${i} still responds to scroll (was ${ratio.toFixed(3)}x)`);
+   assert(ratio<1.18,`Object ${i} settles instead of zooming (was ${ratio.toFixed(3)}x)`);
+  });
   await page.waitForTimeout(150);const still=await metrics();still.width.forEach((w,i)=>assert(Math.abs(w-end.width[i])<1,'Growth stops when scrolling stops'));
   assert.equal(await page.locator('.data-trails').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
   assert.equal(await page.locator('.scroll-light').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
@@ -75,7 +83,8 @@ try{
   await page.waitForFunction(y=>{
    const next=new DOMMatrix(getComputedStyle(document.querySelector('.scroll-light-beam')).transform).m42;
    const span=innerHeight+220,travel=((next-y)%span+span)%span;
-   return Math.abs(travel-17)<1;
+   // 20px of scroll moves the accent 26px: it passes through with the page.
+   return Math.abs(travel-26)<1;
   },down);
   await page.waitForFunction(()=>[...document.querySelectorAll('.data-trail i')].every(e=>Number(getComputedStyle(e).opacity)===0)&&getComputedStyle(document.querySelector('.scroll-light')).opacity==='0', {}, {timeout:2000});
   assert(await page.locator('.data-trail i').evaluateAll(els=>els.every(e=>Number(getComputedStyle(e).opacity)===0)),'Background trails fade out promptly when idle');

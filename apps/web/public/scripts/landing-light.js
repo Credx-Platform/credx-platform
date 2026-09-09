@@ -16,21 +16,23 @@
    cancelAnimationFrame(raf);raf=0;sheet.style.opacity='0';
    packets.forEach(el=>el.style.opacity='0');
   }
+  // Light exists only while the wheel is turning: it passes through with the
+  // scroll and is gone ~110ms after it stops, so it never sits over copy.
   function draw(now){
    raf=0;
-   const fade=Math.max(0,1-(now-lastMove)/160);
-   sheet.style.opacity=String(fade*.32);
+   const fade=Math.max(0,1-(now-lastMove)/110);
+   sheet.style.opacity=String(fade*.22);
    beam.style.transform=`translate3d(0,${position}px,0) rotate(-18deg)`;
    packets.forEach((el,i)=>{
     const phase=((lastY*.8+i*137)%(innerWidth+200))/(innerWidth+200);
     el.style.transform=`translate3d(${(phase-.5)*innerWidth}px,0,0)`;
-    el.style.opacity=String(fade*.45*Math.sin(phase*Math.PI));
+    el.style.opacity=String(fade*.3*Math.sin(phase*Math.PI));
    });
    if(fade>0)raf=requestAnimationFrame(draw);
   }
   function onScroll(){
    const delta=scrollY-lastY;lastY=scrollY;if(!delta)return;
-   position-=delta*.85;
+   position-=delta*1.3;
    const span=innerHeight+220;
    position=((position+110)%span+span)%span-110;
    lastMove=performance.now();if(!raf)raf=requestAnimationFrame(draw);
