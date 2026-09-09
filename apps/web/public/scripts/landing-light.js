@@ -5,7 +5,7 @@
  const sheet=document.createElement('div');
  sheet.className='scroll-light';sheet.setAttribute('aria-hidden','true');
  // Three stars on their own lanes and offsets so they never read as one bar.
- const starSpecs=[[10,88,0,'#7fe6ff'],[46,64,-260,'#a9e9ff'],[22,52,-520,'#8fd4ff']];
+ const starSpecs=[[10,88,0,'#fff'],[46,64,-260,'rgba(255,255,255,.85)'],[22,52,-520,'rgba(255,255,255,.7)']];
  sheet.innerHTML=starSpecs.map(([x,len,off,color])=>
   `<div class="scroll-light-beam" data-offset="${off}" style="--x:${x}px;--len:${len}px;--star:${color}"></div>`).join('');
  document.body.append(sheet);
