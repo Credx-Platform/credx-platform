@@ -18,7 +18,8 @@ try{
   while(true){try{await fetch(base);break}catch{if(Date.now()>deadline)throw Error('Preview server failed');await new Promise(r=>setTimeout(r,100))}}
  }
  browser=await pw[engine].launch({headless:true});
- for(const width of [375,390,430,768,1024,1280,1440,1920]){
+ const widths=process.env.LANDING_WIDTHS?process.env.LANDING_WIDTHS.split(',').map(Number):[375,390,430,768,1024,1280,1440,1920];
+ for(const width of widths){
   const page=await browser.newPage({viewport:{width,height:width<768?844:1000}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   // WebKit upgrades loopback HTTP due to the production CSP. Relax only that
