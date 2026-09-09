@@ -31,13 +31,14 @@
   {from:.62,to:1.10,z0:-180,z1:65,rx:3,ry:-8,x:0,y:-14,pointer:8},
   {from:.64,to:1.06,z0:-90,z1:95,rx:-3,ry:9,x:14,y:12,pointer:14},
   {from:.55,to:.93,z0:-300,z1:-50,rx:5,ry:10,x:-16,y:-16,pointer:3},
-  {from:.58,to:.98,z0:-220,z1:-15,rx:-4,ry:-12,x:14,y:-12,pointer:6}
+  {from:.65,to:1.12,z0:-140,z1:85,rx:-4,ry:-5,x:0,y:-12,pointer:10},
+  {from:.55,to:1.04,z0:-300,z1:30,rx:4,ry:10,x:-12,y:250,pointer:7}
  ];
  function mount(){
   dispose();
   const abort=new AbortController();
   const opts={passive:true,signal:abort.signal};
-  const sectionData=[...document.querySelectorAll('body>section:not(.hero-bridge)')].map((el,i)=>({
+  const sectionData=[...document.querySelectorAll('body>section')].map((el,i)=>({
    el,content:el.querySelector(':scope>.container,:scope>.about-inner'),pattern:el.id==='how-it-works'?3:i%3,top:0,done:false
   })).filter(s=>s.content);
   let raf=0,active=true,dirty=true,width=innerWidth,view=innerHeight,heroTop=0,heroHeight=0,distance=1;
@@ -46,14 +47,14 @@
   const reset=()=>{
    document.documentElement.classList.remove('cinematic-ready');hero.classList.remove('scene-active');
    runway.style.removeProperty('--hero-height');runway.style.removeProperty('--pin-top');
-   objects.forEach(o=>{o.style.removeProperty('transform');o.querySelector('.object-motion').style.removeProperty('transform')});
+   objects.forEach(o=>{o.style.removeProperty('transform');o.style.removeProperty('opacity');o.querySelector('.object-motion').style.removeProperty('transform')});
    cueRow.style.removeProperty('opacity');copy.style.removeProperty('transform');trails.style.removeProperty('transform');trails.style.removeProperty('opacity');
    sectionData.forEach(s=>{s.el.classList.remove('section-opening');['transform','opacity','filter','clip-path','will-change'].forEach(p=>s.content.style.removeProperty(p))});
   };
   dispose=()=>{abort.abort();cancelAnimationFrame(raf);observer?.disconnect();resize?.disconnect();reset()};
   if(media.matches){reset();return;}
   document.documentElement.classList.add('cinematic-ready');
-  sectionData.forEach(s=>s.el.classList.add('section-opening'));
+  sectionData.forEach((s,i)=>{s.el.classList.add('section-opening');s.el.dataset.graphic=String(i%3)});
   function measure(){
    width=innerWidth;view=innerHeight;heroHeight=hero.offsetHeight;
    runway.style.setProperty('--hero-height',`${heroHeight}px`);
@@ -75,10 +76,11 @@
    if(active){
     objects.forEach((el,i)=>{
      const d=depths[i],travel=mobile?.5:1;
+     if(i===4)el.style.opacity=String((mobile?.75:.34)+approaching*(mobile?.25:.66));
      // Mobile keeps generous spacing; original aspect ratios remain untouched.
      const scale=d.from+(d.to-d.from)*approaching;
      const z=d.z0+(d.z1-d.z0)*approaching;
-     el.style.transform=`translate3d(${d.x*approaching*travel}px,${d.y*approaching*travel}px,${z*travel}px) rotateX(${d.rx*(1-approaching)}deg) rotateY(${d.ry*(1-approaching*.65)}deg) scale(${scale})`;
+     el.style.transform=`translate3d(${d.x*approaching*travel}px,${(i===4&&mobile?75:d.y)*approaching*travel}px,${z*travel}px) rotateX(${d.rx*(1-approaching)}deg) rotateY(${d.ry*(1-approaching*.65)}deg) scale(${scale})`;
      el.querySelector('.object-motion').style.transform=`translate3d(${pointerX*d.pointer}px,${pointerY*d.pointer}px,0)`;
     });
     copy.style.transform=`translate3d(0,${-departing*(mobile?12:28)}px,0)`;

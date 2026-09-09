@@ -32,8 +32,8 @@ try{
   await page.goto(base,{waitUntil:'networkidle'});
   await page.evaluate(()=>document.fonts.ready);
   await page.waitForTimeout(120);
-  assert.equal(await page.locator('.scene-object img').count(),4);
-  assert(await page.locator('.scene-object img').evaluateAll(els=>els.every(el=>el.complete&&el.naturalWidth>0)),'All four source images decode');
+  assert.equal(await page.locator('.scene-object img').count(),5);
+  assert(await page.locator('.scene-object img').evaluateAll(els=>els.every(el=>el.complete&&el.naturalWidth>0)),'All five source images decode');
   const metrics=()=>page.evaluate(()=>({
    overflow:document.documentElement.scrollWidth>innerWidth,
    width:[...document.querySelectorAll('.scene-object img')].map(e=>e.getBoundingClientRect().width),
@@ -49,6 +49,22 @@ try{
   end.width.forEach((w,i)=>assert(w>start.width[i]*1.25,`Object ${i} grows with scroll`));
   await page.waitForTimeout(150);const still=await metrics();still.width.forEach((w,i)=>assert(Math.abs(w-end.width[i])<1,'Growth stops when scrolling stops'));
   assert.equal(await page.locator('.data-trails').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
+  assert.equal(await page.locator('.scroll-light').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
+  // Light must follow either scroll direction and stop after input stops.
+  const beamY=()=>page.locator('.scroll-light-beam').evaluate(e=>new DOMMatrix(getComputedStyle(e).transform).m42);
+  const beforeLight=await beamY();
+  await page.evaluate(()=>scrollBy({top:100,behavior:'instant'}));
+  await page.waitForFunction(y=>new DOMMatrix(getComputedStyle(document.querySelector('.scroll-light-beam')).transform).m42!==y,beforeLight);
+  const down=await beamY();
+  assert(await page.locator('.scroll-light').evaluate(e=>Number(getComputedStyle(e).opacity)>0),'Scroll activates light');
+  await page.evaluate(()=>scrollBy({top:-20,behavior:'instant'}));
+  await page.waitForFunction(y=>{
+   const next=new DOMMatrix(getComputedStyle(document.querySelector('.scroll-light-beam')).transform).m42;
+   const span=innerHeight+220,travel=((next-y)%span+span)%span;
+   return Math.abs(travel-17)<1;
+  },down);
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.scroll-light')).opacity==='0',{},{timeout:5000});
+  assert.equal(await page.locator('.scroll-light').evaluate(e=>getComputedStyle(e).opacity),'0','Light stops when idle');
   for(const section of await page.locator('body>section').all()){
    await section.evaluate(e=>scrollTo({top:e.getBoundingClientRect().top+scrollY-100,behavior:'instant'}));
    await page.waitForFunction(el=>{const c=el.querySelector(':scope>.container,:scope>.about-inner');return !c||getComputedStyle(c).opacity==='1'},await section.elementHandle(),{timeout:5000});
@@ -59,11 +75,14 @@ try{
   await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
   await page.locator('.hero-btns a[href="#how-it-works"]').click();
   await page.waitForFunction(()=>{const t=document.querySelector('#how-it-works').getBoundingClientRect().top;return t>=55&&t<160},{},{timeout:8000});
-  await page.emulateMedia({reducedMotion:'reduce'});await page.waitForTimeout(120);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.waitForFunction(()=>document.querySelectorAll('.light-sheen').length===0,{},{timeout:5000});
   assert(await page.evaluate(()=>getComputedStyle(document.querySelector('.hero')).position==='relative'));
   assert.equal(await page.locator('.data-trails').evaluate(e=>getComputedStyle(e).display),'none');
+  assert.equal(await page.locator('.light-sheen').count(),0,'Reduced motion cleans up reflections');
   assert(await page.evaluate(()=>Math.abs(document.querySelector('.hero-runway').offsetHeight-document.querySelector('.hero').offsetHeight)<2),'No pin spacer in reduced motion');
-  await page.emulateMedia({reducedMotion:'no-preference'});await page.waitForTimeout(120);
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.hero')).position==='sticky'&&document.querySelector('.light-sheen'),{},{timeout:5000});
   assert.equal(await page.locator('.hero').evaluate(e=>getComputedStyle(e).position),'sticky','Motion reinitialises without reload');
   assert.deepEqual(errors,[],'No page JavaScript errors');
   console.log(`PASS ${engine} ${width}px: assets, growth, pinning, reveals, overflow, FAQ, CTA anchor, reduced motion, cleanup`);
