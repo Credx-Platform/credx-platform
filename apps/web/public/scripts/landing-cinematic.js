@@ -12,6 +12,9 @@
  let dispose=()=>{};
  const clamp=(v,min=0,max=1)=>Math.max(min,Math.min(max,v));
  const ease=v=>v*v*(3-2*v);
+ // Decelerating curve for section reveals: fastest at the start, easing out to a
+ // stop, which reads as one fluid motion instead of a panel snapping into place.
+ const glide=v=>1-Math.pow(1-v,3);
  const objects=[...hero.querySelectorAll('.scene-object')];
  const copy=hero.querySelector('.hero-copy');
  const trails=hero.querySelector('.data-trails');
@@ -25,7 +28,7 @@
   ['mid',83,87,160,-26,15,-12,.30],['front',52,42,260,18,12,-2,.42]
  ];
  trails.innerHTML=trailSpecs.map(([plane,left,top,length,angle,duration,delay,alpha],i)=>
-  `<span class="data-trail" data-plane="${plane}" style="--left:${left}%;--top:${top}%;--length:${Math.round(length*.4)}px;--angle:${angle}deg;--duration:${duration}s;--delay:${delay}s;--alpha:${alpha};--trail-color:${i===6?'#a7a2f3':'#6ee2ff'}"><i></i></span>`).join('');
+  `<span class="data-trail" data-plane="${plane}" style="--left:${left}%;--top:${top}%;--length:${Math.round(length*.4)}px;--angle:${angle}deg;--duration:${duration}s;--delay:${delay}s;--alpha:${alpha};--trail-color:${i===6?'rgba(255,255,255,.8)':'#fff'}"><i></i></span>`).join('');
  // Scene settles rather than zooms: objects open near their final size, so the
  // page reads as ordinary scrolling. End values (to/z1) are unchanged, which
  // keeps the approved final composition and relative sizing exactly as it was.
@@ -41,7 +44,7 @@
   const abort=new AbortController();
   const opts={passive:true,signal:abort.signal};
   const sectionData=[...document.querySelectorAll('body>section')].map((el,i)=>({
-   el,content:el.querySelector(':scope>.container,:scope>.about-inner'),pattern:el.id==='how-it-works'?3:i%3,top:0,done:false
+   el,content:el.querySelector(':scope>.container,:scope>.about-inner'),top:0,done:false
   })).filter(s=>s.content);
   // Section titles pull back from oversized to their true size as they arrive.
   // Driven by scroll position, not a timer, so it tracks the wheel exactly.
@@ -99,23 +102,21 @@
     const label=p<.4?'01 / PERSPECTIVE':p<.8?'02 / POSSIBILITIES':'03 / YOUR NEXT STEP';
     if(cue.textContent!==label)cue.textContent=label;
    }
-   // Each section finishes opening early enough that its entire content is clear
-   // while being read. Completed sections stay open when scrolling back.
+   // One continuous fluid reveal for every section: drift and settle, decelerating
+   // the whole way. No clip-path rectangles, no horizontal squash and no blur
+   // step — those were what made the old transitions read as blocky panels.
    sectionData.forEach(s=>{
     if(s.done)return;
     const top=s.top-y;
-    if(top>view*1.08)return;
-    const progress=clamp((view*.98-top)/(Math.min(view*.48,360)));
-    const e=ease(progress);
+    if(top>view*1.12)return;
+    const progress=clamp((view*1.02-top)/(Math.min(view*.62,540)));
+    const e=glide(progress);
     if(top<0||progress===1){
      s.done=true;['transform','opacity','filter','clip-path','will-change'].forEach(p=>s.content.style.removeProperty(p));return;
     }
     s.content.style.willChange='transform, opacity';
-    s.content.style.opacity=String(.16+.84*e);
-    if(s.pattern===0)s.content.style.transform=`translate3d(0,${24*(1-e)}px,0) scaleX(${.86+.14*e})`;
-    if(s.pattern===1){s.content.style.transform=`translate3d(0,${28*(1-e)}px,0) scale(${.96+.04*e})`;s.content.style.filter=`blur(${(mobile?2:6)*(1-e)}px)`;}
-    if(s.pattern===2){s.content.style.clipPath=`inset(${(mobile?3:7)*(1-e)}% 0 ${8*(1-e)}% 0 round ${18*(1-e)}px)`;s.content.style.transform=`translate3d(0,${20*(1-e)}px,0)`;}
-    if(s.pattern===3)s.content.style.transform=`perspective(1400px) translate3d(0,${32*(1-e)}px,${-80*(1-e)}px) rotateX(${(mobile?2:5)*(1-e)}deg)`;
+    s.content.style.opacity=String(.3+.7*e);
+    s.content.style.transform=`translate3d(0,${(mobile?16:22)*(1-e)}px,0) scale(${.988+.012*e})`;
    });
    titles.forEach(el=>{
     const top=el.getBoundingClientRect().top;
