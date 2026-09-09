@@ -26,7 +26,7 @@
   }));targets.forEach(el=>observer.observe(el));
   function draw(now){
    raf=0;const fade=Math.max(0,1-(now-lastMove)/420),height=innerHeight;
-   sheet.style.opacity=String(fade*.8);
+   sheet.style.opacity=String(fade*.92);
    beam.style.transform=`translate3d(0,${position-55}px,0) rotate(${slope}deg)`;
    // Read geometry together, then write highlights; only viewport targets count.
    const readings=[...visible].map(el=>({el,rect:el.getBoundingClientRect()}));

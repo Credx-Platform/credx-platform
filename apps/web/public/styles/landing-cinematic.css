@@ -20,22 +20,23 @@ body{overflow-x:clip}
 .object-car{width:56%;right:-1%;bottom:2%;z-index:5;transform:translate3d(0,0,-90px) rotateY(9deg) scale(.64)}
 .object-cash{width:41%;left:-2%;top:0;z-index:1;transform:translate3d(0,0,-300px) rotateY(10deg) scale(.55)}
 .object-merch{width:36%;right:-1%;top:0;z-index:2;transform:translate3d(0,0,-220px) rotateY(-12deg) scale(.58)}
-.scene-orbit{position:absolute;pointer-events:none;border:1px solid rgba(87,197,248,.13);border-radius:50%;width:80%;height:66%;left:10%;top:20%;transform:rotateX(68deg) rotateZ(-24deg) translateZ(-140px)}
-.orbit-front{width:100%;height:90%;left:0;top:10%;border-color:rgba(110,119,230,.09);transform:rotateX(62deg) rotateZ(24deg) translateZ(80px)}
+.scene-orbit{position:absolute;pointer-events:none;border:1px solid rgba(87,197,248,.22);border-radius:50%;width:80%;height:66%;left:10%;top:20%;box-shadow:0 0 16px rgba(0,198,251,.14),inset 0 0 16px rgba(0,198,251,.08);transform:rotateX(68deg) rotateZ(-24deg) translateZ(-140px)}
+.orbit-front{width:100%;height:90%;left:0;top:10%;border-color:rgba(126,136,240,.16);box-shadow:0 0 14px rgba(110,119,230,.12);transform:rotateX(62deg) rotateZ(24deg) translateZ(80px)}
 .hero-atmosphere{position:absolute;inset:0;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 77% 40%,rgba(9,95,132,.18),transparent 49%),radial-gradient(ellipse at 96% 70%,rgba(81,53,159,.08),transparent 40%),linear-gradient(125deg,#101c29,#060b13 50%);z-index:0}
 .hero-atmosphere::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 65%,#060b13),radial-gradient(ellipse,transparent 40%,rgba(3,7,14,.65))}
-.scene-grid{position:absolute;inset:42% -20% -45%;background-image:linear-gradient(rgba(64,182,224,.065) 1px,transparent 1px),linear-gradient(90deg,rgba(64,182,224,.065) 1px,transparent 1px);background-size:72px 72px;transform:perspective(600px) rotateX(62deg);mask-image:linear-gradient(transparent,#000 30%,transparent 88%)}
+.scene-grid{position:absolute;inset:42% -20% -45%;background-image:linear-gradient(rgba(72,196,240,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(72,196,240,.1) 1px,transparent 1px);background-size:72px 72px;transform:perspective(600px) rotateX(62deg);mask-image:linear-gradient(transparent,#000 30%,transparent 88%)}
 .scene-bloom{position:absolute;width:55%;height:70%;right:0;top:0;background:radial-gradient(ellipse,rgba(0,158,230,.12),transparent 68%);transform:translate3d(0,0,0)}
-.data-trails{position:absolute;inset:0;pointer-events:none;overflow:clip;z-index:1;perspective:900px;opacity:.55}
+.data-trails{position:absolute;inset:0;pointer-events:none;overflow:clip;z-index:1;perspective:900px;opacity:.7}
 .data-trail{position:absolute;left:var(--left);top:var(--top);width:var(--length);height:1px;opacity:var(--alpha);transform:rotate(var(--angle));pointer-events:none}
-.data-trail i{display:block;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(43,150,235,.2) 12%,var(--trail-color,#6ee2ff) 76%,transparent);transform:translate3d(-45vw,0,0);opacity:0}
+.data-trail i{display:block;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(43,150,235,.34) 12%,var(--trail-color,#6ee2ff) 76%,transparent);transform:translate3d(-45vw,0,0);opacity:0}
 .scene-active .data-trail i{animation:dataTransit var(--duration) linear var(--delay) infinite;will-change:transform,opacity}
-.data-trail[data-plane="back"]{filter:blur(.65px)}
-.data-trail[data-plane="front"]{height:2px;filter:drop-shadow(0 0 4px rgba(111,215,255,.4))}
+.data-trail[data-plane="back"]{filter:blur(.65px) drop-shadow(0 0 5px rgba(96,206,255,.35))}
+.data-trail[data-plane="mid"]{height:1.5px;filter:drop-shadow(0 0 5px rgba(111,215,255,.5))}
+.data-trail[data-plane="front"]{height:2.5px;filter:drop-shadow(0 0 6px rgba(140,229,255,.75)) drop-shadow(0 0 18px rgba(0,198,251,.4))}
 @keyframes dataTransit{0%,18%{opacity:0;transform:translate3d(-40vw,0,0)}25%{opacity:.7}43%{opacity:.7}52%,100%{opacity:0;transform:translate3d(58vw,0,0)}}
 .scene-active .scene-object,.scene-active .object-motion{will-change:transform}
 .journey-cue{position:absolute;left:clamp(24px,4vw,80px);right:clamp(24px,4vw,80px);bottom:28px;display:flex;align-items:center;gap:20px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1.7px;color:#88a0b8;z-index:4}
-.journey-cue i{height:1px;flex:1;background:linear-gradient(90deg,rgba(0,198,251,.7),rgba(0,198,251,.08));transform-origin:left;transform:scaleX(var(--journey-fill,.05))}
+.journey-cue i{height:2px;flex:1;border-radius:2px;background:linear-gradient(90deg,rgba(0,198,251,.95),rgba(0,198,251,.12));box-shadow:0 0 10px rgba(0,198,251,.5);transform-origin:left;transform:scaleX(var(--journey-fill,.05))}
 .hero-bridge{position:relative;z-index:3;background:linear-gradient(180deg,#060b13,#0b1220);padding:64px clamp(16px,4vw,48px) 90px;margin-top:-1px;border-top:1px solid rgba(57,174,223,.12)}
 .cinematic-ready .hero-bridge{margin-top:-22svh}
 .bridge-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
@@ -112,23 +113,23 @@ section[id]{scroll-margin-top:78px}
  .hero-art{position:absolute;inset:0;width:100%;height:100%;z-index:2;perspective-origin:60% 50%}
  .object-merch{width:29%;left:47%;right:auto;top:30%;z-index:5}
  .object-house{width:30%;left:71%;top:0;z-index:2}
- .object-cash{width:19%;left:48%;top:-3%;z-index:1}
+ .object-cash{width:24%;left:44%;top:-4%;z-index:1}
  .object-car{width:30%;right:-1%;bottom:-1%;z-index:4}
- .object-cards{width:36%;left:1%;top:28%;z-index:2;opacity:.34;transform:translate3d(0,0,-300px) scale(.55)}
+ .object-cards{width:28%;left:2%;top:31%;z-index:2;opacity:.34;transform:translate3d(0,0,-300px) scale(.55)}
  .cinematic-hero.hero{padding-bottom:100px}
 }
 .object-cards img{filter:drop-shadow(0 0 16px rgba(0,198,251,.16));mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
 @media(min-width:768px) and (max-width:1100px){
  .cinematic-hero .hero-copy{width:49%}.cinematic-hero .hero-grid{min-height:660px}
- .object-merch{left:50%;width:30%;top:34%}.object-cards{top:57%;width:45%}
+ .object-merch{left:50%;width:30%;top:34%}.object-cards{top:51%;width:36%}
 }
 @media(max-width:767px){
  .hero-art{height:335px;margin-top:6px}
  .object-merch{width:45%;left:30%;right:auto;top:25%;z-index:5}
  .object-house{width:47%;left:57%;top:0;z-index:2}
- .object-cash{width:32%;left:1%;top:-1%;z-index:1}
+ .object-cash{width:39%;left:-2%;top:-2%;z-index:1}
  .object-car{width:48%;right:-1%;bottom:0;z-index:4}
- .object-cards{width:49%;left:-2%;top:46%;z-index:2;opacity:.75;transform:translate3d(0,0,-150px) scale(.55)}
+ .object-cards{width:43%;left:0;top:49%;z-index:2;opacity:.75;transform:translate3d(0,0,-150px) scale(.55)}
  .object-cards img{filter:none}
 }
 /* Distinct quiet graphic accents frame every section without covering content. */
@@ -139,7 +140,7 @@ section[id]{scroll-margin-top:78px}
 .section-opening>.container,.section-opening>.about-inner{position:relative;z-index:1}
 /* A scroll-linked light sheet and matching local reflections. */
 .scroll-light{position:fixed;inset:0;pointer-events:none;z-index:20;overflow:clip;opacity:0;contain:strict}
-.scroll-light-beam{position:absolute;left:-15%;width:130%;height:110px;top:0;background:linear-gradient(180deg,transparent,rgba(0,149,230,.025) 30%,rgba(0,198,251,.13) 49%,rgba(189,249,255,.5) 50%,rgba(0,198,251,.07) 51%,transparent 75%);transform:translate3d(0,-150px,0) rotate(-9deg)}
+.scroll-light-beam{position:absolute;left:-15%;width:130%;height:110px;top:0;background:linear-gradient(180deg,transparent,rgba(0,149,230,.06) 26%,rgba(0,198,251,.34) 46.5%,rgba(150,244,255,.92) 50%,rgba(0,198,251,.22) 53.5%,transparent 80%);filter:drop-shadow(0 0 9px rgba(0,198,251,.65)) drop-shadow(0 0 30px rgba(0,176,244,.38));transform:translate3d(0,-150px,0) rotate(-9deg)}
 .light-surface{position:relative}
 .light-sheen{position:absolute;inset:0;pointer-events:none;border-radius:inherit;overflow:hidden;opacity:0;z-index:8;background:linear-gradient(125deg,transparent 28%,rgba(0,198,251,.04) 39%,rgba(145,240,255,.23) 49%,rgba(0,198,251,.08) 55%,transparent 67%);background-size:100% 220%;background-position:50% var(--reflect-y,50%)}
 .object-motion>.light-sheen{mask-size:100% 100%;-webkit-mask-size:100% 100%}

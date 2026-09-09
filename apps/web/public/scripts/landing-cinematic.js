@@ -30,9 +30,9 @@
  const depths=[
   {from:.62,to:1.10,z0:-180,z1:65,rx:3,ry:-8,x:0,y:-14,pointer:8},
   {from:.64,to:1.06,z0:-90,z1:95,rx:-3,ry:9,x:14,y:12,pointer:14},
-  {from:.55,to:.93,z0:-300,z1:-50,rx:5,ry:10,x:-16,y:-16,pointer:3},
+  {from:.58,to:.97,z0:-300,z1:-50,rx:5,ry:10,x:-16,y:-16,pointer:3},
   {from:.65,to:1.12,z0:-140,z1:85,rx:-4,ry:-5,x:0,y:-12,pointer:10},
-  {from:.55,to:1.04,z0:-300,z1:30,rx:4,ry:10,x:-12,y:250,pointer:7}
+  {from:.55,to:.98,z0:-300,z1:30,rx:4,ry:10,x:-12,y:250,pointer:7}
  ];
  function mount(){
   dispose();
@@ -84,7 +84,7 @@
      el.querySelector('.object-motion').style.transform=`translate3d(${pointerX*d.pointer}px,${pointerY*d.pointer}px,0)`;
     });
     copy.style.transform=`translate3d(0,${-departing*(mobile?12:28)}px,0)`;
-    trails.style.opacity=String(.35+approaching*.4);
+    trails.style.opacity=String(.5+approaching*.42);
     trails.style.transform=`translate3d(${p*-22}px,${p*18}px,0)`;
     hero.style.setProperty('--journey-fill',String(.05+.95*p));
     cueRow.style.opacity=String(1-ease(clamp((p-.70)/.15)));
