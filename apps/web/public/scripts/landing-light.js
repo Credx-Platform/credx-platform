@@ -1,67 +1,54 @@
-/* Scroll-only illumination. No idle loops, hit targets, or business-flow hooks. */
-(() => {
- 'use strict';
- const preference=matchMedia('(prefers-reduced-motion: reduce)');
- const sheet=document.createElement('div');
- sheet.className='scroll-light';sheet.setAttribute('aria-hidden','true');
- sheet.innerHTML='<div class="scroll-light-beam"></div>';document.body.append(sheet);
- const beam=sheet.firstElementChild;
- let dispose=()=>{};
- function mount(){
-  dispose();if(preference.matches)return;
-  const abort=new AbortController(),visible=new Set(),surfaces=[];
-  let raf=0,lastY=scrollY,position=innerHeight*.72,lastMove=0,travel=0,nextSweep=0,slope=-7;
-  const headings=new Set(document.querySelectorAll('.hero h1,.stitle,.about h2'));
-  const targets=[...headings,...document.querySelectorAll('.md-card,.pg-card,.plan,.step,.rc-card,.dash-ui,.object-motion')];
-  for(const el of targets){
-   if(headings.has(el)){el.classList.add('light-heading');continue;}
-   el.classList.add('light-surface');const sheen=document.createElement('span');
-   sheen.className='light-sheen';sheen.setAttribute('aria-hidden','true');el.append(sheen);
-   surfaces.push({el,sheen});
-  }
-  const lookup=new Map(surfaces.map(s=>[s.el,s.sheen]));
-  const observer=new IntersectionObserver(entries=>entries.forEach(e=>{
-   if(e.isIntersecting)visible.add(e.target);
-   else {visible.delete(e.target);e.target.style.removeProperty('--reflect-strength');const sheen=lookup.get(e.target);if(sheen)sheen.style.opacity='0';}
-  }));targets.forEach(el=>observer.observe(el));
-  function draw(now){
-   raf=0;const fade=Math.max(0,1-(now-lastMove)/420),height=innerHeight;
-   sheet.style.opacity=String(fade*.92);
-   beam.style.transform=`translate3d(0,${position-55}px,0) rotate(${slope}deg)`;
-   // Read geometry together, then write highlights; only viewport targets count.
-   const readings=[...visible].map(el=>({el,rect:el.getBoundingClientRect()}));
-   readings.forEach(({el,rect})=>{
-    const localBeam=position+Math.tan(slope*Math.PI/180)*(rect.left+rect.width/2-innerWidth/2);
-    const distance=Math.abs(rect.top+rect.height/2-localBeam);
-    const strength=Math.max(0,1-distance/(rect.height/2+110))*fade;
-    if(headings.has(el))el.style.setProperty('--reflect-strength',String(strength*.6));
-    else {const sheen=lookup.get(el);sheen.style.opacity=String(strength);sheen.style.setProperty('--reflect-y',`${50+(localBeam-rect.top)/Math.max(1,rect.height)*50}%`);}
-   });
-   if(fade>0)raf=requestAnimationFrame(draw);
-  }
-  function onScroll(){
-   const delta=scrollY-lastY;lastY=scrollY;if(!delta)return;
-   travel+=Math.abs(delta);
-   if(travel>=nextSweep){
-    nextSweep=travel+innerHeight*(1.3+Math.random()*.9);
-    slope=(Math.random()>.5?1:-1)*(4+Math.random()*8);
-   }
-   position-=delta*.85;
-   // Preserve travel across viewport edges, including fast scroll and reversal.
-   const span=innerHeight+220;
-   position=((position+110)%span+span)%span-110;
-   lastMove=performance.now();if(!raf)raf=requestAnimationFrame(draw);
-  }
-  addEventListener('scroll',onScroll,{passive:true,signal:abort.signal});
-  document.addEventListener('visibilitychange',()=>{
-   if(document.hidden){cancelAnimationFrame(raf);raf=0;sheet.style.opacity='0';}
-  },{signal:abort.signal});
-  dispose=()=>{
-   abort.abort();observer.disconnect();cancelAnimationFrame(raf);sheet.style.opacity='0';
-   surfaces.forEach(({el,sheen})=>{sheen.remove();el.classList.remove('light-surface')});
-   headings.forEach(el=>{el.classList.remove('light-heading');el.style.removeProperty('--reflect-strength')});
-  };
- }
- preference.addEventListener('change',mount);
- addEventListener('pagehide',()=>dispose());addEventListener('pageshow',e=>{if(e.persisted)mount()});mount();
-})();
+/* Scroll-triggered finite energy packets, always BEHIND text and controls.
+ * No stars, bright heads, full-screen beams, idle loops, or network resources. */
+window.CredXMotion.register(({on,request,top,clamp})=>{
+ const mobile=innerWidth<768;
+ const specs=[...document.querySelectorAll('#hero,#platform-introduction,#breakdown,#how-it-works,#progress,#modules')].map(host=>{
+  const field=document.createElement('div');field.className='energy-field';field.setAttribute('aria-hidden','true');
+  host.prepend(field);host.classList.add('energy-scene');
+  const lines=Array.from({length:mobile?2:3},(_,i)=>{const el=document.createElement('i');el.className=`energy-trace energy-${i===0?'back':i===1?'mid':'front'}`;field.append(el);return {el,start:-Infinity,duration:600,x:0,y:0,dx:0,dy:0,angle:0,depth:0,alpha:.2}});
+  return {host,field,lines,top:0,height:0};
+ });
+ let lastY=scrollY,lastEmit=-Infinity,sequence=0,direction=1,travel=0;
+ function clear(){specs.forEach(s=>s.lines.forEach(l=>{l.start=-Infinity;l.el.style.opacity='0';l.el.style.willChange='auto'}))}
+ on(window,'scroll',()=>{
+  const delta=scrollY-lastY;lastY=scrollY;if(!delta||document.documentElement.dataset.motionProfile==='light')return;
+  const next=Math.sign(delta);if(next!==direction){clear();direction=next;travel=100;}
+  travel+=Math.abs(delta);const now=performance.now();
+  if(now-lastEmit<140||travel<65)return;
+  const scene=specs.find(s=>s.top+s.height>scrollY+innerHeight*.25&&s.top<scrollY+innerHeight*.8);
+  if(!scene)return;
+  const order=scene.lines.map((_,i)=>scene.lines[(i+sequence+1)%scene.lines.length]);
+  const line=order.find(l=>now-l.start>l.duration);if(!line)return;
+  lastEmit=now;travel=0;sequence++;
+  const plane=scene.lines.indexOf(line);
+  line.duration=plane===0?900:plane===1?460:280;
+  const fromLeft=sequence%2===0;
+  // The path lives in scene gutters. Copy/UI are on higher stacking planes.
+  line.x=fromLeft?12:innerWidth-90;
+  line.y=clamp(scrollY-scene.top+innerHeight*(.3+(sequence%3)*.19),24,scene.height-80);
+  line.dx=(fromLeft?1:-1)*(mobile?120:280);
+  line.dy=-direction*(plane===0?120:220);
+  line.angle=sequence%3===0?0:Math.atan2(line.dy,line.dx)*180/Math.PI;
+  line.depth=plane===2?35:plane===0?-30:0;
+  line.alpha=plane===0?.16:plane===1?.32:.46;
+  line.start=now;request();
+ });
+ return {
+  measure(){specs.forEach(s=>{s.top=top(s.host);s.height=s.host.offsetHeight})},
+  render(f){if(f.simple){clear();return false;}let active=false;
+   specs.forEach(s=>s.lines.forEach(l=>{
+    const p=(f.now-l.start)/l.duration;
+    // A scroll event can arrive after this frame's rAF timestamp. Keep the
+    // new packet scheduled until its first non-negative frame.
+    if(p<0&&Number.isFinite(l.start)){active=true;return;}
+    if(p>=1){l.el.style.opacity='0';l.el.style.willChange='auto';return;}
+    if(s.top+s.height<f.y||s.top>f.y+f.h){l.start=-Infinity;l.el.style.opacity='0';l.el.style.willChange='auto';return;}
+    active=true;l.el.style.willChange='transform, opacity';
+    l.el.style.opacity=String(Math.sin(p*Math.PI)*l.alpha);
+    l.el.style.transform=`translate3d(${l.x+l.dx*p}px,${l.y+l.dy*p}px,${l.depth*p}px) rotate(${l.angle}deg) scaleX(${.8+.2*p})`;
+   }));return active;
+  },
+  pause:clear,
+  destroy(){clear();specs.forEach(s=>{s.field.remove();s.host.classList.remove('energy-scene')})}
+ };
+});

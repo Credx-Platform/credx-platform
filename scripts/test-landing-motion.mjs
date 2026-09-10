@@ -1,92 +1,89 @@
-// Browser regression checks for the public landing only. Uses an existing
-// Playwright installation; no browser tooling is shipped to website visitors.
-// PLAYWRIGHT_MODULE=/absolute/path/to/playwright-core/index.mjs node scripts/test-landing-motion.mjs
-// Optional: BROWSER_ENGINE=webkit, LANDING_BASE_URL=https://www.credxme.com
+// Native-scroll journey regression suite. Build web before running.
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 const pw=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
-const engine=process.env.BROWSER_ENGINE||'chromium';
-// Keep browser-engine runs isolated so one cannot stop another's preview.
-const port=process.env.LANDING_PORT||(engine==='webkit'?'8780':'8778');
-const base=process.env.LANDING_BASE_URL||`http://127.0.0.1:${port}`;
-let server,browser;
-try{
- if(!process.env.LANDING_BASE_URL){
-  server=spawn(process.execPath,[fileURLToPath(new URL('../apps/web/server.mjs',import.meta.url))],{env:{...process.env,PORT:port},stdio:'ignore'});
-  const deadline=Date.now()+10000;
-  while(true){try{await fetch(base);break}catch{if(Date.now()>deadline)throw Error('Preview server failed');await new Promise(r=>setTimeout(r,100))}}
- }
- browser=await pw[engine].launch({headless:true});
- const widths=process.env.LANDING_WIDTHS?process.env.LANDING_WIDTHS.split(',').map(Number):[375,390,430,768,1024,1280,1440,1920];
+const engine=process.env.BROWSER_ENGINE||'chromium',port=engine==='webkit'?8780:8778;
+const base=`http://127.0.0.1:${port}`;
+const server=spawn(process.execPath,[fileURLToPath(new URL('../apps/web/server.mjs',import.meta.url))],{env:{...process.env,PORT:String(port)},stdio:'ignore'});
+let browser;
+try {
+ for(let i=0;i<100;i++){try{await fetch(base);break}catch{await new Promise(r=>setTimeout(r,100))}}
+ browser=await pw[engine].launch();
+ async function prepare(page){await page.addInitScript(()=>{Object.defineProperty(navigator,'hardwareConcurrency',{configurable:true,get:()=>8});Object.defineProperty(navigator,'deviceMemory',{configurable:true,get:()=>8})});if(engine==='webkit')await page.route('**/*',async r=>{if(r.request().resourceType()!=='document')return r.continue();const response=await r.fetch(),headers=response.headers();headers['content-security-policy']=headers['content-security-policy']?.replace('upgrade-insecure-requests','')||'';await r.fulfill({response,headers})});}
+ const widths=process.env.VIEWPORT_WIDTHS?process.env.VIEWPORT_WIDTHS.split(',').map(Number):[375,390,430,768,1024,1280,1440,1920];
  for(const width of widths){
-  const page=await browser.newPage({viewport:{width,height:width<768?844:1000}});
+  const page=await browser.newPage({viewport:{width,height:width<768?844:1000}});await prepare(page);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  // WebKit upgrades loopback HTTP due to the production CSP. Relax only that
-  // directive in intercepted LOCAL test responses; never touch site headers.
-  if(engine==='webkit'&&!process.env.LANDING_BASE_URL)await page.route('**/*',async route=>{
-   if(route.request().resourceType()!=='document')return route.continue();
-   const response=await route.fetch(),headers=response.headers();
-   headers['content-security-policy']=headers['content-security-policy'].replace('upgrade-insecure-requests','');
-   await route.fulfill({response,headers});
-  });
-  await page.goto(base,{waitUntil:'networkidle'});
-  await page.evaluate(()=>document.fonts.ready);
-  await page.waitForTimeout(120);
+  await page.goto(base,{waitUntil:'networkidle'});await page.evaluate(()=>document.fonts.ready);
+  const scroll=async y=>{await page.evaluate(y=>scrollTo({top:y,behavior:'instant'}),y);await page.waitForFunction(y=>Math.abs(scrollY-Math.max(0,Math.min(y,document.documentElement.scrollHeight-innerHeight)))<2,y);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))};
+  const overflow=()=>page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
+  const pos=selector=>page.locator(selector).evaluate(e=>{let y=0;for(let n=e;n;n=n.offsetParent)y+=n.offsetTop;return y});
+  assert.deepEqual(await page.locator('body>section').evaluateAll(es=>es.map(e=>e.id)),['platform-introduction','how-it-works','modules','breakdown','action-plan','progress','funding','chat','how','masterclass-curriculum','about','testimonials','faq','pricing','get-started'],'Product narrative precedes conversion');
   assert.equal(await page.locator('.scene-object img').count(),5);
-  assert(await page.locator('.scene-object img').evaluateAll(els=>els.every(el=>el.complete&&el.naturalWidth>0)),'All five source images decode');
-  const metrics=()=>page.evaluate(()=>({
-   overflow:document.documentElement.scrollWidth>innerWidth,
-   width:[...document.querySelectorAll('.scene-object img')].map(e=>e.getBoundingClientRect().width),
-   distance:document.querySelector('.hero-runway').offsetHeight-document.querySelector('.hero').offsetHeight,
-   top:document.querySelector('.hero').getBoundingClientRect().top,
-   expectedTop:parseFloat(getComputedStyle(document.querySelector('.hero')).top),
-   cta:document.querySelector('.hero-btns').getBoundingClientRect().bottom
-  }));
-  const start=await metrics();assert(!start.overflow);assert(start.cta<(width<768?844:1000),'Primary CTAs visible at opening');
-  await page.evaluate(y=>scrollTo({top:y,behavior:'instant'}),start.distance*.75);
-  await page.waitForFunction(widths=>[...document.querySelectorAll('.scene-object img')].every((el,i)=>el.getBoundingClientRect().width>widths[i]*1.25),start.width,{timeout:5000});
-  const end=await metrics();assert(!end.overflow);assert(Math.abs(end.top-end.expectedTop)<2,'Hero remains sticky during scrub');
-  end.width.forEach((w,i)=>assert(w>start.width[i]*1.25,`Object ${i} grows with scroll`));
-  await page.waitForTimeout(150);const still=await metrics();still.width.forEach((w,i)=>assert(Math.abs(w-end.width[i])<1,'Growth stops when scrolling stops'));
-  assert.equal(await page.locator('.data-trails').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
-  assert.equal(await page.locator('.scroll-light').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
-  // Light must follow either scroll direction and stop after input stops.
-  const beamY=()=>page.locator('.scroll-light-beam').evaluate(e=>new DOMMatrix(getComputedStyle(e).transform).m42);
-  const beforeLight=await beamY();
-  await page.evaluate(()=>scrollBy({top:100,behavior:'instant'}));
-  await page.waitForFunction(y=>new DOMMatrix(getComputedStyle(document.querySelector('.scroll-light-beam')).transform).m42!==y,beforeLight);
-  const down=await beamY();
-  assert(await page.locator('.scroll-light').evaluate(e=>Number(getComputedStyle(e).opacity)>0),'Scroll activates light');
-  await page.evaluate(()=>scrollBy({top:-20,behavior:'instant'}));
-  await page.waitForFunction(y=>{
-   const next=new DOMMatrix(getComputedStyle(document.querySelector('.scroll-light-beam')).transform).m42;
-   const span=innerHeight+220,travel=((next-y)%span+span)%span;
-   return Math.abs(travel-17)<1;
-  },down);
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.scroll-light')).opacity==='0',{},{timeout:5000});
-  assert.equal(await page.locator('.scroll-light').evaluate(e=>getComputedStyle(e).opacity),'0','Light stops when idle');
+  assert(await page.locator('.scene-object img').evaluateAll(es=>es.every(e=>e.complete&&e.naturalWidth)));
+  assert(!await overflow());
+  assert(await page.evaluate(()=>document.querySelector('.hero-art').getBoundingClientRect().top>=document.querySelector('.hero-copy').getBoundingClientRect().bottom-1));
+  assert(await page.locator('.hero-btns').evaluate(e=>e.getBoundingClientRect().bottom<innerHeight));
+  const widths=()=>page.locator('.scene-object img').evaluateAll(es=>es.map(e=>e.getBoundingClientRect().width));
+  await page.mouse.wheel(0,160);
+  await page.waitForFunction(()=>[...document.querySelectorAll('.energy-trace')].some(e=>Number(e.style.opacity)>0));
+  await page.waitForTimeout(1700); // Let the wheel gesture and finite pulse finish.
+  await scroll(0);
+  const start=await widths(),distance=await page.locator('.hero-runway').evaluate(e=>e.offsetHeight-e.querySelector('.hero').offsetHeight);
+  await scroll(distance*.8);const end=await widths();end.forEach((v,i)=>assert(v/start[i]>1.05&&v/start[i]<1.5,`Controlled approach ${v/start[i]}`));
+  await scroll(0);const reverse=await widths();reverse.forEach((v,i)=>assert(Math.abs(v-start[i])<2,'Hero reverses'));
+  const about=await pos('#platform-introduction'),h=width<768?844:1000;
+  const aperture=()=>page.locator('.journey-aperture').evaluate(e=>({opacity:Number(e.style.opacity),transform:e.firstElementChild.style.transform}));
+  await scroll(about-h*.7);const middle=await aperture();assert(middle.opacity>0,'Aperture forms');
+  await scroll(about-h*.35);assert.notEqual((await aperture()).transform,middle.transform);
+  await scroll(about-h*.7);assert.equal((await aperture()).transform,middle.transform,'Aperture reverses without drift');
+  await scroll(about-100);assert.equal(await page.locator('#platform-introduction .bridge-grid').evaluate(e=>getComputedStyle(e).opacity),'1');
+  assert.equal((await aperture()).opacity,0);
+  assert.equal(await page.locator('.scroll-streak,.scroll-star').count(),0,'No celestial graphics');
+  assert.equal(await page.locator('.energy-field').count(),6);
+  assert(await page.locator('.energy-field').evaluateAll(es=>es.every(e=>getComputedStyle(e).pointerEvents==='none'&&getComputedStyle(e).zIndex==='1')));
+  await scroll(about+50);await page.waitForTimeout(1700);
+  assert(await page.locator('.energy-trace').evaluateAll(es=>es.every(e=>Number(getComputedStyle(e).opacity)===0)),'Finite traces expire');
   for(const section of await page.locator('body>section').all()){
-   await section.evaluate(e=>scrollTo({top:e.getBoundingClientRect().top+scrollY-100,behavior:'instant'}));
-   await page.waitForFunction(el=>{const c=el.querySelector(':scope>.container,:scope>.about-inner');return !c||getComputedStyle(c).opacity==='1'},await section.elementHandle(),{timeout:5000});
-   assert(await section.evaluate(e=>{const c=e.querySelector(':scope>.container,:scope>.about-inner');return !c||getComputedStyle(c).opacity==='1'}),'Section fully reveals');
-   assert(!(await metrics()).overflow);
+   const y=await section.evaluate(e=>e.offsetTop);await scroll(y-100);assert(!await overflow(),'No section overflow');
+   const content=section.locator(':scope>.container,:scope>.about-inner');
+   if(await content.count())await page.waitForFunction(e=>Number(getComputedStyle(e).opacity)>.95,await content.first().elementHandle());
+  }
+  for(const id of ['pricing','get-started']){
+   await scroll(await pos('#'+id)-h*.95);
+   assert(await page.locator('#'+id+'>.container').evaluate(e=>getComputedStyle(e).opacity==='1'&&getComputedStyle(e).transform==='none'),'Conversion never waits for motion');
   }
   await page.locator('.faq-q').first().click();assert(await page.locator('.faq-item').first().evaluate(e=>e.classList.contains('open')));
-  await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
-  await page.locator('.hero-btns a[href="#how-it-works"]').click();
-  await page.waitForFunction(()=>{const t=document.querySelector('#how-it-works').getBoundingClientRect().top;return t>=55&&t<160},{},{timeout:8000});
-  await page.emulateMedia({reducedMotion:'reduce'});
-  await page.waitForFunction(()=>document.querySelectorAll('.light-sheen').length===0,{},{timeout:5000});
-  assert(await page.evaluate(()=>getComputedStyle(document.querySelector('.hero')).position==='relative'));
-  assert.equal(await page.locator('.data-trails').evaluate(e=>getComputedStyle(e).display),'none');
-  assert.equal(await page.locator('.light-sheen').count(),0,'Reduced motion cleans up reflections');
-  assert(await page.evaluate(()=>Math.abs(document.querySelector('.hero-runway').offsetHeight-document.querySelector('.hero').offsetHeight)<2),'No pin spacer in reduced motion');
-  await page.emulateMedia({reducedMotion:'no-preference'});
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.hero')).position==='sticky'&&document.querySelector('.light-sheen'),{},{timeout:5000});
-  assert.equal(await page.locator('.hero').evaluate(e=>getComputedStyle(e).position),'sticky','Motion reinitialises without reload');
-  assert.deepEqual(errors,[],'No page JavaScript errors');
-  console.log(`PASS ${engine} ${width}px: assets, growth, pinning, reveals, overflow, FAQ, CTA anchor, reduced motion, cleanup`);
-  await page.close();
+  await scroll(0);await page.locator('.hero-btns a[href="#how-it-works"]').click();
+  await page.waitForFunction(()=>{const t=document.querySelector('#how-it-works').getBoundingClientRect().top;return t>=55&&t<160});
+  await page.locator('#pricing a').first().focus();assert.equal(await page.locator('#pricing>.container').evaluate(e=>getComputedStyle(e).opacity),'1','Keyboard focus exposes content');
+  await page.emulateMedia({reducedMotion:'reduce'});await page.waitForFunction(()=>!document.documentElement.classList.contains('cinematic-ready'));
+  assert.equal(await page.locator('.journey-aperture,.energy-field').count(),0);
+  assert.equal(await page.locator('html.cinematic-ready').count(),0);
+  await page.emulateMedia({reducedMotion:'no-preference'});await page.waitForFunction(()=>document.querySelector('.journey-aperture'));
+  assert.equal(await page.locator('.journey-aperture').count(),1,'Rebuild without duplicates');
+  await page.setViewportSize({width:width<768?1280:390,height:900});await page.waitForTimeout(150);assert(!await overflow());
+  await page.reload({waitUntil:'networkidle'});assert.equal(await page.locator('.journey-aperture').count(),1);
+  await page.goto(base+'#platform-introduction',{waitUntil:'networkidle'});await page.waitForFunction(()=>getComputedStyle(document.querySelector('#platform-introduction .bridge-grid')).opacity==='1');
+  assert.deepEqual(errors,[]);await page.close();console.log(`${engine} ${width}: pass`);
  }
-}finally{await browser?.close();server?.kill()}
+ const staticPage=await browser.newPage({javaScriptEnabled:false});await prepare(staticPage);await staticPage.goto(base,{waitUntil:'networkidle'});
+ assert(await staticPage.locator('h1,h2').evaluateAll(es=>es.length>10&&es.every(e=>getComputedStyle(e).opacity==='1')),'No-JS narrative remains visible');
+ console.log(`${engine}: static fallback pass`);
+ const light=await browser.newPage();await prepare(light);
+ await light.addInitScript(()=>{Object.defineProperty(navigator,'hardwareConcurrency',{get:()=>2});Object.defineProperty(navigator,'deviceMemory',{get:()=>2})});
+ await light.goto(base,{waitUntil:'networkidle'});
+ assert.equal(await light.locator('html').getAttribute('data-motion-profile'),'light');
+ await light.mouse.wheel(0,400);await light.waitForTimeout(200);
+ assert(await light.locator('.energy-field').evaluateAll(es=>es.every(e=>getComputedStyle(e).display==='none')),'Constrained devices do not animate energy');
+ await light.close();
+ const failed=await browser.newPage();await prepare(failed);
+ await failed.route('**/scripts/landing-light.js',async route=>{const response=await route.fetch();await route.fulfill({response,body:await response.text()+"\nwindow.CredXMotion.register(()=>({render(){throw new Error('Injected motion failure')}}));"})});
+ await failed.goto(base,{waitUntil:'networkidle'});
+ assert.equal(await failed.locator('html').getAttribute('data-motion-profile'),'static');
+ assert.equal(await failed.locator('.journey-aperture,.energy-field').count(),0);
+ assert(await failed.locator('body>section>.container').evaluateAll(es=>es.every(e=>getComputedStyle(e).opacity==='1'&&getComputedStyle(e).transform==='none')),'Runtime failure restores all content');
+ await failed.close();
+ console.log(`${engine}: constrained-device and runtime-error fallbacks pass`);
+}finally{await browser?.close();server.kill()}
