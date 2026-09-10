@@ -36,6 +36,7 @@ before(async () => {
   ctx.base = `http://127.0.0.1:${(ctx.server.address() as AddressInfo).port}`;
 
   const p = ctx.prisma;
+  await p.activityEvent.deleteMany({ where: { client: { user: { email: { in: ['ct1@t.com', 'ct2@t.com'] } } } } });
   await p.task.deleteMany({ where: { client: { user: { email: { in: ['ct1@t.com', 'ct2@t.com'] } } } } });
   await p.client.deleteMany({ where: { user: { email: { in: ['ct1@t.com', 'ct2@t.com'] } } } });
   await p.user.deleteMany({ where: { email: { in: ['ct1@t.com', 'ct2@t.com', 'admin-t@t.com'] } } });
@@ -53,6 +54,7 @@ before(async () => {
 
 after(async () => {
   if (skip || !ctx.prisma) return;
+  await ctx.prisma.activityEvent.deleteMany({ where: { client: { user: { email: { in: ['ct1@t.com', 'ct2@t.com'] } } } } }).catch(() => {});
   await ctx.prisma.task.deleteMany({ where: { client: { user: { email: { in: ['ct1@t.com', 'ct2@t.com'] } } } } }).catch(() => {});
   ctx.server?.close();
   await ctx.prisma.$disconnect();
