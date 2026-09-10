@@ -138,22 +138,65 @@ section[id]{scroll-margin-top:78px}
 .section-opening[data-graphic="1"]::before{background:repeating-radial-gradient(ellipse at 0 0,transparent 0 58px,rgba(71,164,223,.2) 59px 60px,transparent 61px 115px);mask-image:linear-gradient(90deg,#000,transparent 60%)}
 .section-opening[data-graphic="2"]::before{background:linear-gradient(90deg,transparent,rgba(0,198,251,.3),transparent) center 20px/75% 1px no-repeat,radial-gradient(ellipse at 50% 0,rgba(71,104,225,.2),transparent 65%)}
 .section-opening>.container,.section-opening>.about-inner{position:relative;z-index:1}
-/* A scroll-linked light sheet and matching local reflections. */
-.scroll-light{position:fixed;inset:0;pointer-events:none;z-index:20;overflow:clip;opacity:0;contain:strict}
-.scroll-light-beam{position:absolute;left:-15%;width:130%;height:110px;top:0;background:linear-gradient(180deg,transparent,rgba(0,149,230,.06) 26%,rgba(0,198,251,.34) 46.5%,rgba(150,244,255,.92) 50%,rgba(0,198,251,.22) 53.5%,transparent 80%);filter:drop-shadow(0 0 9px rgba(0,198,251,.65)) drop-shadow(0 0 30px rgba(0,176,244,.38));transform:translate3d(0,-150px,0) rotate(-9deg)}
-.light-surface{position:relative}
-.light-sheen{position:absolute;inset:0;pointer-events:none;border-radius:inherit;overflow:hidden;opacity:0;z-index:8;background:linear-gradient(125deg,transparent 28%,rgba(0,198,251,.04) 39%,rgba(145,240,255,.23) 49%,rgba(0,198,251,.08) 55%,transparent 67%);background-size:100% 220%;background-position:50% var(--reflect-y,50%)}
-.object-motion>.light-sheen{mask-size:100% 100%;-webkit-mask-size:100% 100%}
-.object-house .light-sheen{mask-image:url('/images/hero/house-mask.webp')}
-.object-car .light-sheen{mask-image:url('/images/hero/car-mask.webp')}
-.object-cash .light-sheen{mask-image:url('/images/hero/cash-mask.webp')}
-.object-merch .light-sheen{mask-image:url('/images/hero/merch-mask.webp')}
-.object-cards .light-sheen{clip-path:polygon(24% 9%,95% 0,100% 54%,81% 100%,0 85%,1% 57%)}
-.light-heading{text-shadow:0 0 18px rgba(77,220,255,var(--reflect-strength,0))}
-@media(max-width:767px){.scroll-light-beam{height:75px}.section-opening::before{opacity:.22}}
-@media(prefers-reduced-motion:reduce){
- .scroll-light,.light-sheen{display:none!important}.light-heading{text-shadow:none}
- .object-cards{opacity:.85!important}.section-opening::before{opacity:.15}
-}
-
 .cinematic-hero .hero-btns .btn-outline{background:rgba(6,11,19,.88)}
+
+/* Connected narrative: restrained shared easing; readable static-first DOM. */
+:root{--motion-ease:cubic-bezier(.4,0,.2,1);--motion-duration:480ms}
+.cinematic-ready .hero-runway{height:calc(var(--hero-height,100svh) + 78svh)}
+.cinematic-ready .hero-bridge{margin-top:0}
+.data-trails{perspective:none;inset:0 0 0 48%;overflow:hidden;opacity:.45;transform:none}
+.energy-rail{position:absolute;left:0;right:-10%;height:1px;top:25%;background:rgba(0,198,251,.12);transform:rotate(-12deg);overflow:hidden}
+.energy-rail:nth-child(2){top:57%;transform:rotate(12deg)}
+.energy-rail:nth-child(3){top:81%;transform:rotate(-12deg)}
+.energy-rail i{display:block;width:300px;height:1px;background:linear-gradient(90deg,transparent,rgba(0,198,251,.65),#80e4fa,rgba(0,198,251,.65),transparent);box-shadow:0 0 6px rgba(0,198,251,.35)}
+/* No constant background loops, full-screen filters or reflective repainting. */
+.scene-active .data-trail i{animation:none}
+.scene-active .scene-object,.scene-active .object-motion{will-change:auto}
+.scene-orbit{box-shadow:none;border-color:rgba(0,198,251,.12)}
+.scene-object img{filter:none}
+.interface-runway{position:relative;isolation:isolate;background:#080e18}
+.interface-runway .dash{position:relative;background:transparent;z-index:2}
+.portal-frames{display:none;position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:3}
+.portal-frames i{position:absolute;inset:10% 12%;border:1px solid rgba(0,198,251,.48);border-radius:28px;box-shadow:0 0 12px rgba(0,198,251,.1),inset 0 0 12px rgba(0,198,251,.08);opacity:0;transform-origin:50% 52%}
+.portal-frames i:nth-child(2){inset:13% 15%;border-color:rgba(78,141,236,.35)}
+.portal-frames i:nth-child(3){inset:16% 18%;border-color:rgba(0,198,251,.25)}
+.narrative-ready .interface-runway{height:calc(var(--interface-height,800px) + 66svh)}
+.narrative-ready .interface-runway .dash{position:sticky;top:var(--interface-pin,0px)}
+.narrative-ready .portal-frames{display:block;height:var(--interface-height,800px);position:sticky;top:var(--interface-pin,0px);margin-bottom:calc(-1 * var(--interface-height,800px))}
+.narrative-ready .dash-ui{transition:none;transform-origin:50% 45%}
+.narrative-ready :is(.md-card,.bd-cat,.pl-item,.pg-card,.fr-card,.chat-window){transition:box-shadow var(--motion-duration) var(--motion-ease),border-color var(--motion-duration) var(--motion-ease);opacity:1;filter:none}
+.narrative-ready .bd-cat{opacity:1}
+.narrative-ready :is(.rc-card,.rc-live::before,.rc-halo,.rc-ring){animation:none}
+.narrative-ready .reveal{opacity:1;transform:none;filter:none;transition:none}
+:is(.md-grid,.pg-grid,.fr-grid){perspective:1200px}
+:is(#pricing,#masterclass-curriculum,#get-started) :is(.plan,.cur-card,.btn){transform:none;animation:none}
+:is(#pricing,#masterclass-curriculum,#get-started){scroll-margin-top:84px}
+:is(.btn,.md-card,.plan,.cur-card,.faq-item){transition-timing-function:var(--motion-ease)}
+:is(#modules,#progress,#funding){position:relative}
+:is(#modules,#progress,#funding)::before{content:'';position:absolute;top:0;left:7%;width:1px;height:54px;background:linear-gradient(rgba(0,198,251,.38),transparent);pointer-events:none}
+#progress::before{left:auto;right:7%}
+.motion-simple .portal-frames i:not(:first-child){display:none}
+.motion-simple .scene-grid,.motion-simple .scene-orbit{display:none}
+.motion-simple .hero-runway{height:calc(var(--hero-height,100svh) + 30svh)}
+.motion-simple .interface-runway{height:calc(var(--interface-height,800px) + 20svh)}
+@media(max-width:767px){
+ .data-trails{display:block;inset:52% 0 0 0;opacity:.3}
+ .energy-rail:nth-child(3){display:none}
+ .portal-frames i{inset:9% 4%;border-radius:16px;box-shadow:none}
+ .narrative-ready .interface-runway{height:auto}
+ .narrative-ready .interface-runway .dash{position:relative;top:auto}
+ .narrative-ready .portal-frames{position:absolute;height:100%;margin-bottom:0;top:0}
+ .hero-bridge{padding-top:42px;padding-bottom:48px}
+}
+@media(prefers-reduced-motion:reduce){
+ .data-trails,.portal-frames{display:none!important}
+ .interface-runway{height:auto!important}
+ .interface-runway .dash{position:relative!important;top:auto!important}
+ .dash-ui,.bd-cat,.scene-object,.rc-card{transform:none!important;opacity:1!important}
+ .bd-cat{opacity:1!important}
+}
+/* Static paint once; avoid blur sampling behind each moving interface card. */
+.narrative-ready :is(.md-card,.pg-card,.pl-item,.fr-item,.dash-ui){backdrop-filter:none}
+.narrative-ready .fr-item{transition:border-color var(--motion-duration) var(--motion-ease)}
+/* Reset legacy transforms before JS as well: no hidden content dependency. */
+.bd-cat{opacity:1}

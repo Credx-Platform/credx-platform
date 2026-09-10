@@ -64,7 +64,11 @@
 --font-display:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
 --font-body:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
 }
-html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+/* Smooth scrolling is opt-in: Chromium animates history scroll restoration while
+   it is enabled, so a mid-page refresh visibly travels down from the top.
+   landing-cinematic.js adds .smooth-scroll once the restored position settles. */
+html{-webkit-font-smoothing:antialiased}
+html.smooth-scroll{scroll-behavior:smooth}
 body{font-family:var(--font-body);background:var(--bg);color:var(--white);line-height:1.65;overflow-x:hidden}
 h1,h2,h3,h4,.hd{font-family:var(--font-display)}
 a{text-decoration:none;color:inherit}
@@ -289,7 +293,7 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 .section-fade{position:relative}
 .section-fade::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:120px;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.012),rgba(255,255,255,0));pointer-events:none;opacity:.8}
 @media (prefers-reduced-motion: reduce){
- html{scroll-behavior:auto}
+ html,html.smooth-scroll{scroll-behavior:auto}
  *,*::before,*::after{animation:none !important;transition:none !important}
  .reveal,.reveal.visible,.reveal[data-reveal="left"],.reveal[data-reveal="right"]{opacity:1 !important;transform:none !important;filter:none !important}
  .step:hover,.cur-card:hover,.test-card:hover,.faq-item:hover,.form-wrap:hover,.chat-window:hover,.btn-primary:hover,.plan:hover,.choice-card:hover{transform:none;box-shadow:none}
@@ -505,7 +509,7 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
 </style>
 <link rel="stylesheet" href="/styles/landing-cinematic.css">
 <script defer src="/scripts/landing-cinematic.js"></script>
-<script defer src="/scripts/landing-light.js"></script>
+
 </head>
 <body>
 
@@ -584,24 +588,13 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
   </div></div>
 </section>
 
-<section class="bd section-fade" id="breakdown">
- <div class="container">
-  <div class="stag">Readiness breakdown</div>
-  <h2 class="stitle">Your credit score is only one piece.</h2>
-  <p class="ssub">CredX evaluates six readiness factors so you can see what may be helping you, what may be holding you back, and which action to prioritize next.</p>
-  <div class="bd-stage" id="bdStage"><!-- rendered from CREDX_DEMO.categories --></div>
-  <div class="bd-total">
-   <b id="bdTotal">78</b>
-   <span>CredX Readiness Score &middot; sample profile</span>
-  </div>
- </div>
-</section>
-
+<div class="interface-runway" id="interfaceRunway">
+<div class="portal-frames" aria-hidden="true"><i></i><i></i><i></i></div>
 <section class="dash section-fade" id="how-it-works">
  <div class="container">
   <div class="stag">The software</div>
   <h2 class="stitle">A real workspace, not a slideshow.</h2>
-  <p class="ssub">Everything above lives inside the CredX portal — your score, your next actions, and your progress, in one place you return to.</p>
+  <p class="ssub">Your readiness tools live inside the CredX portal — your score, your next actions, and your progress, in one place you return to.</p>
   <div class="dash-wrap">
    <div class="dash-ui" id="dashUi">
     <div class="dash-bar">
@@ -646,30 +639,8 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
   <p class="hero-note" style="margin-top:18px">Interface shown with a sample profile for illustration. Signed-in figures reflect your own data.</p>
  </div>
 </section>
+</div>
 
-<section class="plan-s section-fade" id="action-plan">
- <div class="container">
-  <div class="stag">Action plan</div>
-  <h2 class="stitle">Know exactly what to work on next.</h2>
-  <p class="ssub">CredX converts your profile into a ranked list of actions, each tied to the readiness factor it affects — so effort goes where it may count most.</p>
-  <div class="pl-list" id="plList"><!-- rendered from CREDX_DEMO.actions --></div>
- </div>
-</section>
-
-<section class="about section-fade" id="about">
- <div class="about-inner">
-  <img class="about-photo" src="/images/cesar-profile.jpg" alt="J. Malloy leadership profile for CredX">
-  <div>
-   <div class="about-tag">About CredX</div>
-   <h2>Meet J. Malloy, CEO and creator of CredX.</h2>
-   <p>J. Malloy built CredX to be more than a credit brand. The vision is a structured credit intelligence and financial readiness platform that helps people understand their profile, organize goals, track progress, and make better-prepared decisions.</p>
-   <p>Cesar serves as the AI-assisted CredX guide, helping users understand concepts, dashboard context, readiness steps, and practical next actions. Professional support can extend the platform when human review is needed.</p>
-   <p>The mission is simple, combine clean strategy, real communication, and disciplined execution so every client knows where they stand and what comes next.</p>
-   <div class="about-name">J. Malloy</div>
-   <div class="about-role">CEO, Creator of CredX</div>
-  </div>
- </div>
-</section>
 <section class="how section-fade" id="how">
  <div class="container">
   <div class="stag">How it works</div>
@@ -682,45 +653,77 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
   </div>
  </div>
 </section>
-<section class="pricing section-fade" id="pricing">
+
+<section class="mods section-fade" id="modules">
  <div class="container">
-  <div class="stag">Pricing</div>
-  <h2 class="stitle">Choose a CredX access tier after review.</h2>
-  <p class="ssub">Start with intake and initial review, then choose the CredX access tier that fits your next step. The platform catalog starts with Masterclass, Essential, Premium, and Family.</p>
-  <div style="margin-top:32px;display:flex;gap:12px;flex-wrap:wrap">
-   <a href="/pricing" class="btn btn-primary">View plans &amp; pricing →</a>
-   <a href="/signup" class="btn btn-outline">Start intake review</a>
+  <div class="stag">The platform</div>
+  <h2 class="stitle">One workspace for the whole picture.</h2>
+  <p class="ssub">CredX is modular. Each part answers a different question about where you stand and what to do next.</p>
+  <div class="md-grid">
+   <div class="md-card"><div class="md-i">&#9678;</div><div class="md-t">Readiness Dashboard</div><div class="md-d">Your score, your factors and your next actions on one screen.</div></div>
+   <div class="md-card"><div class="md-i">&#9650;</div><div class="md-t">Readiness Score</div><div class="md-d">Six weighted factors scored out of 100, saved as snapshots over time.</div></div>
+   <div class="md-card"><div class="md-i">&#9776;</div><div class="md-t">Action Plan</div><div class="md-d">A ranked next-best-action list tied to the factor each one affects.</div></div>
+   <div class="md-card"><div class="md-i">&#9679;</div><div class="md-t">Cesar AI</div><div class="md-d">An AI guide for next steps, available to visitors and signed-in clients.</div></div>
+   <div class="md-card"><div class="md-i">&#9744;</div><div class="md-t">Funding Readiness</div><div class="md-d">Preparation indicators and document checklists before you apply.</div></div>
+   <div class="md-card"><div class="md-i">&#9636;</div><div class="md-t">Business Credit</div><div class="md-d">A nine-item foundation assessment with vendor and tradeline tracking.</div></div>
+   <div class="md-card"><div class="md-i">&#9998;</div><div class="md-t">Learning Center</div><div class="md-d">Structured education, including the 5-Day Masterclass curriculum.</div></div>
+   <div class="md-card"><div class="md-i">&#9993;</div><div class="md-t">Reports &amp; Notifications</div><div class="md-d">Generated readiness reports, in-app alerts and a weekly check-in loop.</div></div>
+  </div>
+  <p class="hero-note" style="max-width:100%;margin-top:24px">The CredX Readiness Score is a proprietary CredX readiness metric. It is not a consumer credit score, FICO<sup>&reg;</sup> score, funding approval, legal opinion, or guarantee of any credit-report change. Educational tools and analysis are provided as software; any dispute assistance is a separate service under its own written agreement.</p>
+ </div>
+</section>
+
+<section class="bd section-fade" id="breakdown">
+ <div class="container">
+  <div class="stag">Readiness breakdown</div>
+  <h2 class="stitle">Your credit score is only one piece.</h2>
+  <p class="ssub">CredX evaluates six readiness factors so you can see what may be helping you, what may be holding you back, and which action to prioritize next.</p>
+  <div class="bd-stage" id="bdStage"><!-- rendered from CREDX_DEMO.categories --></div>
+  <div class="bd-total">
+   <b id="bdTotal">78</b>
+   <span>CredX Readiness Score &middot; sample profile</span>
   </div>
  </div>
 </section>
-<section class="pricing section-fade" id="masterclass-curriculum">
+
+<section class="plan-s section-fade" id="action-plan">
  <div class="container">
-  <div class="stag">The System</div>
-  <h2 class="stitle">5-Day Masterclass + Bonus Day</h2>
-  <p class="ssub">Each day builds on the last so the DIY client gets a complete credit, business credit, and wealth-building roadmap inside CredX.</p>
-  <div class="cur-grid">
-   <div class="cur-card"><div class="cur-n">01</div><div class="cur-badge">Day 1</div><h3 class="cur-title">Credit Fundamentals</h3><p class="cur-desc">How scores work, what factors matter, and how to read reports correctly.</p><div class="tags"><span class="tag">FICO</span><span class="tag">Reports</span><span class="tag">Bureaus</span></div></div>
-   <div class="cur-card"><div class="cur-n">02</div><div class="cur-badge">Day 2</div><h3 class="cur-title">Disputes & Removals</h3><p class="cur-desc">609 letters, FCRA rights, and lawful dispute workflow principles.</p><div class="tags"><span class="tag">609</span><span class="tag">FCRA</span><span class="tag">Disputes</span></div></div>
-   <div class="cur-card"><div class="cur-n">03</div><div class="cur-badge">Day 3</div><h3 class="cur-title">Advanced Strategies</h3><p class="cur-desc">Goodwill letters, pay-for-delete awareness, rescoring, and sequencing.</p><div class="tags"><span class="tag">Strategy</span><span class="tag">Rescoring</span><span class="tag">Negotiation</span></div></div>
-   <div class="cur-card"><div class="cur-n">04</div><div class="cur-badge">Day 4</div><h3 class="cur-title">Credit Building</h3><p class="cur-desc">Secured cards, builder loans, utilization, and profile rebuilding habits.</p><div class="tags"><span class="tag">Secured Cards</span><span class="tag">Builder Loans</span><span class="tag">Utilization</span></div></div>
-   <div class="cur-card"><div class="cur-n">05</div><div class="cur-badge">Day 5</div><h3 class="cur-title">Business Credit</h3><p class="cur-desc">LLC, EIN, DUNS, Net-30 accounts, and funding-readiness basics.</p><div class="tags"><span class="tag">LLC/EIN</span><span class="tag">DUNS</span><span class="tag">Funding</span></div></div>
-   <div class="cur-card"><div class="cur-n">★</div><div class="cur-badge">Bonus Day</div><h3 class="cur-title">Generational Wealth</h3><p class="cur-desc">Real estate, investing, passive income, and long-term wealth structure.</p><div class="tags"><span class="tag">Real Estate</span><span class="tag">Investing</span><span class="tag">Legacy</span></div></div>
-  </div>
-  <p class="masterclass-note">Masterclass access is handled as a paid education tier or through approved internal promotions.</p>
+  <div class="stag">Action plan</div>
+  <h2 class="stitle">Know exactly what to work on next.</h2>
+  <p class="ssub">CredX converts your profile into a ranked list of actions, each tied to the readiness factor it affects — so effort goes where it may count most.</p>
+  <div class="pl-list" id="plList"><!-- rendered from CREDX_DEMO.actions --></div>
  </div>
 </section>
-<section class="test-section section-fade" id="testimonials">
+
+<section class="prog section-fade" id="progress">
  <div class="container">
-  <div class="stag">Results</div>
-  <h2 class="stitle">Clients come for clarity, structure, and momentum</h2>
-  <p class="ssub">This section can be updated with verified testimonials later. For now, it gives the page the right public shape.</p>
-  <div class="test-grid">
-   <div class="test-card"><div class="test-stars">★★★★★</div><div class="test-quote">“I finally had a clear plan instead of random advice from everywhere.”</div><div class="test-author"><div class="test-av">CR</div><div><div class="test-name">CredX Client</div><div class="test-info">Strategic review</div></div></div></div>
-   <div class="test-card"><div class="test-stars">★★★★★</div><div class="test-quote">“The portal and process made everything feel organized and easier to follow.”</div><div class="test-author"><div class="test-av">MG</div><div><div class="test-name">CredX Client</div><div class="test-info">Progress tracking</div></div></div></div>
-   <div class="test-card"><div class="test-stars">★★★★★</div><div class="test-quote">“What I needed most was direction, and CredX gave me that fast.”</div><div class="test-author"><div class="test-av">TM</div><div><div class="test-name">CredX Client</div><div class="test-info">Credit rebuild path</div></div></div></div>
+  <div class="stag">Progress</div>
+  <h2 class="stitle">Turn financial goals into measurable progress.</h2>
+  <p class="ssub">CredX records where you started and what has changed, so progress is something you can see rather than something you hope for.</p>
+  <div class="pg-grid">
+   <div class="pg-card"><div class="pg-k">Readiness score</div><div class="pg-v">78<small>/100</small></div><div class="pg-bar"><i data-fill="78"></i></div><div class="pg-n">Tracked over time with saved snapshots</div></div>
+   <div class="pg-card"><div class="pg-k">Completed actions</div><div class="pg-v">11<small>/16</small></div><div class="pg-bar"><i data-fill="69"></i></div><div class="pg-n">Each action maps to a readiness factor</div></div>
+   <div class="pg-card"><div class="pg-k">Learning progress</div><div class="pg-v">7<small>/10</small></div><div class="pg-bar"><i data-fill="70"></i></div><div class="pg-n">Education milestones recorded in-portal</div></div>
+   <div class="pg-card"><div class="pg-k">Funding profile</div><div class="pg-v">64<small>%</small></div><div class="pg-bar"><i data-fill="64"></i></div><div class="pg-n">Completion of your funding readiness file</div></div>
+   <div class="pg-card"><div class="pg-k">Business readiness</div><div class="pg-v">5<small>/9</small></div><div class="pg-bar"><i data-fill="56"></i></div><div class="pg-n">Business credit foundation checklist</div></div>
+   <div class="pg-card"><div class="pg-k">Weekly check-in</div><div class="pg-v">On<small> track</small></div><div class="pg-bar"><i data-fill="85"></i></div><div class="pg-n">A short weekly loop that recomputes readiness</div></div>
+  </div>
+  <p class="hero-note" style="margin-top:18px">Figures shown are a sample profile used to illustrate the interface.</p>
+ </div>
+</section>
+
+<section class="fund section-fade" id="funding">
+ <div class="container">
+  <div class="stag">Funding readiness</div>
+  <h2 class="stitle">See how funding-ready you are before you apply.</h2>
+  <p class="ssub">CredX reviews the indicators lenders commonly consider and shows where your profile looks prepared and where there may be room to improve — before you put an application in front of anyone.</p>
+  <div class="fr-grid" id="frGrid"><!-- rendered from CREDX_DEMO.funding --></div>
+  <div class="fr-disc">
+   <strong style="color:var(--white)">What this is, and is not.</strong> Funding Readiness is a preparation and decision-support tool. It does not predict approval, estimate approval odds, or represent any lender's criteria, and CredX does not guarantee approval or funding. Indicators are educational and are intended to help you prioritize what to prepare next.
   </div>
  </div>
 </section>
+
 <section class="chat-section section-fade" id="chat">
  <div class="container chat-container">
   <div class="stag">Chat</div>
@@ -752,6 +755,64 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
   </div>
  </div>
 </section>
+
+<section class="about section-fade" id="about">
+ <div class="about-inner">
+  <img class="about-photo" src="/images/cesar-profile.jpg" alt="J. Malloy leadership profile for CredX">
+  <div>
+   <div class="about-tag">About CredX</div>
+   <h2>Meet J. Malloy, CEO and creator of CredX.</h2>
+   <p>J. Malloy built CredX to be more than a credit brand. The vision is a structured credit intelligence and financial readiness platform that helps people understand their profile, organize goals, track progress, and make better-prepared decisions.</p>
+   <p>Cesar serves as the AI-assisted CredX guide, helping users understand concepts, dashboard context, readiness steps, and practical next actions. Professional support can extend the platform when human review is needed.</p>
+   <p>The mission is simple, combine clean strategy, real communication, and disciplined execution so every client knows where they stand and what comes next.</p>
+   <div class="about-name">J. Malloy</div>
+   <div class="about-role">CEO, Creator of CredX</div>
+  </div>
+ </div>
+</section>
+
+<section class="test-section section-fade" id="testimonials">
+ <div class="container">
+  <div class="stag">Results</div>
+  <h2 class="stitle">Clients come for clarity, structure, and momentum</h2>
+  <p class="ssub">This section can be updated with verified testimonials later. For now, it gives the page the right public shape.</p>
+  <div class="test-grid">
+   <div class="test-card"><div class="test-stars">★★★★★</div><div class="test-quote">“I finally had a clear plan instead of random advice from everywhere.”</div><div class="test-author"><div class="test-av">CR</div><div><div class="test-name">CredX Client</div><div class="test-info">Strategic review</div></div></div></div>
+   <div class="test-card"><div class="test-stars">★★★★★</div><div class="test-quote">“The portal and process made everything feel organized and easier to follow.”</div><div class="test-author"><div class="test-av">MG</div><div><div class="test-name">CredX Client</div><div class="test-info">Progress tracking</div></div></div></div>
+   <div class="test-card"><div class="test-stars">★★★★★</div><div class="test-quote">“What I needed most was direction, and CredX gave me that fast.”</div><div class="test-author"><div class="test-av">TM</div><div><div class="test-name">CredX Client</div><div class="test-info">Credit rebuild path</div></div></div></div>
+  </div>
+ </div>
+</section>
+
+<section class="pricing section-fade" id="masterclass-curriculum">
+ <div class="container">
+  <div class="stag">The System</div>
+  <h2 class="stitle">5-Day Masterclass + Bonus Day</h2>
+  <p class="ssub">Each day builds on the last so the DIY client gets a complete credit, business credit, and wealth-building roadmap inside CredX.</p>
+  <div class="cur-grid">
+   <div class="cur-card"><div class="cur-n">01</div><div class="cur-badge">Day 1</div><h3 class="cur-title">Credit Fundamentals</h3><p class="cur-desc">How scores work, what factors matter, and how to read reports correctly.</p><div class="tags"><span class="tag">FICO</span><span class="tag">Reports</span><span class="tag">Bureaus</span></div></div>
+   <div class="cur-card"><div class="cur-n">02</div><div class="cur-badge">Day 2</div><h3 class="cur-title">Disputes & Removals</h3><p class="cur-desc">609 letters, FCRA rights, and lawful dispute workflow principles.</p><div class="tags"><span class="tag">609</span><span class="tag">FCRA</span><span class="tag">Disputes</span></div></div>
+   <div class="cur-card"><div class="cur-n">03</div><div class="cur-badge">Day 3</div><h3 class="cur-title">Advanced Strategies</h3><p class="cur-desc">Goodwill letters, pay-for-delete awareness, rescoring, and sequencing.</p><div class="tags"><span class="tag">Strategy</span><span class="tag">Rescoring</span><span class="tag">Negotiation</span></div></div>
+   <div class="cur-card"><div class="cur-n">04</div><div class="cur-badge">Day 4</div><h3 class="cur-title">Credit Building</h3><p class="cur-desc">Secured cards, builder loans, utilization, and profile rebuilding habits.</p><div class="tags"><span class="tag">Secured Cards</span><span class="tag">Builder Loans</span><span class="tag">Utilization</span></div></div>
+   <div class="cur-card"><div class="cur-n">05</div><div class="cur-badge">Day 5</div><h3 class="cur-title">Business Credit</h3><p class="cur-desc">LLC, EIN, DUNS, Net-30 accounts, and funding-readiness basics.</p><div class="tags"><span class="tag">LLC/EIN</span><span class="tag">DUNS</span><span class="tag">Funding</span></div></div>
+   <div class="cur-card"><div class="cur-n">★</div><div class="cur-badge">Bonus Day</div><h3 class="cur-title">Generational Wealth</h3><p class="cur-desc">Real estate, investing, passive income, and long-term wealth structure.</p><div class="tags"><span class="tag">Real Estate</span><span class="tag">Investing</span><span class="tag">Legacy</span></div></div>
+  </div>
+  <p class="masterclass-note">Masterclass access is handled as a paid education tier or through approved internal promotions.</p>
+ </div>
+</section>
+
+<section class="pricing section-fade" id="pricing">
+ <div class="container">
+  <div class="stag">Pricing</div>
+  <h2 class="stitle">Choose a CredX access tier after review.</h2>
+  <p class="ssub">Start with intake and initial review, then choose the CredX access tier that fits your next step. The platform catalog starts with Masterclass, Essential, Premium, and Family.</p>
+  <div style="margin-top:32px;display:flex;gap:12px;flex-wrap:wrap">
+   <a href="/pricing" class="btn btn-primary">View plans &amp; pricing →</a>
+   <a href="/signup" class="btn btn-outline">Start intake review</a>
+  </div>
+ </div>
+</section>
+
 <section class="faq-section section-fade" id="faq">
  <div class="container">
   <div class="stag">FAQ</div>
@@ -761,53 +822,6 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
    <div class="faq-item"><div class="faq-q">Can I start with a free review?</div><div class="faq-a"><div class="faq-a-inner">Yes. The intake form is the best place to start so the team can review your file and goals.</div></div></div>
    <div class="faq-item"><div class="faq-q">Will I get portal access?</div><div class="faq-a"><div class="faq-a-inner">The platform includes a client portal path, and full access depends on the service flow you are enrolled into.</div></div></div>
   </div>
- </div>
-</section>
-<section class="prog section-fade" id="progress">
- <div class="container">
-  <div class="stag">Progress</div>
-  <h2 class="stitle">Turn financial goals into measurable progress.</h2>
-  <p class="ssub">CredX records where you started and what has changed, so progress is something you can see rather than something you hope for.</p>
-  <div class="pg-grid">
-   <div class="pg-card"><div class="pg-k">Readiness score</div><div class="pg-v">78<small>/100</small></div><div class="pg-bar"><i data-fill="78"></i></div><div class="pg-n">Tracked over time with saved snapshots</div></div>
-   <div class="pg-card"><div class="pg-k">Completed actions</div><div class="pg-v">11<small>/16</small></div><div class="pg-bar"><i data-fill="69"></i></div><div class="pg-n">Each action maps to a readiness factor</div></div>
-   <div class="pg-card"><div class="pg-k">Learning progress</div><div class="pg-v">7<small>/10</small></div><div class="pg-bar"><i data-fill="70"></i></div><div class="pg-n">Education milestones recorded in-portal</div></div>
-   <div class="pg-card"><div class="pg-k">Funding profile</div><div class="pg-v">64<small>%</small></div><div class="pg-bar"><i data-fill="64"></i></div><div class="pg-n">Completion of your funding readiness file</div></div>
-   <div class="pg-card"><div class="pg-k">Business readiness</div><div class="pg-v">5<small>/9</small></div><div class="pg-bar"><i data-fill="56"></i></div><div class="pg-n">Business credit foundation checklist</div></div>
-   <div class="pg-card"><div class="pg-k">Weekly check-in</div><div class="pg-v">On<small> track</small></div><div class="pg-bar"><i data-fill="85"></i></div><div class="pg-n">A short weekly loop that recomputes readiness</div></div>
-  </div>
-  <p class="hero-note" style="margin-top:18px">Figures shown are a sample profile used to illustrate the interface.</p>
- </div>
-</section>
-
-<section class="fund section-fade" id="funding">
- <div class="container">
-  <div class="stag">Funding readiness</div>
-  <h2 class="stitle">See how funding-ready you are before you apply.</h2>
-  <p class="ssub">CredX reviews the indicators lenders commonly consider and shows where your profile looks prepared and where there may be room to improve — before you put an application in front of anyone.</p>
-  <div class="fr-grid" id="frGrid"><!-- rendered from CREDX_DEMO.funding --></div>
-  <div class="fr-disc">
-   <strong style="color:var(--white)">What this is, and is not.</strong> Funding Readiness is a preparation and decision-support tool. It does not predict approval, estimate approval odds, or represent any lender's criteria, and CredX does not guarantee approval or funding. Indicators are educational and are intended to help you prioritize what to prepare next.
-  </div>
- </div>
-</section>
-
-<section class="mods section-fade" id="modules">
- <div class="container">
-  <div class="stag">The platform</div>
-  <h2 class="stitle">One workspace for the whole picture.</h2>
-  <p class="ssub">CredX is modular. Each part answers a different question about where you stand and what to do next.</p>
-  <div class="md-grid">
-   <div class="md-card"><div class="md-i">&#9678;</div><div class="md-t">Readiness Dashboard</div><div class="md-d">Your score, your factors and your next actions on one screen.</div></div>
-   <div class="md-card"><div class="md-i">&#9650;</div><div class="md-t">Readiness Score</div><div class="md-d">Six weighted factors scored out of 100, saved as snapshots over time.</div></div>
-   <div class="md-card"><div class="md-i">&#9776;</div><div class="md-t">Action Plan</div><div class="md-d">A ranked next-best-action list tied to the factor each one affects.</div></div>
-   <div class="md-card"><div class="md-i">&#9679;</div><div class="md-t">Cesar AI</div><div class="md-d">An AI guide for next steps, available to visitors and signed-in clients.</div></div>
-   <div class="md-card"><div class="md-i">&#9744;</div><div class="md-t">Funding Readiness</div><div class="md-d">Preparation indicators and document checklists before you apply.</div></div>
-   <div class="md-card"><div class="md-i">&#9636;</div><div class="md-t">Business Credit</div><div class="md-d">A nine-item foundation assessment with vendor and tradeline tracking.</div></div>
-   <div class="md-card"><div class="md-i">&#9998;</div><div class="md-t">Learning Center</div><div class="md-d">Structured education, including the 5-Day Masterclass curriculum.</div></div>
-   <div class="md-card"><div class="md-i">&#9993;</div><div class="md-t">Reports &amp; Notifications</div><div class="md-d">Generated readiness reports, in-app alerts and a weekly check-in loop.</div></div>
-  </div>
-  <p class="hero-note" style="max-width:100%;margin-top:24px">The CredX Readiness Score is a proprietary CredX readiness metric. It is not a consumer credit score, FICO<sup>&reg;</sup> score, funding approval, legal opinion, or guarantee of any credit-report change. Educational tools and analysis are provided as software; any dispute assistance is a separate service under its own written agreement.</p>
  </div>
 </section>
 
@@ -963,30 +977,6 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').match
   requestAnimationFrame(()=>{ if(meter) meter.style.width = target + '%'; });
 })();
 
-/* Pointer parallax on the hero object. rAF-throttled, passive, desktop only. */
-(function heroParallax(){
-  const stage = document.getElementById('rcStage');
-  const card = document.getElementById('rcCard');
-  if(!stage || !card || reduceMotion) return;
-  if(window.matchMedia('(hover: none)').matches) return; // skip on touch
-
-  let raf = 0, tx = 0, ty = 0;
-  function apply(){
-    raf = 0;
-    card.style.transform = `rotateY(${tx * 11}deg) rotateX(${-ty * 9}deg)`;
-  }
-  stage.addEventListener('pointermove', (e) => {
-    const r = stage.getBoundingClientRect();
-    tx = (e.clientX - r.left) / r.width - 0.5;
-    ty = (e.clientY - r.top) / r.height - 0.5;
-    if(!raf) raf = requestAnimationFrame(apply);
-  }, { passive: true });
-  stage.addEventListener('pointerleave', () => {
-    tx = ty = 0;
-    if(!raf) raf = requestAnimationFrame(apply);
-  }, { passive: true });
-})();
-
 /* If a backdrop cut-out is missing or fails to decode, drop that layer entirely
    rather than leaving a broken-image box floating in the hero. */
 (function heroLayerGuard(){
@@ -994,35 +984,6 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').match
     const hide = () => { const l = img.closest('.hb-layer'); if(l) l.style.display = 'none'; };
     if(img.complete && img.naturalWidth === 0) hide();
     img.addEventListener('error', hide, { once: true });
-  });
-})();
-
-/* "Invisible" 3D on the module/feature boxes: flat until the pointer approaches,
-   then a small perspective tilt toward the cursor. Pointer-only, motion-gated. */
-(function cardTilt(){
-  if(reduceMotion) return;
-  if(window.matchMedia('(hover: none)').matches) return;
-
-  const cards = document.querySelectorAll('.md-card');
-  if(!cards.length) return;
-
-  cards.forEach(card => {
-    card.classList.add('tilt3d');
-    let raf = 0, rx = 0, ry = 0;
-    const apply = () => {
-      raf = 0;
-      card.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(6px)`;
-    };
-    card.addEventListener('pointermove', (e) => {
-      const r = card.getBoundingClientRect();
-      ry = ((e.clientX - r.left) / r.width - 0.5) * 9;
-      rx = -((e.clientY - r.top) / r.height - 0.5) * 7;
-      if(!raf) raf = requestAnimationFrame(apply);
-    }, { passive: true });
-    card.addEventListener('pointerleave', () => {
-      rx = ry = 0;
-      if(!raf) raf = requestAnimationFrame(apply);
-    }, { passive: true });
   });
 })();
 
