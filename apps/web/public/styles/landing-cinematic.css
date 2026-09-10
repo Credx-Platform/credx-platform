@@ -2,7 +2,7 @@
 body{overflow-x:clip}
 .hero-runway{position:relative;isolation:isolate}
 /* Short runway: the hero settles quickly, then the page scrolls on normally. */
-.cinematic-ready .hero-runway{height:calc(var(--hero-height, 100svh) + 50svh)}
+.cinematic-ready .hero-runway{height:calc(var(--hero-height, 100svh) + 80svh)}
 .cinematic-hero.hero{position:relative;min-height:760px;min-height:max(760px,100svh);padding:100px clamp(24px,4vw,80px) 84px;display:flex;align-items:center;overflow:clip;background:#060b13;isolation:isolate}
 .cinematic-ready .cinematic-hero{position:sticky;top:var(--pin-top,0px)}
 .cinematic-hero .hero-grid{max-width:1680px;grid-template-columns:minmax(0,.95fr) minmax(0,1.15fr);gap:12px;align-items:center}
@@ -18,10 +18,10 @@ body{overflow-x:clip}
 .object-motion{transform-style:preserve-3d;backface-visibility:hidden}
 .scene-object img{display:block;width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 8px 14px rgba(0,160,255,.10));user-select:none}
 /* Pre-JS transforms mirror the scripted start values so first paint never pops. */
-.object-house{width:72%;left:16%;top:20%;z-index:3;transform:translate3d(0,0,5px) rotateY(-8deg) scale(1.02)}
-.object-car{width:56%;right:-1%;bottom:2%;z-index:5;transform:translate3d(0,0,20px) rotateY(9deg) scale(.99)}
-.object-cash{width:41%;left:-2%;top:0;z-index:1;transform:translate3d(0,0,-52px) rotateY(10deg) scale(.90)}
-.object-merch{width:36%;right:-1%;top:0;z-index:2;transform:translate3d(0,0,15px) rotateY(-12deg) scale(1.04)}
+.object-house{width:72%;left:16%;top:20%;z-index:3;transform:translate3d(0,0,5px) rotateY(-8deg) scale(.88)}
+.object-car{width:56%;right:-1%;bottom:2%;z-index:5;transform:translate3d(0,0,20px) rotateY(9deg) scale(.848)}
+.object-cash{width:41%;left:-2%;top:0;z-index:1;transform:translate3d(0,0,-52px) rotateY(10deg) scale(.776)}
+.object-merch{width:36%;right:-1%;top:0;z-index:2;transform:translate3d(0,0,15px) rotateY(-12deg) scale(.896)}
 .scene-orbit{position:absolute;pointer-events:none;border:1px solid rgba(255,255,255,.16);border-radius:50%;width:80%;height:66%;left:10%;top:20%;box-shadow:0 0 16px rgba(255,255,255,.10),inset 0 0 16px rgba(255,255,255,.06);transform:rotateX(68deg) rotateZ(-24deg) translateZ(-140px)}
 .orbit-front{width:100%;height:90%;left:0;top:10%;border-color:rgba(255,255,255,.12);box-shadow:0 0 14px rgba(255,255,255,.08);transform:rotateX(62deg) rotateZ(24deg) translateZ(80px)}
 .hero-atmosphere{position:absolute;inset:0;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 77% 40%,rgba(9,95,132,.18),transparent 49%),radial-gradient(ellipse at 96% 70%,rgba(81,53,159,.08),transparent 40%),linear-gradient(125deg,#101c29,#060b13 50%);z-index:0}
@@ -31,7 +31,7 @@ body{overflow-x:clip}
 .data-trails{position:absolute;inset:0;pointer-events:none;overflow:clip;z-index:1;perspective:900px;opacity:.7}
 .data-trail{position:absolute;left:var(--left);top:var(--top);width:var(--length);height:1px;opacity:var(--alpha);transform:rotate(var(--angle));pointer-events:none}
 .data-trail i{display:block;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.28) 12%,var(--trail-color,#fff) 76%,transparent);transform:translate3d(-45vw,0,0);opacity:0}
-.scene-active .data-trail i{will-change:transform,opacity}
+
 .data-trail[data-plane="back"]{filter:blur(.65px) drop-shadow(0 0 5px rgba(255,255,255,.3))}
 .data-trail[data-plane="mid"]{height:1.5px;filter:drop-shadow(0 0 5px rgba(255,255,255,.42))}
 .data-trail[data-plane="front"]{height:2px;filter:drop-shadow(0 0 6px rgba(255,255,255,.7)) drop-shadow(0 0 18px rgba(255,255,255,.3))}
@@ -64,7 +64,7 @@ section[id]{scroll-margin-top:78px}
  .bridge-grid{gap:36px}
 }
 @media(max-width:767px){
- .cinematic-ready .hero-runway{height:calc(var(--hero-height, 100svh) + 42svh)}
+ .cinematic-ready .hero-runway{height:calc(var(--hero-height, 100svh) + 58svh)}
  .cinematic-hero.hero{min-height:100svh;padding:88px 20px 72px;align-items:flex-start}
  .cinematic-hero .hero-grid{display:flex;flex-direction:column;gap:0}
  .cinematic-hero .hero-copy{max-width:560px;width:100%;z-index:4}
@@ -117,7 +117,7 @@ section[id]{scroll-margin-top:78px}
 .object-house{width:47%;left:57%;top:0;z-index:2}
 .object-cash{width:39%;left:-2%;top:-2%;z-index:1}
 .object-car{width:48%;right:-1%;bottom:0;z-index:4}
-.object-cards{width:43%;left:0;top:49%;z-index:2;opacity:.75;transform:translate3d(0,0,-12px) scale(.91)}
+.object-cards{width:43%;left:0;top:49%;z-index:2;opacity:.75;transform:translate3d(0,0,-12px) scale(.784)}
 .object-cards img{filter:none;mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
 .orbit-front{display:none}
 @media(min-width:768px){
@@ -125,33 +125,7 @@ section[id]{scroll-margin-top:78px}
  .cinematic-hero h1{font-size:clamp(42px,4vw,58px);margin-bottom:16px}
  .cinematic-hero .hero-tag{margin-bottom:16px}
  .cinematic-hero .hero-sub{max-width:620px;font-size:16px;line-height:1.6;margin-bottom:20px}
- .cinematic-ready .hero-runway{height:calc(var(--hero-height,100svh) + 50svh)}
+ .cinematic-ready .hero-runway{height:calc(var(--hero-height,100svh) + 80svh)}
 }
 @media(max-width:767px){.hero-art{height:335px;max-width:520px}}
-/* Distinct quiet graphic accents frame every section without covering content. */
-.section-opening{position:relative}
-.section-opening::before{content:'';position:absolute;inset:14px 0 auto;height:150px;pointer-events:none;z-index:0;opacity:.32;background:radial-gradient(ellipse at 85% 0,rgba(255,255,255,.13),transparent 60%),linear-gradient(112deg,transparent 60%,rgba(255,255,255,.3) 60.1%,transparent 60.3%)}
-.section-opening[data-graphic="1"]::before{background:repeating-radial-gradient(ellipse at 0 0,transparent 0 58px,rgba(255,255,255,.16) 59px 60px,transparent 61px 115px);mask-image:linear-gradient(90deg,#000,transparent 60%)}
-.section-opening[data-graphic="2"]::before{background:linear-gradient(90deg,transparent,rgba(255,255,255,.32),transparent) center 20px/75% 1px no-repeat,radial-gradient(ellipse at 50% 0,rgba(255,255,255,.12),transparent 65%)}
-.section-opening>.container,.section-opening>.about-inner{position:relative;z-index:1}
-/* Titles pull back to size as they scroll in. Left origin plus a clip on the
-   content column means the oversized start can never widen the document. */
-.cinematic-ready .section-opening>.container,.cinematic-ready .section-opening>.about-inner{overflow-x:clip}
-.cinematic-ready .stitle,.cinematic-ready .about-inner>h2{transform-origin:0 50%;will-change:transform}
-@media(prefers-reduced-motion:reduce){
- .cinematic-ready .stitle,.cinematic-ready .about-inner>h2{transform:none!important;will-change:auto!important}
- .cinematic-ready .section-opening>.container,.cinematic-ready .section-opening>.about-inner{overflow-x:visible}
-}
-/* Short edge accents: no screen-wide band or content reflection overlays. */
-.scroll-light{position:fixed;inset:0;pointer-events:none;z-index:20;overflow:clip;opacity:0;contain:strict;mix-blend-mode:screen}
-/* A field of thin white streaks on a steep diagonal, lengths and brightness
-   varied, soft glow on the brighter ones. Screen blending means they only ever
-   add light: they cannot darken or obscure the text they pass over. */
-.scroll-streak{position:absolute;left:var(--x);top:0;width:var(--w,1px);height:var(--len);border-radius:1px;
- background:linear-gradient(180deg,transparent,rgba(255,255,255,calc(var(--a) * .35)) 26%,rgba(255,255,255,var(--a)) 82%,transparent);
- transform:translate3d(0,-140%,0) rotate(var(--rot));transform-origin:50% 0}
-.scroll-streak[data-bright="1"]{filter:drop-shadow(0 0 3px rgba(255,255,255,.5))}
-@media(max-width:767px){.section-opening::before{opacity:.22}}
-@media(prefers-reduced-motion:reduce){.scroll-light{display:none!important}.object-cards{opacity:.85!important}.section-opening::before{opacity:.15}}
-
 .cinematic-hero .hero-btns .btn-outline{background:rgba(6,11,19,.88)}

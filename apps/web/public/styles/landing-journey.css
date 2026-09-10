@@ -1,0 +1,60 @@
+/* Motion tokens and depth treatments: public landing only. */
+:root{--motion-fast:380ms;--motion-medium:620ms;--motion-slow:1400ms;--depth-near:35px;--depth-mid:0px;--depth-far:-30px;--energy-blue:45,169,237;--scene-ink:#070d17}
+/* Shared atmosphere connects scenes without covering text with luminous layers. */
+body{background:var(--scene-ink)}
+.cinematic-hero.hero{background:var(--scene-ink)}
+.hero-atmosphere{background:radial-gradient(ellipse at 58% 67%,rgba(17,103,147,.14),transparent 55%),linear-gradient(180deg,#0c1622,var(--scene-ink) 90%)}
+.hero-atmosphere::after{background:linear-gradient(180deg,transparent 70%,var(--scene-ink))}
+.scene-orbit{border-radius:24px;border-color:rgba(118,193,223,.12);box-shadow:none}
+.data-trails{display:none}
+.hero-runway+.about{margin:0;padding-top:80px;padding-bottom:100px;background:linear-gradient(180deg,var(--scene-ink),#0b1420 65%,var(--scene-ink))}
+.hero-bridge{background:linear-gradient(180deg,var(--scene-ink),#0b1420);border-top:0}
+.cinematic-ready .hero-bridge{padding-top:64px}
+.journey-about{position:relative;isolation:isolate}
+.journey-about::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:calc(.2 + var(--aperture-light,0)*.4);background:radial-gradient(ellipse at 50% 30%,rgba(45,169,237,.12),transparent 68%)}
+.about-inner{position:relative;z-index:2;transform-origin:50% 30%}
+.about-photo{box-shadow:0 24px 60px rgba(0,0,0,.24)}
+.journey-aperture{position:fixed;inset:0;display:grid;place-items:center;overflow:clip;contain:strict;pointer-events:none;z-index:6;opacity:0;visibility:hidden}
+.aperture-frame{position:relative;width:min(72vw,980px);height:60vh;border:1px solid rgba(88,172,210,.34);border-radius:18px;box-shadow:0 0 26px rgba(45,169,237,.08),inset 0 0 24px rgba(45,169,237,.045);transform-origin:50% 50%;background:transparent}
+.aperture-frame::after{content:'';position:absolute;inset:10px;border:1px solid rgba(88,172,210,.08);border-radius:12px}
+.aperture-frame i{position:absolute;width:32px;height:32px;border-color:rgba(161,220,245,.65);border-style:solid;border-width:0}
+.aperture-frame i:nth-child(1){left:-1px;top:-1px;border-left-width:2px;border-top-width:2px;border-radius:18px 0 0}
+.aperture-frame i:nth-child(2){right:-1px;top:-1px;border-right-width:2px;border-top-width:2px;border-radius:0 18px 0 0}
+.aperture-frame i:nth-child(3){left:-1px;bottom:-1px;border-left-width:2px;border-bottom-width:2px;border-radius:0 0 0 18px}
+.aperture-frame i:nth-child(4){right:-1px;bottom:-1px;border-right-width:2px;border-bottom-width:2px;border-radius:0 0 18px}
+.journey-section{position:relative;isolation:isolate;overflow:clip}
+.journey-section:not(.pricing):not(.fcta){background:linear-gradient(180deg,#0b1420,var(--scene-ink) 60%,#0b1420)}
+.journey-section::before{content:'';position:absolute;left:10%;right:10%;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(132,187,211,.1),transparent);pointer-events:none}
+.journey-section>.container{position:relative;z-index:2;transform-origin:50% 25%}
+.motion-card{transition:border-color .2s,background-color .2s!important;backface-visibility:hidden}
+/* Retain demo bar filling, but retire its old one-shot card/dashboard transform. */
+.bd-cat{opacity:1;transform:none}
+.cinematic-ready .dash-ui{transform:none;transition:none}
+.cinematic-ready .dash-panel{position:relative}
+.cinematic-ready .dash-panel:last-child{border-color:rgba(45,169,237,.2)}
+/* Selected software frame opens without clipping readable content. */
+.cinematic-ready #how-it-works .dash-bar{border-bottom-color:rgba(45,169,237,.25)}
+.energy-scene{position:relative;isolation:isolate}
+.energy-field{position:absolute;inset:0;overflow:clip;pointer-events:none;z-index:1;perspective:1100px;contain:strict}
+.energy-scene>.container,.energy-scene>.about-inner,.energy-scene>.hero-grid{position:relative;z-index:2}
+.energy-trace{position:absolute;left:0;top:0;width:90px;height:1px;opacity:0;pointer-events:none;border-radius:0;background:linear-gradient(90deg,transparent,rgba(var(--energy-blue),.6) 32%,rgba(140,221,255,.85) 66%,transparent);transform-origin:center}
+.energy-back{width:54px;filter:blur(.4px)}
+.energy-mid{width:90px;box-shadow:0 0 4px rgba(var(--energy-blue),.14)}
+.energy-front{width:62px;height:1.5px;box-shadow:0 0 6px rgba(var(--energy-blue),.2)}
+/* Focus exposes content immediately regardless of camera position. */
+.journey-section:focus-within .motion-content,.journey-section:focus-within .motion-card,.journey-about:focus-within .about-inner,.journey-about:focus-within .about-inner *{opacity:1!important;transform:none!important;filter:none!important}
+@media(max-width:767px){
+ .hero-runway+.about{padding-top:56px;padding-bottom:72px}
+ .aperture-frame{width:86vw;height:50svh;border-radius:12px;box-shadow:none}
+ .aperture-frame::after{display:none}
+ .energy-trace{max-width:58px;filter:none;box-shadow:none}
+ .journey-section{perspective:none}
+}
+@media(prefers-reduced-motion:reduce){
+ html{scroll-behavior:auto}
+ .journey-aperture,.energy-field{display:none!important}
+ .hero-runway{height:auto!important}
+ .cinematic-hero{position:relative!important;top:0!important}
+ .motion-content,.motion-card,.about-inner,.about-inner *{transform:none!important;opacity:1!important;filter:none!important;will-change:auto!important}
+ .scene-object,.object-motion{transform:none!important;will-change:auto!important}
+}

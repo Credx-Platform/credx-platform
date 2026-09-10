@@ -504,7 +504,11 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
 .md-card,.pg-card,.pl-item{backdrop-filter:blur(12px);box-shadow:inset 0 1px rgba(153,231,255,.045),0 18px 48px rgba(0,0,0,.15)}
 </style>
 <link rel="stylesheet" href="/styles/landing-cinematic.css">
+<link rel="stylesheet" href="/styles/landing-journey.css">
+<script defer src="/scripts/landing-motion-core.js"></script>
 <script defer src="/scripts/landing-cinematic.js"></script>
+<script defer src="/scripts/landing-portal.js"></script>
+<script defer src="/scripts/landing-sections.js"></script>
 <script defer src="/scripts/landing-light.js"></script>
 </head>
 <body>
@@ -552,6 +556,20 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
  <div class="journey-cue" aria-hidden="true"><span>SCROLL TO EXPLORE</span><i></i><span class="journey-state">01 / PERSPECTIVE</span></div>
 </section>
 </div>
+<section class="about section-fade" id="about">
+ <div class="about-inner">
+  <img class="about-photo" src="/images/cesar-profile.jpg" alt="J. Malloy leadership profile for CredX">
+  <div>
+   <div class="about-tag">About CredX</div>
+   <h2>Meet J. Malloy, CEO and creator of CredX.</h2>
+   <p>J. Malloy built CredX to be more than a credit brand. The vision is a structured credit intelligence and financial readiness platform that helps people understand their profile, organize goals, track progress, and make better-prepared decisions.</p>
+   <p>Cesar serves as the AI-assisted CredX guide, helping users understand concepts, dashboard context, readiness steps, and practical next actions. Professional support can extend the platform when human review is needed.</p>
+   <p>The mission is simple, combine clean strategy, real communication, and disciplined execution so every client knows where they stand and what comes next.</p>
+   <div class="about-name">J. Malloy</div>
+   <div class="about-role">CEO, Creator of CredX</div>
+  </div>
+ </div>
+</section>
 <section class="hero-bridge" aria-label="Your readiness at a glance">
  <div class="container bridge-grid"><div class="bridge-context">   <div class="hero-stats">
     <div><div class="hs-num">6</div><div class="hs-label">Readiness factors</div></div>
@@ -656,20 +674,7 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
  </div>
 </section>
 
-<section class="about section-fade" id="about">
- <div class="about-inner">
-  <img class="about-photo" src="/images/cesar-profile.jpg" alt="J. Malloy leadership profile for CredX">
-  <div>
-   <div class="about-tag">About CredX</div>
-   <h2>Meet J. Malloy, CEO and creator of CredX.</h2>
-   <p>J. Malloy built CredX to be more than a credit brand. The vision is a structured credit intelligence and financial readiness platform that helps people understand their profile, organize goals, track progress, and make better-prepared decisions.</p>
-   <p>Cesar serves as the AI-assisted CredX guide, helping users understand concepts, dashboard context, readiness steps, and practical next actions. Professional support can extend the platform when human review is needed.</p>
-   <p>The mission is simple, combine clean strategy, real communication, and disciplined execution so every client knows where they stand and what comes next.</p>
-   <div class="about-name">J. Malloy</div>
-   <div class="about-role">CEO, Creator of CredX</div>
-  </div>
- </div>
-</section>
+
 <section class="how section-fade" id="how">
  <div class="container">
   <div class="stag">How it works</div>
@@ -963,30 +968,6 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').match
   requestAnimationFrame(()=>{ if(meter) meter.style.width = target + '%'; });
 })();
 
-/* Pointer parallax on the hero object. rAF-throttled, passive, desktop only. */
-(function heroParallax(){
-  const stage = document.getElementById('rcStage');
-  const card = document.getElementById('rcCard');
-  if(!stage || !card || reduceMotion) return;
-  if(window.matchMedia('(hover: none)').matches) return; // skip on touch
-
-  let raf = 0, tx = 0, ty = 0;
-  function apply(){
-    raf = 0;
-    card.style.transform = `rotateY(${tx * 11}deg) rotateX(${-ty * 9}deg)`;
-  }
-  stage.addEventListener('pointermove', (e) => {
-    const r = stage.getBoundingClientRect();
-    tx = (e.clientX - r.left) / r.width - 0.5;
-    ty = (e.clientY - r.top) / r.height - 0.5;
-    if(!raf) raf = requestAnimationFrame(apply);
-  }, { passive: true });
-  stage.addEventListener('pointerleave', () => {
-    tx = ty = 0;
-    if(!raf) raf = requestAnimationFrame(apply);
-  }, { passive: true });
-})();
-
 /* If a backdrop cut-out is missing or fails to decode, drop that layer entirely
    rather than leaving a broken-image box floating in the hero. */
 (function heroLayerGuard(){
@@ -994,35 +975,6 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').match
     const hide = () => { const l = img.closest('.hb-layer'); if(l) l.style.display = 'none'; };
     if(img.complete && img.naturalWidth === 0) hide();
     img.addEventListener('error', hide, { once: true });
-  });
-})();
-
-/* "Invisible" 3D on the module/feature boxes: flat until the pointer approaches,
-   then a small perspective tilt toward the cursor. Pointer-only, motion-gated. */
-(function cardTilt(){
-  if(reduceMotion) return;
-  if(window.matchMedia('(hover: none)').matches) return;
-
-  const cards = document.querySelectorAll('.md-card');
-  if(!cards.length) return;
-
-  cards.forEach(card => {
-    card.classList.add('tilt3d');
-    let raf = 0, rx = 0, ry = 0;
-    const apply = () => {
-      raf = 0;
-      card.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(6px)`;
-    };
-    card.addEventListener('pointermove', (e) => {
-      const r = card.getBoundingClientRect();
-      ry = ((e.clientX - r.left) / r.width - 0.5) * 9;
-      rx = -((e.clientY - r.top) / r.height - 0.5) * 7;
-      if(!raf) raf = requestAnimationFrame(apply);
-    }, { passive: true });
-    card.addEventListener('pointerleave', () => {
-      rx = ry = 0;
-      if(!raf) raf = requestAnimationFrame(apply);
-    }, { passive: true });
   });
 })();
 
