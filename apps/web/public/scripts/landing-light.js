@@ -4,10 +4,25 @@
  const preference=matchMedia('(prefers-reduced-motion: reduce)');
  const sheet=document.createElement('div');
  sheet.className='scroll-light';sheet.setAttribute('aria-hidden','true');
- // Three stars on their own lanes and offsets so they never read as one bar.
- const starSpecs=[[10,88,0,'#fff'],[46,64,-260,'rgba(255,255,255,.85)'],[22,52,-520,'rgba(255,255,255,.7)']];
- sheet.innerHTML=starSpecs.map(([x,len,off,color])=>
-  `<div class="scroll-light-beam" data-offset="${off}" style="--x:${x}px;--len:${len}px;--star:${color}"></div>`).join('');
+ // A field of thin white streaks on a steep diagonal, after the look on
+ // 8bit.ai: lengths, brightness and lanes all vary, a few bright ones carry a
+ // glow, the rest stay faint. Seeded so the layout is identical every load.
+ const seeded=(s=>()=>(s=(s*1103515245+12345)&0x7fffffff)/0x7fffffff)(20260910);
+ const wide=innerWidth>=768;
+ const count=wide?26:12;
+ const specs=[...Array(count)].map((_,i)=>{
+  const r=seeded(),r2=seeded(),r3=seeded();
+  return {
+   x:+(2+((i*37+r*23)%96)).toFixed(2),
+   len:Math.round(60+r2*(wide?360:190)),
+   a:+(.14+r3*.7).toFixed(2),
+   rot:+(196+r*10).toFixed(1),
+   w:r3>.86?2:1,
+   offset:Math.round(-r2*1400)
+  };
+ });
+ sheet.innerHTML=specs.map(s=>
+  `<div class="scroll-streak" data-bright="${s.a>.6?1:0}" data-offset="${s.offset}" data-rot="${s.rot}" style="--x:${s.x}vw;--len:${s.len}px;--a:${s.a};--rot:${s.rot}deg;--w:${s.w}px"></div>`).join('');
  document.body.append(sheet);
  const stars=[...sheet.children];
  let dispose=()=>{};
@@ -20,18 +35,21 @@
    cancelAnimationFrame(raf);raf=0;sheet.style.opacity='0';
    packets.forEach(el=>el.style.opacity='0');
   }
-  // Stars exist only while the wheel is turning: they travel at exactly scroll
+  // Streaks exist only while the wheel is turning: they travel at exactly scroll
   // speed and are gone ~90ms after it stops, so nothing rests over the copy.
-  const span=()=>innerHeight+220;
+  // The span clears the longest streak so none of them pop as they wrap.
+  const span=()=>innerHeight+620;
   function draw(now){
    raf=0;
    const fade=Math.max(0,1-(now-lastMove)/90);
-   sheet.style.opacity=String(fade*.5);
+   sheet.style.opacity=String(fade*.62);
    const s=span();
+   // Written as literal degrees, not var(--rot): an inline transform should be
+   // readable on its own, and DOMMatrix cannot parse a custom property.
    stars.forEach(el=>{
     const off=Number(el.dataset.offset)||0;
-    const y=((position+off+110)%s+s)%s-110;
-    el.style.transform=`translate3d(0,${y}px,0) rotate(-18deg)`;
+    const y=((position+off+500)%s+s)%s-500;
+    el.style.transform=`translate3d(0,${y}px,0) rotate(${el.dataset.rot}deg)`;
    });
    packets.forEach((el,i)=>{
     const phase=((lastY*.8+i*137)%(innerWidth+200))/(innerWidth+200);
@@ -42,10 +60,10 @@
   }
   function onScroll(){
    const delta=scrollY-lastY;lastY=scrollY;if(!delta)return;
-   // 1:1 with the wheel: the stars move exactly as far as the page does.
+   // 1:1 with the wheel: the streaks move exactly as far as the page does.
    position-=delta;
    const s=span();
-   position=((position+110)%s+s)%s-110;
+   position=((position+500)%s+s)%s-500;
    lastMove=performance.now();if(!raf)raf=requestAnimationFrame(draw);
   }
   addEventListener('scroll',onScroll,{passive:true,signal:abort.signal});

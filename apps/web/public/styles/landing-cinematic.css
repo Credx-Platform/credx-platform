@@ -143,13 +143,15 @@ section[id]{scroll-margin-top:78px}
  .cinematic-ready .section-opening>.container,.cinematic-ready .section-opening>.about-inner{overflow-x:visible}
 }
 /* Short edge accents: no screen-wide band or content reflection overlays. */
-.scroll-light{position:fixed;inset:0;pointer-events:none;z-index:20;overflow:clip;opacity:0;contain:strict}
-/* Shooting stars: a bright head with a tapering tail behind it. They exist only
-   while the page is moving and travel at exactly scroll speed. */
-.scroll-light-beam{position:absolute;left:var(--x,10px);width:var(--len,88px);height:2px;top:0;transform:translate3d(0,-200px,0) rotate(-18deg);transform-origin:100% 50%}
-.scroll-light-beam::before{content:'';position:absolute;inset:0;border-radius:2px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.14) 45%,var(--star,#fff));opacity:.85}
-.scroll-light-beam::after{content:'';position:absolute;right:-1px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:#fff;box-shadow:0 0 7px 1.5px rgba(255,255,255,.85),0 0 16px rgba(255,255,255,.45)}
-@media(max-width:767px){.scroll-light-beam{--len:52px}.section-opening::before{opacity:.22}}
+.scroll-light{position:fixed;inset:0;pointer-events:none;z-index:20;overflow:clip;opacity:0;contain:strict;mix-blend-mode:screen}
+/* A field of thin white streaks on a steep diagonal, lengths and brightness
+   varied, soft glow on the brighter ones. Screen blending means they only ever
+   add light: they cannot darken or obscure the text they pass over. */
+.scroll-streak{position:absolute;left:var(--x);top:0;width:var(--w,1px);height:var(--len);border-radius:1px;
+ background:linear-gradient(180deg,transparent,rgba(255,255,255,calc(var(--a) * .35)) 26%,rgba(255,255,255,var(--a)) 82%,transparent);
+ transform:translate3d(0,-140%,0) rotate(var(--rot));transform-origin:50% 0}
+.scroll-streak[data-bright="1"]{filter:drop-shadow(0 0 3px rgba(255,255,255,.5))}
+@media(max-width:767px){.section-opening::before{opacity:.22}}
 @media(prefers-reduced-motion:reduce){.scroll-light{display:none!important}.object-cards{opacity:.85!important}.section-opening::before{opacity:.15}}
 
 .cinematic-hero .hero-btns .btn-outline{background:rgba(6,11,19,.88)}

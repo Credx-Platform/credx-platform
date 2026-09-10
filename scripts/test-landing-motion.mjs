@@ -45,13 +45,19 @@ try{
   }));
   assert(await page.evaluate(()=>{const a=document.querySelector('.hero-art').getBoundingClientRect(),c=document.querySelector('.hero-copy').getBoundingClientRect();return a.top>=c.bottom-1}),'Artwork stays below copy at every width');
   assert.equal(await page.locator('.light-sheen').count(),0,'No reflection overlays over content');
-  assert(await page.locator('.scroll-light-beam').first().evaluate(e=>e.offsetWidth<=140&&e.offsetHeight<=2),'Light is a short thin accent');
-  assert.equal(await page.locator('.scroll-light-beam').count(),3,'Three shooting stars, not one bar');
-  // A shooting star is a bright head plus a tail that fades out behind it.
-  assert(await page.locator('.scroll-light-beam').first().evaluate(e=>{
-   const head=getComputedStyle(e,'::after'),tail=getComputedStyle(e,'::before');
-   return parseFloat(head.width)<=5&&head.borderTopLeftRadius==='50%'&&tail.backgroundImage.includes('gradient');
-  }),'Star has a small round head and a gradient tail');
+  // A field of thin diagonal streaks, not a bar and not a round-headed star.
+  assert(await page.locator('.scroll-streak').count()>=10,'Streak field, not a lone accent');
+  assert(await page.locator('.scroll-streak').evaluateAll(els=>els.every(e=>e.offsetWidth<=2&&e.offsetHeight<=460)),'Streaks stay hairline thin');
+  assert(await page.locator('.scroll-streak').evaluateAll(els=>{
+   const lens=new Set(els.map(e=>e.offsetHeight)),alphas=new Set(els.map(e=>getComputedStyle(e).getPropertyValue('--a').trim()));
+   return lens.size>=5&&alphas.size>=5;
+  }),'Lengths and brightness vary across the field');
+  assert(await page.locator('.scroll-streak').first().evaluate(e=>{
+   const s=getComputedStyle(e),deg=parseFloat(s.getPropertyValue('--rot'));
+   return s.backgroundImage.includes('gradient')&&deg>190&&deg<210;
+  }),'Streak is a gradient on a steep diagonal');
+  // Screen blending guarantees the field can only add light, never obscure text.
+  assert.equal(await page.locator('.scroll-light').evaluate(e=>getComputedStyle(e).mixBlendMode),'screen','Light only ever adds, never darkens content');
   const start=await metrics();assert(!start.overflow);assert(start.cta<(width<768?844:1000),'Primary CTAs visible at opening');
   await page.evaluate(y=>scrollTo({top:y,behavior:'instant'}),start.distance*.75);
   // The scene settles, it does not zoom. Objects open near final size and gain
@@ -69,11 +75,11 @@ try{
   assert.equal(await page.locator('.data-trails').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
   assert.equal(await page.locator('.scroll-light').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
   // Light must follow either scroll direction and stop after input stops.
-  const beamY=()=>page.locator('.scroll-light-beam').first().evaluate(e=>new DOMMatrix(getComputedStyle(e).transform).m42);
+  const beamY=()=>page.locator('.scroll-streak').first().evaluate(e=>new DOMMatrix(getComputedStyle(e).transform).m42);
   const lightFrame=await page.evaluate(()=>new Promise(resolve=>{
    // Observe the first style update in-page; a short accent may have faded
    // before another remote WebKit command or rendered frame can sample it.
-   const beam=document.querySelector('.scroll-light-beam');
+   const beam=document.querySelector('.scroll-streak');
    const observer=new MutationObserver(()=>{
     observer.disconnect();resolve({
      y:new DOMMatrix(beam.style.transform).m42,
@@ -87,9 +93,9 @@ try{
   assert(lightFrame.opacity>0,'Scroll activates light');
   await page.evaluate(()=>scrollBy({top:-20,behavior:'instant'}));
   await page.waitForFunction(y=>{
-   const next=new DOMMatrix(getComputedStyle(document.querySelector('.scroll-light-beam')).transform).m42;
+   const next=new DOMMatrix(getComputedStyle(document.querySelector('.scroll-streak')).transform).m42;
    const span=innerHeight+220,travel=((next-y)%span+span)%span;
-   // Stars move 1:1 with the wheel: 20px of scroll moves them exactly 20px.
+   // Streaks move 1:1 with the wheel: 20px of scroll moves them exactly 20px.
    return Math.abs(travel-20)<1;
   },down);
   await page.waitForFunction(()=>[...document.querySelectorAll('.data-trail i')].every(e=>Number(getComputedStyle(e).opacity)===0)&&getComputedStyle(document.querySelector('.scroll-light')).opacity==='0', {}, {timeout:2000});
@@ -103,18 +109,24 @@ try{
   }
   // Titles arrive oversized and pull back to their true size, driven by scroll.
   const titleScale=()=>page.evaluate(()=>new DOMMatrix(getComputedStyle(document.querySelector('.section-opening .stitle')).transform).m11);
-  // Park by waiting for the title to actually reach the target band: WebKit does
-  // not always honour instant scrolling, so a fixed delay races the scroll.
+  // Settle the title's section first. Until a section finishes opening it carries
+  // its own transform, which moves the title while we are trying to position it;
+  // once open those styles are dropped, so its document offset is then stable.
+  const frame=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
   const parkTitle=async f=>{
    await page.evaluate(frac=>{const t=document.querySelector('.section-opening .stitle');
     scrollTo({top:t.getBoundingClientRect().top+scrollY-innerHeight*frac,behavior:'instant'})},f);
-   await page.waitForFunction(frac=>Math.abs(document.querySelector('.section-opening .stitle').getBoundingClientRect().top-innerHeight*frac)<6,f,{timeout:5000});
-   await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+   await frame();
   };
-  await parkTitle(.86);
-  const arriving=await titleScale();
-  await parkTitle(.2);
+  await parkTitle(.2);await parkTitle(.2);
   const settled=await titleScale();
+  // Its section is open now, so this offset no longer shifts under us.
+  const docTop=await page.evaluate(()=>document.querySelector('.section-opening .stitle').getBoundingClientRect().top+scrollY);
+  const arriving=await page.evaluate(async top=>{
+   scrollTo({top:Math.max(0,top-innerHeight*.86),behavior:'instant'});
+   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+   return new DOMMatrix(getComputedStyle(document.querySelector('.section-opening .stitle')).transform).m11;
+  },docTop);
   assert(arriving>1.05,`Title arrives oversized (was ${arriving.toFixed(3)}x)`);
   assert(Math.abs(settled-1)<.03,`Title settles to true size (was ${settled.toFixed(3)}x)`);
   assert(!(await metrics()).overflow,'Title zoom never widens the document');
