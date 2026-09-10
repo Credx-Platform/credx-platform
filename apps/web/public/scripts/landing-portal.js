@@ -1,31 +1,32 @@
-/* A single abstract interface aperture between the hero and the real About section. */
+/* One interface aperture: approach the sample workspace, enter, then settle. */
 window.CredXMotion.register(({clamp,range,top})=>{
- const about=document.querySelector('#about'),content=about.querySelector('.about-inner'),art=document.querySelector('.hero-art');
- const children=[...content.querySelectorAll('h2,p,.about-name,.about-role')],photo=content.querySelector('.about-photo');
+ const host=document.querySelector('#platform-introduction'),content=host.querySelector('.bridge-grid');
+ const art=document.querySelector('.hero-art'),card=host.querySelector('.rc-card');
  const layer=document.createElement('div');layer.className='journey-aperture';layer.setAttribute('aria-hidden','true');
  layer.innerHTML='<div class="aperture-frame"><i></i><i></i><i></i><i></i></div>';
  document.body.append(layer);const frame=layer.firstElementChild;
- about.classList.add('journey-about');let start=0;
+ host.classList.add('journey-entry');let start=0;
  return {
-  measure(){start=top(about)},
+  measure(){start=top(host)},
   render(f){
-   const screenTop=start-f.y,focused=about.contains(document.activeElement);
-   const p=clamp((f.h*1.2-screenTop)/(f.h*.95));
+   if(!f.changed)return;
+   const focused=host.contains(document.activeElement);
+   const p=clamp((f.h*1.2-(start-f.y))/(f.h*.95));
    const formation=range(p,0,.25),pass=range(p,.25,.9),leave=range(p,.72,1);
+   const active=p>0&&p<1&&!focused;
    layer.style.opacity=String(focused?0:formation*(1-leave)*.65);
-   layer.style.visibility=p>0&&p<1&&!focused?'visible':'hidden';
-   // The fast final expansion occupies ~200–260 scroll pixels on common screens.
-   frame.style.transform=`perspective(1200px) translate3d(0,${(1-pass)*f.h*.08}px,${pass*140}px) scale(${.55+pass*2.4}) rotateX(${(1-pass)*(f.mobile?1:3)}deg)`;
-   frame.style.willChange=p>0&&p<1?'transform, opacity':'auto';
-   const reveal=focused?1:range(p,.15,.78),visual=focused?1:range(p,.24,.86);
-   content.style.opacity=String(.12+.88*reveal);
-   content.style.transform=`perspective(1400px) translate3d(0,${(1-reveal)*24}px,0) scale(${.92+.08*reveal})`;
-   content.style.filter=f.mobile?'none':`blur(${(1-reveal)*2}px)`;
-   children.forEach((el,i)=>{const v=focused?1:range(p,.23+Math.min(i,3)*.035,.74+Math.min(i,3)*.035);el.style.opacity=String(.35+.65*v);el.style.transform=`translate3d(0,${(1-v)*10}px,0)`});
-   photo.style.transform=`perspective(1000px) translate3d(${(1-visual)*(f.mobile?0:-16)}px,0,0) rotateY(${(1-visual)*4}deg)`;
-   art.style.opacity=String(1-.65*range(p,0,.5));
-   about.style.setProperty('--aperture-light',String(formation*(1-leave)));
+   layer.style.visibility=active?'visible':'hidden';
+   frame.style.transform=f.simple?`scale(${.85+pass*.45})`:`perspective(1200px) translate3d(0,${(1-pass)*f.h*.08}px,${pass*140}px) scale(${.55+pass*2.4}) rotateX(${(1-pass)*(f.mobile?1:3)}deg)`;
+   frame.style.willChange=active?'transform, opacity':'auto';
+   const reveal=focused?1:range(p,.12,.74),visual=focused?1:range(p,.2,.84);
+   // Heading stays legible while the sample interface advances through the frame.
+   content.style.opacity=String(.65+.35*reveal);
+   content.style.transform=`translate3d(0,${(1-reveal)*(f.simple?8:20)}px,0)`;
+   card.style.transform=f.simple?'none':`perspective(1200px) translate3d(${(1-visual)*(f.mobile?0:22)}px,0,${-70*(1-visual)}px) rotateY(${(1-visual)*(f.mobile?-2:-8)}deg) scale(${.94+.06*visual})`;
+   card.style.willChange=active&&!f.simple?'transform':'auto';
+   art.style.opacity=String(1-.55*range(p,0,.5));
+   host.style.setProperty('--aperture-light',String(formation*(1-leave)));
   },
-  destroy(){layer.remove();about.classList.remove('journey-about');about.style.removeProperty('--aperture-light');[content,photo,...children,art].forEach(el=>['transform','opacity','filter'].forEach(p=>el.style.removeProperty(p)))}
+  destroy(){layer.remove();host.classList.remove('journey-entry');host.style.removeProperty('--aperture-light');[content,card,art].forEach(el=>['transform','opacity','will-change'].forEach(p=>el.style.removeProperty(p)))}
  };
 });
