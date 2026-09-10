@@ -28,6 +28,7 @@ import { orgRouter } from './routes/org.js';
 import { fundingReadinessRouter } from './routes/fundingReadiness.js';
 import { businessCreditRouter } from './routes/businessCredit.js';
 import { notificationsRouter } from './routes/notifications.js';
+import { tasksRouter } from './routes/tasks.js';
 import { checkinRouter } from './routes/checkin.js';
 import { platformReportsRouter } from './routes/platformReports.js';
 import { aiRouter } from './routes/ai.js';
@@ -164,6 +165,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     app.use(`${prefix}/funding-readiness`, fundingReadinessRouter);
     app.use(`${prefix}/business-credit`, businessCreditRouter);
     app.use(`${prefix}/notifications`, notificationsRouter);
+    app.use(`${prefix}/tasks`, tasksRouter);
     app.use(`${prefix}/checkin`, checkinRouter);
     app.use(`${prefix}/reports`, platformReportsRouter);
     app.use(`${prefix}/ai`, aiRouter);

@@ -467,10 +467,17 @@ model Task {
   client      Client    @relation(fields: [clientId], references: [id])
   title       String
   description String?
+  category    String    @default("general")
+  priority    String    @default("medium")
   completed   Boolean   @default(false)
   dueAt       DateTime?
+  completedAt DateTime?
+  createdBy   String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([clientId])
+  @@index([completed])
 }
 
 model Note {
