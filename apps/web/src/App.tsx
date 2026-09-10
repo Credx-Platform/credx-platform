@@ -3305,284 +3305,140 @@ function LoginScreen({
   );
 }
 
-function TasksRoute() {
-  const [tasks, setTasks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('credx_admin_tasks') || '[]'); }
-    catch { return []; }
-  });
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // all, pending, today, overdue
+type AdminTask = {
+  id: string;
+  clientId: string;
+  title: string;
+  description?: string | null;
+  category: string;
+  priority: string;
+  completed: boolean;
+  completedAt?: string | null;
+  dueAt?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  clientName?: string;
+  clientEmail?: string;
+};
 
-  const TOKEN_KEY = '***';
+function TasksRoute() {
+  const [tasks, setTasks] = useState<AdminTask[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // all, pending, today, overdue, completed
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTask, setNewTask] = useState({ clientId: '', title: '', description: '', category: 'Dispute', priority: 'medium', dueAt: '' });
+  const [saving, setSaving] = useState(false);
+
+  const TOKEN_KEY = 'credx_admin_token';
   const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
 
-  // Auto-fetch clients and sync tasks
+  const loadTasks = async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) { setLoading(false); return; }
+    try {
+      const res = await fetch(`${API_BASE}/api/tasks`, { headers: { authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('fetch failed');
+      const data = await res.json();
+      setTasks(data.tasks || []);
+    } catch { /* keep existing list on transient errors */ }
+    setLoading(false);
+  };
+
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) { setLoading(false); return; }
 
     fetch(`${API_BASE}/api/clients`, { headers: { authorization: `Bearer ${token}` } })
       .then(r => r.json())
-      .then(data => {
-        const clientsList = data?.clients || [];
-        setClients(clientsList);
-        // Sync tasks to match current client states
-        syncTasksFromClients(clientsList);
-        setLoading(false);
-      })
-      .catch(() => {
-        // Demo mode if API fails
-        const demo = [
-          { id: 'c1', user: { firstName: 'James', lastName: 'Malloy', email: 'james@example.com' }, status: 'ANALYSIS_READY', serviceTier: 'ESSENTIAL', estimatedTimelineMonths: 4, disputes: [{id:'d1',status:'PENDING'}], documents: [{id:'doc1'}], currentAddressLine1: '123 Main St', currentCity: 'Newark', currentState: 'NJ' },
-          { id: 'c2', user: { firstName: 'Darnell', lastName: 'Robinson', email: 'darnell@example.com' }, status: 'ACTIVE', serviceTier: 'AGGRESSIVE', estimatedTimelineMonths: 6, disputes: [{id:'d2',status:'LETTER_SENT'},{id:'d3',status:'PENDING'}], documents: [{id:'doc2'},{id:'doc3'}], currentAddressLine1: '456 Oak Ave', currentCity: 'Jersey City', currentState: 'NJ' },
-          { id: 'c3', user: { firstName: 'Yvonne', lastName: 'Thompson', email: 'yvonne@example.com' }, status: 'UPGRADE_OFFERED', serviceTier: 'FAMILY', estimatedTimelineMonths: 3, disputes: [], documents: [{id:'doc4'}], currentAddressLine1: '789 Pine Rd', currentCity: 'Paterson', currentState: 'NJ' },
-          { id: 'c4', user: { firstName: 'Anthony', lastName: 'Reyes', email: 'anthony@example.com' }, status: 'INTAKE_RECEIVED', serviceTier: 'ESSENTIAL', estimatedTimelineMonths: null, disputes: [], documents: [], currentAddressLine1: '321 Elm St', currentCity: 'Trenton', currentState: 'NJ' },
-        ];
-        setClients(demo);
-        syncTasksFromClients(demo);
-        setLoading(false);
-      });
+      .then(data => setClients(data?.clients || []))
+      .catch(() => {});
+
+    loadTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const syncTasksFromClients = (clientList) => {
-    const existing = JSON.parse(localStorage.getItem('credx_admin_tasks') || '[]');
-    const now = new Date().toISOString();
-    const today = new Date().toISOString().split('T')[0];
-
-    // Map each client to ONE task based on their current status
-    const generated = clientList.map(client => {
-      const fullName = `${client.user?.firstName || ''} ${client.user?.lastName || ''}`.trim() || 'Client';
-      const existingTask = existing.find(t => t.clientId === client.id && !t.completed);
-
-      // Determine task based on status
-      let task = null;
-      switch (client.status) {
-        case 'LEAD':
-          task = {
-            id: `task_${client.id}_lead`,
-            clientId: client.id,
-            title: `📞 Contact ${fullName} — schedule onboarding call`,
-            priority: 'medium',
-            due: today,
-            category: 'Client Follow-up',
-            notes: `Lead: ${client.user?.email || ''}. Goal: get them to submit intake docs.`,
-            action: 'Send onboarding link',
-            nextStatus: 'INTAKE_RECEIVED'
-          };
-          break;
-
-        case 'INTAKE_RECEIVED':
-          const missingDocs = 3 - (client.documents?.length || 0);
-          task = {
-            id: `task_${client.id}_intake`,
-            clientId: client.id,
-            title: `📄 Collect documents from ${fullName} (${missingDocs > 0 ? missingDocs + ' missing' : 'complete'})`,
-            priority: missingDocs > 0 ? 'high' : 'medium',
-            due: today,
-            category: 'Admin',
-            notes: `Address: ${[client.currentAddressLine1, client.currentCity, client.currentState].filter(Boolean).join(', ') || 'Not on file'}. Need ID, proof of address, credit reports.`,
-            action: missingDocs > 0 ? 'Send reminder' : 'Run analysis',
-            nextStatus: 'ANALYSIS_READY'
-          };
-          break;
-
-        case 'ANALYSIS_READY':
-          task = {
-            id: `task_${client.id}_analysis`,
-            clientId: client.id,
-            title: `📊 Schedule analysis interview with ${fullName}`,
-            priority: 'high',
-            due: today,
-            category: 'Client Follow-up',
-            notes: `Analysis complete. Timeline: ${client.estimatedTimelineMonths || '?'} months. Dispute plan ready. Email analysis and schedule call.`,
-            action: 'Email analysis + schedule call',
-            nextStatus: 'UPGRADE_OFFERED'
-          };
-          break;
-
-        case 'UPGRADE_OFFERED':
-          task = {
-            id: `task_${client.id}_upgrade`,
-            clientId: client.id,
-            title: `💳 Follow up with ${fullName} — plan upgrade decision`,
-            priority: 'high',
-            due: today,
-            category: 'Billing',
-            notes: `${client.serviceTier} tier selected. Awaiting payment confirmation or upgrade to full service.`,
-            action: 'Send payment link / follow up',
-            nextStatus: 'ACTIVE'
-          };
-          break;
-
-        case 'ACTIVE':
-          const pendingDisputes = client.disputes?.filter(d => d.status === 'PENDING').length || 0;
-          const sentDisputes = client.disputes?.filter(d => d.status === 'LETTER_SENT').length || 0;
-          const responseDue = client.disputes?.filter(d => d.status === 'RESPONSE_DUE').length || 0;
-
-          if (pendingDisputes > 0) {
-            task = {
-              id: `task_${client.id}_disputes`,
-              clientId: client.id,
-              title: `📨 Send Round 1 disputes — ${fullName} (${pendingDisputes} items ready)`,
-              priority: 'high',
-              due: today,
-              category: 'Dispute',
-              notes: `${pendingDisputes} dispute items generated and ready to mail. Verify address, print, send certified mail.`,
-              action: 'Send certified mail',
-              nextStatus: null // stays ACTIVE, updates dispute status
-            };
-          } else if (responseDue > 0) {
-            task = {
-              id: `task_${client.id}_response`,
-              clientId: client.id,
-              title: `📋 Review bureau responses — ${fullName} (${responseDue} due)`,
-              priority: 'high',
-              due: today,
-              category: 'Dispute',
-              notes: 'Bureau responses received. Review outcomes, plan Round 2 if needed.',
-              action: 'Review responses',
-              nextStatus: null
-            };
-          } else if (sentDisputes > 0) {
-            task = {
-              id: `task_${client.id}_track`,
-              clientId: client.id,
-              title: `📍 Track delivery — ${fullName} (${sentDisputes} letters sent)`,
-              priority: 'medium',
-              due: today,
-              category: 'Dispute',
-              notes: 'Letters sent. Confirm delivery within 3-5 days. Update status when received.',
-              action: 'Check tracking',
-              nextStatus: null
-            };
-          } else {
-            task = {
-              id: `task_${client.id}_active`,
-              clientId: client.id,
-              title: `✅ Check in with ${fullName} — active client status`,
-              priority: 'low',
-              due: today,
-              category: 'Client Follow-up',
-              notes: 'Client is active. No pending disputes. Good time for monthly check-in.',
-              action: 'Monthly check-in',
-              nextStatus: null
-            };
-          }
-          break;
-
-        case 'PAST_DUE':
-          task = {
-            id: `task_${client.id}_pastdue`,
-            clientId: client.id,
-            title: `⚠️ Payment past due — ${fullName}`,
-            priority: 'high',
-            due: today,
-            category: 'Billing',
-            notes: 'Payment failed or overdue. Contact client to resolve billing issue.',
-            action: 'Call client about payment',
-            nextStatus: 'ACTIVE'
-          };
-          break;
-
-        case 'RESTRICTED':
-          task = {
-            id: `task_${client.id}_restricted`,
-            clientId: client.id,
-            title: `🔒 Portal restricted — ${fullName} (needs resolution)`,
-            priority: 'medium',
-            due: today,
-            category: 'Admin',
-            notes: 'Client portal is restricted. Determine reason and reactivate or close account.',
-            action: 'Review restriction',
-            nextStatus: 'ACTIVE'
-          };
-          break;
-
-        default:
-          task = {
-            id: `task_${client.id}_general`,
-            clientId: client.id,
-            title: `📋 Review ${fullName} — status: ${client.status}`,
-            priority: 'medium',
-            due: today,
-            category: 'Admin',
-            notes: `Client status: ${client.status}. Review and update as needed.`,
-            action: 'Review client',
-            nextStatus: null
-          };
-      }
-
-      return {
-        ...task,
-        completed: existingTask?.completed || false,
-        completedAt: existingTask?.completedAt || null,
-        createdAt: existingTask?.createdAt || now,
-      };
-    });
-
-    // Merge: keep existing completed tasks, replace current ones
-    const completedTasks = existing.filter(t => t.completed && !generated.find(g => g.id === t.id));
-    const merged = [...generated, ...completedTasks];
-    setTasks(merged);
-    localStorage.setItem('credx_admin_tasks', JSON.stringify(merged));
+  const toggleTask = async (taskId: string) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/toggle`, {
+        method: 'PATCH',
+        headers: { authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('toggle failed');
+      const { task } = await res.json();
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...task } : t));
+    } catch { /* list stays as-is on error */ }
   };
 
-  const completeTask = (taskId) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-
-    const updated = tasks.map(t => t.id === taskId ? { ...t, completed: true, completedAt: new Date().toISOString() } : t);
-    setTasks(updated);
-    localStorage.setItem('credx_admin_tasks', JSON.stringify(updated));
-
-    // In production, this would also update the client status via API
-    // For now, we show a confirmation
-    const client = clients.find(c => c.id === task.clientId);
-    if (client && task.nextStatus) {
-      alert(`✅ Task complete for ${client.user?.firstName || 'Client'}!\n\nNext step: ${task.nextStatus.replace('_', ' ')}\n\n(Connect API to auto-update client status)`);
-    }
+  const deleteTask = async (id: string) => {
+    if (!confirm('Delete this task?')) return;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/tasks/${id}`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('delete failed');
+      setTasks(prev => prev.filter(t => t.id !== id));
+    } catch { /* keep list on error */ }
   };
 
-  const deleteTask = (id) => {
-    if (!confirm('Remove this task from your list?')) return;
-    const updated = tasks.filter(t => t.id !== id);
-    setTasks(updated);
-    localStorage.setItem('credx_admin_tasks', JSON.stringify(updated));
+  const addTask = async (e: FormEvent) => {
+    e.preventDefault();
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token || !newTask.clientId || !newTask.title.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/tasks`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientId: newTask.clientId,
+          title: newTask.title.trim(),
+          description: newTask.description.trim() || undefined,
+          category: newTask.category,
+          priority: newTask.priority,
+          dueAt: newTask.dueAt ? new Date(newTask.dueAt).toISOString() : null
+        })
+      });
+      if (!res.ok) throw new Error('create failed');
+      const { task } = await res.json();
+      setTasks(prev => [task, ...prev]);
+      setNewTask({ clientId: '', title: '', description: '', category: 'Dispute', priority: 'medium', dueAt: '' });
+      setShowAdd(false);
+    } catch { /* surface silently */ }
+    setSaving(false);
   };
 
-  const clearCompleted = () => {
-    if (!confirm('Clear all completed tasks?')) return;
-    const updated = tasks.filter(t => !t.completed);
-    setTasks(updated);
-    localStorage.setItem('credx_admin_tasks', JSON.stringify(updated));
-  };
-
-  // Filter tasks
+  // Filter + sort
+  const todayStr = new Date().toISOString().split('T')[0];
   let filtered = tasks.filter(t => !t.completed);
   if (filter === 'all') filtered = tasks;
   else if (filter === 'completed') filtered = tasks.filter(t => t.completed);
-  else if (filter === 'today') filtered = tasks.filter(t => !t.completed && t.due === new Date().toISOString().split('T')[0]);
-  else if (filter === 'overdue') filtered = tasks.filter(t => !t.completed && t.due < new Date().toISOString().split('T')[0]);
+  else if (filter === 'today') filtered = tasks.filter(t => !t.completed && t.dueAt && t.dueAt.slice(0, 10) === todayStr);
+  else if (filter === 'overdue') filtered = tasks.filter(t => !t.completed && t.dueAt && t.dueAt.slice(0, 10) < todayStr);
 
-  // Sort by priority then due date
-  const priorityOrder = { high: 0, medium: 1, low: 2 };
-  filtered.sort((a, b) => (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1));
+  const priorityOrder: Record<string, number> = { critical: -1, high: 0, medium: 1, low: 2 };
+  filtered = [...filtered].sort((a, b) => (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1));
 
   const total = tasks.length;
   const pending = tasks.filter(t => !t.completed).length;
-  const completed = tasks.filter(t => t.completed).length;
-  const highPriority = tasks.filter(t => !t.completed && t.priority === 'high').length;
-  const todayStr = new Date().toISOString().split('T')[0];
+  const completedCount = tasks.filter(t => t.completed).length;
+  const highPriority = tasks.filter(t => !t.completed && (t.priority === 'high' || t.priority === 'critical')).length;
+  const dueToday = tasks.filter(t => !t.completed && t.dueAt && t.dueAt.slice(0, 10) === todayStr).length;
+  const overdueCount = tasks.filter(t => !t.completed && t.dueAt && t.dueAt.slice(0, 10) < todayStr).length;
 
-  const priorityDot = (p) => {
-    const colors = { high: '#dc2626', medium: '#d97706', low: '#16a34a' };
+  const priorityDot = (p: string) => {
+    const colors: Record<string, string> = { critical: '#7c3aed', high: '#dc2626', medium: '#d97706', low: '#16a34a' };
     return <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: colors[p] || '#9ca3af', marginRight: '6px' }} />;
   };
 
   if (loading) return (
     <div className="page-grid">
-      <div className="panel"><p className="helper-text">Loading tasks from your client book...</p></div>
+      <div className="panel"><p className="helper-text">Loading tasks...</p></div>
     </div>
   );
 
@@ -3592,11 +3448,11 @@ function TasksRoute() {
       <div className="task-metrics">
         <div className="stat-card" style={{ borderLeft: '3px solid #00c6fb' }}><span>Total</span><strong>{total}</strong></div>
         <div className="stat-card" style={{ borderLeft: '3px solid #d97706' }}><span>Pending</span><strong style={{ color: '#d97706' }}>{pending}</strong></div>
-        <div className="stat-card" style={{ borderLeft: '3px solid #16a34a' }}><span>Done</span><strong style={{ color: '#16a34a' }}>{completed}</strong></div>
+        <div className="stat-card" style={{ borderLeft: '3px solid #16a34a' }}><span>Done</span><strong style={{ color: '#16a34a' }}>{completedCount}</strong></div>
         <div className="stat-card" style={{ borderLeft: '3px solid #dc2626' }}><span>High Priority</span><strong style={{ color: '#dc2626' }}>{highPriority}</strong></div>
       </div>
 
-      {/* Filters */}
+      {/* Filters + Add */}
       <div className="filter-bar task-filter-bar">
         {[
           { key: 'pending', label: 'Pending' },
@@ -3606,13 +3462,63 @@ function TasksRoute() {
           { key: 'completed', label: 'Completed' },
         ].map(f => (
           <button key={f.key} className={`filter-chip ${filter === f.key ? 'filter-chip--active' : ''}`} onClick={() => setFilter(f.key)}>
-            {f.label} <span className="filter-chip__count">{f.key === 'pending' ? pending : f.key === 'today' ? tasks.filter(t => !t.completed && t.due === todayStr).length : f.key === 'overdue' ? tasks.filter(t => !t.completed && t.due < todayStr).length : f.key === 'completed' ? completed : total}</span>
+            {f.label} <span className="filter-chip__count">{f.key === 'pending' ? pending : f.key === 'today' ? dueToday : f.key === 'overdue' ? overdueCount : f.key === 'completed' ? completedCount : total}</span>
           </button>
         ))}
         <div className="task-filter-spacer">
-          <button className="btn btn-outline" onClick={clearCompleted}>Clear Completed</button>
+          <button className="btn btn-primary" onClick={() => setShowAdd(v => !v)}>+ Add Task</button>
         </div>
       </div>
+
+      {/* Add form */}
+      {showAdd && (
+        <section className="panel" style={{ marginBottom: '16px' }}>
+          <form onSubmit={addTask} style={{ display: 'grid', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <label style={{ display: 'grid', gap: '4px', fontSize: '12px' }}>
+                Client *
+                <select required value={newTask.clientId} onChange={e => setNewTask(v => ({ ...v, clientId: e.target.value }))} style={{ padding: '8px', borderRadius: '6px', border: '1px solid #374151', background: '#111827', color: '#f9fafb' }}>
+                  <option value="">Select client...</option>
+                  {clients.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.user ? `${c.user.firstName || ''} ${c.user.lastName || ''}`.trim() || c.user.email : c.id}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: 'grid', gap: '4px', fontSize: '12px' }}>
+                Category
+                <select value={newTask.category} onChange={e => setNewTask(v => ({ ...v, category: e.target.value }))} style={{ padding: '8px', borderRadius: '6px', border: '1px solid #374151', background: '#111827', color: '#f9fafb' }}>
+                  {['Dispute', 'Onboarding', 'Billing', 'Client Follow-up', 'Admin', 'general'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+              <label style={{ display: 'grid', gap: '4px', fontSize: '12px' }}>
+                Priority
+                <select value={newTask.priority} onChange={e => setNewTask(v => ({ ...v, priority: e.target.value }))} style={{ padding: '8px', borderRadius: '6px', border: '1px solid #374151', background: '#111827', color: '#f9fafb' }}>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </label>
+            </div>
+            <label style={{ display: 'grid', gap: '4px', fontSize: '12px' }}>
+              Title *
+              <input required value={newTask.title} onChange={e => setNewTask(v => ({ ...v, title: e.target.value }))} placeholder="e.g. Send Round 1 dispute letters" style={{ padding: '8px', borderRadius: '6px', border: '1px solid #374151', background: '#111827', color: '#f9fafb' }} />
+            </label>
+            <label style={{ display: 'grid', gap: '4px', fontSize: '12px' }}>
+              Description
+              <textarea value={newTask.description} onChange={e => setNewTask(v => ({ ...v, description: e.target.value }))} rows={2} style={{ padding: '8px', borderRadius: '6px', border: '1px solid #374151', background: '#111827', color: '#f9fafb' }} />
+            </label>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <label style={{ display: 'flex', gap: '8px', fontSize: '12px', alignItems: 'center' }}>
+                Due date
+                <input type="date" value={newTask.dueAt} onChange={e => setNewTask(v => ({ ...v, dueAt: e.target.value }))} style={{ padding: '8px', borderRadius: '6px', border: '1px solid #374151', background: '#111827', color: '#f9fafb' }} />
+              </label>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving...' : 'Assign Task'}</button>
+              <button type="button" className="btn btn-outline" onClick={() => setShowAdd(false)}>Cancel</button>
+            </div>
+          </form>
+        </section>
+      )}
 
       {/* Task List */}
       <section className="panel">
@@ -3620,34 +3526,32 @@ function TasksRoute() {
           <div className="empty-state-card" style={{ textAlign: 'center', padding: '40px' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>✅</div>
             <strong>No tasks here</strong>
-            <p className="helper-text">All caught up! Tasks will appear when clients need action.</p>
+            <p className="helper-text">All caught up! Assign a task with the button above.</p>
           </div>
         ) : (
           <div className="task-list">
             {filtered.map(task => {
-              const isOverdue = task.due && !task.completed && task.due < todayStr;
-              const client = clients.find(c => c.id === task.clientId);
+              const isOverdue = task.dueAt && !task.completed && task.dueAt.slice(0, 10) < todayStr;
               return (
                 <div key={task.id} className={`task-row ${isOverdue ? 'task-row--overdue' : ''}`}>
                   <div className="task-row__dot">{priorityDot(task.priority)}</div>
                   <div className="task-row__body">
                     <div className="task-row__titleline">
-                      <span className="task-row__title">{task.title}</span>
-                      <span className={`task-row__tag task-row__tag--${String(task.category || 'admin').toLowerCase().replace(/\s+/g, '-')}`}>
+                      <span className="task-row__title" style={task.completed ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}>{task.title}</span>
+                      <span className={`task-row__tag task-row__tag--${String(task.category || 'general').toLowerCase().replace(/\s+/g, '-')}`}>
                         {task.category}
                       </span>
                       {isOverdue && <span className="task-row__overdue">OVERDUE</span>}
                     </div>
                     <div className="task-row__meta">
-                      {task.due ? new Date(task.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'} · {client?.user ? `${client.user.firstName} ${client.user.lastName}` : 'Client'} · <strong>{task.action}</strong>
+                      {task.dueAt ? new Date(task.dueAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'} · {task.clientName || 'Client'}
+                      {task.description ? ` · ${task.description.slice(0, 80)}${task.description.length > 80 ? '…' : ''}` : ''}
                     </div>
                   </div>
                   <div className="task-row__actions">
-                    {!task.completed && (
-                      <button className="task-row__button" onClick={() => completeTask(task.id)}>
-                        Complete
-                      </button>
-                    )}
+                    <button className="task-row__button" onClick={() => toggleTask(task.id)}>
+                      {task.completed ? 'Reopen' : 'Complete'}
+                    </button>
                     <button className="task-row__delete" onClick={() => deleteTask(task.id)} aria-label="Delete task">
                       Delete
                     </button>

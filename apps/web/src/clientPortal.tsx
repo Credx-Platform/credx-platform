@@ -3708,6 +3708,33 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
     localStorage.setItem('credx_submitted_tasks', JSON.stringify([...set]));
   };
 
+  // Server-assigned tasks from the CredX team (via /api/tasks)
+  const [assignedTasks, setAssignedTasks] = useState<Array<{ id: string; title: string; description?: string | null; completed: boolean; completedAt?: string | null; dueAt?: string | null; priority: string; category: string }>>([]);
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<{ tasks: Array<{ id: string; title: string; description?: string | null; completed: boolean; completedAt?: string | null; dueAt?: string | null; priority: string; category: string }> }>('/api/tasks', token)
+      .then(data => setAssignedTasks(data.tasks || []))
+      .catch(() => {});
+  }, [token]);
+
+  const toggleAssignedTask = async (taskId: string) => {
+    setCompleting(taskId);
+    try {
+      const { task } = await apiFetch<{ task: { id: string; completed: boolean; completedAt?: string | null } }>(`/api/tasks/${taskId}/toggle`, token, { method: 'PATCH' });
+      setAssignedTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...task } : t));
+      if (task.completed) {
+        setMessage('✅ Task completed. Nice work!');
+        setTimeout(() => setMessage(null), 5000);
+      }
+    } catch (err) {
+      setMessage(`Could not update task: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setTimeout(() => setMessage(null), 5000);
+    } finally {
+      setCompleting(null);
+    }
+  };
+
   // Generate workflow tasks based on client status
   const workflowTasks = useMemo(() => {
     if (!client || !user) return [];
@@ -3798,6 +3825,9 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
     return tasks;
   }, [client, user, progress, submittedTasks]);
 
+  const pendingAssigned = assignedTasks.filter(t => !t.completed);
+  const completedAssigned = assignedTasks.filter(t => t.completed);
+
   const pendingTasks = workflowTasks.filter(t => !t.submitted && !t.auto);
   const submittedForReview = workflowTasks.filter(t => t.submitted);
   const completedTasks = workflowTasks.filter(t => t.auto && (t.id === 'contract' ? progress?.onboarding?.signature?.signedAt : t.id === 'intake' ? !['LEAD', 'STUDENT', 'CONTRACT_SENT', 'INTAKE_RECEIVED'].includes(client.status) : t.id === 'report' ? (progress?.uploadedDocs || []).filter(d => (d.type || '').toLowerCase().includes('credit')).length > 0 : t.id === 'analysis_wait' ? !!(client?.analysisSummary || progress?.analysis) : false));
@@ -3850,9 +3880,9 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
           <p>Complete each step below to move your credit journey forward. We will email you when new tasks are ready.</p>
         </div>
         <div className="hero-stats">
-          <div className="stat-card"><span>Pending</span><strong style={{ color: '#d97706' }}>{pendingTasks.length}</strong></div>
+          <div className="stat-card"><span>Pending</span><strong style={{ color: '#d97706' }}>{pendingTasks.length + pendingAssigned.length}</strong></div>
           <div className="stat-card"><span>In Review</span><strong style={{ color: '#00c6fb' }}>{submittedForReview.length}</strong></div>
-          <div className="stat-card"><span>Completed</span><strong style={{ color: '#16a34a' }}>{completedTasks.length}</strong></div>
+          <div className="stat-card"><span>Completed</span><strong style={{ color: '#16a34a' }}>{completedTasks.length + completedAssigned.length}</strong></div>
           <div className="stat-card"><span>Stage</span><strong>{client?.status?.replace(/_/g, ' ') || 'Unknown'}</strong></div>
         </div>
       </section>
@@ -3866,6 +3896,39 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
         </div>
       ) : null}
 
+      {/* Tasks assigned by your CredX team */}
+      {pendingAssigned.length > 0 && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">From Your CredX Team</p>
+              <h2>Tasks your specialist assigned to you</h2>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {pendingAssigned.map(task => (
+              <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontWeight: 600, fontSize: '13px', color: '#f8fafc' }}>{task.title}</span>
+                  {task.description ? <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{task.description}</div> : null}
+                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '4px', textTransform: 'capitalize' }}>
+                    {task.category}{task.dueAt ? ` · due ${new Date(task.dueAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleAssignedTask(task.id)}
+                  disabled={completing === task.id}
+                  className="portal-task-row__button"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {completing === task.id ? 'Saving...' : 'Mark Done'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Pending Tasks */}
       <section className="panel">
         <div className="panel-header">
@@ -3875,7 +3938,7 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
           </div>
         </div>
 
-        {pendingTasks.length === 0 && submittedForReview.length === 0 ? (
+        {pendingTasks.length === 0 && submittedForReview.length === 0 && pendingAssigned.length === 0 ? (
           <div className="empty-state-card" style={{ textAlign: 'center', padding: '40px' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>🎉</div>
             <strong>All caught up!</strong>
@@ -3944,6 +4007,15 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
               <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', opacity: 0.6 }}>
                 <span style={{ fontSize: '18px' }}>✅</span>
                 <span style={{ fontWeight: 600, fontSize: '13px', color: '#64748b', textDecoration: 'line-through' }}>{task.title}</span>
+              </div>
+            ))}
+            {completedAssigned.map(task => (
+              <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', opacity: 0.6 }}>
+                <span style={{ fontSize: '18px' }}>✅</span>
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: '13px', color: '#64748b', textDecoration: 'line-through' }}>{task.title}</span>
+                  <div style={{ fontSize: '10px', color: '#475569' }}>From your CredX team{task.completedAt ? ` · ${new Date(task.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</div>
+                </div>
               </div>
             ))}
           </div>
