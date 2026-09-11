@@ -94,7 +94,7 @@
      const p=clamp((y-heroTop)/heroDistance),e=ease(p),amplitude=simple?.45:1;
      objects.forEach((el,i)=>{
       const side=[1,1,-1,-1,-1][i],depth=[-150,-70,-220,-110,-170][i];
-      el.style.transform=`translate3d(${side*e*18*amplitude}px,${e*(i===4?90:-12)*amplitude}px,${(depth+(180+i*10)*e)*amplitude}px) rotateY(${side*(1-e)*5*amplitude}deg) scale(${.84+.12*e})`;
+      el.style.transform=`translate3d(${side*e*18*amplitude}px,${e*(i===4?90:-12)*amplitude}px,${(depth+(180+i*10)*e)*amplitude}px) rotateY(${side*(1-e)*5*amplitude}deg) scale(${1+e})`;
      });
      hero.style.setProperty('--journey-fill',String(.05+.95*p));
      const label=p<.5?'01 / YOUR PERSPECTIVE':'02 / INSIDE CREDX';

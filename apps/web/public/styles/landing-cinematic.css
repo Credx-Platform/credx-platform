@@ -18,31 +18,31 @@ body{overflow-x:clip}
 .cinematic-hero .hero-btns{gap:10px}
 .cinematic-hero .btn{padding-inline:22px}
 .hero-art{position:relative;height:clamp(470px,42vw,660px);perspective:1300px;perspective-origin:50% 48%;transform-style:preserve-3d;pointer-events:none;z-index:2}
-.scene-object{position:absolute;transform-style:preserve-3d;backface-visibility:hidden}
+.scene-object{position:absolute;transform-style:preserve-3d;backface-visibility:hidden;transform-origin:center center}
 .object-motion{transform-style:preserve-3d;backface-visibility:hidden}
-.scene-object img{display:block;width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 8px 14px rgba(0,160,255,.10));user-select:none}
-.object-house{width:72%;left:16%;top:20%;z-index:3;transform:translate3d(0,0,-180px) rotateY(-8deg) scale(.77)}
-.object-car{width:56%;right:-1%;bottom:2%;z-index:5;transform:translate3d(0,0,-90px) rotateY(9deg) scale(.79)}
-.object-cash{width:41%;left:-2%;top:0;z-index:1;transform:translate3d(0,0,-300px) rotateY(10deg) scale(.68)}
-.object-merch{width:36%;right:-1%;top:0;z-index:2;transform:translate3d(0,0,-220px) rotateY(-12deg) scale(.72)}
-.scene-orbit{position:absolute;pointer-events:none;border:1px solid rgba(87,197,248,.22);border-radius:50%;width:80%;height:66%;left:10%;top:20%;box-shadow:0 0 16px rgba(0,198,251,.14),inset 0 0 16px rgba(0,198,251,.08);transform:rotateX(68deg) rotateZ(-24deg) translateZ(-140px)}
-.orbit-front{width:100%;height:90%;left:0;top:10%;border-color:rgba(126,136,240,.16);box-shadow:0 0 14px rgba(110,119,230,.12);transform:rotateX(62deg) rotateZ(24deg) translateZ(80px)}
-.hero-atmosphere{position:absolute;inset:0;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 77% 40%,rgba(9,95,132,.18),transparent 49%),radial-gradient(ellipse at 96% 70%,rgba(81,53,159,.08),transparent 40%),linear-gradient(125deg,#101c29,#060b13 50%);z-index:0}
+.scene-object img{display:block;width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 8px 14px rgba(16,160,224,.10));user-select:none}
+.object-house{width:72%;left:16%;top:20%;z-index:3;transform:translate3d(0,0,-180px) rotateY(-8deg) scale(1)}
+.object-car{width:56%;right:-1%;bottom:2%;z-index:5;transform:translate3d(0,0,-90px) rotateY(9deg) scale(1)}
+.object-cash{width:41%;left:-2%;top:0;z-index:1;transform:translate3d(0,0,-300px) rotateY(10deg) scale(1)}
+.object-merch{width:36%;right:-1%;top:0;z-index:2;transform:translate3d(0,0,-220px) rotateY(-12deg) scale(1)}
+.scene-orbit{position:absolute;pointer-events:none;border:1px solid rgba(72,176,240,.22);border-radius:50%;width:80%;height:66%;left:10%;top:20%;box-shadow:0 0 16px rgba(16,160,224,.14),inset 0 0 16px rgba(16,160,224,.08);transform:rotateX(68deg) rotateZ(-24deg) translateZ(-140px)}
+.orbit-front{width:100%;height:90%;left:0;top:10%;border-color:rgba(72,176,240,.16);box-shadow:0 0 14px rgba(16,160,224,.12);transform:rotateX(62deg) rotateZ(24deg) translateZ(80px)}
+.hero-atmosphere{position:absolute;inset:0;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 77% 40%,rgba(8,152,216,.18),transparent 49%),radial-gradient(ellipse at 96% 70%,rgba(8,152,216,.08),transparent 40%),linear-gradient(125deg,#101c29,#060b13 50%);z-index:0}
 .hero-atmosphere::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 65%,#060b13),radial-gradient(ellipse,transparent 40%,rgba(3,7,14,.65))}
-.scene-grid{position:absolute;inset:42% -20% -45%;background-image:linear-gradient(rgba(72,196,240,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(72,196,240,.1) 1px,transparent 1px);background-size:72px 72px;transform:perspective(600px) rotateX(62deg);mask-image:linear-gradient(transparent,#000 30%,transparent 88%)}
-.scene-bloom{position:absolute;width:55%;height:70%;right:0;top:0;background:radial-gradient(ellipse,rgba(0,158,230,.12),transparent 68%);transform:translate3d(0,0,0)}
+.scene-grid{position:absolute;inset:42% -20% -45%;background-image:linear-gradient(rgba(72,176,240,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(72,176,240,.1) 1px,transparent 1px);background-size:72px 72px;transform:perspective(600px) rotateX(62deg);mask-image:linear-gradient(transparent,#000 30%,transparent 88%)}
+.scene-bloom{position:absolute;width:55%;height:70%;right:0;top:0;background:radial-gradient(ellipse,rgba(16,160,224,.12),transparent 68%);transform:translate3d(0,0,0)}
 .data-trails{position:absolute;inset:0;pointer-events:none;overflow:clip;z-index:1;perspective:900px;opacity:.7}
 .data-trail{position:absolute;left:var(--left);top:var(--top);width:var(--length);height:1px;opacity:var(--alpha);transform:rotate(var(--angle));pointer-events:none}
-.data-trail i{display:block;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(43,150,235,.34) 12%,var(--trail-color,#6ee2ff) 76%,transparent);transform:translate3d(-45vw,0,0);opacity:0}
+.data-trail i{display:block;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(16,160,224,.34) 12%,var(--trail-color,var(--credx-blue-light)) 76%,transparent);transform:translate3d(-45vw,0,0);opacity:0}
 .scene-active .data-trail i{animation:dataTransit var(--duration) linear var(--delay) infinite;will-change:transform,opacity}
-.data-trail[data-plane="back"]{filter:blur(.65px) drop-shadow(0 0 5px rgba(96,206,255,.35))}
-.data-trail[data-plane="mid"]{height:1.5px;filter:drop-shadow(0 0 5px rgba(111,215,255,.5))}
-.data-trail[data-plane="front"]{height:2.5px;filter:drop-shadow(0 0 6px rgba(140,229,255,.75)) drop-shadow(0 0 18px rgba(0,198,251,.4))}
+.data-trail[data-plane="back"]{filter:blur(.65px) drop-shadow(0 0 5px rgba(72,176,240,.35))}
+.data-trail[data-plane="mid"]{height:1.5px;filter:drop-shadow(0 0 5px rgba(72,176,240,.5))}
+.data-trail[data-plane="front"]{height:2.5px;filter:drop-shadow(0 0 6px rgba(72,176,240,.75)) drop-shadow(0 0 18px rgba(16,160,224,.4))}
 @keyframes dataTransit{0%,18%{opacity:0;transform:translate3d(-40vw,0,0)}25%{opacity:.7}43%{opacity:.7}52%,100%{opacity:0;transform:translate3d(58vw,0,0)}}
 .scene-active .scene-object,.scene-active .object-motion{will-change:transform}
 .journey-cue{position:absolute;left:clamp(24px,4vw,80px);right:clamp(24px,4vw,80px);bottom:28px;display:flex;align-items:center;gap:20px;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1.7px;color:#88a0b8;z-index:4}
-.journey-cue i{height:2px;flex:1;border-radius:2px;background:linear-gradient(90deg,rgba(0,198,251,.95),rgba(0,198,251,.12));box-shadow:0 0 10px rgba(0,198,251,.5);transform-origin:left;transform:scaleX(var(--journey-fill,.05))}
-.hero-bridge{position:relative;z-index:3;background:linear-gradient(180deg,#060b13,#0b1220);padding:64px clamp(16px,4vw,48px) 90px;margin-top:-1px;border-top:1px solid rgba(57,174,223,.12)}
+.journey-cue i{height:2px;flex:1;border-radius:2px;background:linear-gradient(90deg,rgba(16,160,224,.95),rgba(16,160,224,.12));box-shadow:0 0 10px rgba(16,160,224,.5);transform-origin:left;transform:scaleX(var(--journey-fill,.05))}
+.hero-bridge{position:relative;z-index:3;background:linear-gradient(180deg,#060b13,#0b1220);padding:64px clamp(16px,4vw,48px) 90px;margin-top:-1px;border-top:1px solid rgba(16,160,224,.12)}
 .cinematic-ready .hero-bridge{margin-top:-22svh}
 .bridge-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
 .bridge-context .hero-stats{margin-top:0;padding-top:0;border:0}
@@ -83,7 +83,7 @@ section[id]{scroll-margin-top:78px}
  .object-cash{width:39%;left:-1%;top:0}
  .object-merch{width:33%;right:2%;top:0}
  .scene-object img{filter:none}
- .scene-orbit{border-color:rgba(87,197,248,.10)}.orbit-front{display:none}
+ .scene-orbit{border-color:rgba(72,176,240,.10)}.orbit-front{display:none}
  .data-trail:nth-child(n+5){display:none}.data-trail[data-plane="back"]{filter:none}
  .journey-cue{left:20px;right:20px;bottom:17px;font-size:7px;letter-spacing:1px;gap:12px}
  .hero-bridge{padding:44px 20px 62px}.bridge-grid{grid-template-columns:1fr;gap:28px}
@@ -122,10 +122,10 @@ section[id]{scroll-margin-top:78px}
     and shares the house's top alignment so the two frame the copy symmetrically. */
  .object-cash{width:24%;left:2%;top:0;z-index:1}
  .object-car{width:30%;right:-1%;bottom:-1%;z-index:4}
- .object-cards{width:28%;left:2%;top:31%;z-index:2;opacity:.34;transform:translate3d(0,0,-300px) scale(.68)}
+ .object-cards{width:28%;left:2%;top:31%;z-index:2;opacity:.34;transform:translate3d(0,0,-300px) scale(1)}
  .cinematic-hero.hero{padding-bottom:100px}
 }
-.object-cards img{filter:drop-shadow(0 0 16px rgba(0,198,251,.16));mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
+.object-cards img{filter:drop-shadow(0 0 16px rgba(16,160,224,.16));mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
 @media(min-width:768px) and (max-width:1100px){
  .cinematic-hero .hero-copy{width:49%}.cinematic-hero .hero-grid{min-height:660px}
  .object-merch{left:50%;width:30%;top:34%}.object-cards{top:51%;width:36%}
@@ -136,14 +136,14 @@ section[id]{scroll-margin-top:78px}
  .object-house{width:47%;left:57%;top:0;z-index:2}
  .object-cash{width:39%;left:-2%;top:-2%;z-index:1}
  .object-car{width:48%;right:-1%;bottom:0;z-index:4}
- .object-cards{width:43%;left:0;top:49%;z-index:2;opacity:.75;transform:translate3d(0,0,-150px) scale(.68)}
+ .object-cards{width:43%;left:0;top:49%;z-index:2;opacity:.75;transform:translate3d(0,0,-150px) scale(1)}
  .object-cards img{filter:none}
 }
 /* Distinct quiet graphic accents frame every section without covering content. */
 .section-opening{position:relative}
-.section-opening::before{content:'';position:absolute;inset:14px 0 auto;height:150px;pointer-events:none;z-index:0;opacity:.32;background:radial-gradient(ellipse at 85% 0,rgba(0,198,251,.22),transparent 60%),linear-gradient(112deg,transparent 60%,rgba(88,216,255,.28) 60.1%,transparent 60.3%)}
-.section-opening[data-graphic="1"]::before{background:repeating-radial-gradient(ellipse at 0 0,transparent 0 58px,rgba(71,164,223,.2) 59px 60px,transparent 61px 115px);mask-image:linear-gradient(90deg,#000,transparent 60%)}
-.section-opening[data-graphic="2"]::before{background:linear-gradient(90deg,transparent,rgba(0,198,251,.3),transparent) center 20px/75% 1px no-repeat,radial-gradient(ellipse at 50% 0,rgba(71,104,225,.2),transparent 65%)}
+.section-opening::before{content:'';position:absolute;inset:14px 0 auto;height:150px;pointer-events:none;z-index:0;opacity:.32;background:radial-gradient(ellipse at 85% 0,rgba(16,160,224,.22),transparent 60%),linear-gradient(112deg,transparent 60%,rgba(72,176,240,.28) 60.1%,transparent 60.3%)}
+.section-opening[data-graphic="1"]::before{background:repeating-radial-gradient(ellipse at 0 0,transparent 0 58px,rgba(16,160,224,.2) 59px 60px,transparent 61px 115px);mask-image:linear-gradient(90deg,#000,transparent 60%)}
+.section-opening[data-graphic="2"]::before{background:linear-gradient(90deg,transparent,rgba(16,160,224,.3),transparent) center 20px/75% 1px no-repeat,radial-gradient(ellipse at 50% 0,rgba(16,160,224,.2),transparent 65%)}
 .section-opening>.container,.section-opening>.about-inner{position:relative;z-index:1}
 .cinematic-hero .hero-btns .btn-outline{background:rgba(6,11,19,.88)}
 
@@ -154,21 +154,26 @@ section[id]{scroll-margin-top:78px}
 /* Site-wide line pattern: fixed behind every section, half the previous count. */
 /* Above every section background (max z-index 3) but under the nav (100), so the
    pattern reads across the whole page instead of being painted over section by section. */
-.data-trails{position:fixed;inset:0;z-index:6;pointer-events:none;perspective:none;overflow:hidden;opacity:.45;transform:none}
-.energy-rail{position:absolute;left:-5%;right:-5%;height:1px;top:29%;background:rgba(0,198,251,.1);transform:rotate(-12deg);overflow:hidden}
-.energy-rail:nth-child(2){top:72%;transform:rotate(12deg)}
-.energy-rail i{display:block;width:300px;height:1px;background:linear-gradient(90deg,transparent,rgba(0,198,251,.65),#80e4fa,rgba(0,198,251,.65),transparent);box-shadow:0 0 6px rgba(0,198,251,.35)}
+.data-trails{position:fixed;inset:0;z-index:6;pointer-events:none;perspective:none;overflow:hidden;opacity:.2;transform:none}
+/* 5x the old 1px weight. Two rails only (see report): rail 1 carries the full
+   width, rail 2 about half, so the field has depth instead of uniform stripes. */
+.energy-rail{position:absolute;left:-5%;right:-5%;height:5px;top:29%;background:rgba(16,160,224,.045);transform:rotate(-12deg);overflow:hidden}
+.energy-rail:nth-child(2){top:72%;height:2.5px;transform:rotate(12deg)}
+/* Per-line opacity drops to ~45% of the old value because the band is 5x wider;
+   the extra blur + wider glow keep it reading as light rather than a white bar. */
+.energy-rail i{display:block;width:300px;height:100%;background:linear-gradient(90deg,transparent,rgba(16,160,224,.3),var(--credx-cyan),rgba(16,160,224,.3),transparent);
+ box-shadow:0 0 14px rgba(16,160,224,.16),0 0 32px rgba(16,160,224,.08);filter:blur(1.6px)}
 /* No constant background loops, full-screen filters or reflective repainting. */
 .scene-active .data-trail i{animation:none}
-.scene-active .scene-object,.scene-active .object-motion{will-change:auto}
-.scene-orbit{box-shadow:none;border-color:rgba(0,198,251,.12)}
+.scene-active .scene-object,.scene-active .object-motion{will-change:transform}
+.scene-orbit{box-shadow:none;border-color:rgba(16,160,224,.12)}
 .scene-object img{filter:none}
 .interface-runway{position:relative;isolation:isolate;background:#080e18}
 .interface-runway .dash{position:relative;background:transparent;z-index:2}
 .portal-frames{display:none;position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:3}
-.portal-frames i{position:absolute;inset:10% 12%;border:1px solid rgba(0,198,251,.48);border-radius:28px;box-shadow:0 0 12px rgba(0,198,251,.1),inset 0 0 12px rgba(0,198,251,.08);opacity:0;transform-origin:50% 52%}
-.portal-frames i:nth-child(2){inset:13% 15%;border-color:rgba(78,141,236,.35)}
-.portal-frames i:nth-child(3){inset:16% 18%;border-color:rgba(0,198,251,.25)}
+.portal-frames i{position:absolute;inset:10% 12%;border:1px solid rgba(16,160,224,.48);border-radius:28px;box-shadow:0 0 12px rgba(16,160,224,.1),inset 0 0 12px rgba(16,160,224,.08);opacity:0;transform-origin:50% 52%}
+.portal-frames i:nth-child(2){inset:13% 15%;border-color:rgba(72,176,240,.35)}
+.portal-frames i:nth-child(3){inset:16% 18%;border-color:rgba(16,160,224,.25)}
 .narrative-ready .interface-runway{height:calc(var(--interface-height,800px) + 66svh)}
 .narrative-ready .interface-runway .dash{position:sticky;top:var(--interface-pin,0px)}
 .narrative-ready .portal-frames{display:block;height:var(--interface-height,800px);position:sticky;top:var(--interface-pin,0px);margin-bottom:calc(-1 * var(--interface-height,800px))}
@@ -182,14 +187,15 @@ section[id]{scroll-margin-top:78px}
 :is(#pricing,#masterclass-curriculum,#get-started){scroll-margin-top:84px}
 :is(.btn,.md-card,.plan,.cur-card,.faq-item){transition-timing-function:var(--motion-ease)}
 :is(#modules,#progress,#funding){position:relative}
-:is(#modules,#progress,#funding)::before{content:'';position:absolute;top:0;left:7%;width:1px;height:54px;background:linear-gradient(rgba(0,198,251,.38),transparent);pointer-events:none}
+:is(#modules,#progress,#funding)::before{content:'';position:absolute;top:0;left:7%;width:1px;height:54px;background:linear-gradient(rgba(16,160,224,.38),transparent);pointer-events:none}
 #progress::before{left:auto;right:7%}
 .motion-simple .portal-frames i:not(:first-child){display:none}
 .motion-simple .scene-grid,.motion-simple .scene-orbit{display:none}
 .motion-simple .hero-runway{height:calc(var(--hero-height,100svh) + 30svh)}
 .motion-simple .interface-runway{height:calc(var(--interface-height,800px) + 20svh)}
 @media(max-width:767px){
- .data-trails{display:block;inset:0;opacity:.26}
+ .data-trails{display:block;inset:0;opacity:.12}
+ .energy-rail{height:3px}.energy-rail:nth-child(2){height:1.5px}
  .energy-rail:nth-child(2){top:78%}
  .portal-frames i{inset:9% 4%;border-radius:16px;box-shadow:none}
  .narrative-ready .interface-runway{height:auto}
@@ -209,3 +215,58 @@ section[id]{scroll-margin-top:78px}
 .narrative-ready .fr-item{transition:border-color var(--motion-duration) var(--motion-ease)}
 /* Reset legacy transforms before JS as well: no hidden content dependency. */
 .bd-cat{opacity:1}
+
+/* ── Edit 3: About portal ─────────────────────────────────────────────────────
+   A ring the section passes through, not a cut or a fade. The background never
+   changes across the boundary (#about and both neighbours are var(--bg2)), and
+   the fixed .data-trails streaks keep running over the top of all of this, so
+   nothing here starts, stops or hides them.
+   Everything is decorative: pointer-events:none, aria-hidden, and the settled
+   state is what renders with no JS and under reduced motion. */
+/* The moment gets its own scroll runway above the copy — same spacer technique
+   the hero and interface runways already use — so the rings and logo never sit
+   on top of the About text. The runway only exists once JS is driving it. */
+.portal{position:absolute;left:0;right:0;top:0;height:var(--portal-runway,100svh);overflow:hidden;pointer-events:none;z-index:0}
+.portal-ready .about{padding-top:calc(100px + var(--portal-runway,100svh))}
+.portal-stage{position:sticky;top:calc(50vh - min(320px,46vw));width:min(640px,92vw);height:min(640px,92vw);
+ margin:calc(50svh - min(320px,46vw)) auto 0;perspective:1200px;transform-style:preserve-3d}
+.portal-rings{position:absolute;inset:0;width:100%;height:100%;overflow:visible;
+ filter:drop-shadow(0 0 5px rgba(16,160,224,.35))}
+.portal-ring{fill:none;stroke:rgba(255,255,255,.16);stroke-width:1.25;
+ transform-origin:50% 50%;transform-box:fill-box}
+.portal-ring-1{stroke-width:1;stroke:rgba(255,255,255,.13);animation:portalSpin 68s linear infinite}
+.portal-ring-2{stroke-width:1.5;stroke:rgba(255,255,255,.2);animation:portalSpin 52s linear infinite reverse}
+.portal-ring-3{stroke-width:1.25;stroke:rgba(255,255,255,.15);animation:portalSpin 44s linear infinite}
+@keyframes portalSpin{to{transform:rotate(360deg)}}
+/* Halo behind the mark, scaled by JS in sync with the logo so it grows with it. */
+.portal-halo{position:absolute;left:50%;top:50%;width:74%;height:74%;margin:-37% 0 0 -37%;
+ background:radial-gradient(circle,rgba(16,160,224,.25),rgba(16,160,224,.09) 42%,transparent 70%)}
+.portal-logo{position:absolute;left:50%;top:50%;width:62%;margin-left:-31%;transform:translateY(-50%);
+ transform-style:preserve-3d}
+.portal-logo-core{display:block;width:100%;height:auto;
+ filter:drop-shadow(0 0 8px rgba(16,160,224,.55)) drop-shadow(0 0 40px rgba(16,160,224,.28))}
+/* One iridescent copy only — a second turns into visible ghosting. */
+.portal-logo-edge{position:absolute;inset:0;background:var(--credx-cyan);opacity:.26;
+ mix-blend-mode:screen;transform:translate(1.5px,-1.5px);
+ -webkit-mask:url("/images/credx-logo-mark.webp") center/contain no-repeat;
+ mask:url("/images/credx-logo-mark.webp") center/contain no-repeat}
+/* Pre-JS / no-JS settled state, so the section never renders empty. */
+.portal-ready .portal-stage{will-change:transform}
+.portal-ready .portal-ring{stroke-dasharray:var(--ring-len,2000);stroke-dashoffset:var(--ring-len,2000)}
+.portal-ready .portal-logo{opacity:0}
+@media(max-width:767px){
+ .portal{--portal-runway:72svh}
+ .portal-stage{top:calc(50vh - 46vw);margin-top:calc(50svh - 46vw)}
+ .portal-logo{width:72%;margin-left:-36%}
+ .portal-logo-core{filter:drop-shadow(0 0 6px rgba(16,160,224,.5)) drop-shadow(0 0 24px rgba(16,160,224,.26))}
+}
+@media(prefers-reduced-motion:reduce){
+ /* Final state immediately: rings drawn, logo settled, nothing animating. */
+ .portal-ring{animation:none!important}
+ .portal-ready .portal-ring{stroke-dasharray:none!important;stroke-dashoffset:0!important}
+ .portal-ready .portal-logo{opacity:1!important}
+ .portal-stage,.portal-rings,.portal-logo,.portal-halo{transform:none!important;will-change:auto!important}
+ .portal-logo{transform:translateY(-50%)!important}
+ .portal-ready .about{padding-top:100px}
+ .portal{display:none}
+}
