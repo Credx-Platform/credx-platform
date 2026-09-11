@@ -69,7 +69,7 @@ try{
   assert(Math.abs(await scale()-1)<.001);
   let lastScale=1;
   for(let i=1;i<=12;i++){await jump(p,first.heroDistance*i/12);const next=await scale();assert(next<=lastScale+.001);lastScale=next;assert(await contained())}
-  assert(Math.abs(lastScale-(width<768?.64:.52))<.002,'Hero reaches requested final size');
+  assert(Math.abs(lastScale-(width<768?.68:.52))<.002,'Hero reaches requested final size');
   const advanced=await state();await p.waitForTimeout(160);assert.deepEqual((await state()).transforms,advanced.transforms,'No delayed interpolation');
   await p.screenshot({path:`${shots}/${engine}-${width}-hero-out.png`});
   assert(await p.locator('.scene-object').evaluateAll(els=>els.every(e=>getComputedStyle(e).transform==='none')),'No independent asset scaling');
@@ -174,6 +174,13 @@ try{
  await relaxCsp(staticPage);
  await staticPage.goto(base,{waitUntil:'load'});assert(await staticPage.locator('h1').isVisible());
  assert.equal(await staticPage.locator('#hero').evaluate(e=>getComputedStyle(e).position),'relative');await staticPage.close();
- console.log('PASS low-power and JavaScript-disabled fallbacks');
+ for(const [width,height] of [[320,568],[375,667],[844,390]]){
+  const short=await browser.newPage({viewport:{width,height}});await relaxCsp(short);
+  await short.goto(base,{waitUntil:'load'});await short.evaluate(()=>document.fonts.ready);await settle(short);
+  assert(await short.evaluate(()=>{const c=document.querySelector('.hero-copy').getBoundingClientRect(),a=document.querySelector('.hero-art').getBoundingClientRect(),h=document.querySelector('#hero').getBoundingClientRect();return c.top>=60&&a.top>=c.bottom&&a.bottom<=h.bottom&&document.documentElement.scrollWidth<=innerWidth}),'Short viewport keeps title and complete artwork within the hero');
+  if(height<=560){await jump(short,120);assert.equal(await short.locator('.hero-art').evaluate(e=>getComputedStyle(e).transform),'none')}
+  await short.screenshot({path:`${shots}/${engine}-${width}x${height}-short.png`});await short.close();
+ }
+ console.log('PASS low-power, JavaScript-disabled and short/landscape viewport fallbacks');
  await writeFile(`${shots}/${engine}-results.json`,JSON.stringify(report,null,2));
 }finally{await browser?.close();server?.kill()}

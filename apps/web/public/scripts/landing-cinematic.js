@@ -21,7 +21,7 @@
  // Shared smooth acceleration/deceleration. Position follows scroll immediately;
  // no interpolation tail, spring, scroll interception, or synthetic momentum.
  const ease=v=>{v=clamp(v);return v*v*(3-2*v)};
- const art=hero.querySelector('.hero-art');
+ const art=hero.querySelector('.hero-art'),heroCopy=hero.querySelector('.hero-copy'),heroGrid=hero.querySelector('.hero-grid');
  const frames=[...portal.querySelectorAll('.portal-frames i')];
  const dash=portal.querySelector('.dash-ui');
  const cue=hero.querySelector('.journey-state');
@@ -65,7 +65,7 @@
    runway.style.removeProperty('--hero-height');runway.style.removeProperty('--pin-top');
    portal.style.removeProperty('--interface-height');portal.style.removeProperty('--interface-pin');
    animated.forEach(el=>{el.style.removeProperty('transform');el.style.removeProperty('opacity');el.style.removeProperty('will-change');el.style.removeProperty('clip-path');el.style.removeProperty('pointer-events')});
-   energy.style.removeProperty('opacity');hero.style.removeProperty('--journey-fill');
+   energy.style.removeProperty('opacity');hero.style.removeProperty('--journey-fill');hero.style.removeProperty('--hero-art-cap');
   }
   function stopStreaks(){clearTimeout(streakTimer);streakTimer=0;streaks.forEach((a,el)=>{a.cancel();el.remove()});streaks.clear();energy.replaceChildren()}
   suspend=()=>{paused=true;cancelAnimationFrame(raf);raf=0;stopStreaks();hero.classList.remove('scene-active')};
@@ -121,6 +121,13 @@
    width=innerWidth;view=innerHeight;
    // Read first, write spacer variables, then cache positions in one layout pass.
    const h=hero.offsetHeight,dh=portal.querySelector('section').offsetHeight;
+   // Read every hero metric before writing, then size the artwork from the space
+   // the headline leaves. Keeps the scene uncropped and --pin-top at 0, so the
+   // headline stays put while only the composition scales.
+   const heroStyle=getComputedStyle(hero);
+   const spare=hero.clientHeight-parseFloat(heroStyle.paddingTop)-parseFloat(heroStyle.paddingBottom)
+    -heroCopy.offsetHeight-(parseFloat(getComputedStyle(heroGrid).rowGap)||0);
+   hero.style.setProperty('--hero-art-cap',`${Math.max(240,spare*(width<768?1.25:2.1))}px`);
    runway.style.setProperty('--hero-height',`${h}px`);
    runway.style.setProperty('--pin-top',`${Math.min(0,view-h)}px`);
    portal.style.setProperty('--interface-height',`${dh}px`);
@@ -149,7 +156,7 @@
     aboutContent.style.opacity=String(1-exit);
     aboutFrames.forEach((el,i)=>{
      el.style.transform=`scale(${.28+entrance*1.15+i*.06})`;
-     el.style.opacity=String(clamp(entrance*7)*(1-ease((entrance-.58)/.42))*(1-exit)*(.98-i*.2));
+     el.style.opacity=String(clamp(entrance*7)*(1-ease((entrance-.66)/.3))*(1-exit)*(.98-i*.2));
     });
     socials.forEach((el,i)=>{
      const pop=ease((view*.99-bottom-i*14)/(view*.2));
@@ -161,7 +168,7 @@
     });
     if(active.has(runway)){
      const p=clamp((y-heroTop-12)/Math.max(1,heroDistance-12)),e=ease(p);
-     art.style.transform=`translate3d(0,${-e*(simple?8:18)}px,0) scale(${1-(innerWidth<768?.36:.48)*e})`;
+     art.style.transform=`translate3d(0,${-e*(simple?10:28)}px,0) scale(${1-(width<768?.32:.48)*e})`;
      hero.style.setProperty('--journey-fill',String(.05+.95*p));
      const label=p<.5?'01 / YOUR PERSPECTIVE':'02 / INSIDE CREDX';
      if(cue.textContent!==label)cue.textContent=label;

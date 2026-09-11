@@ -7,10 +7,10 @@ was attached to this request, so composition follows the written direction.
 
 ## Interaction design
 - Headline, explanation and CTAs above the connected five-asset composition at all widths.
-- Scroll-coupled group scale 1 → .52 desktop / .64 mobile; smoothstep easing,
+- Scroll-coupled group scale 1 → .52 desktop / .68 mobile; smoothstep easing,
   12px lead-in, no per-object scale or asynchronous interpolation tail.
 - Cached sticky geometry, shorter hero/software runways, reversible timelines.
-- About aperture starts above the section; luminous 6px desktop / 4px mobile
+- About aperture starts above the section; luminous 7px desktop / 4px mobile
   core, secondary light rings, masked content reveal. Visible at 25% entry and
   cleared before the reading position. No text-by-text choreography.
 - Compact 52px circular social targets, blue underglow and subtle hover lift.

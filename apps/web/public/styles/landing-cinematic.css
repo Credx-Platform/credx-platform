@@ -4,10 +4,10 @@ body{overflow-x:clip;background:#050a13}
 section[id]{scroll-margin-top:80px}
 /* Headline precedes the complete artwork at every breakpoint. */
 .hero-runway{position:relative;isolation:isolate}
-.cinematic-hero.hero{position:relative;min-height:100svh;padding:100px clamp(20px,4vw,64px) 60px;display:block;overflow:clip;background:#060b13;isolation:isolate}
+.cinematic-hero.hero{position:relative;height:100svh;padding:clamp(84px,9svh,100px) clamp(20px,4vw,64px) clamp(44px,6svh,60px);display:flex;flex-direction:column;justify-content:center;overflow:clip;background:#060b13;isolation:isolate}
 .cinematic-ready .hero-runway{height:calc(var(--hero-height,100svh) + 62svh)}
 .cinematic-ready .cinematic-hero{position:sticky;top:var(--pin-top,0px)}
-.cinematic-hero .hero-grid{display:flex;flex-direction:column;gap:30px;max-width:1180px;margin:0 auto;width:100%}
+.cinematic-hero .hero-grid{display:flex;flex-direction:column;gap:clamp(18px,3svh,30px);max-width:1180px;margin:0 auto;width:100%}
 .cinematic-hero .hero-copy{position:relative;max-width:940px;width:100%;text-align:center;padding:0;z-index:3}
 .cinematic-hero .hero-copy::before{display:none}
 .cinematic-hero h1{font-size:clamp(40px,4.4vw,68px);line-height:1.07;letter-spacing:-.045em;margin:0 auto 18px;max-width:940px;text-shadow:0 2px 12px rgba(0,0,0,.2)}
@@ -19,7 +19,7 @@ section[id]{scroll-margin-top:80px}
 .cinematic-hero .btn{padding-inline:24px;justify-content:center}
 .cinematic-hero .hero-login-note{font-size:11px;margin-top:12px}
 .cinematic-hero .hero-btns .btn-outline{background:rgba(6,11,19,.85)}
-.hero-art{position:relative;width:100%;max-width:1080px;aspect-ratio:2.1;height:auto;margin:0 auto;pointer-events:none;z-index:2;transform-origin:50% 50%;transform:translate3d(0,0,0) scale(1)}
+.hero-art{position:relative;width:min(1080px,100%,var(--hero-art-cap,max(420px,calc((100svh - 520px) * 2.1))));aspect-ratio:2.1;height:auto;margin:0 auto;pointer-events:none;z-index:2;transform-origin:50% 50%;transform:translate3d(0,0,0) scale(1)}
 .scene-object{position:absolute;transform:none;opacity:1;backface-visibility:hidden}
 .object-motion{transform:none}
 .scene-object img{display:block;width:100%;height:auto;object-fit:contain;user-select:none}
@@ -76,16 +76,16 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
 :is(.btn,.md-card,.plan,.cur-card,.faq-item){transition-timing-function:var(--motion-ease)}
 .bd-cat{opacity:1}
 .test-card h3{font-size:20px;letter-spacing:-.4px;margin:12px 0}
-.test-card .test-quote{margin:0;color:var(--muted)}
+.test-card .test-quote{font-style:normal;margin:0;color:var(--muted)}
 /* Aperture light begins above the About boundary, not halfway down its copy. */
 #about{position:relative;isolation:isolate;overflow:visible;padding-top:110px;padding-bottom:80px}
 #about::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse at 50% 25%,rgba(14,125,193,.17),transparent 65%)}
 #about .about-inner{position:relative;z-index:2;transform-origin:50% 160px}
 .about-photo{height:auto;box-shadow:0 0 0 4px rgba(33,111,169,.1),0 20px 50px rgba(0,0,0,.55);border-radius:18px}
-.about-gateway{position:absolute;left:50%;top:-130px;width:min(1120px,96%);height:clamp(380px,62svh,640px);transform:translateX(-50%);pointer-events:none;z-index:3;display:none}
-.about-gateway i{position:absolute;inset:8% 9%;border-radius:50%;border:6px solid #a3f2ff;box-shadow:0 0 3px #effeff,0 0 15px rgba(17,210,255,.75),0 0 42px rgba(0,131,244,.42),inset 0 0 24px rgba(42,186,249,.3);opacity:0;transform-origin:center}
+.about-gateway{--gateway-h:clamp(380px,62svh,640px);position:absolute;left:50%;top:calc(var(--gateway-h) / -2 - 24px);width:min(1120px,96%);height:var(--gateway-h);transform:translateX(-50%);pointer-events:none;z-index:3;display:none}
+.about-gateway i{position:absolute;inset:8% 9%;border-radius:50%;border:7px solid #b5f5ff;box-shadow:0 0 4px #f2feff,0 0 18px rgba(17,210,255,.8),0 0 54px rgba(0,142,247,.5),0 0 120px rgba(0,104,214,.28),inset 0 0 30px rgba(42,186,249,.34);opacity:0;transform-origin:center}
 .about-gateway i:nth-child(2){inset:5% 6%;border:2px solid rgba(32,167,255,.55);box-shadow:0 0 22px rgba(22,119,244,.3)}
-.about-gateway i:nth-child(3){inset:1% 2%;border:1px solid rgba(91,126,245,.28);box-shadow:0 0 32px rgba(24,106,221,.2)}
+.about-gateway i:nth-child(3){inset:1% 2%;border:1px solid rgba(91,126,245,.3);box-shadow:0 0 46px rgba(24,106,221,.26),0 0 140px rgba(17,84,198,.18)}
 .narrative-ready .about-gateway{display:block}
 .about-socials{position:relative;z-index:4;display:flex;justify-content:center;gap:16px;margin:40px auto 0;width:fit-content;max-width:100%}
 .about-socials a{position:relative;display:flex;align-items:center;justify-content:center;width:52px;height:52px;border:1px solid rgba(82,196,250,.34);border-radius:50%;background:rgba(9,22,37,.88);box-shadow:inset 0 1px 0 rgba(208,241,255,.1),0 10px 22px -8px rgba(0,171,255,.4);color:#d4f1ff;text-decoration:none;transform-origin:50% 100%;transition:translate .2s,box-shadow .2s,border-color .2s}
@@ -95,6 +95,29 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
 .about-socials a:focus-visible{outline:3px solid #b6f0ff;outline-offset:5px}
 #about:focus-within .about-inner,#about:focus-within .about-socials a{clip-path:none!important;transform:none!important;opacity:1!important;pointer-events:auto!important}
 .narrative-ready :is(.step,.md-card,.bd-cat,.pl-item,.pg-card,.fr-item,.chat-window,.test-grid,.cur-grid,.faq-list):focus-within{transform:none!important;opacity:1!important}
+/* Laptop-height windows: trade a little headline scale and padding for a
+   composition that still reads as the dominant element. */
+@media(min-width:768px) and (max-height:960px){
+ .cinematic-hero.hero{padding-top:76px;padding-bottom:44px}
+ .cinematic-hero .hero-grid{gap:20px}
+ .cinematic-hero h1{font-size:clamp(36px,3.9vw,56px);margin-bottom:14px}
+ .cinematic-hero .hero-tag{margin-bottom:14px}
+ .cinematic-hero .hero-sub{font-size:15px;margin-bottom:18px}
+ .cinematic-hero .hero-login-note{margin-top:9px}
+}
+@media(min-width:768px) and (max-height:800px){
+ .cinematic-hero h1{font-size:clamp(32px,3.4vw,44px);margin-bottom:10px}
+ .cinematic-hero .hero-tag{margin-bottom:10px}
+ .cinematic-hero .hero-sub{font-size:14px;margin-bottom:14px;line-height:1.55}
+}
+/* Landscape phones and very short windows: no pinned zoom, just a readable page. */
+@media(max-height:560px){
+ .cinematic-hero.hero{height:auto;min-height:0;padding-top:84px}
+ .cinematic-ready .hero-runway{height:auto}
+ .cinematic-ready .cinematic-hero{position:relative;top:0}
+ .hero-art{width:min(1080px,100%)}
+ .journey-cue{display:none}
+}
 @media(min-width:768px) and (max-width:1100px){
  .nav-links{gap:14px}.nav-links a{font-size:12px}
  .bridge-grid{gap:36px}
@@ -108,7 +131,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
  .cinematic-hero .hero-sub{font-size:14px;line-height:1.6;margin-bottom:20px;max-width:400px}
  .cinematic-hero .hero-btns{display:grid;grid-template-columns:1fr;gap:8px;max-width:370px;margin:auto}
  .cinematic-hero .btn{height:44px;width:100%;font-size:12px}
- .hero-art{max-width:500px;aspect-ratio:1.25}
+ .hero-art{width:min(500px,100%,var(--hero-art-cap,max(260px,calc((100svh - 500px) * 1.25))));max-width:500px;aspect-ratio:1.25}
  .object-house{width:49%;left:auto;right:2%;top:2%}
  .object-car{width:52%;right:1%;bottom:0}
  .object-cash{width:34%;left:2%;top:8%}
@@ -124,12 +147,19 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
  .narrative-ready .portal-frames{position:absolute;height:100%;margin-bottom:0;top:0}
  .portal-frames i{inset:9% 4%;border-radius:16px;box-shadow:none}
  #about{padding-top:80px;padding-bottom:64px}
- .about-gateway{top:-100px;height:400px;width:100%}
+ .about-gateway{--gateway-h:400px;top:calc(var(--gateway-h) / -2 - 16px);width:100%}
  .about-gateway i{inset:8% 5%;border-width:4px}
  .about-socials{margin-top:32px;gap:14px}
 }
 .motion-simple .portal-frames i:not(:first-child),.motion-simple .about-gateway i:last-child{display:none}
 .motion-simple .scene-grid{display:none}
+/* Six items form balanced rows instead of a stranded fifth/sixth card. */
+@media(min-width:768px){.bd-stage,.pg-grid,.fr-grid,.cur-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:767px) and (max-height:740px){
+ .cinematic-hero.hero{height:auto;min-height:100svh;justify-content:flex-start}
+ .hero-art{width:min(360px,100%)}
+}
+@media(max-height:560px){.hero-art{transform:none!important}}
 @media(prefers-reduced-motion:reduce){
  .data-trails,.portal-frames,.about-gateway,.journey-cue{display:none!important}
  .hero-runway,.interface-runway{height:auto!important}
