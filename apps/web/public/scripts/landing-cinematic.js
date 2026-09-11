@@ -33,10 +33,11 @@
   {id:'funding',selector:'.fr-item',kind:'stack'},
   {id:'chat',selector:'.chat-window',kind:'focus'}
  ].map(t=>({...t,el:document.getElementById(t.id)}));
- const energy=hero.querySelector('.data-trails');
+ // Site-wide now: the pattern layer lives on <body>, not inside the hero.
+ const energy=document.querySelector('.data-trails');
  // Continuous rails, not particles or shooting stars. Short, clipped energy
  // bands travel along fixed paths only when the user scrolls.
- energy.innerHTML='<span class="energy-rail"><i></i></span><span class="energy-rail"><i></i></span><span class="energy-rail"><i></i></span>';
+ energy.innerHTML='<span class="energy-rail"><i></i></span><span class="energy-rail"><i></i></span>';
  const rails=[...energy.querySelectorAll('i')];
  let dispose=()=>{},degraded=false;
  const weak=()=>navigator.connection?.saveData||
@@ -87,14 +88,14 @@
     if(dirty)measure();
     const y=scrollY;
     travel+=(y-lastScroll)*3.2;lastScroll=y;
+    // The rails span the whole page, so they travel with any scroll, not just the hero's.
+    rails.forEach((el,i)=>el.style.transform=`translate3d(${((travel*(1+i*.12))%700+700)%700-350}px,0,0)`);
     if(active.has(runway)){
      const p=clamp((y-heroTop)/heroDistance),e=ease(p),amplitude=simple?.45:1;
      objects.forEach((el,i)=>{
       const side=[1,1,-1,-1,-1][i],depth=[-150,-70,-220,-110,-170][i];
-      el.style.transform=`translate3d(${side*e*18*amplitude}px,${e*(i===4?90:-12)*amplitude}px,${(depth+(180+i*10)*e)*amplitude}px) rotateY(${side*(1-e)*5*amplitude}deg) scale(${.68+.28*e})`;
+      el.style.transform=`translate3d(${side*e*18*amplitude}px,${e*(i===4?90:-12)*amplitude}px,${(depth+(180+i*10)*e)*amplitude}px) rotateY(${side*(1-e)*5*amplitude}deg) scale(${.84+.12*e})`;
      });
-     rails.forEach((el,i)=>el.style.transform=`translate3d(${((travel*(1+i*.12))%700+700)%700-350}px,0,0)`);
-     energy.style.opacity=String(.38+.24*e);
      hero.style.setProperty('--journey-fill',String(.05+.95*p));
      const label=p<.5?'01 / YOUR PERSPECTIVE':'02 / INSIDE CREDX';
      if(cue.textContent!==label)cue.textContent=label;

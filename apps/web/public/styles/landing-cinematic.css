@@ -6,8 +6,13 @@ body{overflow-x:clip}
 .cinematic-ready .cinematic-hero{position:sticky;top:var(--pin-top,0px)}
 .cinematic-hero .hero-grid{max-width:1680px;grid-template-columns:minmax(0,.95fr) minmax(0,1.15fr);gap:12px;align-items:center}
 .cinematic-hero .hero-copy{max-width:660px;z-index:5}
-.cinematic-hero .hero-copy::before{inset:-35% -12% -30% -30%;background:radial-gradient(ellipse at 35% 50%,rgba(6,11,19,.98),rgba(6,11,19,.74) 50%,transparent 75%)}
-.cinematic-hero h1{font-size:clamp(44px,4.5vw,76px);line-height:1.06;letter-spacing:-.045em;margin-bottom:24px}
+.cinematic-hero .hero-copy::before{inset:-35% -12% -30% -30%;background:radial-gradient(ellipse at 35% 50%,rgba(6,11,19,.62),rgba(6,11,19,.34) 52%,transparent 76%)}
+/* One seamless hero: the copy hovers in front of the artwork, so it carries its
+   own shadow instead of sitting on an opaque panel that hides the images. */
+.cinematic-hero h1{font-size:clamp(44px,4.5vw,76px);line-height:1.06;letter-spacing:-.045em;margin-bottom:24px;
+ text-shadow:0 1px 2px rgba(2,6,12,.95),0 3px 14px rgba(2,6,12,.85),0 8px 40px rgba(2,6,12,.7)}
+.cinematic-hero .hero-sub,.cinematic-hero .hero-login-note{text-shadow:0 1px 3px rgba(2,6,12,.92),0 2px 16px rgba(2,6,12,.7)}
+.cinematic-hero .hero-tag{backdrop-filter:blur(3px)}
 .cinematic-hero .hero-tag{font-size:10px;letter-spacing:1px;margin-bottom:24px;padding:7px 12px}
 .cinematic-hero .hero-sub{font-size:clamp(15px,1.15vw,18px);line-height:1.7;max-width:530px;margin-bottom:28px}
 .cinematic-hero .hero-btns{gap:10px}
@@ -16,10 +21,10 @@ body{overflow-x:clip}
 .scene-object{position:absolute;transform-style:preserve-3d;backface-visibility:hidden}
 .object-motion{transform-style:preserve-3d;backface-visibility:hidden}
 .scene-object img{display:block;width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 8px 14px rgba(0,160,255,.10));user-select:none}
-.object-house{width:72%;left:16%;top:20%;z-index:3;transform:translate3d(0,0,-180px) rotateY(-8deg) scale(.62)}
-.object-car{width:56%;right:-1%;bottom:2%;z-index:5;transform:translate3d(0,0,-90px) rotateY(9deg) scale(.64)}
-.object-cash{width:41%;left:-2%;top:0;z-index:1;transform:translate3d(0,0,-300px) rotateY(10deg) scale(.55)}
-.object-merch{width:36%;right:-1%;top:0;z-index:2;transform:translate3d(0,0,-220px) rotateY(-12deg) scale(.58)}
+.object-house{width:72%;left:16%;top:20%;z-index:3;transform:translate3d(0,0,-180px) rotateY(-8deg) scale(.77)}
+.object-car{width:56%;right:-1%;bottom:2%;z-index:5;transform:translate3d(0,0,-90px) rotateY(9deg) scale(.79)}
+.object-cash{width:41%;left:-2%;top:0;z-index:1;transform:translate3d(0,0,-300px) rotateY(10deg) scale(.68)}
+.object-merch{width:36%;right:-1%;top:0;z-index:2;transform:translate3d(0,0,-220px) rotateY(-12deg) scale(.72)}
 .scene-orbit{position:absolute;pointer-events:none;border:1px solid rgba(87,197,248,.22);border-radius:50%;width:80%;height:66%;left:10%;top:20%;box-shadow:0 0 16px rgba(0,198,251,.14),inset 0 0 16px rgba(0,198,251,.08);transform:rotateX(68deg) rotateZ(-24deg) translateZ(-140px)}
 .orbit-front{width:100%;height:90%;left:0;top:10%;border-color:rgba(126,136,240,.16);box-shadow:0 0 14px rgba(110,119,230,.12);transform:rotateX(62deg) rotateZ(24deg) translateZ(80px)}
 .hero-atmosphere{position:absolute;inset:0;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 77% 40%,rgba(9,95,132,.18),transparent 49%),radial-gradient(ellipse at 96% 70%,rgba(81,53,159,.08),transparent 40%),linear-gradient(125deg,#101c29,#060b13 50%);z-index:0}
@@ -109,13 +114,15 @@ section[id]{scroll-margin-top:78px}
 @media(min-width:768px){
  .cinematic-hero .hero-grid{display:block;min-height:650px}
  .cinematic-hero .hero-copy{width:46%;padding-top:54px}
- .cinematic-hero .hero-copy::before{inset:-28% -23% -30% -32%;background:radial-gradient(ellipse at 45% 45%,rgba(6,11,19,.96),rgba(6,11,19,.85) 42%,rgba(6,11,19,.38) 59%,transparent 73%)}
+ .cinematic-hero .hero-copy::before{inset:-28% -23% -30% -32%;background:radial-gradient(ellipse at 45% 45%,rgba(6,11,19,.6),rgba(6,11,19,.42) 44%,rgba(6,11,19,.16) 62%,transparent 76%)}
  .hero-art{position:absolute;inset:0;width:100%;height:100%;z-index:2;perspective-origin:60% 50%}
  .object-merch{width:29%;left:47%;right:auto;top:30%;z-index:5}
  .object-house{width:30%;left:71%;top:0;z-index:2}
- .object-cash{width:24%;left:44%;top:-4%;z-index:1}
+ /* Cash sits the same ~2% off its edge as the cards, house and car do off theirs,
+    and shares the house's top alignment so the two frame the copy symmetrically. */
+ .object-cash{width:24%;left:2%;top:0;z-index:1}
  .object-car{width:30%;right:-1%;bottom:-1%;z-index:4}
- .object-cards{width:28%;left:2%;top:31%;z-index:2;opacity:.34;transform:translate3d(0,0,-300px) scale(.55)}
+ .object-cards{width:28%;left:2%;top:31%;z-index:2;opacity:.34;transform:translate3d(0,0,-300px) scale(.68)}
  .cinematic-hero.hero{padding-bottom:100px}
 }
 .object-cards img{filter:drop-shadow(0 0 16px rgba(0,198,251,.16));mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
@@ -129,7 +136,7 @@ section[id]{scroll-margin-top:78px}
  .object-house{width:47%;left:57%;top:0;z-index:2}
  .object-cash{width:39%;left:-2%;top:-2%;z-index:1}
  .object-car{width:48%;right:-1%;bottom:0;z-index:4}
- .object-cards{width:43%;left:0;top:49%;z-index:2;opacity:.75;transform:translate3d(0,0,-150px) scale(.55)}
+ .object-cards{width:43%;left:0;top:49%;z-index:2;opacity:.75;transform:translate3d(0,0,-150px) scale(.68)}
  .object-cards img{filter:none}
 }
 /* Distinct quiet graphic accents frame every section without covering content. */
@@ -144,10 +151,12 @@ section[id]{scroll-margin-top:78px}
 :root{--motion-ease:cubic-bezier(.4,0,.2,1);--motion-duration:480ms}
 .cinematic-ready .hero-runway{height:calc(var(--hero-height,100svh) + 78svh)}
 .cinematic-ready .hero-bridge{margin-top:0}
-.data-trails{perspective:none;inset:0 0 0 48%;overflow:hidden;opacity:.45;transform:none}
-.energy-rail{position:absolute;left:0;right:-10%;height:1px;top:25%;background:rgba(0,198,251,.12);transform:rotate(-12deg);overflow:hidden}
-.energy-rail:nth-child(2){top:57%;transform:rotate(12deg)}
-.energy-rail:nth-child(3){top:81%;transform:rotate(-12deg)}
+/* Site-wide line pattern: fixed behind every section, half the previous count. */
+/* Above every section background (max z-index 3) but under the nav (100), so the
+   pattern reads across the whole page instead of being painted over section by section. */
+.data-trails{position:fixed;inset:0;z-index:6;pointer-events:none;perspective:none;overflow:hidden;opacity:.45;transform:none}
+.energy-rail{position:absolute;left:-5%;right:-5%;height:1px;top:29%;background:rgba(0,198,251,.1);transform:rotate(-12deg);overflow:hidden}
+.energy-rail:nth-child(2){top:72%;transform:rotate(12deg)}
 .energy-rail i{display:block;width:300px;height:1px;background:linear-gradient(90deg,transparent,rgba(0,198,251,.65),#80e4fa,rgba(0,198,251,.65),transparent);box-shadow:0 0 6px rgba(0,198,251,.35)}
 /* No constant background loops, full-screen filters or reflective repainting. */
 .scene-active .data-trail i{animation:none}
@@ -180,8 +189,8 @@ section[id]{scroll-margin-top:78px}
 .motion-simple .hero-runway{height:calc(var(--hero-height,100svh) + 30svh)}
 .motion-simple .interface-runway{height:calc(var(--interface-height,800px) + 20svh)}
 @media(max-width:767px){
- .data-trails{display:block;inset:52% 0 0 0;opacity:.3}
- .energy-rail:nth-child(3){display:none}
+ .data-trails{display:block;inset:0;opacity:.26}
+ .energy-rail:nth-child(2){top:78%}
  .portal-frames i{inset:9% 4%;border-radius:16px;box-shadow:none}
  .narrative-ready .interface-runway{height:auto}
  .narrative-ready .interface-runway .dash{position:relative;top:auto}
