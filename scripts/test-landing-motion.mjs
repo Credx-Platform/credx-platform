@@ -31,7 +31,7 @@ try{
   for(let i=0;i<100;i++){try{await fetch(base);break}catch{await new Promise(r=>setTimeout(r,100))}}
  }
  browser=await pw[engine].launch({headless:true});
- const widths=(process.env.LANDING_WIDTHS||'1440,1920,1280,768,1024,390,430').split(',').map(Number);
+ const widths=(process.env.LANDING_WIDTHS||'1440,1920,1280,768,1024,375,390,430').split(',').map(Number);
  for(const width of widths){
   const height=width<768?844:1000;
   const context=await browser.newContext({viewport:{width,height},hasTouch:width<1025});
@@ -52,7 +52,7 @@ try{
    heroDistance:document.querySelector('#heroRunway').offsetHeight-document.querySelector('#hero').offsetHeight,
    portalTop:document.querySelector('#interfaceRunway').offsetTop,
    portalDistance:document.querySelector('#interfaceRunway').offsetHeight-document.querySelector('#how-it-works').offsetHeight,
-   transforms:[...document.querySelectorAll('.scene-object')].map(e=>getComputedStyle(e).transform),
+   transforms:[getComputedStyle(document.querySelector('.hero-art')).transform],
    headings:[...document.querySelectorAll('h1,h2')].length,
    y:scrollY
   }));
@@ -61,30 +61,29 @@ try{
   assert.equal(await p.locator('.scene-object img').count(),5);
   assert(await p.locator('.scene-object img').evaluateAll(els=>els.every(el=>el.complete&&el.naturalWidth>0)));
   await p.screenshot({path:`${shots}/${engine}-${width}-intro.png`});
-  // Camera stays scroll-coupled; energy completes a finite pass after input stops.
-  const energy=()=>p.locator('.energy-rail i').first().evaluate(e=>getComputedStyle(e).transform);
-  const rail0=await energy();
-  for(let i=1;i<=12;i++)await jump(p,first.heroDistance*i/18);
-  const advanced=await state();assert.notDeepEqual(advanced.transforms,first.transforms);
-  assert.notEqual(await energy(),rail0,'Energy visibly advances with scrolling');
-  await p.waitForTimeout(160);assert.deepEqual((await state()).transforms,advanced.transforms,'No delayed interpolation');
+  // One coherent composition shrinks smoothly, with no independent pieces.
+  assert(await p.evaluate(()=>{const a=document.querySelector('.hero-art').getBoundingClientRect(),c=document.querySelector('.hero-copy').getBoundingClientRect();return a.top>=c.bottom+18}),'Headline and copy stay above artwork');
+  const contained=()=>p.evaluate(()=>{const a=document.querySelector('.hero-art').getBoundingClientRect();return [...document.querySelectorAll('.scene-object')].every(e=>{const r=e.getBoundingClientRect();return r.left>=a.left-1&&r.right<=a.right+1&&r.top>=a.top-1&&r.bottom<=a.bottom+1})});
+  assert(await contained(),'All five asset bounds contained at full size');
+  const scale=()=>p.locator('.hero-art').evaluate(e=>new DOMMatrix(getComputedStyle(e).transform).a);
+  assert(Math.abs(await scale()-1)<.001);
+  let lastScale=1;
+  for(let i=1;i<=12;i++){await jump(p,first.heroDistance*i/12);const next=await scale();assert(next<=lastScale+.001);lastScale=next;assert(await contained())}
+  assert(Math.abs(lastScale-(width<768?.64:.52))<.002,'Hero reaches requested final size');
+  const advanced=await state();await p.waitForTimeout(160);assert.deepEqual((await state()).transforms,advanced.transforms,'No delayed interpolation');
+  await p.screenshot({path:`${shots}/${engine}-${width}-hero-out.png`});
+  assert(await p.locator('.scene-object').evaluateAll(els=>els.every(e=>getComputedStyle(e).transform==='none')),'No independent asset scaling');
   await jump(p,0);assert.deepEqual((await state()).transforms,first.transforms,'Reversal restores exact camera position');
-  // A scroll-triggered rail continues without input, crosses the full screen,
-  // then ends (no permanent ambient loop or frozen bright band).
-  await p.waitForTimeout(1500);await jump(p,120);await p.waitForTimeout(100);
-  const movingRail=await energy();await p.waitForTimeout(180);
-  assert.notEqual(await energy(),movingRail,'Rail continues after scroll stops');
-  await p.waitForTimeout(1450);
-  assert.equal(await p.locator('.energy-rail i').evaluateAll(els=>els.reduce((n,e)=>n+e.getAnimations().length,0)),0,'Rail completes its passage');
-  assert.equal(await p.locator('.energy-rail').first().evaluate(e=>getComputedStyle(e).height),'3px');
-  if(width<768){
-   assert(await p.evaluate(()=>{const a=document.querySelector('.hero-art').getBoundingClientRect(),c=document.querySelector('.hero-copy').getBoundingClientRect();return a.top<c.bottom&&a.bottom>c.top}),'Mobile copy overlays artwork');
-  }
+  await p.waitForFunction(()=>document.querySelector('.cyber-streak'));
+  assert(await p.locator('.cyber-streak').count()<=(width<768?2:3),'Bounded streak density');
   // About opens before its reading position. Social controls appear at the
   // section bottom, fade on exit, and recover on reverse/keyboard navigation.
   const about=await p.locator('#about').evaluate(e=>({top:e.getBoundingClientRect().top+scrollY,height:e.offsetHeight}));
   await jump(p,about.top-height*.8);
   const opening=await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).clipPath);
+  await jump(p,about.top-height*.75);
+  assert(await p.locator('.about-gateway i').first().evaluate(e=>{const r=e.getBoundingClientRect();return Number(getComputedStyle(e).opacity)>.5&&r.top<innerHeight&&r.bottom>0}),'Bright portal visible at 25% section entry');
+  await p.screenshot({path:`${shots}/${engine}-${width}-about-entry.png`});
   await p.locator('.about-socials a').first().focus();
   assert.equal(await p.evaluate(()=>document.activeElement.closest('.about-socials')!==null),true,'Unrevealed social links remain keyboard reachable');
   assert.equal(await p.locator('.about-socials a').first().evaluate(e=>getComputedStyle(e).opacity),'1','Focus exposes an unrevealed link');
@@ -137,9 +136,9 @@ try{
   assert(Math.abs((await state()).y-middle)<120,'Refresh restores mid-page position');
   await p.goto(base+'/pricing',{waitUntil:'domcontentloaded'});await p.goBack({waitUntil:'load'});await p.waitForTimeout(500);
   assert((await state()).mode.includes('narrative-ready'),'Back navigation remounts');
-  assert.equal(await p.locator('.energy-rail').count(),2,'No duplicated effects');
-  // The line pattern is site-wide now: fixed, outside the hero, and still painted
-  // under the nav rather than over it.
+  assert.equal(await p.locator('.data-trails').count(),1,'No duplicated effects');
+  assert(await p.locator('.cyber-streak').count()<=3,'No leaked streaks after back');
+  // The bounded data-energy layer is site-wide and non-interactive.
   assert.equal(await p.locator('.data-trails').evaluate(e=>e.closest('#hero')?'hero':'body'),'body');
   assert.equal(await p.locator('.data-trails').evaluate(e=>getComputedStyle(e).position),'fixed');
   // Resizing across breakpoints and orientation-like changes.
