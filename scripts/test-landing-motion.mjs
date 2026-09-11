@@ -61,7 +61,7 @@ try{
   assert.equal(await p.locator('.scene-object img').count(),5);
   assert(await p.locator('.scene-object img').evaluateAll(els=>els.every(el=>el.complete&&el.naturalWidth>0)));
   await p.screenshot({path:`${shots}/${engine}-${width}-intro.png`});
-  // Slow scroll, direct coupling, reversal, no drift at rest.
+  // Camera stays scroll-coupled; energy completes a finite pass after input stops.
   const energy=()=>p.locator('.energy-rail i').first().evaluate(e=>getComputedStyle(e).transform);
   const rail0=await energy();
   for(let i=1;i<=12;i++)await jump(p,first.heroDistance*i/18);
@@ -69,6 +69,34 @@ try{
   assert.notEqual(await energy(),rail0,'Energy visibly advances with scrolling');
   await p.waitForTimeout(160);assert.deepEqual((await state()).transforms,advanced.transforms,'No delayed interpolation');
   await jump(p,0);assert.deepEqual((await state()).transforms,first.transforms,'Reversal restores exact camera position');
+  // A scroll-triggered rail continues without input, crosses the full screen,
+  // then ends (no permanent ambient loop or frozen bright band).
+  await p.waitForTimeout(1500);await jump(p,120);await p.waitForTimeout(100);
+  const movingRail=await energy();await p.waitForTimeout(180);
+  assert.notEqual(await energy(),movingRail,'Rail continues after scroll stops');
+  await p.waitForTimeout(1450);
+  assert.equal(await p.locator('.energy-rail i').evaluateAll(els=>els.reduce((n,e)=>n+e.getAnimations().length,0)),0,'Rail completes its passage');
+  assert.equal(await p.locator('.energy-rail').first().evaluate(e=>getComputedStyle(e).height),'3px');
+  if(width<768){
+   assert(await p.evaluate(()=>{const a=document.querySelector('.hero-art').getBoundingClientRect(),c=document.querySelector('.hero-copy').getBoundingClientRect();return a.top<c.bottom&&a.bottom>c.top}),'Mobile copy overlays artwork');
+  }
+  // About opens before its reading position. Social controls appear at the
+  // section bottom, fade on exit, and recover on reverse/keyboard navigation.
+  const about=await p.locator('#about').evaluate(e=>({top:e.getBoundingClientRect().top+scrollY,height:e.offsetHeight}));
+  await jump(p,about.top-height*.8);
+  const opening=await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).clipPath);
+  await jump(p,about.top-80);
+  assert.notEqual(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).clipPath),opening);
+  await jump(p,about.top+about.height-height*.72);
+  assert(await p.locator('.about-socials a').evaluateAll(els=>els.every(e=>Number(getComputedStyle(e).opacity)>.9&&getComputedStyle(e).visibility==='visible')),'All social icons pop in');
+  assert.deepEqual(await p.locator('.about-socials a').evaluateAll(els=>els.map(e=>new URL(e.href).hostname)),['www.instagram.com','www.youtube.com','www.facebook.com']);
+  await p.screenshot({path:`${shots}/${engine}-${width}-about-social.png`});
+  await jump(p,about.top+about.height);
+  assert(await p.locator('.about-socials a').evaluateAll(els=>els.every(e=>Number(getComputedStyle(e).opacity)<.01)),'Socials fade after About');
+  await jump(p,about.top+about.height-height*.72);
+  await p.locator('.about-socials a').first().focus();
+  assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).clipPath),'none','Keyboard focus exposes content');
+  await p.locator('.about-socials a').first().evaluate(e=>e.blur());
   // Wheel/trackpad-like bursts: native scroll responds without an input trap.
   await p.mouse.move(width/2,height/2);await p.mouse.wheel(0,240);await p.waitForTimeout(200);assert((await state()).y>0);
   for(let i=0;i<5;i++)await p.mouse.wheel(0,13);
@@ -125,6 +153,7 @@ try{
   await p.emulateMedia({reducedMotion:'reduce'});await settle(p);
   assert.equal(await p.locator('.portal-frames').evaluate(e=>getComputedStyle(e).display),'none');
   assert(!(await state()).mode.includes('narrative-ready'));
+  assert(await p.locator('.about-socials a').evaluateAll(els=>els.every(e=>getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity==='1')),'Reduced motion keeps all social links available');
   assert.equal((await state()).heroDistance,0,'Reduced motion removes sticky runway');
   assert.equal(await p.locator('#hero').evaluate(e=>getComputedStyle(e).position),'relative');
   await p.emulateMedia({reducedMotion:'no-preference'});await settle(p);assert((await state()).mode.includes('narrative-ready'));

@@ -1,5 +1,5 @@
 /* CredX public scroll narrative. Native scroll, no renderer or dependencies.
- * One event-driven rAF, cached layout, reversible timelines, no idle loop.
+ * One event-driven rAF, cached layout, reversible timelines, finite rail passes.
  * Content remains visible before JS, in reduced motion and on failure.
  */
 (() => {
@@ -35,10 +35,13 @@
  ].map(t=>({...t,el:document.getElementById(t.id)}));
  // Site-wide now: the pattern layer lives on <body>, not inside the hero.
  const energy=document.querySelector('.data-trails');
- // Continuous rails, not particles or shooting stars. Short, clipped energy
- // bands travel along fixed paths only when the user scrolls.
+ // Scroll launches a complete passage. Compositor animations finish even when
+ // input stops, without keeping a JavaScript animation loop alive.
  energy.innerHTML='<span class="energy-rail"><i></i></span><span class="energy-rail"><i></i></span>';
  const rails=[...energy.querySelectorAll('i')];
+ const about=document.getElementById('about'),aboutContent=about.querySelector('.about-inner');
+ const aboutFrames=[...about.querySelectorAll('.about-gateway i')];
+ const socials=[...about.querySelectorAll('.about-socials a')];
  let dispose=()=>{},degraded=false;
  const weak=()=>navigator.connection?.saveData||
   (navigator.deviceMemory>0&&navigator.deviceMemory<=4)||
@@ -46,27 +49,40 @@
  function mount(){
   dispose();
   const abort=new AbortController(),opts={passive:true,signal:abort.signal};
-  let raf=0,dirty=true,lastScroll=scrollY,travel=0,view=innerHeight,width=innerWidth;
-  let heroTop=0,heroDistance=1,portalTop=0,portalDistance=1;
+  let raf=0,dirty=true,lastScroll=scrollY,lastInput=-Infinity,view=innerHeight,width=innerWidth;
+  let heroTop=0,heroDistance=1,portalTop=0,portalDistance=1,aboutTop=0,aboutHeight=1;
+  const railRuns=new Map();
   let slowFrames=0,samples=0,observer;
   const simple=degraded||weak()||innerWidth<768;
-  const animated=new Set([...objects,...frames,dash,...rails]);
+  const animated=new Set([...objects,...frames,dash,...rails,aboutContent,...aboutFrames,...socials]);
   const active=new Set();
   function reset(){
    root.classList.remove('cinematic-ready','narrative-ready','motion-simple');
    hero.classList.remove('scene-active');
    runway.style.removeProperty('--hero-height');runway.style.removeProperty('--pin-top');
    portal.style.removeProperty('--interface-height');portal.style.removeProperty('--interface-pin');
-   animated.forEach(el=>{el.style.removeProperty('transform');el.style.removeProperty('opacity');el.style.removeProperty('will-change')});
+   animated.forEach(el=>{el.style.removeProperty('transform');el.style.removeProperty('opacity');el.style.removeProperty('will-change');el.style.removeProperty('clip-path');el.style.removeProperty('visibility')});
    energy.style.removeProperty('opacity');hero.style.removeProperty('--journey-fill');
   }
-  dispose=()=>{abort.abort();cancelAnimationFrame(raf);observer?.disconnect();reset()};
+  dispose=()=>{abort.abort();cancelAnimationFrame(raf);observer?.disconnect();railRuns.forEach(a=>a.cancel());railRuns.clear();reset()};
   if(preference.matches)return;
   root.classList.add('cinematic-ready','narrative-ready');
   root.classList.toggle('motion-simple',!!simple);
   const scenes=tracks.map(t=>({...t,items:[...t.el.querySelectorAll(t.selector)],top:0,height:0}));
   scenes.forEach(t=>t.items.forEach(el=>animated.add(el)));
   function schedule(){if(!raf&&!document.hidden)raf=requestAnimationFrame(draw)}
+  function launchRail(el,i){
+   if(railRuns.has(el)||document.hidden||abort.signal.aborted)return;
+   const start=-620,end=width*1.1+40;
+   const run=el.animate([
+    {transform:`translate3d(${start}px,0,0)`,opacity:0,offset:0},
+    {transform:`translate3d(${start+(end-start)*.12}px,0,0)`,opacity:1,offset:.12},
+    {transform:`translate3d(${start+(end-start)*.88}px,0,0)`,opacity:1,offset:.88},
+    {transform:`translate3d(${end}px,0,0)`,opacity:0,offset:1}
+   ],{duration:1200+i*180,easing:'linear'});
+   railRuns.set(el,run);
+   run.onfinish=()=>{railRuns.delete(el);if(performance.now()-lastInput<160)launchRail(el,i)};
+  }
   function measure(){
    width=innerWidth;view=innerHeight;
    // Read first, write spacer variables, then cache positions in one layout pass.
@@ -80,6 +96,7 @@
    portalTop=portal.getBoundingClientRect().top+scrollY;
    portalDistance=Math.max(1,portal.offsetHeight-dh);
    scenes.forEach(t=>{t.top=t.el.getBoundingClientRect().top+scrollY;t.height=t.el.offsetHeight});
+   aboutTop=about.getBoundingClientRect().top+scrollY;aboutHeight=about.offsetHeight;
    dirty=false;
   }
   function draw(){
@@ -87,9 +104,26 @@
    try{
     if(dirty)measure();
     const y=scrollY;
-    travel+=(y-lastScroll)*3.2;lastScroll=y;
-    // The rails span the whole page, so they travel with any scroll, not just the hero's.
-    rails.forEach((el,i)=>el.style.transform=`translate3d(${((travel*(1+i*.12))%700+700)%700-350}px,0,0)`);
+    if(y!==lastScroll){lastInput=performance.now();rails.forEach(launchRail)}
+    lastScroll=y;
+    // Open before the reading position, hold for tall mobile copy, then exit.
+    const entrance=ease((view*.96-(aboutTop-y))/(view*.6));
+    const bottom=aboutTop+aboutHeight-y;
+    const exit=ease((view*.32-bottom)/(view*.38));
+    aboutContent.style.clipPath=`ellipse(${entrance*100}% ${entrance*100}% at 50% 50%)`;
+    aboutContent.style.transform=`perspective(1400px) translate3d(0,${(1-entrance)*36}px,0) scale(${.94+.06*entrance})`;
+    aboutContent.style.opacity=String(1-exit);
+    aboutFrames.forEach((el,i)=>{
+     el.style.transform=`scale(${.12+entrance*1.3+i*.08}) rotate(${(1-entrance)*(i%2?8:-8)}deg)`;
+     el.style.opacity=String(Math.sin(entrance*Math.PI)*(1-exit)*(.9-i*.18));
+    });
+    socials.forEach((el,i)=>{
+     const pop=ease((view*.99-bottom-i*14)/(view*.2));
+     const fade=1-ease((view*.28-bottom)/(view*.28));
+     el.style.opacity=String(pop*fade);
+     el.style.visibility=pop*fade<.01?'hidden':'visible';
+     el.style.transform=`translate3d(0,${(1-pop)*32}px,0) scale(${.65+.35*pop})`;
+    });
     if(active.has(runway)){
      const p=clamp((y-heroTop)/heroDistance),e=ease(p),amplitude=simple?.45:1;
      objects.forEach((el,i)=>{
@@ -143,7 +177,7 @@
   },opts);
   addEventListener('orientationchange',()=>{dirty=true;schedule()},opts);
   document.addEventListener('visibilitychange',()=>{
-   if(document.hidden){cancelAnimationFrame(raf);raf=0;hero.classList.remove('scene-active')}
+   if(document.hidden){cancelAnimationFrame(raf);raf=0;railRuns.forEach(a=>a.cancel());railRuns.clear();hero.classList.remove('scene-active')}
    else {dirty=true;schedule()}
   },opts);
   document.addEventListener('focusin',e=>{
