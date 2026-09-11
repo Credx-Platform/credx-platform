@@ -85,6 +85,10 @@ try{
   const about=await p.locator('#about').evaluate(e=>({top:e.getBoundingClientRect().top+scrollY,height:e.offsetHeight}));
   await jump(p,about.top-height*.8);
   const opening=await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).clipPath);
+  await p.locator('.about-socials a').first().focus();
+  assert.equal(await p.evaluate(()=>document.activeElement.closest('.about-socials')!==null),true,'Unrevealed social links remain keyboard reachable');
+  assert.equal(await p.locator('.about-socials a').first().evaluate(e=>getComputedStyle(e).opacity),'1','Focus exposes an unrevealed link');
+  await p.locator('.about-socials a').first().evaluate(e=>e.blur());
   await jump(p,about.top-80);
   assert.notEqual(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).clipPath),opening);
   await jump(p,about.top+about.height-height*.72);

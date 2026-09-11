@@ -61,7 +61,7 @@
    hero.classList.remove('scene-active');
    runway.style.removeProperty('--hero-height');runway.style.removeProperty('--pin-top');
    portal.style.removeProperty('--interface-height');portal.style.removeProperty('--interface-pin');
-   animated.forEach(el=>{el.style.removeProperty('transform');el.style.removeProperty('opacity');el.style.removeProperty('will-change');el.style.removeProperty('clip-path');el.style.removeProperty('visibility')});
+   animated.forEach(el=>{el.style.removeProperty('transform');el.style.removeProperty('opacity');el.style.removeProperty('will-change');el.style.removeProperty('clip-path');el.style.removeProperty('pointer-events')});
    energy.style.removeProperty('opacity');hero.style.removeProperty('--journey-fill');
   }
   dispose=()=>{abort.abort();cancelAnimationFrame(raf);observer?.disconnect();railRuns.forEach(a=>a.cancel());railRuns.clear();reset()};
@@ -121,7 +121,8 @@
      const pop=ease((view*.99-bottom-i*14)/(view*.2));
      const fade=1-ease((view*.28-bottom)/(view*.28));
      el.style.opacity=String(pop*fade);
-     el.style.visibility=pop*fade<.01?'hidden':'visible';
+     // Keep links in keyboard order even while their visual reveal is offscreen.
+     el.style.pointerEvents=pop*fade<.01?'none':'auto';
      el.style.transform=`translate3d(0,${(1-pop)*32}px,0) scale(${.65+.35*pop})`;
     });
     if(active.has(runway)){

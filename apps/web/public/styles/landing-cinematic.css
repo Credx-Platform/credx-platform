@@ -235,7 +235,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
 .about-socials span{font-size:10px;letter-spacing:.4px}
 .about-socials a:hover{background:#173b57;border-color:#a5ebff}
 .about-socials a:focus-visible{outline:3px solid #b6f0ff;outline-offset:5px}
-#about:focus-within .about-inner,#about:focus-within .about-socials a{clip-path:none!important;transform:none!important;opacity:1!important;visibility:visible!important}
+#about:focus-within .about-inner,#about:focus-within .about-socials a{clip-path:none!important;transform:none!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important}
 @media(max-width:767px){
  .cinematic-hero .hero-grid{display:block;position:relative;min-height:620px}
  .cinematic-hero .hero-copy{position:relative;z-index:5;padding-top:100px}
@@ -255,5 +255,5 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
 .motion-simple .about-gateway i:not(:first-child){display:none}
 @media(prefers-reduced-motion:reduce){
  .about-gateway{display:none!important}
- #about .about-inner,.about-socials a{transform:none!important;opacity:1!important;clip-path:none!important;visibility:visible!important}
+ #about .about-inner,.about-socials a{transform:none!important;opacity:1!important;clip-path:none!important;visibility:visible!important;pointer-events:auto!important}
 }
