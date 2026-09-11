@@ -133,6 +133,7 @@ try{
   await p.evaluate(()=>history.replaceState(null,'',location.pathname));
   const middle=(await state()).y;
   await p.reload({waitUntil:'load'});await p.waitForTimeout(500);
+  assert(!await p.evaluate(()=>document.documentElement.classList.contains('smooth-scroll')),'Restoration is never switched to smooth scrolling by a timer');
   assert(Math.abs((await state()).y-middle)<120,'Refresh restores mid-page position');
   await p.goto(base+'/pricing',{waitUntil:'domcontentloaded'});await p.goBack({waitUntil:'load'});await p.waitForTimeout(500);
   assert((await state()).mode.includes('narrative-ready'),'Back navigation remounts');

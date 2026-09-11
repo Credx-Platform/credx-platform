@@ -6,10 +6,9 @@
  'use strict';
  const root=document.documentElement;
  // CSS keeps scroll-behavior instant so the browser restores a mid-page refresh
- // without animating the whole document. Hand smooth scrolling back for anchor
- // jumps once the restored position has settled, or as soon as the user acts.
+ // without animating the whole document. Only actual input enables smooth
+ // anchor navigation: a timer can race late native history restoration.
  const enableSmooth=()=>root.classList.add('smooth-scroll');
- addEventListener('load',()=>setTimeout(enableSmooth,250),{once:true});
  for(const type of ['pointerdown','keydown','wheel','touchstart'])
   addEventListener(type,enableSmooth,{once:true,passive:true});
 
@@ -230,7 +229,7 @@
  }
  preference.addEventListener('change',mount);
  // Preserve sticky spacer geometry across history/BFCache; suspend effects only.
- addEventListener('pagehide',()=>suspend());
+ addEventListener('pagehide',()=>{root.classList.remove('smooth-scroll');suspend()});
  addEventListener('pageshow',()=>resume());
  mount();
 })();

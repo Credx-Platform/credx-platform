@@ -1,5 +1,7 @@
 /* CredX landing: static-first content, one coherent artwork, bounded motion. */
 :root{--motion-ease:cubic-bezier(.4,0,.2,1);--motion-duration:440ms}
+/* Native history restores position; spacer changes must not re-anchor it. */
+html{overflow-anchor:none}
 body{overflow-x:clip;background:#050a13}
 section[id]{scroll-margin-top:80px}
 /* Headline precedes the complete artwork at every breakpoint. */
