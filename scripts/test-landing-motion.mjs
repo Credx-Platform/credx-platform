@@ -105,7 +105,11 @@ try{
   assert(Math.abs((await state()).y-middle)<120,'Refresh restores mid-page position');
   await p.goto(base+'/pricing',{waitUntil:'domcontentloaded'});await p.goBack({waitUntil:'load'});await p.waitForTimeout(500);
   assert((await state()).mode.includes('narrative-ready'),'Back navigation remounts');
-  assert.equal(await p.locator('.energy-rail').count(),3,'No duplicated effects');
+  assert.equal(await p.locator('.energy-rail').count(),2,'No duplicated effects');
+  // The line pattern is site-wide now: fixed, outside the hero, and still painted
+  // under the nav rather than over it.
+  assert.equal(await p.locator('.data-trails').evaluate(e=>e.closest('#hero')?'hero':'body'),'body');
+  assert.equal(await p.locator('.data-trails').evaluate(e=>getComputedStyle(e).position),'fixed');
   // Resizing across breakpoints and orientation-like changes.
   await p.setViewportSize({width:width<768?1024:430,height:900});await p.waitForTimeout(180);assert(!(await state()).overflow);
   await p.setViewportSize({width,height});await p.waitForTimeout(180);assert(!(await state()).overflow);
