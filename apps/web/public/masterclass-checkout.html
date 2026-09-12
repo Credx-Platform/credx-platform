@@ -37,16 +37,16 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
 .promo-line{display:none;margin:-4px 0 18px;padding:10px 12px;background:rgba(0,198,251,.08);border:1px solid var(--border-c);border-radius:8px;color:var(--white);font-size:13px;line-height:1.45}
 .promo-line.show{display:block}
 .promo-line strong{color:var(--cyan)}
-.promo-field{display:grid;grid-template-columns:1fr auto;gap:10px;margin:-4px 0 18px}
-.promo-field input{height:42px;padding:0 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--white);font-family:var(--font);font-size:13px;text-transform:uppercase;outline:none}
+.promo-field{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin:-4px 0 18px}
+.promo-field input{min-width:0;width:100%;height:42px;padding:0 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--white);font-family:var(--font);font-size:13px;text-transform:uppercase;outline:none}
 .promo-field input:focus{border-color:var(--border-c)}
 .promo-field button{height:42px;padding:0 14px;border:1px solid var(--border-c);border-radius:8px;background:rgba(0,198,251,.1);color:var(--cyan);font-family:var(--font);font-size:12px;font-weight:800;cursor:pointer}
 .promo-field button:hover{background:rgba(0,198,251,.16)}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
 .field span{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
-.field input{height:44px;padding:0 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--white);font-family:var(--font);font-size:14px;outline:none;transition:border-color .2s}
+.field input{min-width:0;width:100%;height:44px;padding:0 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--white);font-family:var(--font);font-size:14px;outline:none;transition:border-color .2s}
 .field input:focus{border-color:var(--border-c)}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 #paypalButtons{margin-top:20px;min-height:48px}
 .claim-btn{display:none;width:100%;height:48px;margin-top:20px;border:0;border-radius:8px;background:var(--cyan);color:#06101f;font-family:var(--font);font-size:15px;font-weight:800;cursor:pointer;transition:transform .2s,background .2s}
 .claim-btn:hover{background:var(--cyan2);transform:translateY(-1px)}
@@ -65,8 +65,9 @@ h1{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.6px;margin-bo
 .legal{margin-top:32px;font-size:11.5px;color:var(--muted2);text-align:center;line-height:1.7}
 .legal a{color:var(--muted2);text-decoration:none}.legal a:hover{color:var(--cyan)}
 </style>
+<link rel="stylesheet" href="/styles/platform-theme.css">
 </head>
-<body>
+<body data-cx-platform>
 <div class="container">
 <a class="back" href="/pricing">← Back to Pricing</a>
 <div class="stag">Secure Checkout</div>

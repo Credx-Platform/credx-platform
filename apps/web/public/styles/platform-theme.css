@@ -1,0 +1,64 @@
+@import url('./brand-tokens.css');
+/* Platform-wide visual language. Landing choreography stays landing-only. */
+@media screen {
+ body[data-cx-platform]{
+  --bg:var(--cx-bg);--bg2:var(--cx-bg-2);--bg3:var(--cx-bg-3);--bg4:var(--cx-bg-4);
+  --surface:#0b1422;--surface-2:#101c2d;--surface-text:#edf4fc;
+  --surface-text-muted:#bccbde;--surface-text-soft:#94a9c2;
+  --surface-border:rgba(96,174,231,.24);--surface-border-strong:rgba(0,198,251,.5);
+  --platform-bg:var(--cx-bg);--card:rgba(11,20,34,.96);--panel:var(--card);
+  --text:var(--cx-text-soft);--white:var(--cx-text);--muted:#bccbde;--muted2:#94a9c2;
+  --cyan:var(--cx-cyan);--cyan2:var(--cx-cyan-2);--border:var(--surface-border);--border-c:var(--cx-border-strong);
+  --font:var(--cx-font-body);--font-body:var(--cx-font-body);--font-display:var(--cx-font-display);
+  --cx-card-surface:linear-gradient(145deg,rgba(28,47,70,.96),rgba(8,16,31,.98) 62%);
+  --cx-card-shadow:inset 0 1px 0 rgba(184,225,255,.12),0 8px 0 -5px #030710,0 18px 34px -14px rgba(0,0,0,.7);
+  color:var(--cx-text-soft);font-family:var(--cx-font-body);color-scheme:dark;
+  background:radial-gradient(ellipse at 12% 10%,rgba(33,87,166,.12),transparent 48%),radial-gradient(ellipse at 88% 65%,rgba(65,51,115,.07),transparent 48%),var(--cx-bg);
+ }
+ body[data-cx-platform] :is(h1,h2,h3,h4,button,input,select,textarea){font-family:var(--cx-font-body)}
+ body[data-cx-platform] :is(h1,h2,h3,h4){letter-spacing:-.025em}
+ body[data-cx-platform] :is(.card,.panel,.auth-card,.hero-card,.plan-card,.stat-card,.preview-card,.empty-state-card,.dispute-card-live,.mc-tutorial-card,.mc-profile-card,.mc-overview-day-card,.mc-report-provider-card,.resource-link-card){
+  background:var(--cx-card-surface);color:var(--surface-text);border-color:var(--surface-border);border-radius:16px;box-shadow:var(--cx-card-shadow)
+ }
+ body[data-cx-platform] :is(.topbar,.sidebar,.site-footer){background:rgba(5,10,19,.96);border-color:var(--surface-border);box-shadow:none;backdrop-filter:none}
+ body[data-cx-platform] :is(.sidebar a.active,.tab.active){background:rgba(0,198,251,.1);border-color:var(--cx-border-strong);color:var(--cx-cyan)}
+ body[data-cx-platform] :is(.primary-button,.btn-primary,.btn.primary){background:var(--cx-cyan);color:#031018;border-color:var(--cx-cyan);box-shadow:0 6px 20px rgba(0,198,251,.1);border-radius:8px}
+ body[data-cx-platform] :is(.ghost-button,.btn-outline){border-color:var(--surface-border-strong);border-radius:8px}
+ body[data-cx-platform] :is(input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea){background-color:#07111f;color:var(--cx-text-soft);border-color:var(--surface-border);border-radius:8px}
+ body[data-cx-platform] :is(input,textarea)::placeholder{color:#91a5bf;opacity:1}
+ body[data-cx-platform] :is(input,select,textarea):focus-visible{outline:2px solid var(--cx-cyan);outline-offset:2px}
+ body[data-cx-platform] :is(.mc-report-provider-card strong,.mc-report-provider-rank){color:var(--cx-text-soft)!important}
+ body[data-cx-platform] .mc-report-provider-card small{color:var(--surface-text-muted)!important}
+ body[data-cx-platform] .mc-report-provider-cta{color:var(--cx-cyan)!important}
+ body[data-cx-platform] :is(.status-pill,.source-bubble--other){color:#cbd5e1}
+ body[data-cx-platform] :is(.status-pill--ok,.source-bubble--referral,.tradeline-row__bureau--EQ){color:#86efac}
+ body[data-cx-platform] :is(.source-bubble--masterclass,.tradeline-row__bureau--TU){color:#d8b4fe}
+ body[data-cx-platform] :is(.source-bubble--web,.source-bubble--signup,.tradeline-row__bureau--EX){color:#7dd3fc}
+ body[data-cx-platform] .source-bubble--social{color:#f9a8d4}
+ body[data-cx-platform] .source-bubble--direct{color:#5eead4}
+ body[data-cx-platform] :is(.status-pill--warning,.status-upgrade_offered){color:#fcd34d}
+ body[data-cx-platform] .signed-agreement-card__badge{color:#86efac}
+ body[data-cx-platform] :is(.analysis-empty,.analysis-toolbar,.referral-send-panel,.referral-link-option,.btn-secondary){background:var(--surface);border-color:var(--surface-border);color:var(--surface-text)}
+ body[data-cx-platform] :is(.analysis-empty h3,.referral-link-option strong,.referral-note-field){color:var(--surface-text)}
+ body[data-cx-platform] :is(.analysis-loading,.analysis-empty,.referral-link-option small,.referral-disclosure){color:var(--surface-text-muted)}
+ /* Exportable analysis report retains its paper palette. */
+ body[data-cx-platform] .report-section{color:#0f172a;color-scheme:light}
+ body[data-cx-platform] :is(.status-lead,.status-pending,.status-response_due){color:#fcd34d}
+ body[data-cx-platform] :is(.status-active,.status-completed,.helper-text--success,.monitoring-provider-card.is-selected .monitoring-provider-check){color:#86efac}
+ body[data-cx-platform] :is(.status-student,.status-contract_sent,.status-letter_sent,.status-intake_received,.status-analysis_ready,.link-button,.link-usage-details summary){color:var(--cx-cyan)}
+ body[data-cx-platform] :is(.status-past_due,.status-restricted,.status-rejected,.status-cancelled,.helper-text--error,.danger-zone h3){color:#fca5a5}
+ body[data-cx-platform] .danger-button{color:#fca5a5!important}
+ body[data-cx-platform] .setup-steps li::before{color:#fdba74}
+ /* Paper remains paper, including ink used by signature capture/export. */
+ body[data-cx-platform] :is(.contract-body,.signature-pad-wrap,.signature-display){--surface-text:#0f172a;--surface-text-muted:#475569;--surface-border:rgba(15,23,42,.15);color:#0f172a;background:#fff;color-scheme:light}
+ body[data-cx-platform] .contract-body :is(h2,h3,p,li,strong){color:#0f172a}
+ body[data-cx-platform] .signature-pad-wrap input{color:#0f172a;background:#fff}
+ /* No floating panels or scroll choreography on working/application pages. */
+ body[data-cx-platform] :is(.clickable-card,.stat-card--interactive,.mc-report-provider-card):hover{transform:none}
+ body[data-cx-platform] .hero-tag::before{animation:none}
+ body[data-cx-platform] .reveal{opacity:1!important;transform:none!important;filter:none!important}
+ body[data-cx-platform]>:is(.page,.container,main,#root){animation:cx-platform-fade .32s ease-out both}
+ body[data-cx-platform] .question.fade-in{animation:cx-platform-fade .26s ease-out both}
+}
+@keyframes cx-platform-fade{from{opacity:.65}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){body[data-cx-platform],body[data-cx-platform] *{animation:none!important;transition:none!important}}

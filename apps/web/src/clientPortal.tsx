@@ -1,3 +1,4 @@
+import { usePageFade } from './platformMotion';
 import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import MasterclassDashboard from './components/MasterclassDashboard';
 import CreditScoreWidget from './components/CreditScoreWidget';
@@ -4049,6 +4050,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PortalTab>('overview');
+  usePageFade(activeTab, '.client-shell .page-grid');
   const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeLeaving, setWelcomeLeaving] = useState(false);

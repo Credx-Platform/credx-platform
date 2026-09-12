@@ -59,6 +59,7 @@ try{
   }));
   let first=await state();assert(!first.overflow);assert(first.cta<height,'Hero CTA immediately available');
   assert(first.mode.includes('narrative-ready'));assert.equal(first.headings,15);
+  assert.equal(await p.locator('.journey-cue').count(),0,'Scroll to Explore label and bar removed');
   assert.equal(await p.locator('.scene-object img').count(),5);
   assert(await p.locator('.scene-object img').evaluateAll(els=>els.every(el=>el.complete&&el.naturalWidth>0)));
   await p.screenshot({path:`${shots}/${engine}-${width}-intro.png`});
@@ -80,10 +81,10 @@ try{
   assert(await p.locator('.cyber-streak').evaluateAll(els=>els.every(e=>parseFloat(e.style.height)>=1.4&&parseFloat(e.style.height)<=3.6)),'Lines are twice the prior thickness');
   assert(await p.locator('.cyber-streak').evaluateAll(els=>els.every(e=>parseFloat(e.style.width)>=(innerWidth<768?540:840))),'Trails are three times the previous length');
   const streakState=()=>p.locator('.cyber-streak').evaluateAll(els=>els.map(e=>({transform:getComputedStyle(e).transform,opacity:getComputedStyle(e).opacity,time:e.getAnimations()[0].currentTime,playState:e.getAnimations()[0].playState})));
-  const frozen=await streakState();assert(frozen.every(e=>e.playState==='paused'));
-  await p.waitForTimeout(450);assert.deepEqual(await streakState(),frozen,'No movement, fade or new trails when scrolling stops');
-  await p.evaluate(()=>scrollBy({top:24,behavior:'instant'}));await settle(p);
-  assert.notDeepEqual(await streakState(),frozen,'Trails resume from native scroll input');
+  const flying=await streakState();assert(flying.every(e=>e.playState==='running'));
+  await p.waitForTimeout(350);assert.notDeepEqual(await streakState(),flying,'Launched lines continue soaring when scrolling stops');
+  await p.waitForFunction(()=>!document.querySelector('.cyber-streak'),null,{timeout:6000});
+  await p.waitForTimeout(350);assert.equal(await p.locator('.cyber-streak').count(),0,'No new lines launch while idle');
   // About opens before its reading position. Social controls appear at the
   // section bottom, fade on exit, and recover on reverse/keyboard navigation.
   const about=await p.locator('#aboutRunway').evaluate(e=>({top:e.getBoundingClientRect().top+scrollY,height:e.offsetHeight,travel:parseFloat(e.style.getPropertyValue('--about-travel'))}));

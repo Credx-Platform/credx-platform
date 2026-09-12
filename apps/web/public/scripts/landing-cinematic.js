@@ -23,7 +23,6 @@
  const art=hero.querySelector('.hero-art'),heroCopy=hero.querySelector('.hero-copy'),heroGrid=hero.querySelector('.hero-grid');
  const frames=[...portal.querySelectorAll('.portal-frames i')];
  const dash=portal.querySelector('.dash-ui');
- const cue=hero.querySelector('.journey-state');
  const tracks=[
   {id:'how',selector:'.step',kind:'rise'},
   {id:'testimonials',selector:'.test-card',kind:'slide'},
@@ -84,18 +83,10 @@
   const scenes=tracks.map(t=>({...t,items:[...t.el.querySelectorAll(t.selector)],top:0,height:0}));
   scenes.forEach(t=>t.items.forEach(el=>animated.add(el)));
   function schedule(){if(!raf&&!document.hidden&&!paused)raf=requestAnimationFrame(draw)}
-  // Paused animation timelines are scrubbed ONLY by native scroll distance.
-  // There is no timer, playback tail, or ambient motion while the page rests.
+  // Scroll launches a trail; its autonomous flight finishes after input stops.
+  // No timer launches new trails while the page is idle.
   function advanceStreaks(delta){
    if(!delta)return;
-   streaks.forEach((state,el)=>{
-    state.time+=delta/state.lifetime*1000;
-    if(state.time<=0||state.time>=1000){state.run.cancel();el.remove();streaks.delete(el)}
-    else {
-     state.run.currentTime=state.time;state.travel+=Math.abs(delta);
-     el.style.opacity=String(state.brightness*ease(state.travel/100)*ease(Math.min(state.time,1000-state.time)/180));
-    }
-   });
    streakTravel+=Math.abs(delta);
    if(streakTravel>=nextStreak){
     spawnStreak(delta);streakTravel=0;
@@ -111,22 +102,22 @@
    const lanes=[-.85,-.32,.35,.82,Math.PI-.85,Math.PI-.32,Math.PI+.35,Math.PI+.82];
    const angle=lanes[Math.floor(random(0,lanes.length))]+random(-.09,.09);
    const distance=Math.max(width,view)+length;
-   const time=delta>0?350:650;
+   const time=350;
    const x=random(width*.12,width*.88)-Math.cos(angle)*(distance*time/1000+length*.5);
    const y=random(view*.18,view*.85)-Math.sin(angle)*(distance*time/1000+length*.5);
    const brightness=random(.22,.46),bend=random(-1,1)*(portalBusy?130:70);
    el.style.width=`${length}px`;el.style.height=`${random(1.4,3.6).toFixed(2)}px`;
-   const keyframes=[0,.14,.52,.82,1].map(t=>{
+   const keyframes=[0,.14,.52,.82,1].map((t,i)=>{
     const curve=Math.sin(t*Math.PI)*bend;
     const px=x+Math.cos(angle)*distance*t-Math.sin(angle)*curve;
     const py=y+Math.sin(angle)*distance*t+Math.cos(angle)*curve;
     const tangent=angle+Math.atan(Math.cos(t*Math.PI)*Math.PI*bend/distance);
-    return {transform:`translate3d(${px}px,${py}px,0) rotate(${tangent}rad)`,offset:t};
+    return {transform:`translate3d(${px}px,${py}px,0) rotate(${tangent}rad)`,opacity:[0,brightness,brightness*.85,brightness*.35,0][i],offset:t};
    });
    energy.append(el);
-   const run=el.animate(keyframes,{duration:1000,easing:'linear',fill:'both'});
-   run.pause();run.currentTime=time;
-   streaks.set(el,{run,time,brightness,travel:0,lifetime:random(view*1.4,view*2)});
+   const run=el.animate(keyframes,{duration:random(2600,4200),easing:'linear'});
+   streaks.set(el,{run});
+   run.onfinish=()=>{streaks.delete(el);el.remove()};
   }
   resume=()=>{if(abort.signal.aborted||preference.matches)return;paused=false;dirty=true;lastScrollY=scrollY;schedule()};
   function measure(){
@@ -203,9 +194,6 @@
     if(active.has(runway)){
      const p=clamp((y-heroTop-12)/Math.max(1,heroDistance-12)),e=ease(p);
      art.style.transform=`translate3d(0,${-e*(simple?5:14)}px,0) scale(${1-(width<768?.16:.24)*(1-e)})`;
-     hero.style.setProperty('--journey-fill',String(.05+.95*p));
-     const label=p<.5?'01 / YOUR PERSPECTIVE':'02 / INSIDE CREDX';
-     if(cue.textContent!==label)cue.textContent=label;
     }
     if(active.has(portal)){
      const p=clamp((y-portalTop+view*.38)/(portalDistance+view*.38));
