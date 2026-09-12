@@ -56,7 +56,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
 .hero-bridge .rc-float{animation:none}
 /* Short symmetric data segments: no bright comet heads or fixed tracks. */
 .data-trails{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden;contain:strict}
-.cyber-streak{position:absolute;left:0;top:0;height:2px;border-radius:1px;opacity:0;transform-origin:0 50%;background:linear-gradient(90deg,transparent,rgba(45,174,231,.6) 15%,#92e7ff 45%,#92e7ff 55%,rgba(45,174,231,.6) 85%,transparent);box-shadow:0 0 7px rgba(0,178,244,.35);will-change:transform,opacity}
+.data-trails canvas{display:block;width:100%;height:100%}
 /* Existing software entrance stays subordinate to the About aperture. */
 .interface-runway{position:relative;isolation:isolate}
 .interface-runway .dash{position:relative;background:transparent;z-index:2}
@@ -179,8 +179,6 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
 @keyframes intro-trace{from{rotate:-160deg;opacity:0;scale:.9}25%{opacity:1}to{rotate:130deg;opacity:1;scale:1}}
 @keyframes intro-arrive{from{opacity:0;scale:.94}to{opacity:1;scale:1}}
 @keyframes intro-clear{to{opacity:0;visibility:hidden}}
-/* Long, fine blue-white rain; no thick horizontal laser bars over the copy. */
-.cyber-streak{background:linear-gradient(90deg,transparent,rgba(38,148,204,.18) 22%,#72d8f6 78%,#e3faff 98%,transparent);box-shadow:0 0 5px rgba(94,214,249,.38),0 0 16px rgba(0,158,214,.15)}
 .about-runway{position:relative;background:#050a13;isolation:isolate;overflow:clip}
 .narrative-ready .about-runway{height:calc(var(--about-height,100svh) + var(--about-travel,90svh))}
 .narrative-ready #about{position:sticky;top:80px;min-height:calc(100svh - 80px);overflow:visible}

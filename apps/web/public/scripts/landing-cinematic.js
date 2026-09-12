@@ -38,8 +38,9 @@
  ].map(t=>({...t,el:t.host?document.querySelector(t.host):document.getElementById(t.id)}));
  // Site-wide now: the pattern layer lives on <body>, not inside the hero.
  const energy=document.querySelector('.data-trails');
- // Streaks are generated per spawn, never replayed from a fixed path bank.
- energy.replaceChildren();
+ // One canvas draws every trail; paths are generated per spawn, never replayed.
+ const canvas=document.createElement('canvas'),pen=canvas.getContext('2d');
+ energy.replaceChildren(canvas);
  const random=(a,b)=>a+Math.random()*(b-a);
  const about=document.getElementById('about'),aboutContent=about.querySelector('.about-inner');
  const aboutTransition=document.querySelector('.about-transition'),aboutVeil=aboutTransition.querySelector('.about-veil');
@@ -57,8 +58,8 @@
   let skipAbout=location.hash==='#about',socialAnnounced=false,socialOffset=0;
   let raf=0,dirty=true,paused=false,view=innerHeight,width=innerWidth,portalBusy=false;
   let heroTop=0,heroDistance=1,portalTop=0,portalDistance=1,aboutTop=0,aboutHeight=1,aboutTravel=1;
-  const streaks=new Map();
-  let lastScrollY=scrollY,pendingScroll=0,streakTravel=0,nextStreak=80;
+  const darts=[];
+  let lastScrollY=scrollY,pendingScroll=0,streakTravel=0,nextStreak=80,flight=0,flightAt=0;
   let slowFrames=0,samples=0,observer,layoutObserver;
   const simple=degraded||weak()||innerWidth<768;
   const animated=new Set([art,...frames,dash,aboutContent,aboutLogo,aboutTransition,aboutBackdrop,...aboutFrames,...socials]);
@@ -74,7 +75,8 @@
    aboutRunway.style.removeProperty('--about-height');aboutRunway.style.removeProperty('--about-travel');
    energy.style.removeProperty('opacity');hero.style.removeProperty('--journey-fill');hero.style.removeProperty('--hero-art-cap');
   }
-  function stopStreaks(){streaks.forEach(({run},el)=>{run.cancel();el.remove()});streaks.clear();energy.replaceChildren();pendingScroll=0;streakTravel=0;nextStreak=80;}
+  function wipe(){if(pen){pen.setTransform(1,0,0,1,0,0);pen.clearRect(0,0,canvas.width,canvas.height)}}
+  function stopStreaks(){cancelAnimationFrame(flight);flight=0;darts.length=0;energy.dataset.live='0';wipe();pendingScroll=0;streakTravel=0;nextStreak=80;}
   suspend=()=>{paused=true;cancelAnimationFrame(raf);raf=0;stopStreaks();hero.classList.remove('scene-active')};
   dispose=()=>{suspend();abort.abort();observer?.disconnect();layoutObserver?.disconnect();reset()};
   if(preference.matches)return;
@@ -93,31 +95,83 @@
     nextStreak=random(simple?280:340,simple?480:580);
    }
   }
-  function spawnStreak(delta){
-   if(streaks.size>=(simple?2:3))return;
-   const el=document.createElement('i');el.className='cyber-streak';
-   // Three times the previous length, retaining the fine core and muted halo.
-   // Alternate angled lanes, with gentle bends, avoid a vertical rain pattern.
-   const length=random(simple?540:840,simple?1440:2340);
-   const lanes=[-.85,-.32,.35,.82,Math.PI-.85,Math.PI-.32,Math.PI+.35,Math.PI+.82];
-   const angle=lanes[Math.floor(random(0,lanes.length))]+random(-.09,.09);
-   const distance=Math.max(width,view)+length;
-   const time=350;
-   const x=random(width*.12,width*.88)-Math.cos(angle)*(distance*time/1000+length*.5);
-   const y=random(view*.18,view*.85)-Math.sin(angle)*(distance*time/1000+length*.5);
-   const brightness=random(.22,.46),bend=random(-1,1)*(portalBusy?130:70);
-   el.style.width=`${length}px`;el.style.height=`${random(1.4,3.6).toFixed(2)}px`;
-   const keyframes=[0,.14,.52,.82,1].map((t,i)=>{
-    const curve=Math.sin(t*Math.PI)*bend;
-    const px=x+Math.cos(angle)*distance*t-Math.sin(angle)*curve;
-    const py=y+Math.sin(angle)*distance*t+Math.cos(angle)*curve;
-    const tangent=angle+Math.atan(Math.cos(t*Math.PI)*Math.PI*bend/distance);
-    return {transform:`translate3d(${px}px,${py}px,0) rotate(${tangent}rad)`,opacity:[0,brightness,brightness*.85,brightness*.35,0][i],offset:t};
-   });
-   energy.append(el);
-   const run=el.animate(keyframes,{duration:random(2600,4200),easing:'linear'});
-   streaks.set(el,{run});
-   run.onfinish=()=>{streaks.delete(el);el.remove()};
+  // 8bit.ai-style darting light: a fine filament, tapered at both ends, whose
+  // heading swerves at random mid-flight. Half the reference stroke weight.
+  function spawnStreak(){
+   if(!pen||darts.length>=(simple?2:3))return;
+   const dpr=Math.min(devicePixelRatio||1,2),w=Math.round(width*dpr),h=Math.round(view*dpr);
+   if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+   const reach=Math.max(width,view);
+   // Diagonal headings in all four quadrants: no vertical rain, no flat bars over copy.
+   const heading=random(.3,1.25)*(Math.random()<.5?-1:1)+(Math.random()<.5?0:Math.PI);
+   const speed=reach*random(1.1,1.7),lead=speed*.22;
+   const x=random(width*.15,width*.85)-Math.cos(heading)*lead,y=random(view*.2,view*.8)-Math.sin(heading)*lead;
+   const length=reach*random(.3,.55);
+   darts.push({points:[{x,y}],x,y,heading,speed,length,full:length,turn:0,swerve:0,nextSwerve:0,age:0,
+    life:random(.75,1.2),core:random(.8,1.3),glow:random(.75,1)});
+   energy.dataset.live=String(darts.length);
+   if(!flight){flightAt=performance.now();flight=requestAnimationFrame(fly)}
+  }
+  // Strokes the stretch of the trail whose taper exceeds `floor` as one path,
+  // so joints never double up into beads.
+  function trace(points,along,total,floor){
+   const body=k=>Math.sin(Math.PI*Math.pow(along[k]/total,1.6));
+   let a=0,b=points.length-1;
+   while(a<b&&body(a)<floor)a++;
+   while(b>a&&body(b)<floor)b--;
+   if(b-a<1)return;
+   pen.beginPath();pen.moveTo(points[a].x,points[a].y);
+   for(let k=a+1;k<=b;k++)pen.lineTo(points[k].x,points[k].y);
+   pen.stroke();
+  }
+  function fly(now){
+   flight=0;
+   try{
+    const dt=Math.min(.05,(now-flightAt)/1000);flightAt=now;
+    wipe();
+    const dpr=canvas.width/width;
+    pen.setTransform(dpr,0,0,dpr,0,0);
+    pen.globalCompositeOperation='lighter';pen.lineCap='round';pen.lineJoin='round';
+    for(let i=darts.length-1;i>=0;i--){
+     const d=darts[i];d.age+=dt;
+     if(d.age>=d.nextSwerve){d.swerve=random(-1,1)*(portalBusy?2.6:1.8);d.nextSwerve=d.age+random(.12,.3)}
+     d.turn+=(d.swerve-d.turn)*Math.min(1,dt*10);d.heading+=d.turn*dt;
+     d.x+=Math.cos(d.heading)*d.speed*dt;d.y+=Math.sin(d.heading)*d.speed*dt;
+     d.points.push({x:d.x,y:d.y});
+     // Past its life the head keeps flying while the tail catches up.
+     if(d.age>d.life)d.length-=d.speed*dt*1.4;
+     if(d.length<=0||d.age>d.life+2){darts.splice(i,1);continue}
+     const pts=d.points;let run=0;
+     for(let k=pts.length-1;k>0;k--){
+      const seg=Math.hypot(pts[k].x-pts[k-1].x,pts[k].y-pts[k-1].y);
+      if(run+seg>=d.length){
+       const f=(d.length-run)/seg;
+       pts[k-1].x=pts[k].x+(pts[k-1].x-pts[k].x)*f;pts[k-1].y=pts[k].y+(pts[k-1].y-pts[k].y)*f;
+       pts.splice(0,k-1);break;
+      }
+      run+=seg;
+     }
+     if(pts.length<2)continue;
+     const along=[0];
+     for(let k=1;k<pts.length;k++)along.push(along[k-1]+Math.hypot(pts[k].x-pts[k-1].x,pts[k].y-pts[k-1].y));
+     const total=along[along.length-1]||1,tail=pts[0];
+     const alpha=Math.min(1,d.age/.12)*d.glow*(d.age>d.life?Math.max(0,d.length/d.full):1);
+     pen.strokeStyle='rgb(0,158,214)';
+     pen.globalAlpha=.1*alpha;pen.lineWidth=d.core*4.2;trace(pts,along,total,0);
+     pen.strokeStyle='rgb(94,214,249)';
+     pen.globalAlpha=.16*alpha;pen.lineWidth=d.core*2.2;trace(pts,along,total,.5);
+     const tone=pen.createLinearGradient(tail.x,tail.y,d.x,d.y);
+     tone.addColorStop(0,'rgba(38,148,204,0)');tone.addColorStop(.35,'rgba(38,148,204,.5)');
+     tone.addColorStop(.8,'#72d8f6');tone.addColorStop(1,'#e3faff');
+     pen.strokeStyle=tone;
+     for(const [floor,size,strength] of [[0,.45,.55],[.4,.75,.35],[.75,1,.3]]){
+      pen.globalAlpha=strength*alpha;pen.lineWidth=d.core*size;trace(pts,along,total,floor);
+     }
+    }
+    pen.globalAlpha=1;
+    energy.dataset.live=String(darts.length);
+    if(darts.length)flight=requestAnimationFrame(fly);else wipe();
+   }catch(error){dispose();console.warn('CredX motion disabled; static content remains available.');}
   }
   resume=()=>{if(abort.signal.aborted||preference.matches)return;paused=false;dirty=true;lastScrollY=scrollY;schedule()};
   function measure(){

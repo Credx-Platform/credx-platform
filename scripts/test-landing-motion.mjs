@@ -76,15 +76,15 @@ try{
   await p.screenshot({path:`${shots}/${engine}-${width}-hero-out.png`});
   assert(await p.locator('.scene-object').evaluateAll(els=>els.every(e=>getComputedStyle(e).transform==='none')),'No independent asset scaling');
   await jump(p,0);assert.deepEqual((await state()).transforms,first.transforms,'Reversal restores exact camera position');
-  await p.waitForFunction(()=>document.querySelector('.cyber-streak'));
-  assert(await p.locator('.cyber-streak').count()<=(width<768?2:3),'Bounded streak density');
-  assert(await p.locator('.cyber-streak').evaluateAll(els=>els.every(e=>parseFloat(e.style.height)>=1.4&&parseFloat(e.style.height)<=3.6)),'Lines are twice the prior thickness');
-  assert(await p.locator('.cyber-streak').evaluateAll(els=>els.every(e=>parseFloat(e.style.width)>=(innerWidth<768?540:840))),'Trails are three times the previous length');
-  const streakState=()=>p.locator('.cyber-streak').evaluateAll(els=>els.map(e=>({transform:getComputedStyle(e).transform,opacity:getComputedStyle(e).opacity,time:e.getAnimations()[0].currentTime,playState:e.getAnimations()[0].playState})));
-  const flying=await streakState();assert(flying.every(e=>e.playState==='running'));
-  await p.waitForTimeout(350);assert.notDeepEqual(await streakState(),flying,'Launched lines continue soaring when scrolling stops');
-  await p.waitForFunction(()=>!document.querySelector('.cyber-streak'),null,{timeout:6000});
-  await p.waitForTimeout(350);assert.equal(await p.locator('.cyber-streak').count(),0,'No new lines launch while idle');
+  const live=()=>p.locator('.data-trails').evaluate(e=>Number(e.dataset.live||0));
+  await p.waitForFunction(()=>Number(document.querySelector('.data-trails').dataset.live)>0);
+  assert.equal(await p.locator('.data-trails canvas').count(),1,'Trails render into a single canvas layer');
+  assert(await live()<=(width<768?2:3),'Bounded streak density');
+  const pixels=()=>p.locator('.data-trails canvas').evaluate(c=>c.toDataURL());
+  const flying=await pixels();
+  await p.waitForTimeout(120);assert.notEqual(await pixels(),flying,'Launched lines continue darting when scrolling stops');
+  await p.waitForFunction(()=>document.querySelector('.data-trails').dataset.live==='0',null,{timeout:6000});
+  await p.waitForTimeout(350);assert.equal(await live(),0,'No new lines launch while idle');
   // About opens before its reading position. Social controls appear at the
   // section bottom, fade on exit, and recover on reverse/keyboard navigation.
   const about=await p.locator('#aboutRunway').evaluate(e=>({top:e.getBoundingClientRect().top+scrollY,height:e.offsetHeight,travel:parseFloat(e.style.getPropertyValue('--about-travel'))}));
