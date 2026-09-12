@@ -44,7 +44,7 @@ try{
   });
   const p=await context.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));
   await relaxCsp(p);
-  await p.goto(base,{waitUntil:'load'});await p.evaluate(()=>document.fonts.ready);await p.waitForTimeout(1400);
+  await p.goto(base,{waitUntil:'load'});await p.evaluate(()=>document.fonts.ready);await p.waitForTimeout(2450);
   const state=()=>p.evaluate(()=>({
    overflow:document.documentElement.scrollWidth>innerWidth,
    cta:document.querySelector('.hero-btns').getBoundingClientRect().bottom,
@@ -69,27 +69,34 @@ try{
   assert(Math.abs(await scale()-1)<.001);
   let lastScale=1;
   for(let i=1;i<=12;i++){await jump(p,first.heroDistance*i/12);const next=await scale();assert(next<=lastScale+.001);lastScale=next;assert(await contained())}
-  assert(Math.abs(lastScale-(width<768?.68:.52))<.002,'Hero reaches requested final size');
+  assert(Math.abs(lastScale-(width<768?.84:.76))<.002,'Hero reaches requested final size');
   const advanced=await state();await p.waitForTimeout(160);assert.deepEqual((await state()).transforms,advanced.transforms,'No delayed interpolation');
   await p.screenshot({path:`${shots}/${engine}-${width}-hero-out.png`});
   assert(await p.locator('.scene-object').evaluateAll(els=>els.every(e=>getComputedStyle(e).transform==='none')),'No independent asset scaling');
   await jump(p,0);assert.deepEqual((await state()).transforms,first.transforms,'Reversal restores exact camera position');
   await p.waitForFunction(()=>document.querySelector('.cyber-streak'));
-  assert(await p.locator('.cyber-streak').count()<=(width<768?2:3),'Bounded streak density');
+  assert(await p.locator('.cyber-streak').count()<=(width<768?16:24),'Bounded streak density');
   // About opens before its reading position. Social controls appear at the
   // section bottom, fade on exit, and recover on reverse/keyboard navigation.
-  const about=await p.locator('#about').evaluate(e=>({top:e.getBoundingClientRect().top+scrollY,height:e.offsetHeight}));
-  await jump(p,about.top-height*.8);
-  const opening=await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).clipPath);
-  await jump(p,about.top-height*.75);
-  assert(await p.locator('.about-gateway i').first().evaluate(e=>{const r=e.getBoundingClientRect();return Number(getComputedStyle(e).opacity)>.5&&r.top<innerHeight&&r.bottom>0}),'Bright portal visible at 25% section entry');
+  const about=await p.locator('#aboutRunway').evaluate(e=>({top:e.getBoundingClientRect().top+scrollY,height:e.offsetHeight,travel:parseFloat(e.style.getPropertyValue('--about-travel'))}));
+  await jump(p,about.top-80+about.travel*.4);
+  assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'0','About remains hidden while the ring opens');
+  assert(await p.locator('.portal-logo').evaluate(e=>Number(getComputedStyle(e).opacity)>.9),'CredX logo sits inside the portal');
+  assert(await p.locator('.about-gateway i').first().evaluate(e=>{const r=e.getBoundingClientRect();return Number(getComputedStyle(e).opacity)>.5&&r.top<innerHeight&&r.bottom>0}),'Bright portal visible during entry');
   await p.screenshot({path:`${shots}/${engine}-${width}-about-entry.png`});
+  await jump(p,about.top-80+about.travel*.79);
+  assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'0','No content leaks before the circle fully opens');
+  assert(await p.locator('.about-gateway i').first().evaluate(e=>{const r=e.getBoundingClientRect();return r.width>Math.hypot(innerWidth,innerHeight)}),'Circle clears all viewport corners before reveal');
+  await jump(p,about.top-80+about.travel);
+  assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'1','About revealed after complete opening');
+  await p.screenshot({path:`${shots}/${engine}-${width}-about-open.png`});
+  await jump(p,about.top-80+about.travel*.4);
+  assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'0','Reverse scrolling closes the reveal');
   await p.locator('.about-socials a').first().focus();
   assert.equal(await p.evaluate(()=>document.activeElement.closest('.about-socials')!==null),true,'Unrevealed social links remain keyboard reachable');
   assert.equal(await p.locator('.about-socials a').first().evaluate(e=>getComputedStyle(e).opacity),'1','Focus exposes an unrevealed link');
   await p.locator('.about-socials a').first().evaluate(e=>e.blur());
-  await jump(p,about.top-80);
-  assert.notEqual(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).clipPath),opening);
+  await jump(p,about.top+about.travel-80);
   await jump(p,about.top+about.height-height*.72);
   assert(await p.locator('.about-socials a').evaluateAll(els=>els.every(e=>Number(getComputedStyle(e).opacity)>.9&&getComputedStyle(e).visibility==='visible')),'All social icons pop in');
   assert.deepEqual(await p.locator('.about-socials a').evaluateAll(els=>els.map(e=>new URL(e.href).hostname)),['www.instagram.com','www.youtube.com','www.facebook.com']);
@@ -138,7 +145,7 @@ try{
   await p.goto(base+'/pricing',{waitUntil:'domcontentloaded'});await p.goBack({waitUntil:'load'});await p.waitForTimeout(500);
   assert((await state()).mode.includes('narrative-ready'),'Back navigation remounts');
   assert.equal(await p.locator('.data-trails').count(),1,'No duplicated effects');
-  assert(await p.locator('.cyber-streak').count()<=3,'No leaked streaks after back');
+  assert(await p.locator('.cyber-streak').count()<=24,'No leaked streaks after back');
   // The bounded data-energy layer is site-wide and non-interactive.
   assert.equal(await p.locator('.data-trails').evaluate(e=>e.closest('#hero')?'hero':'body'),'body');
   assert.equal(await p.locator('.data-trails').evaluate(e=>getComputedStyle(e).position),'fixed');

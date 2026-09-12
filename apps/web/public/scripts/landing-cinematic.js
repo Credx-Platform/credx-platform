@@ -43,6 +43,7 @@
  const random=(a,b)=>a+Math.random()*(b-a);
  const about=document.getElementById('about'),aboutContent=about.querySelector('.about-inner');
  const aboutFrames=[...about.querySelectorAll('.about-gateway i')];
+ const aboutRunway=document.getElementById('aboutRunway'),aboutLogo=about.querySelector('.portal-logo');
  const socials=[...about.querySelectorAll('.about-socials a')];
  let dispose=()=>{},suspend=()=>{},resume=()=>{},degraded=false;
  const weak=()=>navigator.connection?.saveData||
@@ -51,12 +52,13 @@
  function mount(){
   dispose();
   const abort=new AbortController(),opts={passive:true,signal:abort.signal};
+  let skipAbout=location.hash==='#about';
   let raf=0,dirty=true,paused=false,view=innerHeight,width=innerWidth,streakTimer=0,portalBusy=false;
-  let heroTop=0,heroDistance=1,portalTop=0,portalDistance=1,aboutTop=0,aboutHeight=1;
+  let heroTop=0,heroDistance=1,portalTop=0,portalDistance=1,aboutTop=0,aboutHeight=1,aboutTravel=1;
   const streaks=new Map();
   let slowFrames=0,samples=0,observer;
   const simple=degraded||weak()||innerWidth<768;
-  const animated=new Set([art,...frames,dash,aboutContent,...aboutFrames,...socials]);
+  const animated=new Set([art,...frames,dash,aboutContent,aboutLogo,...aboutFrames,...socials]);
   const active=new Set();
   function reset(){
    root.classList.remove('cinematic-ready','narrative-ready','motion-simple');
@@ -64,6 +66,7 @@
    runway.style.removeProperty('--hero-height');runway.style.removeProperty('--pin-top');
    portal.style.removeProperty('--interface-height');portal.style.removeProperty('--interface-pin');
    animated.forEach(el=>{el.style.removeProperty('transform');el.style.removeProperty('opacity');el.style.removeProperty('will-change');el.style.removeProperty('clip-path');el.style.removeProperty('pointer-events')});
+   aboutRunway.style.removeProperty('--about-height');aboutRunway.style.removeProperty('--about-travel');
    energy.style.removeProperty('opacity');hero.style.removeProperty('--journey-fill');hero.style.removeProperty('--hero-art-cap');
   }
   function stopStreaks(){clearTimeout(streakTimer);streakTimer=0;streaks.forEach((a,el)=>{a.cancel();el.remove()});streaks.clear();energy.replaceChildren()}
@@ -79,30 +82,21 @@
    if(streakTimer||paused||document.hidden||abort.signal.aborted)return;
    streakTimer=setTimeout(()=>{
     streakTimer=0;
-    try{if(!portalBusy)spawnStreak();queueStreak()}
+    try{spawnStreak();queueStreak()}
     catch{dispose();console.warn('CredX motion disabled; static content remains available.')}
-   },random(simple?480:180,simple?1450:920));
+   },random(simple?130:90,simple?220:160));
   }
   function spawnStreak(){
-   if(streaks.size>=(simple?2:3))return;
+   if(streaks.size>=(simple?16:24))return;
    const el=document.createElement('i');el.className='cyber-streak';
-   const length=random(simple?45:70,simple?145:260);
-   let angle=random(0,Math.PI*2),x=random(0,width),y=random(70,view);
-   const orientation=Math.random();
-   if(orientation<.25)angle=random(-.12,.12)+(Math.random()<.5?0:Math.PI);
-   else if(orientation<.45)angle=random(1.4,1.74)+(Math.random()<.5?0:Math.PI);
-   const edge=Math.random()<.55;
-   if(edge){
-    const side=Math.floor(random(0,4));
-    if(side===0){x=-length;angle=random(-.7,.7)}
-    if(side===1){x=width+length;angle=Math.PI+random(-.7,.7)}
-    if(side===2){y=-length;angle=Math.PI/2+random(-.6,.6)}
-    if(side===3){y=view+length;angle=-Math.PI/2+random(-.6,.6)}
-   }
-   const distance=edge&&Math.random()<.35?Math.max(width,view)+length*2:random(160,Math.max(width,view)*.9);
-   const duration=Math.random()<.08?random(1200,1450):random(350,1150);
-   const brightness=random(simple?.2:.22,simple?.46:.65),bend=Math.random()<.3?random(-32,32):0;
-   el.style.width=`${length}px`;el.style.height=`${random(1.5,3).toFixed(2)}px`;
+   // A shared top-right to bottom-left current, with depth from length and speed.
+   const length=random(simple?180:280,simple?480:780);
+   const angle=portalBusy?random(1.66,2.0):random(1.91,2.02);
+   const x=random(0,width+view*.5),y=-length*.5;
+   const distance=(view+length*2)/Math.sin(angle);
+   const duration=random(2200,3800);
+   const brightness=random(.28,.68),bend=portalBusy?random(-100,100):0;
+   el.style.width=`${length}px`;el.style.height=`${random(.7,1.8).toFixed(2)}px`;
    const keyframes=[0,.14,.52,.82,1].map((t,i)=>{
     const curve=Math.sin(t*Math.PI)*bend;
     const px=x+Math.cos(angle)*distance*t-Math.sin(angle)*curve;
@@ -136,7 +130,10 @@
    portalTop=portal.getBoundingClientRect().top+scrollY;
    portalDistance=Math.max(1,portal.offsetHeight-dh);
    scenes.forEach(t=>{t.top=t.el.getBoundingClientRect().top+scrollY;t.height=t.el.offsetHeight});
-   aboutTop=about.getBoundingClientRect().top+scrollY;aboutHeight=about.offsetHeight;
+   aboutHeight=about.offsetHeight;aboutTravel=view*.9;
+   aboutRunway.style.setProperty('--about-height',`${aboutHeight}px`);
+   aboutRunway.style.setProperty('--about-travel',`${aboutTravel}px`);
+   aboutTop=aboutRunway.getBoundingClientRect().top+scrollY;
    dirty=false;
   }
   function draw(){
@@ -145,18 +142,23 @@
     if(dirty)measure();
     const y=scrollY;
 
-    // Open before the reading position, hold for tall mobile copy, then exit.
-    const entrance=ease((view*.99-(aboutTop-y))/(view*.7));
-    portalBusy=entrance>.03&&entrance<.98;
-    const bottom=aboutTop+aboutHeight-y;
+    // The iris crosses every viewport corner BEFORE About starts to appear.
+    const progress=skipAbout?1:clamp((y-aboutTop+81)/aboutTravel);
+    const entrance=ease(progress/.78),reveal=ease((progress-.8)/.2);
+    portalBusy=progress>0&&progress<1;
+    const bottom=aboutTop+aboutTravel+aboutHeight-y;
     const exit=ease((view*.32-bottom)/(view*.38));
-    aboutContent.style.clipPath=`ellipse(${entrance*120}% ${entrance*150}% at 50% 160px)`;
-    aboutContent.style.transform=`perspective(1400px) translate3d(0,${(1-entrance)*36}px,0) scale(${.94+.06*entrance})`;
-    aboutContent.style.opacity=String(1-exit);
+    aboutContent.style.clipPath='none';
+    aboutContent.style.transform=`translate3d(0,${(1-reveal)*14}px,0)`;
+    aboutContent.style.opacity=String(reveal*(1-exit));
+    const diameter=Math.min(width*.72,440);
+    const fullScale=Math.hypot(width,view)*1.3/(diameter*.82);
     aboutFrames.forEach((el,i)=>{
-     el.style.transform=`scale(${.28+entrance*1.15+i*.06})`;
-     el.style.opacity=String(clamp(entrance*7)*(1-ease((entrance-.66)/.3))*(1-exit)*(.98-i*.2));
+     el.style.transform=`scale(${.62+entrance*(fullScale-.62)+i*.1}) rotate(${entrance*(i%2?16:-12)}deg)`;
+     el.style.opacity=String((1-reveal)*(.92-i*.22));
     });
+    aboutLogo.style.transform=`scale(${.85+entrance*.18})`;
+    aboutLogo.style.opacity=String(1-ease((progress-.42)/.32));
     socials.forEach((el,i)=>{
      const pop=ease((view*.99-bottom-i*14)/(view*.2));
      const fade=1-ease((view*.28-bottom)/(view*.28));
@@ -167,7 +169,7 @@
     });
     if(active.has(runway)){
      const p=clamp((y-heroTop-12)/Math.max(1,heroDistance-12)),e=ease(p);
-     art.style.transform=`translate3d(0,${-e*(simple?10:28)}px,0) scale(${1-(width<768?.32:.48)*e})`;
+     art.style.transform=`translate3d(0,${-e*(simple?5:14)}px,0) scale(${1-(width<768?.16:.24)*e})`;
      hero.style.setProperty('--journey-fill',String(.05+.95*p));
      const label=p<.5?'01 / YOUR PERSPECTIVE':'02 / INSIDE CREDX';
      if(cue.textContent!==label)cue.textContent=label;
@@ -226,6 +228,12 @@
   // Images below the fold may alter the document after initial layout.
   document.querySelectorAll('img').forEach(img=>{if(!img.complete)img.addEventListener('load',()=>{dirty=true;schedule()},{once:true,signal:abort.signal})});
   measure();schedule();queueStreak();
+  const showAbout=()=>scrollTo({top:aboutTop+aboutTravel-80,behavior:'instant'});
+  if(location.hash==='#about')showAbout();
+  addEventListener('hashchange',()=>{if(location.hash==='#about'){skipAbout=true;showAbout();schedule()}},{signal:abort.signal});
+  document.querySelectorAll('a[href="#about"]').forEach(link=>link.addEventListener('click',e=>{
+   e.preventDefault();skipAbout=true;history.pushState(null,'','#about');showAbout();schedule();
+  },{signal:abort.signal}));
  }
  preference.addEventListener('change',mount);
  // Preserve sticky spacer geometry across history/BFCache; suspend effects only.

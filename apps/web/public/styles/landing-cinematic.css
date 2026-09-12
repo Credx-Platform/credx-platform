@@ -86,8 +86,8 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
 .about-photo{height:auto;box-shadow:0 0 0 4px rgba(33,111,169,.1),0 20px 50px rgba(0,0,0,.55);border-radius:18px}
 .about-gateway{--gateway-h:clamp(380px,62svh,640px);position:absolute;left:50%;top:calc(var(--gateway-h) / -2 - 24px);width:min(1120px,96%);height:var(--gateway-h);transform:translateX(-50%);pointer-events:none;z-index:3;display:none}
 .about-gateway i{position:absolute;inset:8% 9%;border-radius:50%;border:7px solid #b5f5ff;box-shadow:0 0 4px #f2feff,0 0 18px rgba(17,210,255,.8),0 0 54px rgba(0,142,247,.5),0 0 120px rgba(0,104,214,.28),inset 0 0 30px rgba(42,186,249,.34);opacity:0;transform-origin:center}
-.about-gateway i:nth-child(2){inset:5% 6%;border:2px solid rgba(32,167,255,.55);box-shadow:0 0 22px rgba(22,119,244,.3)}
-.about-gateway i:nth-child(3){inset:1% 2%;border:1px solid rgba(91,126,245,.3);box-shadow:0 0 46px rgba(24,106,221,.26),0 0 140px rgba(17,84,198,.18)}
+.about-gateway i:nth-of-type(2){inset:5% 6%;border:2px solid rgba(32,167,255,.55);box-shadow:0 0 22px rgba(22,119,244,.3)}
+.about-gateway i:nth-of-type(3){inset:1% 2%;border:1px solid rgba(91,126,245,.3);box-shadow:0 0 46px rgba(24,106,221,.26),0 0 140px rgba(17,84,198,.18)}
 .narrative-ready .about-gateway{display:block}
 .about-socials{position:relative;z-index:4;display:flex;justify-content:center;gap:16px;margin:40px auto 0;width:fit-content;max-width:100%}
 .about-socials a{position:relative;display:flex;align-items:center;justify-content:center;width:52px;height:52px;border:1px solid rgba(82,196,250,.34);border-radius:50%;background:rgba(9,22,37,.88);box-shadow:inset 0 1px 0 rgba(208,241,255,.1),0 10px 22px -8px rgba(0,171,255,.4);color:#d4f1ff;text-decoration:none;transform-origin:50% 100%;transition:translate .2s,box-shadow .2s,border-color .2s}
@@ -169,3 +169,30 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
  .hero-art,.scene-object,.object-motion,.dash-ui,.bd-cat,.rc-card,#about .about-inner,.about-socials a{transform:none!important;opacity:1!important;clip-path:none!important;pointer-events:auto!important}
  .about-socials a{translate:none;transition:none}
 }
+
+/* Reference opening: black, a fine circular trace, then the live scene. */
+.brand-intro{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#020406;pointer-events:none;animation:intro-clear .7s 1.55s ease-in-out both}
+.intro-emblem{position:relative;width:154px;height:154px;display:grid;place-items:center;animation:intro-arrive .7s ease-out both}
+.intro-emblem span,.portal-logo{font-family:'IBM Plex Sans',sans-serif;font-weight:600;letter-spacing:-.05em;color:#e6faff}
+.intro-emblem span{font-size:28px}.intro-emblem b,.portal-logo b{color:#5edcff}
+.intro-emblem i{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(130,218,242,.14);border-right-color:#b9f2ff;border-bottom-color:#6b9da8;animation:intro-trace 1.5s cubic-bezier(.4,0,.2,1) both;box-shadow:0 0 14px rgba(76,199,233,.05)}
+@keyframes intro-trace{from{rotate:-160deg;opacity:0;scale:.9}25%{opacity:1}to{rotate:130deg;opacity:1;scale:1}}
+@keyframes intro-arrive{from{opacity:0;scale:.94}to{opacity:1;scale:1}}
+@keyframes intro-clear{to{opacity:0;visibility:hidden}}
+/* Long, fine blue-white rain; no thick horizontal laser bars over the copy. */
+.cyber-streak{background:linear-gradient(90deg,transparent,rgba(38,148,204,.18) 22%,#72d8f6 78%,#e3faff 98%,transparent);box-shadow:0 0 5px rgba(94,214,249,.38),0 0 16px rgba(0,158,214,.15)}
+.about-runway{position:relative;background:#050a13;isolation:isolate;overflow:clip}
+.narrative-ready .about-runway{height:calc(var(--about-height,100svh) + var(--about-travel,90svh))}
+.narrative-ready #about{position:sticky;top:80px;min-height:calc(100svh - 80px);overflow:visible}
+#about .about-gateway{width:min(72vw,440px);height:min(72vw,440px);left:50%;top:calc((100svh - 80px) * .46);transform:translate(-50%,-50%);z-index:3}
+.about-gateway i{border-width:1.5px;box-shadow:0 0 9px rgba(190,240,255,.7),0 0 30px rgba(0,198,251,.35),inset 0 0 22px rgba(0,198,251,.24)}
+.about-gateway i:nth-of-type(3){border-style:solid;border-color:rgba(126,219,247,.28);animation:none}
+.portal-logo{position:absolute;left:50%;top:50%;translate:-50% -50%;font-size:clamp(40px,7vw,80px);line-height:1;color:transparent;-webkit-text-stroke:1px #d6f6ff;text-shadow:0 0 22px rgba(0,198,251,.45)}
+.portal-logo b{color:transparent;-webkit-text-stroke-color:#5edcff}
+#about:focus-within .about-gateway{visibility:hidden}
+@media(prefers-reduced-motion:reduce){.brand-intro{display:none}.about-runway{height:auto!important}#about{position:relative!important;top:auto!important}}
+
+/* Equal insets keep the expanding iris circular on every viewport. */
+.about-gateway i{inset:9%;border-color:#d9f8ff rgba(123,221,248,.55) #eefcff rgba(64,188,237,.45)}
+.about-gateway i:nth-of-type(2){inset:5%;border-width:1px}
+.about-gateway i:nth-of-type(3){inset:1%}
