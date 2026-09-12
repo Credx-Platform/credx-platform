@@ -58,7 +58,7 @@ try{
    y:scrollY
   }));
   let first=await state();assert(!first.overflow);assert(first.cta<height,'Hero CTA immediately available');
-  assert(first.mode.includes('narrative-ready'));assert.equal(first.headings,15);
+  assert(first.mode.includes('narrative-ready'));assert.equal(first.headings,18);
   assert.equal(await p.locator('.journey-cue').count(),0,'Scroll to Explore label and bar removed');
   assert.equal(await p.locator('.scene-object img').count(),5);
   assert(await p.locator('.scene-object img').evaluateAll(els=>els.every(el=>el.complete&&el.naturalWidth>0)));

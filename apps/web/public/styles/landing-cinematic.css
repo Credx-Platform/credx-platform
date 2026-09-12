@@ -225,6 +225,48 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 @keyframes social-glint{0%{opacity:0;transform:translateX(-110%)}25%{opacity:.9}70%{opacity:.55}100%{opacity:0;transform:translateX(110%)}}
 @keyframes social-glow{0%{opacity:0;scale:.8}25%{opacity:.9;scale:1.1}100%{opacity:0;scale:1.25}}
 @media(prefers-reduced-motion:reduce){.about-backdrop,.about-socials::before,.about-socials::after{display:none!important}}
+/* Three medium YouTube cards that play in place. */
+.yt-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:32px}
+.yt-card{margin:0;min-width:0}
+.yt-frame{position:relative;display:block;width:100%;aspect-ratio:16/9;padding:0;border-radius:14px;overflow:hidden;cursor:pointer;background:#07101d;border:1px solid rgba(110,188,240,.36);box-shadow:inset 0 1px 0 rgba(196,232,255,.22),0 0 0 1px rgba(2,6,14,.7),0 18px 34px -14px rgba(0,0,0,.85)}
+.yt-frame img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .4s var(--motion-ease)}
+.yt-frame:hover img{transform:scale(1.04)}
+.yt-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.yt-icon{position:absolute;left:50%;top:50%;width:60px;height:42px;translate:-50% -50%;border-radius:10px;background:rgba(4,9,20,.8);border:1px solid rgba(110,188,240,.55);transition:background .2s,border-color .2s}
+.yt-icon::after{content:'';position:absolute;left:24px;top:12px;border-style:solid;border-width:9px 0 9px 15px;border-color:transparent transparent transparent #e6faff}
+.yt-frame:is(:hover,:focus-visible) .yt-icon{background:#00c6fb;border-color:#00c6fb}
+.yt-frame:is(:hover,:focus-visible) .yt-icon::after{border-left-color:#031018}
+.yt-card figcaption{margin-top:10px;font-size:14px;font-weight:600;line-height:1.4;color:var(--white)}
+/* Signup prompts placed between sections. */
+.section-cta{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:32px}
+.section-cta.is-center{justify-content:center}
+.section-cta small{font-size:12px;color:var(--muted)}
+/* Instagram reels line up edge to edge beneath the Results section. */
+.ig-section .container{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:20px}
+.ig-follow{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.ig-nav{width:44px;height:44px;border-radius:50%;border:1px solid rgba(110,188,240,.45);background:rgba(9,22,37,.88);color:#d4f1ff;font-size:20px;line-height:1;cursor:pointer}
+.ig-nav:hover{border-color:#92e8ff}
+.ig-track{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;margin-top:36px;padding:4px clamp(20px,4vw,64px) 14px;scrollbar-width:thin;scrollbar-color:rgba(110,188,240,.4) transparent}
+.ig-reel{flex:0 0 clamp(260px,23vw,326px);height:580px;scroll-snap-align:center;border-radius:16px;overflow:hidden;background:#fff;border:1px solid rgba(110,188,240,.36);box-shadow:0 0 0 1px rgba(2,6,14,.7),0 18px 34px -14px rgba(0,0,0,.85)}
+.ig-reel iframe{display:block;width:100%;height:100%;border:0}
+.ig-track[hidden]{display:none}
+/* One-minute free-analysis promo. */
+.promo-pop{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;padding:20px;background:rgba(2,5,11,.74);animation:promo-in .35s var(--motion-ease) both}
+.promo-pop[hidden]{display:none}
+.promo-card{position:relative;width:min(440px,100%);padding:36px 30px 24px;border-radius:18px;text-align:center;background:linear-gradient(145deg,rgba(28,47,70,.98),rgba(8,16,31,.99) 62%);border:1px solid rgba(110,188,240,.45);box-shadow:inset 0 1px 0 rgba(196,232,255,.22),0 30px 80px -20px rgba(0,0,0,.9),0 0 60px -20px rgba(0,198,251,.35)}
+.promo-card h2{margin:0 0 12px;font-size:clamp(24px,5vw,30px);line-height:1.15;letter-spacing:-.6px;color:var(--white)}
+.promo-card p{margin:0 0 22px;font-size:15px;line-height:1.6;color:var(--muted)}
+.promo-card .btn{width:100%;justify-content:center}
+.promo-later{margin-top:12px;padding:6px;background:none;border:0;font:inherit;font-size:13px;color:var(--muted);text-decoration:underline;cursor:pointer}
+.promo-close{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;background:transparent;border:1px solid rgba(110,188,240,.36);color:var(--white);font-size:20px;line-height:1;cursor:pointer}
+@keyframes promo-in{from{opacity:0}to{opacity:1}}
+@media(max-width:767px){
+ .yt-grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:84%;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px}
+ .yt-card{scroll-snap-align:start}
+ .ig-reel{flex-basis:78vw;height:540px}
+ .section-cta .btn{flex:1 1 100%;justify-content:center}
+}
+@media(prefers-reduced-motion:reduce){.promo-pop{animation:none}.yt-frame img{transition:none}}
 /* A single backdrop prevents a section-edge seam through the transparent iris. */
 .about-portal-active,.about-portal-active #about{background:transparent}
 .about-portal-active #about::before{display:none}
