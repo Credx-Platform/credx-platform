@@ -87,38 +87,44 @@ try{
   // About opens before its reading position. Social controls appear at the
   // section bottom, fade on exit, and recover on reverse/keyboard navigation.
   const about=await p.locator('#aboutRunway').evaluate(e=>({top:e.getBoundingClientRect().top+scrollY,height:e.offsetHeight,travel:parseFloat(e.style.getPropertyValue('--about-travel'))}));
-  await jump(p,about.top-80+about.travel*.18);
+  const portalStartY=about.top-height*.72,portalTravel=about.travel+height*.72-80;
+  await jump(p,portalStartY+portalTravel*.18);
   assert.equal(await p.locator('.about-transition').evaluate(e=>getComputedStyle(e).position),'fixed','Portal uses a viewport overlay');
   assert(await p.locator('.about-veil').evaluate(e=>getComputedStyle(e).maskImage.includes('radial-gradient')||getComputedStyle(e).webkitMaskImage.includes('radial-gradient')),'Overlay opens with a circular mask');
+  assert.equal(await p.locator('.about-inner').evaluate(el=>getComputedStyle(el).position),'fixed','About is positioned inside the portal, not below it');
+  assert.equal(await p.locator('.about-backdrop').evaluate(el=>getComputedStyle(el).opacity),'1','Backdrop hides preceding content');
   await p.screenshot({path:`${shots}/${engine}-${width}-about-overlay.png`});
-  await jump(p,about.top-80+about.travel*.4);
-  assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'0','About remains hidden while the ring opens');
-  assert(await p.locator('.portal-logo').evaluate(e=>Number(getComputedStyle(e).opacity)>.9),'CredX logo sits inside the portal');
+  await jump(p,portalStartY+portalTravel*.4);
+  assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'1','About is visible inside the expanding circle');
+  assert(await p.locator('.portal-logo').evaluate(e=>Number(getComputedStyle(e).opacity)<.01),'Logo clears early so it does not cover About');
   assert(await p.locator('.about-gateway i').first().evaluate(e=>{const r=e.getBoundingClientRect();return Number(getComputedStyle(e).opacity)>.5&&r.top<innerHeight&&r.bottom>0}),'Bright portal visible during entry');
   await p.screenshot({path:`${shots}/${engine}-${width}-about-entry.png`});
-  await jump(p,about.top-80+about.travel*.79);
-  assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'0','No content leaks before the circle fully opens');
+  await jump(p,portalStartY+portalTravel*.79);
+  assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'1','Content does not wait for full circle expansion');
   assert(await p.locator('.about-gateway i').first().evaluate(e=>{const r=e.getBoundingClientRect();return r.width>Math.hypot(innerWidth,innerHeight)}),'Circle clears all viewport corners before reveal');
-  await jump(p,about.top-80+about.travel*.9);
-  assert(await p.locator('.about-inner').evaluate(e=>{const style=getComputedStyle(e);return +style.opacity>0&&+style.opacity<1&&new DOMMatrix(style.transform).m42>30}),'About glides upward after the portal opens');
+  await jump(p,portalStartY+portalTravel*.18);
+  assert(await p.locator('.about-inner').evaluate(e=>{const style=getComputedStyle(e);return +style.opacity>0&&+style.opacity<1&&new DOMMatrix(style.transform).m42>0}),'About glides into view while the circle expands');
   await p.screenshot({path:`${shots}/${engine}-${width}-about-glide.png`});
   await jump(p,about.top-80+about.travel);
   assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'1','About revealed after complete opening');
   await p.screenshot({path:`${shots}/${engine}-${width}-about-open.png`});
-  await jump(p,about.top-80+about.travel*.4);
-  assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'0','Reverse scrolling closes the reveal');
+  await jump(p,portalStartY+portalTravel*.4);
+  await jump(p,portalStartY);
+  assert(Number(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity))<.01,'Reversing back to the entrance closes the reveal');
   await p.locator('.about-socials a').first().focus();
   assert.equal(await p.evaluate(()=>document.activeElement.closest('.about-socials')!==null),true,'Unrevealed social links remain keyboard reachable');
   assert.equal(await p.locator('.about-socials a').first().evaluate(e=>getComputedStyle(e).opacity),'1','Focus exposes an unrevealed link');
   await p.locator('.about-socials a').first().evaluate(e=>e.blur());
   await jump(p,about.top+about.travel-80);
-  await jump(p,about.top+about.height-height*.72);
-  assert(await p.locator('.about-socials a').evaluateAll(els=>els.every(e=>Number(getComputedStyle(e).opacity)>.9&&getComputedStyle(e).visibility==='visible')),'All social icons pop in');
+  const socialReadingY=await p.locator('.about-socials').evaluate(el=>document.querySelector('#aboutRunway').getBoundingClientRect().top+scrollY+parseFloat(document.querySelector('#aboutRunway').style.getPropertyValue('--about-travel'))+el.offsetTop+26-innerHeight*.48);
+  await jump(p,socialReadingY);
+  assert(await p.locator('.about-socials a').evaluateAll(els=>els.every(e=>Number(getComputedStyle(e).opacity)>.9&&getComputedStyle(e).visibility==='visible')),'All social icons fade in by the viewport midpoint');
+  assert(await p.locator('.about-socials').evaluate(el=>el.classList.contains('social-highlight')),'First social entrance triggers a one-shot highlight');
   assert.deepEqual(await p.locator('.about-socials a').evaluateAll(els=>els.map(e=>new URL(e.href).hostname)),['www.instagram.com','www.youtube.com','www.facebook.com']);
   await p.screenshot({path:`${shots}/${engine}-${width}-about-social.png`});
   await jump(p,about.top+about.height);
   assert(await p.locator('.about-socials a').evaluateAll(els=>els.every(e=>Number(getComputedStyle(e).opacity)<.01)),'Socials fade after About');
-  await jump(p,about.top+about.height-height*.72);
+  await jump(p,socialReadingY);
   await p.locator('.about-socials a').first().focus();
   assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).clipPath),'none','Keyboard focus exposes content');
   await p.locator('.about-socials a').first().evaluate(e=>e.blur());
@@ -134,6 +140,20 @@ try{
   const portalEnd=await p.locator('.portal-frames i').first().evaluate(e=>({transform:getComputedStyle(e).transform,opacity:getComputedStyle(e).opacity}));
   assert.notEqual(portalStart.transform,portalEnd.transform);assert(Number(portalEnd.opacity)<.01,'Portal clears interface');
   assert.equal(await p.locator('.portal-frames').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
+  // Cards enter individually, with visibly different presentation styles.
+  const entranceTransforms=[];
+  for(const selector of ['.md-card','.pg-card','.faq-item','.cur-card','.test-card','.rc-card']){
+   const card=p.locator(selector).first();
+   const naturalTop=await card.evaluate(el=>{let top=0;for(let n=el;n;n=n.offsetParent)top+=n.offsetTop;return top});
+   await jump(p,naturalTop-height*.85);
+   const entering=await card.evaluate(el=>({transform:getComputedStyle(el).transform,opacity:Number(getComputedStyle(el).opacity)}));
+   assert(entering.opacity>0&&entering.opacity<1,`${selector} fades in as it enters`);
+   assert.notEqual(entering.transform,'none',`${selector} moves in from its own entrance`);
+   entranceTransforms.push(entering.transform);
+   await jump(p,naturalTop-height*.5);
+   assert.equal(await card.evaluate(el=>getComputedStyle(el).transform),'none',`${selector} settles before reading`);
+  }
+  assert(new Set(entranceTransforms).size>=4,'Cards use a mix of slide, zoom, fade and pop entrances');
   // Every section survives aggressive jumps in either direction, headings visible.
   const sections=await p.locator('section').all();
   for(const section of [...sections,...sections.slice().reverse()]){

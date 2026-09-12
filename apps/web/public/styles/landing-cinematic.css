@@ -203,3 +203,28 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
 .narrative-ready .about-transition{display:block}
 .about-veil{position:absolute;inset:0;background:#02050b;-webkit-mask-image:radial-gradient(circle at 50% 50%,transparent 0 var(--iris-radius,0px),#000 calc(var(--iris-radius,0px) + 2px));mask-image:radial-gradient(circle at 50% 50%,transparent 0 var(--iris-radius,0px),#000 calc(var(--iris-radius,0px) + 2px))}
 @media(prefers-reduced-motion:reduce){.about-transition{display:none!important}}
+
+/* Keynote-style entrances: transform is scroll-owned, never a trailing CSS tween. */
+.narrative-ready :is(.step,.cur-card,.test-card,.faq-item,.rc-card){transition:box-shadow var(--motion-duration) var(--motion-ease),border-color var(--motion-duration) var(--motion-ease)}
+.narrative-ready :is(.step,.cur-card,.test-card,.faq-item,.rc-card):focus-within{transform:none!important;opacity:1!important}
+
+/* Keep only About behind the opening; previous sections never show through. */
+.about-backdrop{position:fixed;inset:0;background:#050a13;z-index:80;pointer-events:none;opacity:0;display:none}
+.narrative-ready .about-backdrop{display:block}
+.about-content-space{display:none}
+.about-portal-active{z-index:81}
+.about-portal-active .about-content-space{display:block}
+.about-portal-active #about .about-inner{position:fixed;top:var(--about-content-top,160px);left:50%;translate:-50% 0;width:min(1000px,calc(100% - 2 * clamp(16px,4vw,48px)));max-width:1000px}
+/* One brief cyan sweep celebrates the social row without an idle glow loop. */
+.about-socials::before,.about-socials::after{content:'';position:absolute;inset:-12px;pointer-events:none;opacity:0;border-radius:32px}
+.about-socials::before{z-index:2;background:linear-gradient(110deg,transparent 30%,rgba(127,235,255,.35) 44%,rgba(237,253,255,.85) 50%,rgba(56,207,255,.3) 56%,transparent 70%)}
+.about-socials::after{z-index:0;background:radial-gradient(ellipse,rgba(0,198,251,.55),transparent 70%);filter:blur(12px)}
+.about-socials a{z-index:1}
+.social-highlight::before{animation:social-glint .55s cubic-bezier(.2,.6,.3,1) both}
+.social-highlight::after{animation:social-glow .65s ease-out both}
+@keyframes social-glint{0%{opacity:0;transform:translateX(-110%)}25%{opacity:.9}70%{opacity:.55}100%{opacity:0;transform:translateX(110%)}}
+@keyframes social-glow{0%{opacity:0;scale:.8}25%{opacity:.9;scale:1.1}100%{opacity:0;scale:1.25}}
+@media(prefers-reduced-motion:reduce){.about-backdrop,.about-socials::before,.about-socials::after{display:none!important}}
+/* A single backdrop prevents a section-edge seam through the transparent iris. */
+.about-portal-active,.about-portal-active #about{background:transparent}
+.about-portal-active #about::before{display:none}
