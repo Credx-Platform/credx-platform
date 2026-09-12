@@ -96,7 +96,7 @@
    }
   }
   // 8bit.ai-style darting light: a fine filament, tapered at both ends, whose
-  // heading swerves at random mid-flight. Half the reference stroke weight.
+  // heading swerves at random mid-flight. Bold enough to read over the cards.
   function spawnStreak(){
    if(!pen||darts.length>=(simple?2:3))return;
    const dpr=Math.min(devicePixelRatio||1,2),w=Math.round(width*dpr),h=Math.round(view*dpr);
@@ -157,14 +157,14 @@
      const total=along[along.length-1]||1,tail=pts[0];
      const alpha=Math.min(1,d.age/.12)*d.glow*(d.age>d.life?Math.max(0,d.length/d.full):1);
      pen.strokeStyle='rgb(0,158,214)';
-     pen.globalAlpha=.1*alpha;pen.lineWidth=d.core*4.2;trace(pts,along,total,0);
+     pen.globalAlpha=.09*alpha;pen.lineWidth=d.core*8;trace(pts,along,total,0);
      pen.strokeStyle='rgb(94,214,249)';
-     pen.globalAlpha=.16*alpha;pen.lineWidth=d.core*2.2;trace(pts,along,total,.5);
+     pen.globalAlpha=.15*alpha;pen.lineWidth=d.core*4;trace(pts,along,total,.5);
      const tone=pen.createLinearGradient(tail.x,tail.y,d.x,d.y);
      tone.addColorStop(0,'rgba(38,148,204,0)');tone.addColorStop(.35,'rgba(38,148,204,.5)');
      tone.addColorStop(.8,'#72d8f6');tone.addColorStop(1,'#e3faff');
      pen.strokeStyle=tone;
-     for(const [floor,size,strength] of [[0,.45,.55],[.4,.75,.35],[.75,1,.3]]){
+     for(const [floor,size,strength] of [[0,1,.55],[.4,1.7,.35],[.75,2.4,.3]]){
       pen.globalAlpha=strength*alpha;pen.lineWidth=d.core*size;trace(pts,along,total,floor);
      }
     }

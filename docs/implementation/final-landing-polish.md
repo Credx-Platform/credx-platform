@@ -42,8 +42,11 @@ was attached to this request, so composition follows the written direction.
   for Chromium, then `BROWSER_ENGINE=webkit` for WebKit. Defaults cover
   375,390,430,768,1024,1280,1440,1920px plus low-power/no-JS fallbacks.
 - `PLAYWRIGHT_MODULE=/path/to/playwright-core/index.mjs node scripts/test-landing-energy.mjs`
-  observes 30 seconds of unseeded streaks, checks uniqueness/density/lifetime,
-  captures every section and checks lifecycle, reduced-motion and error recovery.
+  checks that the canvas trails never launch while idle, then scrolls for 20
+  seconds and checks launch rate, density (3 desktop / 2 phone), unique random
+  origins and diagonal headings, bounded stroke widths and drain after input
+  stops. Also captures every section and checks pagehide/pageshow, resize,
+  reduced motion, initial layout shift and canvas-fault recovery.
 - Reports and screenshots are task artifacts under `/tmp/credx-final-*`.
   Headless timing is evidence, not a claim of certified 60FPS on physical devices.
 

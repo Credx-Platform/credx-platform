@@ -1,19 +1,21 @@
 @import url('./brand-tokens.css');
+@import url('./space-dust.css');
 /* Platform-wide visual language. Landing choreography stays landing-only. */
 @media screen {
  body[data-cx-platform]{
   --bg:var(--cx-bg);--bg2:var(--cx-bg-2);--bg3:var(--cx-bg-3);--bg4:var(--cx-bg-4);
   --surface:#0b1422;--surface-2:#101c2d;--surface-text:#edf4fc;
   --surface-text-muted:#bccbde;--surface-text-soft:#94a9c2;
-  --surface-border:rgba(96,174,231,.24);--surface-border-strong:rgba(0,198,251,.5);
+  --surface-border:rgba(110,188,240,.34);--surface-border-strong:rgba(0,198,251,.5);
   --platform-bg:var(--cx-bg);--card:rgba(11,20,34,.96);--panel:var(--card);
   --text:var(--cx-text-soft);--white:var(--cx-text);--muted:#bccbde;--muted2:#94a9c2;
   --cyan:var(--cx-cyan);--cyan2:var(--cx-cyan-2);--border:var(--surface-border);--border-c:var(--cx-border-strong);
   --font:var(--cx-font-body);--font-body:var(--cx-font-body);--font-display:var(--cx-font-display);
   --cx-card-surface:linear-gradient(145deg,rgba(28,47,70,.96),rgba(8,16,31,.98) 62%);
-  --cx-card-shadow:inset 0 1px 0 rgba(184,225,255,.12),0 8px 0 -5px #030710,0 18px 34px -14px rgba(0,0,0,.7);
+  --cx-card-shadow:inset 0 1px 0 rgba(196,232,255,.2),0 0 0 1px rgba(2,6,14,.7),0 8px 0 -5px #030710,0 18px 34px -14px rgba(0,0,0,.8);
   color:var(--cx-text-soft);font-family:var(--cx-font-body);color-scheme:dark;
-  background:radial-gradient(ellipse at 12% 10%,rgba(33,87,166,.12),transparent 48%),radial-gradient(ellipse at 88% 65%,rgba(65,51,115,.07),transparent 48%),var(--cx-bg);
+  background:var(--cx-space-dust),radial-gradient(ellipse 70% 45% at 6% 6%,rgba(33,87,166,.13),transparent 70%),radial-gradient(ellipse 60% 45% at 96% 70%,rgba(65,51,115,.09),transparent 70%),#040914;
+  background-size:var(--cx-space-dust-size),100% 100%,100% 100%;background-repeat:repeat,repeat,no-repeat,no-repeat;
  }
  body[data-cx-platform] :is(h1,h2,h3,h4,button,input,select,textarea){font-family:var(--cx-font-body)}
  body[data-cx-platform] :is(h1,h2,h3,h4){letter-spacing:-.025em}
