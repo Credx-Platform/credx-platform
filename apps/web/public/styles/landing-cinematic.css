@@ -184,7 +184,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
 .about-runway{position:relative;background:#050a13;isolation:isolate;overflow:clip}
 .narrative-ready .about-runway{height:calc(var(--about-height,100svh) + var(--about-travel,90svh))}
 .narrative-ready #about{position:sticky;top:80px;min-height:calc(100svh - 80px);overflow:visible}
-#about .about-gateway{width:min(72vw,440px);height:min(72vw,440px);left:50%;top:calc((100svh - 80px) * .46);transform:translate(-50%,-50%);z-index:3}
+.about-transition .about-gateway{width:min(72vw,440px);height:min(72vw,440px);left:50%;top:50%;transform:translate(-50%,-50%);z-index:3}
 .about-gateway i{border-width:1.5px;box-shadow:0 0 9px rgba(190,240,255,.7),0 0 30px rgba(0,198,251,.35),inset 0 0 22px rgba(0,198,251,.24)}
 .about-gateway i:nth-of-type(3){border-style:solid;border-color:rgba(126,219,247,.28);animation:none}
 .portal-logo{position:absolute;left:50%;top:50%;translate:-50% -50%;font-size:clamp(40px,7vw,80px);line-height:1;color:transparent;-webkit-text-stroke:1px #d6f6ff;text-shadow:0 0 22px rgba(0,198,251,.45)}
@@ -196,3 +196,10 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#060b16;bac
 .about-gateway i{inset:9%;border-color:#d9f8ff rgba(123,221,248,.55) #eefcff rgba(64,188,237,.45)}
 .about-gateway i:nth-of-type(2){inset:5%;border-width:1px}
 .about-gateway i:nth-of-type(3){inset:1%}
+
+/* A full-screen dark veil makes the luminous ring an actual opening, not a
+   floating outline. The About content rises only after the hole clears it. */
+.about-transition{position:fixed;inset:0;z-index:90;pointer-events:none;overflow:hidden;opacity:0;display:none}
+.narrative-ready .about-transition{display:block}
+.about-veil{position:absolute;inset:0;background:#02050b;-webkit-mask-image:radial-gradient(circle at 50% 50%,transparent 0 var(--iris-radius,0px),#000 calc(var(--iris-radius,0px) + 2px));mask-image:radial-gradient(circle at 50% 50%,transparent 0 var(--iris-radius,0px),#000 calc(var(--iris-radius,0px) + 2px))}
+@media(prefers-reduced-motion:reduce){.about-transition{display:none!important}}

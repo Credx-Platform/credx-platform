@@ -7,7 +7,8 @@ import {fileURLToPath} from 'node:url';
 import {mkdir,writeFile} from 'node:fs/promises';
 const pw=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
 const engine=process.env.BROWSER_ENGINE||'chromium';
-const base=process.env.LANDING_BASE_URL||'http://localhost:8792';
+const port=process.env.LANDING_PORT||'8792';
+const base=process.env.LANDING_BASE_URL||`http://localhost:${port}`;
 const shots=process.env.LANDING_SHOTS||'/tmp/credx-narrative-qa';
 await mkdir(shots,{recursive:true});
 let browser,server;const report=[];
@@ -27,7 +28,7 @@ const relaxCsp=async p=>{
 };
 try{
  if(!process.env.LANDING_BASE_URL){
-  server=spawn(process.execPath,[fileURLToPath(new URL('../apps/web/server.mjs',import.meta.url))],{env:{...process.env,PORT:'8792'},stdio:'ignore'});
+  server=spawn(process.execPath,[fileURLToPath(new URL('../apps/web/server.mjs',import.meta.url))],{env:{...process.env,PORT:port},stdio:'ignore'});
   for(let i=0;i<100;i++){try{await fetch(base);break}catch{await new Promise(r=>setTimeout(r,100))}}
  }
  browser=await pw[engine].launch({headless:true});
@@ -61,24 +62,29 @@ try{
   assert.equal(await p.locator('.scene-object img').count(),5);
   assert(await p.locator('.scene-object img').evaluateAll(els=>els.every(el=>el.complete&&el.naturalWidth>0)));
   await p.screenshot({path:`${shots}/${engine}-${width}-intro.png`});
-  // One coherent composition shrinks smoothly, with no independent pieces.
+  // One coherent composition grows smoothly, with no independent pieces.
   assert(await p.evaluate(()=>{const a=document.querySelector('.hero-art').getBoundingClientRect(),c=document.querySelector('.hero-copy').getBoundingClientRect();return a.top>=c.bottom+18}),'Headline and copy stay above artwork');
   const contained=()=>p.evaluate(()=>{const a=document.querySelector('.hero-art').getBoundingClientRect();return [...document.querySelectorAll('.scene-object')].every(e=>{const r=e.getBoundingClientRect();return r.left>=a.left-1&&r.right<=a.right+1&&r.top>=a.top-1&&r.bottom<=a.bottom+1})});
   assert(await contained(),'All five asset bounds contained at full size');
   const scale=()=>p.locator('.hero-art').evaluate(e=>new DOMMatrix(getComputedStyle(e).transform).a);
-  assert(Math.abs(await scale()-1)<.001);
-  let lastScale=1;
-  for(let i=1;i<=12;i++){await jump(p,first.heroDistance*i/12);const next=await scale();assert(next<=lastScale+.001);lastScale=next;assert(await contained())}
-  assert(Math.abs(lastScale-(width<768?.84:.76))<.002,'Hero reaches requested final size');
+  assert(Math.abs(await scale()-(width<768?.84:.76))<.001,'Hero starts at the previous small endpoint');
+  let lastScale=width<768?.84:.76;
+  for(let i=1;i<=12;i++){await jump(p,first.heroDistance*i/12);const next=await scale();assert(next>=lastScale-.001);lastScale=next;assert(await contained())}
+  assert(Math.abs(lastScale-1)<.002,'Hero ends at the previous large endpoint');
   const advanced=await state();await p.waitForTimeout(160);assert.deepEqual((await state()).transforms,advanced.transforms,'No delayed interpolation');
   await p.screenshot({path:`${shots}/${engine}-${width}-hero-out.png`});
   assert(await p.locator('.scene-object').evaluateAll(els=>els.every(e=>getComputedStyle(e).transform==='none')),'No independent asset scaling');
   await jump(p,0);assert.deepEqual((await state()).transforms,first.transforms,'Reversal restores exact camera position');
   await p.waitForFunction(()=>document.querySelector('.cyber-streak'));
-  assert(await p.locator('.cyber-streak').count()<=(width<768?16:24),'Bounded streak density');
+  assert(await p.locator('.cyber-streak').count()<=(width<768?8:12),'Bounded streak density');
+  assert(await p.locator('.cyber-streak').evaluateAll(els=>els.every(e=>parseFloat(e.style.height)>=1.4&&parseFloat(e.style.height)<=3.6)),'Lines are twice the prior thickness');
   // About opens before its reading position. Social controls appear at the
   // section bottom, fade on exit, and recover on reverse/keyboard navigation.
   const about=await p.locator('#aboutRunway').evaluate(e=>({top:e.getBoundingClientRect().top+scrollY,height:e.offsetHeight,travel:parseFloat(e.style.getPropertyValue('--about-travel'))}));
+  await jump(p,about.top-80+about.travel*.18);
+  assert.equal(await p.locator('.about-transition').evaluate(e=>getComputedStyle(e).position),'fixed','Portal uses a viewport overlay');
+  assert(await p.locator('.about-veil').evaluate(e=>getComputedStyle(e).maskImage.includes('radial-gradient')||getComputedStyle(e).webkitMaskImage.includes('radial-gradient')),'Overlay opens with a circular mask');
+  await p.screenshot({path:`${shots}/${engine}-${width}-about-overlay.png`});
   await jump(p,about.top-80+about.travel*.4);
   assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'0','About remains hidden while the ring opens');
   assert(await p.locator('.portal-logo').evaluate(e=>Number(getComputedStyle(e).opacity)>.9),'CredX logo sits inside the portal');
@@ -87,6 +93,9 @@ try{
   await jump(p,about.top-80+about.travel*.79);
   assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'0','No content leaks before the circle fully opens');
   assert(await p.locator('.about-gateway i').first().evaluate(e=>{const r=e.getBoundingClientRect();return r.width>Math.hypot(innerWidth,innerHeight)}),'Circle clears all viewport corners before reveal');
+  await jump(p,about.top-80+about.travel*.9);
+  assert(await p.locator('.about-inner').evaluate(e=>{const style=getComputedStyle(e);return +style.opacity>0&&+style.opacity<1&&new DOMMatrix(style.transform).m42>30}),'About glides upward after the portal opens');
+  await p.screenshot({path:`${shots}/${engine}-${width}-about-glide.png`});
   await jump(p,about.top-80+about.travel);
   assert.equal(await p.locator('.about-inner').evaluate(e=>getComputedStyle(e).opacity),'1','About revealed after complete opening');
   await p.screenshot({path:`${shots}/${engine}-${width}-about-open.png`});
@@ -145,7 +154,7 @@ try{
   await p.goto(base+'/pricing',{waitUntil:'domcontentloaded'});await p.goBack({waitUntil:'load'});await p.waitForTimeout(500);
   assert((await state()).mode.includes('narrative-ready'),'Back navigation remounts');
   assert.equal(await p.locator('.data-trails').count(),1,'No duplicated effects');
-  assert(await p.locator('.cyber-streak').count()<=24,'No leaked streaks after back');
+  assert(await p.locator('.cyber-streak').count()<=12,'No leaked streaks after back');
   // The bounded data-energy layer is site-wide and non-interactive.
   assert.equal(await p.locator('.data-trails').evaluate(e=>e.closest('#hero')?'hero':'body'),'body');
   assert.equal(await p.locator('.data-trails').evaluate(e=>getComputedStyle(e).position),'fixed');
