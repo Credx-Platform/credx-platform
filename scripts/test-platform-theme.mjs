@@ -17,7 +17,10 @@ try {
  const response=await page.goto(`http://localhost:${port}${path}`);await page.waitForTimeout(500);
  assert.equal(response.status(),200,path);
  const state=await page.evaluate(()=>({themed:document.body.hasAttribute('data-cx-platform'),font:getComputedStyle(document.body).fontFamily,bg:getComputedStyle(document.body).backgroundColor,overflow:document.documentElement.scrollWidth-innerWidth,text:document.body.innerText.length}));
- assert(state.themed,path+' theme missing');assert(state.font.includes('IBM Plex Sans'),path+' font '+state.font);assert(state.overflow<=2,path+' overflow '+state.overflow);assert(state.text>40,path+' empty');
+ // Admin and client portals keep their light soft-gray work surface, outside the dark platform theme.
+ if(['/portal','/adminportal'].includes(path)){assert(!state.themed,path+' should not use the dark theme');assert.equal(state.bg,'rgb(238, 241, 246)',path+' bg')}
+ else{assert(state.themed,path+' theme missing');assert(state.font.includes('IBM Plex Sans'),path+' font '+state.font)}
+ assert(state.overflow<=2,path+' overflow '+state.overflow);assert(state.text>40,path+' empty');
  await page.screenshot({path:`/tmp/credx-platform-qa/${engine}-${width}-${path.replaceAll('/','_')}.png`});console.log(width,path,JSON.stringify(state));
  }
  await page.close();
