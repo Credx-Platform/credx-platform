@@ -54,9 +54,10 @@
   dispose();
   const abort=new AbortController(),opts={passive:true,signal:abort.signal};
   let skipAbout=location.hash==='#about';
-  let raf=0,dirty=true,paused=false,view=innerHeight,width=innerWidth,streakTimer=0,portalBusy=false;
+  let raf=0,dirty=true,paused=false,view=innerHeight,width=innerWidth,portalBusy=false;
   let heroTop=0,heroDistance=1,portalTop=0,portalDistance=1,aboutTop=0,aboutHeight=1,aboutTravel=1;
   const streaks=new Map();
+  let lastScrollY=scrollY,pendingScroll=0,streakTravel=0,nextStreak=80;
   let slowFrames=0,samples=0,observer;
   const simple=degraded||weak()||innerWidth<768;
   const animated=new Set([art,...frames,dash,aboutContent,aboutLogo,aboutTransition,...aboutFrames,...socials]);
@@ -71,7 +72,7 @@
    aboutRunway.style.removeProperty('--about-height');aboutRunway.style.removeProperty('--about-travel');
    energy.style.removeProperty('opacity');hero.style.removeProperty('--journey-fill');hero.style.removeProperty('--hero-art-cap');
   }
-  function stopStreaks(){clearTimeout(streakTimer);streakTimer=0;streaks.forEach((a,el)=>{a.cancel();el.remove()});streaks.clear();energy.replaceChildren()}
+  function stopStreaks(){streaks.forEach(({run},el)=>{run.cancel();el.remove()});streaks.clear();energy.replaceChildren();pendingScroll=0;streakTravel=0;nextStreak=80;}
   suspend=()=>{paused=true;cancelAnimationFrame(raf);raf=0;stopStreaks();hero.classList.remove('scene-active')};
   dispose=()=>{suspend();abort.abort();observer?.disconnect();reset()};
   if(preference.matches)return;
@@ -80,38 +81,51 @@
   const scenes=tracks.map(t=>({...t,items:[...t.el.querySelectorAll(t.selector)],top:0,height:0}));
   scenes.forEach(t=>t.items.forEach(el=>animated.add(el)));
   function schedule(){if(!raf&&!document.hidden&&!paused)raf=requestAnimationFrame(draw)}
-  function queueStreak(){
-   if(streakTimer||paused||document.hidden||abort.signal.aborted)return;
-   streakTimer=setTimeout(()=>{
-    streakTimer=0;
-    try{spawnStreak();queueStreak()}
-    catch{dispose();console.warn('CredX motion disabled; static content remains available.')}
-   },random(simple?260:180,simple?440:320));
+  // Paused animation timelines are scrubbed ONLY by native scroll distance.
+  // There is no timer, playback tail, or ambient motion while the page rests.
+  function advanceStreaks(delta){
+   if(!delta)return;
+   streaks.forEach((state,el)=>{
+    state.time+=delta/state.lifetime*1000;
+    if(state.time<=0||state.time>=1000){state.run.cancel();el.remove();streaks.delete(el)}
+    else {
+     state.run.currentTime=state.time;state.travel+=Math.abs(delta);
+     el.style.opacity=String(state.brightness*ease(state.travel/100)*ease(Math.min(state.time,1000-state.time)/180));
+    }
+   });
+   streakTravel+=Math.abs(delta);
+   if(streakTravel>=nextStreak){
+    spawnStreak(delta);streakTravel=0;
+    nextStreak=random(simple?280:340,simple?480:580);
+   }
   }
-  function spawnStreak(){
-   if(streaks.size>=(simple?8:12))return;
+  function spawnStreak(delta){
+   if(streaks.size>=(simple?2:3))return;
    const el=document.createElement('i');el.className='cyber-streak';
-   // A shared top-right to bottom-left current, with depth from length and speed.
-   const length=random(simple?180:280,simple?480:780);
-   const angle=portalBusy?random(1.66,2.0):random(1.91,2.02);
-   const x=random(0,width+view*.5),y=-length*.5;
-   const distance=(view+length*2)/Math.sin(angle);
-   const duration=random(2200,3800);
-   const brightness=random(.28,.68),bend=portalBusy?random(-100,100):0;
+   // Three times the previous length, retaining the fine core and muted halo.
+   // Alternate angled lanes, with gentle bends, avoid a vertical rain pattern.
+   const length=random(simple?540:840,simple?1440:2340);
+   const lanes=[-.85,-.32,.35,.82,Math.PI-.85,Math.PI-.32,Math.PI+.35,Math.PI+.82];
+   const angle=lanes[Math.floor(random(0,lanes.length))]+random(-.09,.09);
+   const distance=Math.max(width,view)+length;
+   const time=delta>0?350:650;
+   const x=random(width*.12,width*.88)-Math.cos(angle)*(distance*time/1000+length*.5);
+   const y=random(view*.18,view*.85)-Math.sin(angle)*(distance*time/1000+length*.5);
+   const brightness=random(.22,.46),bend=random(-1,1)*(portalBusy?130:70);
    el.style.width=`${length}px`;el.style.height=`${random(1.4,3.6).toFixed(2)}px`;
-   const keyframes=[0,.14,.52,.82,1].map((t,i)=>{
+   const keyframes=[0,.14,.52,.82,1].map(t=>{
     const curve=Math.sin(t*Math.PI)*bend;
     const px=x+Math.cos(angle)*distance*t-Math.sin(angle)*curve;
     const py=y+Math.sin(angle)*distance*t+Math.cos(angle)*curve;
     const tangent=angle+Math.atan(Math.cos(t*Math.PI)*Math.PI*bend/distance);
-    return {transform:`translate3d(${px}px,${py}px,0) rotate(${tangent}rad)`,opacity:[0,brightness,brightness*.85,brightness*.35,0][i],offset:t};
+    return {transform:`translate3d(${px}px,${py}px,0) rotate(${tangent}rad)`,offset:t};
    });
    energy.append(el);
-   const run=el.animate(keyframes,{duration,easing:'linear'});
-   streaks.set(el,run);
-   run.onfinish=()=>{streaks.delete(el);el.remove()};
+   const run=el.animate(keyframes,{duration:1000,easing:'linear',fill:'both'});
+   run.pause();run.currentTime=time;
+   streaks.set(el,{run,time,brightness,travel:0,lifetime:random(view*1.4,view*2)});
   }
-  resume=()=>{if(abort.signal.aborted||preference.matches)return;paused=false;dirty=true;schedule();queueStreak()};
+  resume=()=>{if(abort.signal.aborted||preference.matches)return;paused=false;dirty=true;lastScrollY=scrollY;schedule()};
   function measure(){
    width=innerWidth;view=innerHeight;
    // Read first, write spacer variables, then cache positions in one layout pass.
@@ -148,6 +162,7 @@
     const progress=skipAbout?1:clamp((y-aboutTop+81)/aboutTravel);
     const entrance=ease(progress/.78),reveal=ease((progress-.8)/.2);
     portalBusy=progress>0&&progress<1;
+    const scrollDelta=pendingScroll;pendingScroll=0;advanceStreaks(scrollDelta);
     const bottom=aboutTop+aboutTravel+aboutHeight-y;
     const exit=ease((view*.32-bottom)/(view*.38));
     aboutContent.style.clipPath='none';
@@ -215,11 +230,11 @@
    });schedule();
   },{rootMargin:'120px 0px'});
   [runway,portal,...scenes.map(t=>t.el)].forEach(el=>observer.observe(el));
-  addEventListener('scroll',schedule,opts);
+  addEventListener('scroll',()=>{pendingScroll+=scrollY-lastScrollY;lastScrollY=scrollY;schedule()},opts);
   let lastWidth=innerWidth;
   addEventListener('resize',()=>{
    if((lastWidth<768)!==(innerWidth<768)){mount();return}
-   lastWidth=innerWidth;dirty=true;schedule();
+   lastWidth=innerWidth;stopStreaks();dirty=true;schedule();
   },opts);
   addEventListener('orientationchange',()=>{dirty=true;schedule()},opts);
   document.addEventListener('visibilitychange',()=>{
@@ -233,7 +248,7 @@
   document.fonts?.ready.then(()=>{if(!abort.signal.aborted){dirty=true;schedule()}});
   // Images below the fold may alter the document after initial layout.
   document.querySelectorAll('img').forEach(img=>{if(!img.complete)img.addEventListener('load',()=>{dirty=true;schedule()},{once:true,signal:abort.signal})});
-  measure();schedule();queueStreak();
+  measure();schedule();
   const showAbout=()=>scrollTo({top:aboutTop+aboutTravel-80,behavior:'instant'});
   if(location.hash==='#about')showAbout();
   addEventListener('hashchange',()=>{if(location.hash==='#about'){skipAbout=true;showAbout();schedule()}},{signal:abort.signal});

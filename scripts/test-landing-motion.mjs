@@ -76,8 +76,14 @@ try{
   assert(await p.locator('.scene-object').evaluateAll(els=>els.every(e=>getComputedStyle(e).transform==='none')),'No independent asset scaling');
   await jump(p,0);assert.deepEqual((await state()).transforms,first.transforms,'Reversal restores exact camera position');
   await p.waitForFunction(()=>document.querySelector('.cyber-streak'));
-  assert(await p.locator('.cyber-streak').count()<=(width<768?8:12),'Bounded streak density');
+  assert(await p.locator('.cyber-streak').count()<=(width<768?2:3),'Bounded streak density');
   assert(await p.locator('.cyber-streak').evaluateAll(els=>els.every(e=>parseFloat(e.style.height)>=1.4&&parseFloat(e.style.height)<=3.6)),'Lines are twice the prior thickness');
+  assert(await p.locator('.cyber-streak').evaluateAll(els=>els.every(e=>parseFloat(e.style.width)>=(innerWidth<768?540:840))),'Trails are three times the previous length');
+  const streakState=()=>p.locator('.cyber-streak').evaluateAll(els=>els.map(e=>({transform:getComputedStyle(e).transform,opacity:getComputedStyle(e).opacity,time:e.getAnimations()[0].currentTime,playState:e.getAnimations()[0].playState})));
+  const frozen=await streakState();assert(frozen.every(e=>e.playState==='paused'));
+  await p.waitForTimeout(450);assert.deepEqual(await streakState(),frozen,'No movement, fade or new trails when scrolling stops');
+  await p.evaluate(()=>scrollBy({top:24,behavior:'instant'}));await settle(p);
+  assert.notDeepEqual(await streakState(),frozen,'Trails resume from native scroll input');
   // About opens before its reading position. Social controls appear at the
   // section bottom, fade on exit, and recover on reverse/keyboard navigation.
   const about=await p.locator('#aboutRunway').evaluate(e=>({top:e.getBoundingClientRect().top+scrollY,height:e.offsetHeight,travel:parseFloat(e.style.getPropertyValue('--about-travel'))}));
@@ -154,7 +160,7 @@ try{
   await p.goto(base+'/pricing',{waitUntil:'domcontentloaded'});await p.goBack({waitUntil:'load'});await p.waitForTimeout(500);
   assert((await state()).mode.includes('narrative-ready'),'Back navigation remounts');
   assert.equal(await p.locator('.data-trails').count(),1,'No duplicated effects');
-  assert(await p.locator('.cyber-streak').count()<=12,'No leaked streaks after back');
+  assert(await p.locator('.cyber-streak').count()<=3,'No leaked streaks after back');
   // The bounded data-energy layer is site-wide and non-interactive.
   assert.equal(await p.locator('.data-trails').evaluate(e=>e.closest('#hero')?'hero':'body'),'body');
   assert.equal(await p.locator('.data-trails').evaluate(e=>getComputedStyle(e).position),'fixed');
