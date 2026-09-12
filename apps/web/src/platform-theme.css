@@ -1,0 +1,2 @@
+/* Public and React pages consume the same theme, after their layout styles. */
+@import url('../public/styles/platform-theme.css');

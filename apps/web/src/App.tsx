@@ -3330,7 +3330,7 @@ function TasksRoute() {
   const [newTask, setNewTask] = useState({ clientId: '', title: '', description: '', category: 'Dispute', priority: 'medium', dueAt: '' });
   const [saving, setSaving] = useState(false);
 
-  const TOKEN_KEY = 'credx_admin_token';
+  const TOKEN_KEY = 'credx-admin-token';
   const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
 
   const loadTasks = async () => {

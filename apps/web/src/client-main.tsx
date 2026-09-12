@@ -6,6 +6,8 @@ import ClientPortalApp from './clientPortal';
 import SetPassword from './SetPassword';
 import AffiliateOnboarding from './AffiliateOnboarding';
 import './styles.css';
+import './platform-theme.css';
+import { PlatformPageFade } from './platformMotion';
 
 const normalizedPath = window.location.pathname.replace(/\/+$/, '');
 const isSetPasswordRoute = normalizedPath === '/portal/set-password';
@@ -18,6 +20,7 @@ initErrorReporting();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter basename={basename}>
+      <PlatformPageFade />
       {isAffiliateOnboardingRoute ? <AffiliateOnboarding /> : isSetPasswordRoute ? <SetPassword /> : <ClientPortalApp onboardingOnly={isOnboardingRoute} />}
     </BrowserRouter>
   </React.StrictMode>

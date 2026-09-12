@@ -75,7 +75,7 @@ const contentSecurityPolicy = [
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
   `connect-src 'self' ${API_ORIGIN} https://www.paypal.com`,
-  "frame-src 'self' https://www.paypal.com https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
+  "frame-src 'self' https://www.paypal.com https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com https://www.instagram.com",
   'upgrade-insecure-requests'
 ].join('; ');
 
