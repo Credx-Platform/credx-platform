@@ -171,7 +171,7 @@ function rulesReply(message: string, ctx: CesarContext): CesarReply {
 
   // Public / pre-sales guidance.
   if (!text) {
-    return wrap('Ask me anything about the CredX program, the 5-Day Masterclass, disputes, financing readiness, or rebuilding your credit. I am AI-assisted support, not legal advice or a guaranteed-results service.');
+    return wrap('Ask me anything about CredX, the 5-Day Masterclass, your financial profile, financing readiness, or organizing next steps. I am Cesar, an AI-assisted guide—not legal advice and not a guaranteed-results service.');
   }
   if (/(portal|sign in|log ?in)/.test(text)) {
     return wrap(`If you already have portal access, sign in here: ${LINKS.portal}.<br><br>If you're new and want to get started first, use the sign-up page: ${LINKS.signup}.`);
@@ -180,7 +180,7 @@ function rulesReply(message: string, ctx: CesarContext): CesarReply {
     return wrap(`Here's the fastest path:<br><br>• ${LINKS.signup}<br>• ${LINKS.masterclass} if you want the DIY education route<br>• ${LINKS.portal} if you already have an account.<br><br>Tell me whether you want DIY education or guided support and I'll point you to the best option.`);
   }
   if (/(help me|^help$|what can you help|how can you help)/.test(text)) {
-    return wrap(`I can help you do one of three things right now:<br><br>1. ${LINKS.signup}<br>2. ${LINKS.masterclass}<br>3. ${LINKS.portal}<br><br>Tell me your goal — dispute inaccurate items, prepare for financing, or rebuild after collections — and I'll recommend the best path.`);
+    return wrap(`I can help you choose a next step:<br><br>1. ${LINKS.signup}<br>2. ${LINKS.masterclass}<br>3. ${LINKS.portal}<br><br>Tell me whether you want to understand your profile, prepare for financing, or organize a review, and I'll recommend the best path.`);
   }
   if (/(price|cost|pricing|how much)/.test(text) && /(masterclass|diy)/.test(text)) {
     return wrap(`The CredX 5-Day Masterclass is <strong>$47 one time</strong>. It includes the 5-day curriculum, bonus wealth day, DIY roadmap, resource stack, and portal access. You can review it here: ${LINKS.masterclass}, or go straight to ${LINKS.masterclassCheckout}.`);
@@ -192,10 +192,10 @@ function rulesReply(message: string, ctx: CesarContext): CesarReply {
     return wrap(`The 5-Day Masterclass is the DIY path inside CredX: credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. It is <strong>$47 one time</strong>. Start here: ${LINKS.masterclass}.`);
   }
   if (/(program|coaching|service)/.test(text)) {
-    return wrap(`The CredX Program is the guided path with software, AI support, and coaching. If you want hands-on structure and follow-through, start here: ${LINKS.signup}.`);
+    return wrap(`CredX puts software first: your profile, next actions, and progress live in one workspace. Optional professional support can add human review and follow-through when you want it. Start here: ${LINKS.signup}.`);
   }
   if (/(financing|mortgage|car|approval)/.test(text)) {
-    return wrap(`If your goal is financing readiness, the best move is the guided program so your file can be reviewed in context. Start here: ${LINKS.signup}.`);
+    return wrap(`If your goal is financing readiness, start with the CredX workspace so your profile can be reviewed in context and your preparation steps organized. Optional professional support is available when you want human review: ${LINKS.signup}.`);
   }
   if (/(dispute|collection|inquiry)/.test(text)) {
     return wrap(`CredX helps organize dispute workflow and identify what looks inaccurate or challengeable, but the strongest next step is getting your file into review. Start here: ${LINKS.signup}.`);
@@ -225,7 +225,7 @@ function buildSystemPrompt(ctx: CesarContext): string {
     vars.stageLine = `Their next onboarding step is: ${ctx.stage.label}. Gently guide them toward it. Context: ${ctx.stage.detail}`;
     vars.portalLine = 'Portal tabs they can use: Progress, Analysis, Disputes, Documents, Profile.';
   } else {
-    vars.visitorLine = 'This is a public visitor who has not signed up yet. Guide them toward /signup (guided program), /masterclass (DIY education), /pricing, or /portal to log in.';
+    vars.visitorLine = 'This is a public visitor who has not signed up yet. Guide them toward /signup (CredX platform and optional guidance), /masterclass (DIY education), /pricing, or /portal to log in.';
   }
   return getPrompt('cesar_system', vars).text;
 }

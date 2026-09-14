@@ -4,7 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CredX Sign Up</title>
-<meta name="description" content="Step-by-step CredX signup questionnaire.">
+<meta name="description" content="Start with CredX credit intelligence and financial readiness software. Organize your profile, choose next steps, and see whether optional professional support fits your goals.">
+<meta property="og:title" content="Get started with CredX">
+<meta property="og:description" content="Organize your financial profile, choose next steps, and prepare for better decisions with CredX.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Get started with CredX">
+<meta name="twitter:description" content="Credit intelligence and financial readiness software with optional professional support.">
 <style>
 :root {
   --bg: #07111f;
@@ -724,7 +729,7 @@ function getSteps() {
         <div class="choice-stack">
           <label class="choice ${state.offerInterest === 'program' ? 'active' : ''}">
             <input type="radio" name="offerInterest" value="program" ${state.offerInterest === 'program' ? 'checked' : ''}>
-            <span><strong>AI Assistance</strong><small>Guided support, software workflow, AI organization, and coaching.</small></span>
+            <span><strong>CredX Platform + Guidance</strong><small>Credit intelligence software, organized next steps, Cesar AI guidance, and optional human review.</small></span>
           </label>
           <label class="choice ${state.offerInterest === 'masterclass' ? 'active' : ''}">
             <input type="radio" name="offerInterest" value="masterclass" ${state.offerInterest === 'masterclass' ? 'checked' : ''}>
@@ -832,14 +837,14 @@ function getSteps() {
     },
     {
       key: 'aiScope',
-      label: 'AI Assistance',
+      label: 'Platform + Guidance',
       title: 'Is this for one person or a family?',
       shouldShow: () => state.offerInterest === 'program',
       render: () => `
         <div class="choice-stack">
           <label class="choice ${state.aiPlanScope === 'single' ? 'active' : ''}">
             <input type="radio" name="aiPlanScope" value="single" ${state.aiPlanScope === 'single' ? 'checked' : ''}>
-            <span><strong>Single plan</strong><small>One client file with AI-assisted workflow and guided support.</small></span>
+            <span><strong>Single profile</strong><small>One organized profile with AI-assisted workflow and optional professional support.</small></span>
           </label>
           <label class="choice ${state.aiPlanScope === 'family' ? 'active' : ''}">
             <input type="radio" name="aiPlanScope" value="family" ${state.aiPlanScope === 'family' ? 'checked' : ''}>
@@ -859,8 +864,8 @@ function getSteps() {
     },
     {
       key: 'singleTier',
-      label: 'AI Assistance',
-      title: 'For a single plan, do you want Standard or Aggressive?',
+      label: 'Platform + Guidance',
+      title: 'For a single profile, which support level fits?',
       shouldShow: () => state.offerInterest === 'program' && state.aiPlanScope === 'single',
       render: () => `
         <div class="choice-stack">
@@ -870,7 +875,7 @@ function getSteps() {
           </label>
           <label class="choice ${state.singleTier === 'aggressive' ? 'active' : ''}">
             <input type="radio" name="singleTier" value="aggressive" ${state.singleTier === 'aggressive' ? 'checked' : ''}>
-            <span><strong>Aggressive</strong><small>$447 for the higher-touch path, billed after your completed analysis review — nothing due today.</small></span>
+            <span><strong>Premium support</strong><small>$447 for the higher-touch path, billed after your completed analysis review — nothing due today.</small></span>
           </label>
         </div>
         <div class="price-note"><strong>Selected:</strong> ${escapeHtml(selectedAiPriceLabel())}</div>
@@ -887,7 +892,7 @@ function getSteps() {
     },
     {
       key: 'familyMembers',
-      label: 'AI Assistance',
+      label: 'Platform + Guidance',
       title: 'How many family members are you onboarding?',
       shouldShow: () => state.offerInterest === 'program' && state.aiPlanScope === 'family',
       render: () => `
