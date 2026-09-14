@@ -184,7 +184,7 @@ function recommendedAffiliateLinks(analysis: CreditAnalysis): AffiliateLink[] {
     add('Ava', 'Rent and utility reporting option for clients with eligible monthly bills.');
   }
   if (selected.size === 0) {
-    add('Self Lender', 'General credit-builder option for rebuilding positive history.');
+    add('Self Lender', 'General credit-builder option for establishing positive account history.');
     add('Kovo', 'Low-friction credit-builder education/reporting option.');
   }
   return Array.from(selected.values());

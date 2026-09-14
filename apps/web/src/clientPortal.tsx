@@ -234,7 +234,7 @@ const CARRD_CREDIT_BUILDER_LINKS: BuilderLink[] = [
     label: 'Credit Builder Card',
     url: 'https://www.creditbuildercard.com/mgf.html',
     type: 'Builder card',
-    description: 'Use a dedicated builder card to add positive revolving account activity when the terms fit your rebuild plan.'
+    description: 'Use a dedicated builder card to add positive revolving account activity when the terms fit your financial plan.'
   },
   {
     label: 'Grow Credit',
@@ -625,7 +625,7 @@ const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
   monitoring: { title: 'Report Sources', desc: 'Now lives inside Analysis & Reports — upload a report or choose a third-party report provider.', accent: '#00c6fb' },
   disputes: { title: 'Disputes', desc: 'Track active dispute items, bureau status, and round progression.', accent: '#f59e0b' },
   activity: { title: 'Activity', desc: 'Timeline of what just happened on your file and what comes next.', accent: '#2dd4bf' },
-  resources: { title: 'Credit Builders', desc: 'Partner tools and accounts to rebuild your credit profile.', accent: '#84cc16' },
+  resources: { title: 'Credit Builders', desc: 'Partner tools and accounts that can help you establish positive account history.', accent: '#84cc16' },
   tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' },
   analysis: { title: 'Analysis & Reports', desc: 'Upload a report for analysis or open a third-party report provider — all in one place.', accent: '#2563eb' },
   masterclass: { title: '5-Day Masterclass', desc: 'Your complete credit education curriculum — videos, slides, key terms, and action steps.', accent: '#00c6fb' }
