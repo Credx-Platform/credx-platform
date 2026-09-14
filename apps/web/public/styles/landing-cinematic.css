@@ -181,7 +181,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 @keyframes intro-trace{from{rotate:-160deg;opacity:0;scale:.9}25%{opacity:1}to{rotate:130deg;opacity:1;scale:1}}
 @keyframes intro-arrive{from{opacity:0;scale:.94}to{opacity:1;scale:1}}
 @keyframes intro-clear{to{opacity:0;visibility:hidden}}
-.about-runway{position:relative;background:#050a13;isolation:isolate;overflow:clip}
+.about-runway{position:relative;background:linear-gradient(180deg,var(--bg2),#050a13 18%,#050a13 82%,var(--bg2));isolation:isolate;overflow:clip}
 .narrative-ready .about-runway{height:calc(var(--about-height,100svh) + var(--about-travel,90svh))}
 .narrative-ready #about{position:sticky;top:80px;min-height:calc(100svh - 80px);overflow:visible}
 .about-transition .about-gateway{width:min(72vw,440px);height:min(72vw,440px);left:50%;top:50%;transform:translate(-50%,-50%);z-index:3}
@@ -270,3 +270,8 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 /* A single backdrop prevents a section-edge seam through the transparent iris. */
 .about-portal-active,.about-portal-active #about{background:transparent}
 .about-portal-active #about::before{display:none}
+
+/* Let the biography dissolve into the scene, without a rectangular panel. */
+#about{background:transparent}
+#about .about-inner{background:transparent;border:0;border-radius:0;box-shadow:none}
+#about .about-photo{border:0;box-shadow:none;border-radius:0;-webkit-mask-image:radial-gradient(ellipse at 50% 45%,#000 42%,rgba(0,0,0,.85) 60%,transparent 76%);mask-image:radial-gradient(ellipse at 50% 45%,#000 42%,rgba(0,0,0,.85) 60%,transparent 76%)}
