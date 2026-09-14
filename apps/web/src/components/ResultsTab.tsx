@@ -582,7 +582,7 @@ export function ResultsTab({ token, items, onItemsChange }: ResultsTabProps) {
       ) : (
         <div className="progress-report">
           <h4>📊 Client Progress Report</h4>
-          <p>Overview of dispute outcomes and credit improvement</p>
+          <p>Overview of report review outcomes and readiness progress</p>
           
           <div className="progress-stats">
             <div className="progress-stat">

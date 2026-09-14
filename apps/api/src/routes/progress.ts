@@ -360,6 +360,25 @@ progressRouter.post('/me', requireAuth, async (req: AuthedRequest, res, next) =>
       data: { completedDays, passedQuizzes, scores, disputes, workflow, education }
     });
 
+    // Relational mirrors are the durable source of truth for new clients. Keep
+    // the legacy JSON update above so existing portal builds remain compatible.
+    if (data.completedDay) {
+      await prisma.lessonCompletion.upsert({
+        where: { clientId_lessonKey: { clientId: client.id, lessonKey: data.completedDay } },
+        create: { clientId: client.id, lessonKey: data.completedDay, metadata: { source: 'progress-api' } },
+        update: { completedAt: new Date() }
+      });
+    }
+    if (data.workflow) {
+      const stage = typeof (data.workflow as any).stage === 'string' ? String((data.workflow as any).stage) : 'SIGNUP_RECEIVED';
+      const state = { ...data.workflow };
+      await prisma.workflowState.upsert({
+        where: { clientId: client.id },
+        create: { clientId: client.id, stage, state: state as any },
+        update: { stage, state: state as any, version: { increment: 1 } }
+      });
+    }
+
     // Milestone: a masterclass day was just completed.
     if (data.completedDay && !((client.progress as any).completedDays || []).includes(data.completedDay)) {
       const dayNum = String(data.completedDay).replace(/\D/g, '') || completedDays.length;
@@ -377,146 +396,13 @@ progressRouter.post('/me', requireAuth, async (req: AuthedRequest, res, next) =>
   }
 });
 
-const docSchema = z.object({
-  name: z.string().min(1),
-  type: z.string().optional(),
-  url: z.string().optional(),
-  fileName: z.string().optional(),
-  secure: z.boolean().optional(),
-  sizeBytes: z.number().int().nonnegative().optional(),
-  contentType: z.string().optional()
-});
-
-async function handleDocUpload(req: AuthedRequest, res: any, next: any) {
-  try {
-    const data = docSchema.parse(req.body);
-    const client = await prisma.client.findUnique({ where: { userId: req.auth!.sub }, include: { progress: true } });
-    if (!client || !client.progress) return res.status(404).json({ error: 'Client progress not found' });
-
-    const docType = inferDocumentType(data.type || data.name || data.fileName || '');
-    const doc = {
-      name: data.name,
-      type: docType,
-      url: data.url || null,
-      fileName: data.fileName || data.name,
-      uploadedAt: new Date().toISOString()
-    };
-
-    const progress = client.progress as any;
-    const uploadedDocs = Array.isArray(progress.uploadedDocs) ? [...progress.uploadedDocs] : [];
-    uploadedDocs.push(doc);
-
-    const workflow = { ...(progress.workflow || {}), updatedAt: new Date().toISOString() };
-    if (docType === 'credit_report') {
-      (workflow as any).stage = 'credit_report_received';
-    }
-
-    await prisma.clientProgress.update({
-      where: { clientId: client.id },
-      data: { uploadedDocs, workflow }
-    });
-
-    await prisma.document.upsert({
-      where: {
-        clientId_fileName: {
-          clientId: client.id,
-          fileName: doc.fileName
-        }
-      },
-      update: {
-        type: toPrismaDocumentType(docType),
-        s3Key: doc.url || doc.fileName,
-        contentType: docType === 'credit_report' ? 'application/pdf' : null,
-        uploadedAt: new Date(doc.uploadedAt)
-      },
-      create: {
-        clientId: client.id,
-        type: toPrismaDocumentType(docType),
-        fileName: doc.fileName,
-        s3Key: doc.url || doc.fileName,
-        contentType: docType === 'credit_report' ? 'application/pdf' : null,
-        uploadedAt: new Date(doc.uploadedAt)
-      }
-    });
-
-    let workflowResult = null;
-    if (docType === 'credit_report') {
-      workflowResult = await completeOnboardingWorkflow(client.id, doc);
-
-      // Auto-generate credit analysis if credit report data exists
-      try {
-        const clientWithReports = await prisma.client.findUnique({
-          where: { id: client.id },
-          include: {
-            user: true,
-            creditReports: { orderBy: { pulledAt: 'desc' }, include: { tradelines: true } }
-          }
-        });
-
-        if (clientWithReports && clientWithReports.creditReports.length > 0) {
-          const existingAnalysis = await prisma.clientProgress.findUnique({
-            where: { clientId: client.id },
-            select: { analysis: true }
-          });
-
-          if (!existingAnalysis?.analysis) {
-            const analysis = CreditAnalysisService.generate({
-              client: clientWithReports as any,
-              creditReports: clientWithReports.creditReports as any
-            });
-
-            await syncReportDerivedClientData(prisma, {
-              client: clientWithReports as any,
-              analysis,
-              workflow: {
-                ...(workflow as any || {}),
-                stage: 'analysis_ready',
-                updatedAt: new Date().toISOString(),
-                next: ['review_analysis', 'begin_disputes']
-              }
-            });
-
-            await prisma.client.update({
-              where: { id: client.id },
-              data: {
-                status: 'ANALYSIS_READY',
-                analysisSummary: analysis.clientFacingSummary.slice(0, 500) + '...'
-              }
-            });
-
-            await prisma.activityEvent.create({
-              data: {
-                clientId: client.id,
-                type: 'ANALYSIS_AUTO_GENERATED',
-                message: `Credit analysis auto-generated after report upload: ${analysis.keyFindings.length} findings identified.`,
-                metadata: { findingCount: analysis.keyFindings.length, disputeCount: analysis.disputeOpportunities.length }
-              }
-            });
-
-            (workflowResult as any).analysisGenerated = true;
-            (workflowResult as any).analysisFindings = analysis.keyFindings.length;
-
-            // Offload the PDF render + send to the queue so the upload request
-            // returns fast. Falls back to inline execution if the enqueue fails.
-            const emailQueue = await enqueueJob('emails', 'analysis-email', {
-              clientId: client.id,
-              analysis: analysis as unknown as Record<string, unknown>,
-              trigger: 'auto_doc_upload'
-            });
-            (workflowResult as any).analysisEmailed = emailQueue.status === 'queued' ? 'queued' : emailQueue.status === 'inline';
-            (workflowResult as any).analysisEmailQueue = emailQueue.status;
-          }
-        }
-      } catch (analysisErr) {
-        console.error('Auto-analysis generation failed:', analysisErr);
-        // Non-fatal: don't block the upload if analysis fails
-      }
-    }
-
-    return res.json({ uploadedDocs, workflow: workflowResult });
-  } catch (error) {
-    next(error);
-  }
+// Metadata is not an upload: require bytes through the multipart endpoint.
+// Otherwise callers can advance onboarding with an unretrievable document.
+async function handleDocUpload(_req: AuthedRequest, res: any) {
+  return res.status(422).json({
+    error: 'No file was saved. Please upload the original file using the document upload form.',
+    code: 'FILE_UPLOAD_REQUIRED'
+  });
 }
 
 progressRouter.post('/me/docs', requireAuth, handleDocUpload);
@@ -534,7 +420,10 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
       const stored = await uploadDocument(file.buffer, safeName, file.mimetype || 'application/octet-stream', client.id);
       storageKey = stored.pathname;
     } catch (storageError) {
-      console.warn('Document blob storage unavailable; saving metadata only', storageError);
+      console.warn('Document blob storage unavailable', { durableReportFallback: docType === 'credit_report' });
+      if (docType !== 'credit_report') {
+        return res.status(503).json({ error: 'Your file was not saved. Secure document storage is temporarily unavailable. Please keep the original and try again later.' });
+      }
     }
     const secureDoc = {
       name: safeName,

@@ -127,8 +127,8 @@ billingRouter.post('/paypal/order', async (req, res, next) => {
       amount,
       currency: 'USD',
       description: offer
-        ? `CredX 5-Day Credit Education Masterclass (${offer.label} offer)`
-        : 'CredX 5-Day Credit Education Masterclass (digital course)',
+        ? `CredX Financial Readiness Masterclass (${offer.label} offer)`
+        : 'CredX Financial Readiness Masterclass (digital education)',
       customId: MASTERCLASS_CUSTOM_ID,
       invoiceId: `MC-${offer ? 'OFFER-' : ''}${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
     });

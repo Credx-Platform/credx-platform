@@ -222,9 +222,18 @@ async function sendPrintableDocument(res: any, document: PrintableDocument) {
   // Private Vercel Blob objects are never returned directly. Generate a
   // short-lived signed URL that expires in 15 minutes.
   if (s3Key) {
-    const signedUrl = await getSignedUrlForStoredDocument(s3Key);
-    if (signedUrl) {
-      return res.json({ document, url: signedUrl, signature });
+    try {
+      const signedUrl = await getSignedUrlForStoredDocument(s3Key);
+      if (signedUrl) {
+        res.setHeader('Cache-Control', 'private, no-store');
+        return res.json({ document, url: signedUrl, signature });
+      }
+    } catch (error: any) {
+      if (error?.$metadata?.httpStatusCode === 404) {
+        return res.status(410).json({error:'The original file is unavailable. Please upload it again.',code:'DOCUMENT_REUPLOAD_REQUIRED'});
+      }
+      // Do not expose provider details, credentials, or internal endpoints.
+      return res.status(503).json({error:'Secure document access is temporarily unavailable. Please try again shortly.'});
     }
   }
 
@@ -251,7 +260,12 @@ async function sendPrintableDocument(res: any, document: PrintableDocument) {
     }
   }
 
-  if (s3Key) return res.json({ document, url: s3Key, signature });
+  // Historical secure/ keys contain metadata only, not retrievable URLs.
+  // Never hand them to the browser as though a file exists.
+  if (s3Key) return res.status(410).json({
+    error: 'The original file is unavailable. Please upload it again using the document upload form.',
+    code: 'DOCUMENT_REUPLOAD_REQUIRED'
+  });
   return res.status(410).json({ error: 'This document has no printable content on file.' });
 }
 
