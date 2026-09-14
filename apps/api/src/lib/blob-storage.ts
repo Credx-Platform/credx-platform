@@ -1,8 +1,9 @@
-import { put, del, list, issueSignedToken, presignUrl } from '@vercel/blob';
-import crypto from 'node:crypto';
+import { del, issueSignedToken, presignUrl } from '@vercel/blob';
+import { RAILWAY_DOCUMENT_PREFIX, uploadRailwayDocument, signRailwayDocument, deleteRailwayDocument, listRailwayDocuments } from './railway-storage.js';
 
 /**
- * Vercel Blob storage for client documents.
+ * Railway private storage for new client documents; Vercel signing retained only
+ * for legacy references. No Vercel credentials are needed for Railway uploads.
  * All files are uploaded as private blobs and served through short-lived
  * signed URLs so credit reports, IDs, and other PII are not publicly accessible.
  */
@@ -20,7 +21,7 @@ export interface StoredDocument {
 }
 
 /**
- * Upload a document to Vercel Blob as a private object.
+ * Upload a document to the private Railway bucket.
  * @param fileBuffer - The file buffer
  * @param fileName - Original file name
  * @param contentType - MIME type
@@ -32,24 +33,7 @@ export async function uploadDocument(
   contentType: string,
   clientId: string
 ): Promise<StoredDocument> {
-  // Sanitize filename and add random suffix for uniqueness
-  const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-  const uniqueSuffix = crypto.randomBytes(8).toString('hex');
-  const pathname = `${BLOB_PREFIX}${clientId}/${uniqueSuffix}_${safeName}`;
-
-  const blob = await put(pathname, fileBuffer, {
-    access: 'private',
-    contentType,
-    addRandomSuffix: false // We already added our own
-  });
-
-  return {
-    url: blob.url,
-    pathname: blob.pathname,
-    contentType,
-    size: fileBuffer.length,
-    uploadedAt: new Date().toISOString()
-  };
+  return uploadRailwayDocument(fileBuffer, fileName, contentType, clientId);
 }
 
 /**
@@ -61,6 +45,7 @@ export async function getSignedDocumentUrl(
   pathname: string,
   validForMs: number = DEFAULT_SIGNED_URL_TTL_MS
 ): Promise<string> {
+  if (pathname.startsWith(RAILWAY_DOCUMENT_PREFIX)) return signRailwayDocument(pathname, validForMs);
   const now = Date.now();
   const signedToken = await issueSignedToken({
     pathname,
@@ -111,15 +96,17 @@ export async function getSignedUrlForStoredDocument(
   storageKey: string,
   validForMs: number = DEFAULT_SIGNED_URL_TTL_MS
 ): Promise<string | null> {
+  if (storageKey.startsWith(RAILWAY_DOCUMENT_PREFIX)) return signRailwayDocument(storageKey, validForMs);
   const pathname = extractBlobPathname(storageKey);
   if (!pathname) return null;
   return getSignedDocumentUrl(pathname, validForMs);
 }
 
 /**
- * Delete a document from Vercel Blob
+ * Delete a stored document (Railway or legacy Vercel)
  */
 export async function deleteDocument(pathname: string): Promise<void> {
+  if (pathname.startsWith(RAILWAY_DOCUMENT_PREFIX)) return deleteRailwayDocument(pathname);
   await del(pathname);
 }
 
@@ -128,16 +115,5 @@ export async function deleteDocument(pathname: string): Promise<void> {
  * `getSignedDocumentUrl()` to obtain a readable URL for private blobs.
  */
 export async function listClientDocuments(clientId: string): Promise<StoredDocument[]> {
-  const { blobs } = await list({
-    prefix: `${BLOB_PREFIX}${clientId}/`
-  });
-
-  // list() doesn't return contentType; callers needing it should head(pathname).
-  return blobs.map((blob) => ({
-    url: blob.url,
-    pathname: blob.pathname,
-    contentType: 'application/octet-stream',
-    size: blob.size,
-    uploadedAt: blob.uploadedAt.toISOString()
-  }));
+  return listRailwayDocuments(clientId);
 }
