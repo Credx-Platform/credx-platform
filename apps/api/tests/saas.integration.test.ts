@@ -39,6 +39,8 @@ after(async () => { if (skip || !ctx.prisma) return; ctx.server?.close(); await 
 
 test('durable state writes reload across fresh requests and enforce ownership', { skip }, async () => {
   assert.equal((await req(ctx.one, '/api/saas/onboarding', { method: 'PUT', body: JSON.stringify({ goals: ['funding'], currentStep: 'profile' }) })).status, 200);
+  assert.equal((await req(ctx.one, '/api/saas/action-plan/prepare', { method: 'PUT', body: JSON.stringify({ title: 'Prepare documents', priority: 'HIGH', status: 'OPEN' }) })).status, 200);
+  assert.equal((await req(ctx.one, '/api/saas/milestones/first-goal', { method: 'PUT', body: JSON.stringify({ title: 'First goal', achieved: false }) })).status, 200);
   assert.equal((await req(ctx.one, '/api/saas/lessons/day-1/complete', { method: 'POST', body: JSON.stringify({ metadata: { source: 'test' } }) })).status, 201);
   assert.equal((await req(ctx.one, '/api/saas/quizzes/day-1/results', { method: 'POST', body: JSON.stringify({ score: 90, passed: true, answers: { q1: 1 } }) })).status, 201);
   const conversation = await req(ctx.one, '/api/saas/conversations', { method: 'POST', body: JSON.stringify({ title: 'Private' }) });
@@ -49,11 +51,17 @@ test('durable state writes reload across fresh requests and enforce ownership', 
   const reloaded = await req(ctx.one, '/api/saas/state');
   assert.equal(reloaded.status, 200);
   assert.equal(reloaded.body.onboarding.currentStep, 'profile');
+  assert.equal(reloaded.body.actionPlan[0].key, 'prepare');
   assert.ok(reloaded.body.lessons.some((row: any) => row.lessonKey === 'day-1'));
   assert.equal(reloaded.body.conversations[0].messages[0].content, 'hello');
   const other = await req(ctx.two, '/api/saas/state');
   assert.equal(other.body.lessons.length, 0);
   assert.equal(other.body.conversations.length, 0);
+  assert.equal((await req(ctx.one, '/api/saas/export', { method: 'POST', body: '{}' })).status, 201);
+  assert.equal((await req(ctx.one, '/api/saas/deletion', { method: 'POST', body: JSON.stringify({ reason: 'test' }) })).status, 201);
+  const oneUser = await ctx.prisma.user.findUniqueOrThrow({ where: { email: 'saas-one@test.invalid' } });
+  const auditCount = await ctx.prisma.auditLog.count({ where: { userId: oneUser.id, action: { startsWith: 'SAAS_' } } });
+  assert.ok(auditCount >= 9);
 });
 
 test('workflow optimistic concurrency rejects stale writers', { skip }, async () => {

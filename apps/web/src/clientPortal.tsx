@@ -3705,9 +3705,45 @@ function AnalysisSection({ token, user, client, progress, refreshAll }: { token:
 
 // Client Tasks Section — Hybrid SaaS Workflow
 // Auto-advances digital steps, submits manual steps for admin review
-function ClientTasksSection({ token, user, client, progress, refreshAll, onTabChange }: { token: string; user: User | null; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; onTabChange: (tab: PortalTab) => void; }) {
+function ClientTasksSection({ token, user, client, progress, durableState, refreshAll, onTabChange }: { token: string; user: User | null; client: Client | null; progress: Progress | null; durableState: DurableSaasState | null; refreshAll: () => Promise<void>; onTabChange: (tab: PortalTab) => void; }) {
   const [completing, setCompleting] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [goals, setGoals] = useState<string[]>(() => Array.isArray(durableState?.onboarding?.goals) ? durableState!.onboarding!.goals as string[] : []);
+  const [goalDraft, setGoalDraft] = useState('');
+  const [privacyStatus, setPrivacyStatus] = useState<string | null>(null);
+  const [savingDurable, setSavingDurable] = useState(false);
+
+  useEffect(() => {
+    if (Array.isArray(durableState?.onboarding?.goals)) setGoals(durableState.onboarding.goals as string[]);
+  }, [durableState?.onboarding?.goals]);
+
+  const saveGoals = async () => {
+    setSavingDurable(true);
+    try { await apiFetch('/api/saas/onboarding', token, { method: 'PUT', body: JSON.stringify({ goals, currentStep: 'goals', status: goals.length ? 'IN_PROGRESS' : 'PENDING' }) }); await refreshAll(); setMessage('Goals saved securely.'); }
+    catch (err) { setMessage(`Could not save goals: ${err instanceof Error ? err.message : 'Unknown error'}`); }
+    finally { setSavingDurable(false); }
+  };
+
+  const updateAction = async (item: DurableSaasState['actionPlan'][number]) => {
+    setSavingDurable(true);
+    try { await apiFetch(`/api/saas/action-plan/${encodeURIComponent(item.key)}`, token, { method: 'PUT', body: JSON.stringify({ title: item.title, description: item.description, priority: item.priority, status: 'COMPLETED' }) }); await refreshAll(); setMessage('Action plan updated.'); }
+    catch (err) { setMessage(`Could not update action: ${err instanceof Error ? err.message : 'Unknown error'}`); }
+    finally { setSavingDurable(false); }
+  };
+
+  const updateMilestone = async (item: DurableSaasState['milestones'][number]) => {
+    setSavingDurable(true);
+    try { await apiFetch(`/api/saas/milestones/${encodeURIComponent(item.key)}`, token, { method: 'PUT', body: JSON.stringify({ title: item.title, achieved: true }) }); await refreshAll(); setMessage('Milestone updated.'); }
+    catch (err) { setMessage(`Could not update milestone: ${err instanceof Error ? err.message : 'Unknown error'}`); }
+    finally { setSavingDurable(false); }
+  };
+
+  const requestPrivacy = async (kind: 'export' | 'deletion') => {
+    setSavingDurable(true);
+    try { await apiFetch(`/api/saas/${kind}`, token, { method: 'POST', body: kind === 'deletion' ? JSON.stringify({ reason: 'Requested from client portal' }) : '{}' }); setPrivacyStatus(kind === 'export' ? 'Export requested. CredX will process it securely.' : 'Deletion request recorded for review.'); await refreshAll(); }
+    catch (err) { setPrivacyStatus(`Could not submit request: ${err instanceof Error ? err.message : 'Unknown error'}`); }
+    finally { setSavingDurable(false); }
+  };
 
   // Store submitted-for-review tasks in localStorage
   const [submittedTasks, setSubmittedTasks] = useState<Set<string>>(() => {
@@ -3887,6 +3923,19 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
 
   return (
     <div className="page-grid">
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Durable account controls</p><h2>Your goals and privacy</h2></div></div>
+        <p className="helper-text">These controls save to your CredX account and reload on a new session.</p>
+        <form onSubmit={(event) => { event.preventDefault(); if (goalDraft.trim()) { setGoals((current) => [...current, goalDraft.trim()].slice(0, 20)); setGoalDraft(''); } }} style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+          <input className="chat-input" value={goalDraft} onChange={(event) => setGoalDraft(event.target.value)} placeholder="Add an onboarding goal" maxLength={80} />
+          <button className="ghost-button" type="submit">Add goal</button>
+        </form>
+        {goals.length ? <ul>{goals.map((goal, index) => <li key={`${goal}-${index}`}>{goal}</li>)}</ul> : <p className="helper-text">No goals saved yet.</p>}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}><button className="ghost-button" type="button" disabled={savingDurable} onClick={saveGoals}>Save goals</button><button className="ghost-button" type="button" disabled={savingDurable} onClick={() => requestPrivacy('export')}>Request data export</button><button className="ghost-button" type="button" disabled={savingDurable} onClick={() => requestPrivacy('deletion')}>Request account deletion</button></div>
+        {privacyStatus ? <p className="helper-text" role="status">{privacyStatus}</p> : null}
+      </section>
+      {durableState?.actionPlan.length ? <section className="panel"><div className="panel-header"><div><p className="eyebrow">Durable action plan</p><h2>Owned action items</h2></div></div>{durableState.actionPlan.map((item) => <div className="portal-task-row" key={item.key}><div className="portal-task-row__body"><strong>{item.title}</strong><span className="portal-task-row__badge">{item.status}</span><button className="portal-task-row__button" type="button" disabled={savingDurable || item.status === 'COMPLETED'} onClick={() => updateAction(item)}>{item.status === 'COMPLETED' ? 'Completed' : 'Mark complete'}</button></div></div>)}</section> : null}
+      {durableState?.milestones.length ? <section className="panel"><div className="panel-header"><div><p className="eyebrow">Milestones</p><h2>Your progress checkpoints</h2></div></div>{durableState.milestones.map((item) => <div className="portal-task-row" key={item.key}><div className="portal-task-row__body"><strong>{item.title}</strong><span className="portal-task-row__badge">{item.achievedAt ? 'Achieved' : 'Open'}</span><button className="portal-task-row__button" type="button" disabled={savingDurable || Boolean(item.achievedAt)} onClick={() => updateMilestone(item)}>{item.achievedAt ? 'Achieved' : 'Mark achieved'}</button></div></div>)}</section> : null}
       <section className="hero-card hero-card--compact">
         <div>
           <p className="eyebrow">Your Progress</p>
@@ -4412,7 +4461,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         { key: 'analysis', label: 'Uploads & Analysis' },
         { key: 'disputes', label: 'Disputes' },
         { key: 'masterclass', label: '5-Day Masterclass' },
-        { key: 'resources', label: 'Credit Builders' }
+        { key: 'resources', label: 'Credit Builders' },
+        { key: 'tasks', label: 'Goals & Tasks' }
       ]
     : tier2
       ? [
@@ -4423,7 +4473,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           { key: 'profile', label: 'Profile' },
           { key: 'activity', label: 'Activity' },
           { key: 'resources', label: 'Credit Builders' },
-          { key: 'tasks', label: 'Tasks' }
+          { key: 'tasks', label: 'Goals & Tasks' }
         ]
       : tier1
         ? [
@@ -4431,13 +4481,15 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
             { key: 'analysis', label: 'Analysis & Reports' },
             { key: 'profile', label: 'Profile' },
-            { key: 'resources', label: 'Credit Builders' }
+            { key: 'resources', label: 'Credit Builders' },
+            { key: 'tasks', label: 'Goals & Tasks' }
           ]
         : [
             { key: 'overview', label: 'Overview' },
             ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
             { key: 'analysis', label: 'Analysis & Reports' },
-            { key: 'profile', label: 'Profile' }
+            { key: 'profile', label: 'Profile' },
+            { key: 'tasks', label: 'Goals & Tasks' }
           ];
 
   // Early returns sit AFTER all hooks to satisfy rules-of-hooks under StrictMode.
@@ -4759,7 +4811,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             </>
           ) : null}
 
-          {activeTab === 'tasks' ? <ClientTasksSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} onTabChange={setActiveTab} /> : null}
+          {activeTab === 'tasks' ? <ClientTasksSection token={token} user={user} client={client} progress={progress} durableState={durableState} refreshAll={refreshAll} onTabChange={setActiveTab} /> : null}
 
           {!masterclassOnly ? (
             <CrossPromoFooter
