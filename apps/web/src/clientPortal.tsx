@@ -141,6 +141,19 @@ type SessionResponse = User & {
   portalUnlocked?: boolean;
 };
 
+type DurableSaasState = {
+  onboarding: { goals?: unknown; status?: string; currentStep?: string; completedAt?: string | null } | null;
+  lessons: Array<{ lessonKey: string; completedAt: string; metadata?: unknown }>;
+  quizzes: Array<{ lessonKey: string; attempt: number; score: number; passed: boolean; submittedAt: string }>;
+  actionPlan: Array<{ key: string; title: string; description?: string | null; status: string; priority: string; dueAt?: string | null }>;
+  milestones: Array<{ key: string; title: string; achievedAt?: string | null }>;
+  workflow: { stage: string; state?: unknown; version: number } | null;
+  conversations: Array<{ id: string; title?: string | null; messages?: Array<{ role: 'user' | 'assistant' | 'system'; content: string; createdAt: string }> }>;
+  readinessHistory: Array<{ id: string; score: number; createdAt: string }>;
+  notifications: Array<{ id: string; title?: string | null; message: string; readAt?: string | null; createdAt: string }>;
+  subscription: { planCode: string; status: string; currentPeriodEnd?: string | null; cancelAtPeriodEnd: boolean } | null;
+};
+
 type ContractTextResponse = {
   agreement: string;
   disclosure: string;
@@ -4045,6 +4058,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const [client, setClient] = useState<Client | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
+  const [durableState, setDurableState] = useState<DurableSaasState | null>(null);
   const [readinessSaving, setReadinessSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
@@ -4058,9 +4072,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
   async function refreshAll() {
     if (!token) return;
-    const [sessionResponse, progressResponse] = await Promise.all([
+    const [sessionResponse, progressResponse, durableResponse] = await Promise.all([
       apiFetch<SessionResponse>('/api/auth/me', token),
-      apiFetch<Progress>('/api/progress/me', token)
+      apiFetch<Progress>('/api/progress/me', token),
+      apiFetch<DurableSaasState>('/api/saas/state', token)
     ]);
     const readinessResponse = await apiFetch<ReadinessScore>('/api/progress/readiness', token).catch(() => null);
     const { client: clientResponse, progress: authProgress, ...userResponse } = sessionResponse;
@@ -4068,6 +4083,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     localStorage.setItem(USER_KEY, JSON.stringify(userResponse));
     setClient(clientResponse);
     setProgress(progressResponse ?? authProgress ?? null);
+    setDurableState(durableResponse);
     setReadiness(readinessResponse);
   }
 
@@ -4095,9 +4111,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     Promise.all([
       apiFetch<SessionResponse>('/api/auth/me', token),
       apiFetch<Progress>('/api/progress/me', token),
-      apiFetch<ReadinessScore>('/api/progress/readiness', token).catch(() => null)
+      apiFetch<ReadinessScore>('/api/progress/readiness', token).catch(() => null),
+      apiFetch<DurableSaasState>('/api/saas/state', token).catch(() => null)
     ])
-      .then(([sessionResponse, progressResponse, readinessResponse]) => {
+      .then(([sessionResponse, progressResponse, readinessResponse, durableResponse]) => {
         if (cancelled) return;
         const { client: clientResponse, progress: authProgress, ...userResponse } = sessionResponse;
         setUser(userResponse);
@@ -4105,6 +4122,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         setClient(clientResponse);
         setProgress(progressResponse ?? authProgress ?? null);
         setReadiness(readinessResponse);
+        setDurableState(durableResponse);
       })
       .catch((fetchError) => {
         if (cancelled) return;
@@ -4114,6 +4132,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         setClient(null);
         setProgress(null);
         setReadiness(null);
+        setDurableState(null);
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
       })
@@ -4300,16 +4319,22 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const tier2 = !masterclassEnrolled && (paidServicePayment || ['ACTIVE', 'PAST_DUE'].includes(clientStatusUpper));
   const masterclassOnly = masterclassEnrolled && !paidServicePayment && !['RESTRICTED', 'CANCELLED'].includes(clientStatusUpper);
   const completedMasterclassDays = useMemo(
-    () => (progress?.education?.masterclassProgress || []).filter((s): s is string => typeof s === 'string'),
-    [progress?.education?.masterclassProgress]
+    () => Array.from(new Set([...(durableState?.lessons || []).map((lesson) => lesson.lessonKey), ...(progress?.education?.masterclassProgress || [])])).filter((s): s is string => typeof s === 'string'),
+    [durableState?.lessons, progress?.education?.masterclassProgress]
   );
   const passedMasterclassQuizzes = useMemo(
-    () => (progress?.education?.masterclassPassedQuizzes || []).filter((s): s is string => typeof s === 'string'),
-    [progress?.education?.masterclassPassedQuizzes]
+    () => Array.from(new Set([...(durableState?.quizzes || []).filter((quiz) => quiz.passed).map((quiz) => quiz.lessonKey), ...(progress?.education?.masterclassPassedQuizzes || [])])),
+    [durableState?.quizzes, progress?.education?.masterclassPassedQuizzes]
   );
   const masterclassQuizAttempts = useMemo(
-    () => progress?.education?.masterclassQuizAttempts || {},
-    [progress?.education?.masterclassQuizAttempts]
+    () => {
+      const attempts = { ...(progress?.education?.masterclassQuizAttempts || {}) };
+      for (const quiz of durableState?.quizzes || []) {
+        if (!attempts[quiz.lessonKey] || quiz.attempt >= attempts[quiz.lessonKey].count) attempts[quiz.lessonKey] = { count: quiz.attempt, lastAttemptAt: quiz.submittedAt };
+      }
+      return attempts;
+    },
+    [durableState?.quizzes, progress?.education?.masterclassQuizAttempts]
   );
 
   useEffect(() => {
@@ -4331,9 +4356,9 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     if (!token) return;
     if (completedMasterclassDays.includes(slug)) return;
     try {
-      await apiFetch('/api/masterclass/progress', token, {
+      await apiFetch('/api/saas/lessons/' + encodeURIComponent(slug) + '/complete', token, {
         method: 'POST',
-        body: JSON.stringify({ daySlug: slug })
+        body: JSON.stringify({ metadata: { source: 'client-portal' } })
       });
       await refreshAll();
     } catch (err) {
@@ -4349,6 +4374,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     const result = await apiFetch<QuizSubmitResult>('/api/masterclass/quiz', token, {
       method: 'POST',
       body: JSON.stringify({ daySlug: slug, answers })
+    });
+    await apiFetch('/api/saas/quizzes/' + encodeURIComponent(slug) + '/results', token, {
+      method: 'POST',
+      body: JSON.stringify({ score: result.percent, passed: result.passed, answers })
     });
     await refreshAll();
     return result;
@@ -4742,20 +4771,28 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         </div>
         <SiteFooter />
       </main>
-      <CesarChatWidget token={token} user={user} />
+      <CesarChatWidget token={token} user={user} durableConversations={durableState?.conversations || []} />
     </div>
   );
 }
 
 type CesarChatMessage = { role: 'user' | 'assistant'; content: string; html?: string };
 
-function CesarChatWidget({ token, user }: { token: string; user: User | null }) {
+function CesarChatWidget({ token, user, durableConversations }: { token: string; user: User | null; durableConversations: DurableSaasState['conversations'] }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<CesarChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const greetedRef = useRef(false);
+
+  useEffect(() => {
+    const prior = durableConversations[0];
+    if (!prior) return;
+    setConversationId(prior.id);
+    setMessages((prior.messages || []).map((message) => ({ role: message.role === 'system' ? 'assistant' : message.role, content: message.content })));
+  }, [durableConversations]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -4773,11 +4810,19 @@ function CesarChatWidget({ token, user }: { token: string; user: User | null }) 
   async function requestReply(message: string, history: CesarChatMessage[]) {
     setBusy(true);
     try {
+      let activeConversationId = conversationId;
+      if (!activeConversationId) {
+        const created = await apiFetch<{ conversation: { id: string } }>('/api/saas/conversations', token, { method: 'POST', body: JSON.stringify({ title: 'Cesar guidance' }) });
+        activeConversationId = created.conversation.id;
+        setConversationId(activeConversationId);
+      }
+      if (message && activeConversationId) await apiFetch('/api/saas/conversations/' + encodeURIComponent(activeConversationId) + '/messages', token, { method: 'POST', body: JSON.stringify({ role: 'user', content: message }) });
       const data = await apiFetch<{ reply: string; html: string }>('/api/cesar/chat', token, {
         method: 'POST',
         body: JSON.stringify({ message, history: history.slice(-8).map((m) => ({ role: m.role, content: m.content })) })
       });
       setMessages((current) => [...current, { role: 'assistant', content: data.reply, html: data.html }]);
+      if (activeConversationId) await apiFetch('/api/saas/conversations/' + encodeURIComponent(activeConversationId) + '/messages', token, { method: 'POST', body: JSON.stringify({ role: 'assistant', content: data.reply }) });
     } catch {
       setMessages((current) => [...current, {
         role: 'assistant',

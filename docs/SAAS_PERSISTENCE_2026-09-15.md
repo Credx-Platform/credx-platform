@@ -33,3 +33,22 @@ Zod and action-plan/workflow writes use unique keys/version checks for idempoten
 3. Wire the portal's current fetch/update hooks to `/api/saas/state` and the typed resource endpoints, then run the browser journey.
 4. Reconcile with the separate Railway document-storage repair before any main-branch deployment; this branch intentionally does not alter that release.
 5. Run payment sandbox, inbox delivery, backup/restore, monitoring, and production migration verification separately; this pass performed no live charges, emails, or deployment.
+
+## Portal integration and verification follow-up
+
+The customer portal now requests `/api/saas/state` on every authenticated bootstrap/reload. Durable lesson completions and quiz attempts are merged into the masterclass view, and Cesar conversation/message writes use the authenticated durable conversation endpoints (with the legacy Cesar response endpoint retained for response generation). The legacy progress payload remains loaded for existing dispute/document screens while migration is incremental.
+
+| Capability | Durable API | Portal status | Evidence |
+| --- | --- | --- | --- |
+| Onboarding goals/state | `/api/saas/onboarding` | Bootstrap loaded; existing onboarding UI remains compatibility-backed | `saas.integration.test.ts` reload assertion |
+| Readiness score/explanation/history | Existing readiness routes + state history | Existing readiness panel and snapshot flow; history returned in durable bootstrap | route/UI inspection; existing readiness tests |
+| Action plans/milestones | `/api/saas/action-plan`, `/api/saas/milestones/:key` | APIs durable; legacy Tasks screen remains in staged migration | route implementation; ownership suite |
+| Lessons/quizzes | `/api/saas/lessons/*`, `/api/saas/quizzes/*` | Masterclass completion/attempts mirrored and reload from durable state | `saas.integration.test.ts`; web build |
+| Document vault | Existing authenticated document routes/storage repair | Existing portal document flow retained; no storage changes in this branch | prior commit `5620093` preserved |
+| Cesar limits/conversations | `/api/saas/conversations/*` + Cesar chat | Conversation history bootstraps and new messages persist durably; generation remains legacy endpoint | ownership test; web build |
+| Subscription/entitlements | Durable subscription in `/api/saas/state` | Bootstrap exposes current plan/status; billing UI remains existing flow | route schema/state response |
+| Notifications | Durable notifications in `/api/saas/state` | Bootstrap exposes latest notifications; existing notification component remains API-backed | route schema/state response |
+| Export/deletion requests | `/api/saas/export`, `/api/saas/deletion` | Durable request endpoints available; account controls still require UI migration | route implementation |
+| Admin/audit | `/api/saas/admin/overview`; existing audit records | Staff/admin role gate present; audit UI remains existing surface | route role middleware |
+
+Disposable PostgreSQL verification used the local `credx-launch-tests-20260913` container at `127.0.0.1:55438`; the durable migration SQL was applied directly because this pre-existing disposable schema had no Prisma migration table. Results: API build passed, web build passed, 2 durable integration tests passed (reload/ownership and stale workflow conflict), and no production database, deployment, email, or payment provider was contacted.
