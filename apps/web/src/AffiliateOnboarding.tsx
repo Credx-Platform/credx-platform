@@ -148,7 +148,7 @@ export default function AffiliateOnboarding() {
           <code>{affiliate.referralLink}</code>
         </div>
         <div className="policy-box">
-          <p>CredX provides credit education, credit-report review support, lawful dispute strategy, and financial rebuilding guidance. Affiliates may introduce prospects to CredX using their assigned referral link.</p>
+          <p>CredX provides credit education, credit-report organization, lawful consumer-rights information, and financial-readiness guidance. Affiliates may introduce prospects to CredX using their assigned referral link.</p>
           <p>Affiliates must not promise deletions, guaranteed score increases, guaranteed approvals, guaranteed funding, or legal representation. Affiliates must not tell consumers to lie, fabricate facts, or submit inaccurate information.</p>
           <p>Affiliates must clearly explain that Cesar and CredX analysis tools are AI-assisted education and workflow support, not a lawyer, lender, credit bureau, or guaranteed-results service.</p>
           <p>Affiliate marketing must be truthful, clear, and respectful. CredX may pause or remove an affiliate link if the affiliate misrepresents CredX services or violates these rules.</p>
