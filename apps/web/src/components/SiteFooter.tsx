@@ -18,6 +18,8 @@ export function SiteFooter() {
           <a href="/portal">Client portal</a>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
+          <a href="/refund-policy">Refunds</a>
+          <a href="/croa-disclosure">Disclosures</a>
         </nav>
         <div className="site-footer__meta">
           <span>© {year} CredX. All rights reserved.</span>

@@ -189,7 +189,7 @@ function rulesReply(message: string, ctx: CesarContext): CesarReply {
     return wrap(`Here are the current CredX prices:<br><br>• 5-Day Masterclass: <strong>$47 one time</strong><br>• Essential AI Assistance: <strong>$150 after analysis review</strong><br>• Premium: <strong>$447 after analysis review</strong><br>• Family: <strong>$300 after analysis review</strong>, then monthly support based on family size<br><br>You can compare the options here: ${LINKS.pricing}.`);
   }
   if (/(masterclass|diy)/.test(text)) {
-    return wrap(`The 5-Day Masterclass is the DIY path inside CredX: credit fundamentals, disputes, rebuilding, business credit, and a bonus wealth day. It is <strong>$47 one time</strong>. Start here: ${LINKS.masterclass}.`);
+    return wrap(`The 5-Day Masterclass is the DIY education path inside CredX: credit fundamentals, report accuracy, consumer rights, positive financial habits, business credit, and a bonus wealth day. It is <strong>$47 one time</strong>. Start here: ${LINKS.masterclass}.`);
   }
   if (/(program|coaching|service)/.test(text)) {
     return wrap(`CredX puts software first: your profile, next actions, and progress live in one workspace. Optional professional support can add human review and follow-through when you want it. Start here: ${LINKS.signup}.`);

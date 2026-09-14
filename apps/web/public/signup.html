@@ -536,7 +536,7 @@ function setStateValue(key, value) {
 function selectedPlanLabel() {
   return state.offerInterest === 'masterclass'
     ? '5-Day Masterclass'
-    : 'AI Assistance';
+    : 'Platform + Guidance';
 }
 
 function selectedAiPriceLabel() {
@@ -1101,7 +1101,7 @@ async function submitSignup() {
       if (body && body.token) localStorage.setItem(TOKEN_KEY, body.token);
       showSuccess('Upgrade applied', offerInterest === 'masterclass'
         ? 'Masterclass access has been added to your account. Opening your portal now.'
-        : 'Your account is set for the CredX program. Opening your portal now.');
+        : 'Your CredX profile is set up. Opening your portal now.');
       showToast('Upgrade saved');
       setTimeout(() => { window.location.assign('/portal'); }, 1200);
       return;

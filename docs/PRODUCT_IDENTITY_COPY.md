@@ -1,6 +1,6 @@
 # CredX product identity copy
 
-These strings are the approved software-first wording for external provider setup. They are kept here so payment and social settings can be updated consistently when an authorized operator has access.
+These strings are proposed software-first wording for external provider setup. They are kept here so payment and social settings can be updated consistently when an authorized operator has access. They are not provider-approved values, and no external settings were changed in this worktree.
 
 ## Positioning
 
