@@ -90,6 +90,14 @@ masterclassRouter.post('/progress', requireAuth, async (req: AuthedRequest, res,
       }
     });
 
+    // Keep a relational completion record as the durable source of truth. The
+    // legacy education JSON above remains for older portal clients.
+    await prisma.lessonCompletion.upsert({
+      where: { clientId_lessonKey: { clientId: client.id, lessonKey: daySlug } },
+      create: { clientId: client.id, lessonKey: daySlug, metadata: { source: 'masterclass' } },
+      update: { completedAt: new Date() }
+    });
+
     return res.json({ ok: true, completedDays: completed, education: updated.education });
   } catch (error) {
     next(error);
@@ -151,6 +159,18 @@ masterclassRouter.post('/quiz', requireAuth, async (req: AuthedRequest, res, nex
           masterclassQuizAttempts: nextAttemptsLog,
           masterclassPassedQuizzes: passedQuizzes
         }
+      }
+    });
+
+    const previousAttempts = await prisma.quizResult.aggregate({ where: { clientId: client.id, lessonKey: daySlug }, _max: { attempt: true } });
+    await prisma.quizResult.create({
+      data: {
+        clientId: client.id,
+        lessonKey: daySlug,
+        attempt: (previousAttempts._max.attempt ?? 0) + 1,
+        score: Math.round(grade.percent * 100),
+        passed: grade.passed,
+        answers
       }
     });
 

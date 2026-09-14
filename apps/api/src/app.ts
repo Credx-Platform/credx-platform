@@ -32,6 +32,7 @@ import { tasksRouter } from './routes/tasks.js';
 import { checkinRouter } from './routes/checkin.js';
 import { platformReportsRouter } from './routes/platformReports.js';
 import { aiRouter } from './routes/ai.js';
+import { saasRouter } from './routes/saas.js';
 
 export interface CreateAppOptions {
   /** Disable rate limiters (tests / load harness). */
@@ -169,6 +170,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     app.use(`${prefix}/checkin`, checkinRouter);
     app.use(`${prefix}/reports`, platformReportsRouter);
     app.use(`${prefix}/ai`, aiRouter);
+    app.use(`${prefix}/saas`, saasRouter);
   }
 
   mountAll('/api');
