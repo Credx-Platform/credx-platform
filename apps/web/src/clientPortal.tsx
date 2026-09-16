@@ -1111,7 +1111,6 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
   const [signatureName, setSignatureName] = useState(`${user.firstName} ${user.lastName}`.trim());
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [contractAgreed, setContractAgreed] = useState(false);
-  const [docUpload, setDocUpload] = useState<SecureUploadState>({ file: null, type: 'credit_report' });
   const [wizardState, setWizardState] = useState<WizardState>({ ...defaultWizardState, fullName: `${user.firstName} ${user.lastName}`.trim(), email: user.email, phone: user.phone || '' });
 
   useEffect(() => {
@@ -1130,9 +1129,14 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
   const signatureRepairMode = Boolean(completedAt && !hasStoredSignature);
   const needsContract = signatureRepairMode || ['signup_received', 'contract_pending'].includes(stage);
   const needsApplication = !signatureRepairMode && ['contract_signed', 'application_pending'].includes(stage);
-  const needsMonitoring = ['application_completed', 'report_required'].includes(stage);
-  const uploadedCreditReports = (progress?.uploadedDocs || []).filter((doc) => (doc.type || '').toLowerCase().includes('credit'));
-  const needsUpload = ['application_completed', 'report_required', 'portal_unlocked', 'upload_credit_report', 'credit_report_received'].includes(stage) && uploadedCreditReports.length === 0;
+  // Sign-up no longer waits on a credit report. Once the application is
+  // complete, the client sets their portal password right here; the report
+  // itself is added later from inside the portal.
+  const needsPasswordSetup = !completedAt && ['application_completed', 'report_required', 'portal_unlocked', 'upload_credit_report', 'credit_report_received'].includes(stage);
+  const [passwordValue, setPasswordValue] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordDone, setPasswordDone] = useState(false);
 
   async function refreshProgress() {
     const nextProgress = await apiFetch<Progress>('/api/progress/me', token);
@@ -1215,45 +1219,28 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
     }
   }
 
-  async function submitMonitoring(event: FormEvent<HTMLFormElement>) {
+  async function submitPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setWizardError(null);
-    setBusyStep('monitoring');
-    try {
-      await apiFetch('/api/monitoring', token, {
-        method: 'POST',
-        body: JSON.stringify({ provider: wizardState.provider, username: wizardState.monitorUsername, password: wizardState.monitorPassword })
-      });
-      await refreshProgress();
-    } catch (error) {
-      setWizardError(error instanceof Error ? error.message : 'Unable to save monitoring');
-    } finally {
-      setBusyStep(null);
+    if (passwordValue.length < 8) {
+      setWizardError('Password must be at least 8 characters.');
+      return;
     }
-  }
-
-  async function submitDocument(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!docUpload.file) {
-      setWizardError('Choose a file first.');
+    if (passwordValue !== passwordConfirm) {
+      setWizardError('Passwords do not match.');
       return;
     }
     setWizardError(null);
-    setBusyStep('upload');
+    setPasswordBusy(true);
     try {
-      const formData = new FormData();
-      formData.append('file', docUpload.file);
-      formData.append('type', docUpload.type);
-      await apiUpload('/api/progress/me/docs/upload', token, formData);
-      setDocUpload({ file: null, type: 'credit_report' });
+      await apiFetch('/api/auth/set-password', token, { method: 'POST', body: JSON.stringify({ password: passwordValue }) });
+      setPasswordDone(true);
       await refreshProgress();
     } catch (error) {
-      setWizardError(error instanceof Error ? error.message : 'Unable to save document');
+      setWizardError(error instanceof Error ? error.message : 'Unable to set password');
     } finally {
-      setBusyStep(null);
+      setPasswordBusy(false);
     }
   }
-
   return (
     <section className="panel">
       <div className="panel-header"><div><p className="eyebrow">Onboarding</p><h2>Finish your CredX setup</h2></div></div>
@@ -1319,45 +1306,26 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
             <p className="helper-text" style={{ marginTop: '0.5rem' }}>Fields marked * are required. Name and email use the login record if the browser does not submit them. Address line 2 and phone are optional. Full SSN is encrypted after save; only the last four are shown back.</p>
           </form>
         ) : null}
-        {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}>
-          <div className="dispute-card-top">
-            <strong>Step 3, choose a report source or upload below</strong>
-            <span className="security-note-inline" aria-label="Encrypted">Encrypted</span>
+        {needsPasswordSetup ? (
+          <div className="dispute-card-live">
+            <div className="dispute-card-top"><strong>Welcome to CredX{user.firstName ? `, ${user.firstName}` : ''} — you’re almost in</strong><span className="security-note-inline" aria-label="Encrypted">Encrypted</span></div>
+            <p className="helper-text" style={{ marginBottom: '0.75rem' }}>
+              Your application is complete and your file is in review. Set your password below to access your client portal.
+              Your credit report is no longer part of sign-up — you can add it anytime after signing in, and we’ll show you exactly where.
+            </p>
+            {passwordDone ? (
+              <p className="helper-text" style={{ color: '#16a34a', fontWeight: 600, margin: 0 }}>✓ Password saved. You’re all set — use it to sign in at your CredX portal.</p>
+            ) : (
+              <form className="field-grid" onSubmit={submitPassword}>
+                <input className="chat-input" type="password" name="new-password" autoComplete="new-password" placeholder="Create password (8+ characters)" value={passwordValue} onChange={(e) => setPasswordValue(e.target.value)} disabled={passwordBusy} />
+                <input className="chat-input" type="password" name="confirm-password" autoComplete="new-password" placeholder="Confirm password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} disabled={passwordBusy} />
+                <button className="ghost-button" type="submit" disabled={passwordBusy || passwordValue.length < 8 || !passwordConfirm} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, padding: '12px 18px' }}>{passwordBusy ? 'Saving...' : 'Set password & finish'}</button>
+              </form>
+            )}
+            <p className="helper-text" style={{ marginTop: '0.5rem' }}>Prefer to finish later? A secure setup link is also on its way to your email — it works for 72 hours.</p>
           </div>
-          <p className="helper-text" style={{ marginBottom: '0.75rem' }}>
-            Already have a report? Upload it below. Otherwise, open a third-party provider to obtain your report. Provider signup does not automatically import a report into CredX; provider fees and terms apply separately.
-          </p>
-          <div className="monitoring-provider-grid" role="radiogroup" aria-label="Credit monitoring provider">
-            {CREDIT_MONITORING_PROVIDERS.map((provider) => {
-              const selected = wizardState.provider === provider.label;
-              return (
-                <div key={provider.label} className={`monitoring-provider-card${selected ? ' is-selected' : ''}`}>
-                  <button
-                    type="button"
-                    className="monitoring-provider-select"
-                    onClick={() => setField('provider', provider.label)}
-                    aria-pressed={selected}
-                  >
-                    <span className="monitoring-provider-check" aria-hidden="true">{selected ? 'Selected' : 'Choose'}</span>
-                    <img src={provider.logo} alt={`${provider.label} logo`} />
-                  </button>
-                  <a href={provider.url} target="_blank" rel="noopener noreferrer sponsored" className="monitoring-provider-link">
-                    Open {provider.label}
-                  </a>
-                </div>
-              );
-            })}
-          </div>
-          <p className="helper-text monitoring-credential-copy">Optional report-access assistance: save provider details only if you authorize your CredX team to assist. This does not activate automatic monitoring or report syncing.</p>
-          <div className="field-grid monitoring-credential-grid">
-            <input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" />
-            <input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" />
-            <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save provider details'}</button>
-          </div>
-          <p className="helper-text">Credentials are optional here. If you already downloaded your report, upload the PDF or HTML file below instead.</p>
-        </form> : null}
-        {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Upload your report for analysis</strong></div><div className="field-grid"><input className="chat-input" type="file" accept=".pdf,.html,.htm" onChange={(e: ChangeEvent<HTMLInputElement>) => setDocUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} /><input className="chat-input" value="Credit report" readOnly /><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docUpload.file}>{busyStep === 'upload' ? 'Uploading...' : 'Upload for analysis'}</button></div><p className="helper-text">Upload a PDF, HTML, or HTM credit report. CredX starts extraction and analysis after upload; processing time and results depend on the file. Analysis and consultation/review take place before billing for credit-related support.</p></form> : null}
-        {completedAt ? <div className="empty-state-card">Onboarding complete. Your file is now in review.</div> : null}
+        ) : null}
+        {completedAt ? <div className="empty-state-card">You’re all set! Sign in with your new password to open your client portal. You can add your credit report anytime from the Analysis &amp; Reports tab.</div> : null}
       </div>
     </section>
   );
@@ -4088,6 +4056,20 @@ function ClientTasksSection({ token, user, client, progress, durableState, refre
   );
 }
 
+function ReportReminderBanner({ visible }: { visible: boolean }) {
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem('credx-report-reminder-dismissed') === '1';
+  });
+  if (!visible || dismissed) return null;
+  return (
+    <div role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.85rem 1rem', margin: '0 0 1rem', borderRadius: '12px', background: 'rgba(0,198,251,0.08)', border: '1px solid rgba(0,198,251,0.4)', color: '#0f172a', fontSize: '0.92rem', lineHeight: 1.5 }}>
+      <span>📋 <strong>Add your credit report to unlock your analysis.</strong> Open the <strong>Analysis &amp; Reports</strong> tab to upload your PDF/HTML report or save provider credentials — your free CredX analysis starts once your report is on file.</span>
+      <button type="button" className="ghost-button" style={{ flexShrink: 0 }} onClick={() => { setDismissed(true); if (typeof window !== 'undefined') window.localStorage.setItem('credx-report-reminder-dismissed', '1'); }} aria-label="Dismiss report reminder">Dismiss</button>
+    </div>
+  );
+}
+
 export default function ClientPortalApp({ onboardingOnly = false }: { onboardingOnly?: boolean }) {
   const [token, setToken] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -4504,10 +4486,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     return (
       <div className="shell client-shell onboarding-shell">
         <main className="main onboarding-main">
-          <header className="topbar"><div><div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">CredX Onboarding</p></div><h1 className="top-title">Complete your signup</h1><p className="helper-text">Review your agreement, finish your intake, and connect your credit monitoring provider.</p></div></header>
+          <header className="topbar"><div><div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">CredX Onboarding</p></div><h1 className="top-title">Complete your signup</h1><p className="helper-text">Review your agreement, finish your intake, and set your portal password.</p></div></header>
           {error ? <div className="error-banner">{error}</div> : null}
           {(!progress?.onboarding?.completedAt || !progress?.onboarding?.signature?.signedAt || !progress?.onboarding?.signature?.dataUrl) && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
-          {progress?.onboarding?.completedAt && progress?.onboarding?.signature?.signedAt && progress?.onboarding?.signature?.dataUrl ? <section className="panel"><div className="empty-state-card">Signup complete. Check your email for the password setup link to access your client portal.</div></section> : null}
+          {progress?.onboarding?.completedAt && progress?.onboarding?.signature?.signedAt && progress?.onboarding?.signature?.dataUrl ? <section className="panel"><div className="empty-state-card">Signup complete — sign in with your new password to open your client portal. You can add your credit report anytime from the Analysis & Reports tab.</div></section> : null}
         </main>
       </div>
     );
@@ -4569,6 +4551,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         {error ? <div className="error-banner">{error}</div> : null}
         {client?.portalRestricted ? <div className="error-banner">Your portal access is currently restricted. Contact CredX support for help.</div> : null}
 
+        <ReportReminderBanner visible={!masterclassOnly && !hasCreditReport} />
+
         <div className="page-grid">
           {activeTab === 'overview' ? (
             masterclassOnly ? (
@@ -4591,7 +4575,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                   || client?.analysisSummary
                   || (tier2 ? disputeSummary : tier1
                     ? "Your credit report is on file. Open Analysis & Reports to review your CredX analysis and next steps."
-                    : "First step: pull a fresh credit report from one of our partners below, then upload it for your free CredX analysis.");
+                    : "Add your credit report anytime — open the Analysis & Reports tab and upload your PDF or HTML report, or save your monitoring provider credentials. Your free CredX analysis starts once your report is on file.");
                 const findings = (analysisAny?.keyFindings || []).slice(0, 3);
                 const sExp = typeof progress?.scores?.experian === 'number' ? progress.scores.experian : (analysisAny?.bureauScores || []).find((b: any) => b.bureau === 'EXPERIAN')?.score ?? null;
                 const sEq = typeof progress?.scores?.equifax === 'number' ? progress.scores.equifax : (analysisAny?.bureauScores || []).find((b: any) => b.bureau === 'EQUIFAX')?.score ?? null;
@@ -4641,7 +4625,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                   </div>
                   <div style={{ padding: '0.25rem 0 0' }}>
                     <p style={{ marginBottom: '0.85rem', fontSize: '15px', lineHeight: 1.6 }}>
-                      <strong style={{ color: '#0f172a' }}>If you skipped credit monitoring on the application</strong>, choose one of these two affiliate providers to pull a fresh tri-merge report.
+                      <strong style={{ color: '#0f172a' }}>Ready to pull your report?</strong> Choose one of these two partner providers to get a fresh tri-merge report.
                       Once it's in your hands, come back here and upload — your CredX analysis is generated automatically.
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', margin: '1rem 0 0.75rem' }}>

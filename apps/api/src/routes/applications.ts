@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { encryptPII } from '../lib/encryption.js';
 import { writeAuditLog } from '../lib/audit.js';
+import { maybeSendPortalReadyEmail } from '../lib/portalReady.js';
 
 export const applicationsRouter = Router();
 
@@ -65,14 +66,14 @@ applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) 
       data: {
         onboarding: {
           ...(progress.onboarding || {}),
-          status: 'report_required',
+          status: 'application_completed',
           applicationSubmittedAt: submittedAt
         },
         workflow: {
           ...(progress.workflow || {}),
-          stage: 'report_required',
+          stage: 'application_completed',
           updatedAt: submittedAt,
-          next: ['select_credit_report_provider', 'upload_credit_report_pdf_or_html']
+          next: ['set_portal_password', 'add_credit_report_in_portal']
         }
       }
     });
@@ -100,6 +101,12 @@ applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) 
       metadata: { ssnLast4: ssn.slice(-4), state, zip }
     });
 
+    // Sign-up no longer waits on a credit report. The portal-ready email
+    // (with the password setup link as a recovery path) fires here — the
+    // gates (contract signed + profile filled) have just been satisfied, and
+    // the guard inside ensures it is sent at most once per client.
+    const portalEmail = await maybeSendPortalReadyEmail(client.id);
+
     return res.json({
       success: true,
       application_id: applicationId,
@@ -114,7 +121,8 @@ applicationsRouter.post('/', requireAuth, async (req: AuthedRequest, res, next) 
         submittedAt
       },
       progress: updatedProgress,
-      next_step: 'monitoring_or_report_required'
+      next_step: 'password_setup',
+      portalEmailStatus: portalEmail.status
     });
   } catch (error) {
     next(error);

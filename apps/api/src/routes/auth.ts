@@ -359,6 +359,59 @@ authRouter.post('/password-setup/complete', async (req, res, next) => {
   }
 });
 
+const inlinePasswordSchema = z.object({
+  password: z.string().min(8)
+});
+
+// Authenticated first-time password setup. The client completing sign-up
+// already holds a valid session (provisional password from registration),
+// so they can set their real password inline instead of waiting for an
+// email link. The token-based /password-setup/* flow remains the recovery
+// path for clients who close the browser before finishing.
+authRouter.post('/set-password', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const data = inlinePasswordSchema.parse(req.body);
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    await prisma.user.update({
+      where: { id: req.auth!.sub },
+      data: { passwordHash }
+    });
+    await writeAuditLog({
+      userId: req.auth!.sub,
+      action: 'PASSWORD_SET',
+      entityType: 'User',
+      entityId: req.auth!.sub,
+      metadata: { ip: req.ip, method: 'inline_session' }
+    });
+
+    // Mark onboarding complete the first time a post-application client sets
+    // their password — sign-up no longer waits on a credit report upload.
+    const client = await prisma.client.findUnique({
+      where: { userId: req.auth!.sub },
+      include: { progress: true }
+    });
+    if (client?.progress) {
+      const progress = client.progress as any;
+      const stage = progress?.workflow?.stage;
+      const onboarding = (progress?.onboarding || {}) as Record<string, unknown>;
+      const postApplication = ['application_completed', 'report_required', 'portal_unlocked', 'upload_credit_report', 'credit_report_received'].includes(stage);
+      if (postApplication && !onboarding.completedAt) {
+        const nowIso = new Date().toISOString();
+        await prisma.clientProgress.update({
+          where: { clientId: client.id },
+          data: {
+            onboarding: { ...onboarding, status: 'completed', completedAt: nowIso }
+          }
+        });
+      }
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 const upgradeSchema = z.object({
   offerInterest: z.enum(['program', 'masterclass']),
   phone: z.string().optional(),
