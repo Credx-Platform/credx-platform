@@ -141,6 +141,19 @@ type SessionResponse = User & {
   portalUnlocked?: boolean;
 };
 
+type DurableSaasState = {
+  onboarding: { goals?: unknown; status?: string; currentStep?: string; completedAt?: string | null } | null;
+  lessons: Array<{ lessonKey: string; completedAt: string; metadata?: unknown }>;
+  quizzes: Array<{ lessonKey: string; attempt: number; score: number; passed: boolean; submittedAt: string }>;
+  actionPlan: Array<{ key: string; title: string; description?: string | null; status: string; priority: string; dueAt?: string | null }>;
+  milestones: Array<{ key: string; title: string; achievedAt?: string | null }>;
+  workflow: { stage: string; state?: unknown; version: number } | null;
+  conversations: Array<{ id: string; title?: string | null; messages?: Array<{ role: 'user' | 'assistant' | 'system'; content: string; createdAt: string }> }>;
+  readinessHistory: Array<{ id: string; score: number; createdAt: string }>;
+  notifications: Array<{ id: string; title?: string | null; message: string; readAt?: string | null; createdAt: string }>;
+  subscription: { planCode: string; status: string; currentPeriodEnd?: string | null; cancelAtPeriodEnd: boolean } | null;
+};
+
 type ContractTextResponse = {
   agreement: string;
   disclosure: string;
@@ -234,7 +247,7 @@ const CARRD_CREDIT_BUILDER_LINKS: BuilderLink[] = [
     label: 'Credit Builder Card',
     url: 'https://www.creditbuildercard.com/mgf.html',
     type: 'Builder card',
-    description: 'Use a dedicated builder card to add positive revolving account activity when the terms fit your rebuild plan.'
+    description: 'Use a dedicated builder card to add positive revolving account activity when the terms fit your financial plan.'
   },
   {
     label: 'Grow Credit',
@@ -625,7 +638,7 @@ const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
   monitoring: { title: 'Report Sources', desc: 'Now lives inside Analysis & Reports — upload a report or choose a third-party report provider.', accent: '#00c6fb' },
   disputes: { title: 'Disputes', desc: 'Track active dispute items, bureau status, and round progression.', accent: '#f59e0b' },
   activity: { title: 'Activity', desc: 'Timeline of what just happened on your file and what comes next.', accent: '#2dd4bf' },
-  resources: { title: 'Credit Builders', desc: 'Partner tools and accounts to rebuild your credit profile.', accent: '#84cc16' },
+  resources: { title: 'Credit Builders', desc: 'Partner tools and accounts that can help you establish positive account history.', accent: '#84cc16' },
   tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' },
   analysis: { title: 'Analysis & Reports', desc: 'Upload a report for analysis or open a third-party report provider — all in one place.', accent: '#2563eb' },
   masterclass: { title: '5-Day Masterclass', desc: 'Your complete credit education curriculum — videos, slides, key terms, and action steps.', accent: '#00c6fb' }
@@ -1098,7 +1111,6 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
   const [signatureName, setSignatureName] = useState(`${user.firstName} ${user.lastName}`.trim());
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [contractAgreed, setContractAgreed] = useState(false);
-  const [docUpload, setDocUpload] = useState<SecureUploadState>({ file: null, type: 'credit_report' });
   const [wizardState, setWizardState] = useState<WizardState>({ ...defaultWizardState, fullName: `${user.firstName} ${user.lastName}`.trim(), email: user.email, phone: user.phone || '' });
 
   useEffect(() => {
@@ -1117,9 +1129,14 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
   const signatureRepairMode = Boolean(completedAt && !hasStoredSignature);
   const needsContract = signatureRepairMode || ['signup_received', 'contract_pending'].includes(stage);
   const needsApplication = !signatureRepairMode && ['contract_signed', 'application_pending'].includes(stage);
-  const needsMonitoring = ['application_completed', 'report_required'].includes(stage);
-  const uploadedCreditReports = (progress?.uploadedDocs || []).filter((doc) => (doc.type || '').toLowerCase().includes('credit'));
-  const needsUpload = ['application_completed', 'report_required', 'portal_unlocked', 'upload_credit_report', 'credit_report_received'].includes(stage) && uploadedCreditReports.length === 0;
+  // Sign-up no longer waits on a credit report. Once the application is
+  // complete, the client sets their portal password right here; the report
+  // itself is added later from inside the portal.
+  const needsPasswordSetup = !completedAt && ['application_completed', 'report_required', 'portal_unlocked', 'upload_credit_report', 'credit_report_received'].includes(stage);
+  const [passwordValue, setPasswordValue] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordDone, setPasswordDone] = useState(false);
 
   async function refreshProgress() {
     const nextProgress = await apiFetch<Progress>('/api/progress/me', token);
@@ -1202,45 +1219,28 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
     }
   }
 
-  async function submitMonitoring(event: FormEvent<HTMLFormElement>) {
+  async function submitPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setWizardError(null);
-    setBusyStep('monitoring');
-    try {
-      await apiFetch('/api/monitoring', token, {
-        method: 'POST',
-        body: JSON.stringify({ provider: wizardState.provider, username: wizardState.monitorUsername, password: wizardState.monitorPassword })
-      });
-      await refreshProgress();
-    } catch (error) {
-      setWizardError(error instanceof Error ? error.message : 'Unable to save monitoring');
-    } finally {
-      setBusyStep(null);
+    if (passwordValue.length < 8) {
+      setWizardError('Password must be at least 8 characters.');
+      return;
     }
-  }
-
-  async function submitDocument(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!docUpload.file) {
-      setWizardError('Choose a file first.');
+    if (passwordValue !== passwordConfirm) {
+      setWizardError('Passwords do not match.');
       return;
     }
     setWizardError(null);
-    setBusyStep('upload');
+    setPasswordBusy(true);
     try {
-      const formData = new FormData();
-      formData.append('file', docUpload.file);
-      formData.append('type', docUpload.type);
-      await apiUpload('/api/progress/me/docs/upload', token, formData);
-      setDocUpload({ file: null, type: 'credit_report' });
+      await apiFetch('/api/auth/set-password', token, { method: 'POST', body: JSON.stringify({ password: passwordValue }) });
+      setPasswordDone(true);
       await refreshProgress();
     } catch (error) {
-      setWizardError(error instanceof Error ? error.message : 'Unable to save document');
+      setWizardError(error instanceof Error ? error.message : 'Unable to set password');
     } finally {
-      setBusyStep(null);
+      setPasswordBusy(false);
     }
   }
-
   return (
     <section className="panel">
       <div className="panel-header"><div><p className="eyebrow">Onboarding</p><h2>Finish your CredX setup</h2></div></div>
@@ -1306,45 +1306,26 @@ function OnboardingWizard({ token, user, progress, onProgressUpdated }: { token:
             <p className="helper-text" style={{ marginTop: '0.5rem' }}>Fields marked * are required. Name and email use the login record if the browser does not submit them. Address line 2 and phone are optional. Full SSN is encrypted after save; only the last four are shown back.</p>
           </form>
         ) : null}
-        {needsMonitoring ? <form className="dispute-card-live" onSubmit={submitMonitoring}>
-          <div className="dispute-card-top">
-            <strong>Step 3, choose a report source or upload below</strong>
-            <span className="security-note-inline" aria-label="Encrypted">Encrypted</span>
+        {needsPasswordSetup ? (
+          <div className="dispute-card-live">
+            <div className="dispute-card-top"><strong>Welcome to CredX{user.firstName ? `, ${user.firstName}` : ''} — you’re almost in</strong><span className="security-note-inline" aria-label="Encrypted">Encrypted</span></div>
+            <p className="helper-text" style={{ marginBottom: '0.75rem' }}>
+              Your application is complete and your file is in review. Set your password below to access your client portal.
+              Your credit report is no longer part of sign-up — you can add it anytime after signing in, and we’ll show you exactly where.
+            </p>
+            {passwordDone ? (
+              <p className="helper-text" style={{ color: '#16a34a', fontWeight: 600, margin: 0 }}>✓ Password saved. You’re all set — use it to sign in at your CredX portal.</p>
+            ) : (
+              <form className="field-grid" onSubmit={submitPassword}>
+                <input className="chat-input" type="password" name="new-password" autoComplete="new-password" placeholder="Create password (8+ characters)" value={passwordValue} onChange={(e) => setPasswordValue(e.target.value)} disabled={passwordBusy} />
+                <input className="chat-input" type="password" name="confirm-password" autoComplete="new-password" placeholder="Confirm password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} disabled={passwordBusy} />
+                <button className="ghost-button" type="submit" disabled={passwordBusy || passwordValue.length < 8 || !passwordConfirm} style={{ background: '#22c55e', color: '#fff', border: 'none', fontWeight: 700, padding: '12px 18px' }}>{passwordBusy ? 'Saving...' : 'Set password & finish'}</button>
+              </form>
+            )}
+            <p className="helper-text" style={{ marginTop: '0.5rem' }}>Prefer to finish later? A secure setup link is also on its way to your email — it works for 72 hours.</p>
           </div>
-          <p className="helper-text" style={{ marginBottom: '0.75rem' }}>
-            Already have a report? Upload it below. Otherwise, open a third-party provider to obtain your report. Provider signup does not automatically import a report into CredX; provider fees and terms apply separately.
-          </p>
-          <div className="monitoring-provider-grid" role="radiogroup" aria-label="Credit monitoring provider">
-            {CREDIT_MONITORING_PROVIDERS.map((provider) => {
-              const selected = wizardState.provider === provider.label;
-              return (
-                <div key={provider.label} className={`monitoring-provider-card${selected ? ' is-selected' : ''}`}>
-                  <button
-                    type="button"
-                    className="monitoring-provider-select"
-                    onClick={() => setField('provider', provider.label)}
-                    aria-pressed={selected}
-                  >
-                    <span className="monitoring-provider-check" aria-hidden="true">{selected ? 'Selected' : 'Choose'}</span>
-                    <img src={provider.logo} alt={`${provider.label} logo`} />
-                  </button>
-                  <a href={provider.url} target="_blank" rel="noopener noreferrer sponsored" className="monitoring-provider-link">
-                    Open {provider.label}
-                  </a>
-                </div>
-              );
-            })}
-          </div>
-          <p className="helper-text monitoring-credential-copy">Optional report-access assistance: save provider details only if you authorize your CredX team to assist. This does not activate automatic monitoring or report syncing.</p>
-          <div className="field-grid monitoring-credential-grid">
-            <input className="chat-input" value={wizardState.monitorUsername} onChange={(e) => setField('monitorUsername', e.target.value)} placeholder="Monitoring username" />
-            <input className="chat-input" type="password" value={wizardState.monitorPassword} onChange={(e) => setField('monitorPassword', e.target.value)} placeholder="Monitoring password" />
-            <button className="ghost-button" type="submit" disabled={busyStep === 'monitoring' || !wizardState.provider}>{busyStep === 'monitoring' ? 'Saving...' : 'Save provider details'}</button>
-          </div>
-          <p className="helper-text">Credentials are optional here. If you already downloaded your report, upload the PDF or HTML file below instead.</p>
-        </form> : null}
-        {needsUpload ? <form className="dispute-card-live" onSubmit={submitDocument}><div className="dispute-card-top"><strong>Upload your report for analysis</strong></div><div className="field-grid"><input className="chat-input" type="file" accept=".pdf,.html,.htm" onChange={(e: ChangeEvent<HTMLInputElement>) => setDocUpload((current) => ({ ...current, file: e.target.files?.[0] || null }))} /><input className="chat-input" value="Credit report" readOnly /><button className="ghost-button" type="submit" disabled={busyStep === 'upload' || !docUpload.file}>{busyStep === 'upload' ? 'Uploading...' : 'Upload for analysis'}</button></div><p className="helper-text">Upload a PDF, HTML, or HTM credit report. CredX starts extraction and analysis after upload; processing time and results depend on the file. Analysis and consultation/review take place before billing for credit-related support.</p></form> : null}
-        {completedAt ? <div className="empty-state-card">Onboarding complete. Your file is now in review.</div> : null}
+        ) : null}
+        {completedAt ? <div className="empty-state-card">You’re all set! Sign in with your new password to open your client portal. You can add your credit report anytime from the Analysis &amp; Reports tab.</div> : null}
       </div>
     </section>
   );
@@ -3692,9 +3673,45 @@ function AnalysisSection({ token, user, client, progress, refreshAll }: { token:
 
 // Client Tasks Section — Hybrid SaaS Workflow
 // Auto-advances digital steps, submits manual steps for admin review
-function ClientTasksSection({ token, user, client, progress, refreshAll, onTabChange }: { token: string; user: User | null; client: Client | null; progress: Progress | null; refreshAll: () => Promise<void>; onTabChange: (tab: PortalTab) => void; }) {
+function ClientTasksSection({ token, user, client, progress, durableState, refreshAll, onTabChange }: { token: string; user: User | null; client: Client | null; progress: Progress | null; durableState: DurableSaasState | null; refreshAll: () => Promise<void>; onTabChange: (tab: PortalTab) => void; }) {
   const [completing, setCompleting] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [goals, setGoals] = useState<string[]>(() => Array.isArray(durableState?.onboarding?.goals) ? durableState!.onboarding!.goals as string[] : []);
+  const [goalDraft, setGoalDraft] = useState('');
+  const [privacyStatus, setPrivacyStatus] = useState<string | null>(null);
+  const [savingDurable, setSavingDurable] = useState(false);
+
+  useEffect(() => {
+    if (Array.isArray(durableState?.onboarding?.goals)) setGoals(durableState.onboarding.goals as string[]);
+  }, [durableState?.onboarding?.goals]);
+
+  const saveGoals = async () => {
+    setSavingDurable(true);
+    try { await apiFetch('/api/saas/onboarding', token, { method: 'PUT', body: JSON.stringify({ goals, currentStep: 'goals', status: goals.length ? 'IN_PROGRESS' : 'PENDING' }) }); await refreshAll(); setMessage('Goals saved securely.'); }
+    catch (err) { setMessage(`Could not save goals: ${err instanceof Error ? err.message : 'Unknown error'}`); }
+    finally { setSavingDurable(false); }
+  };
+
+  const updateAction = async (item: DurableSaasState['actionPlan'][number]) => {
+    setSavingDurable(true);
+    try { await apiFetch(`/api/saas/action-plan/${encodeURIComponent(item.key)}`, token, { method: 'PUT', body: JSON.stringify({ title: item.title, description: item.description, priority: item.priority, status: 'COMPLETED' }) }); await refreshAll(); setMessage('Action plan updated.'); }
+    catch (err) { setMessage(`Could not update action: ${err instanceof Error ? err.message : 'Unknown error'}`); }
+    finally { setSavingDurable(false); }
+  };
+
+  const updateMilestone = async (item: DurableSaasState['milestones'][number]) => {
+    setSavingDurable(true);
+    try { await apiFetch(`/api/saas/milestones/${encodeURIComponent(item.key)}`, token, { method: 'PUT', body: JSON.stringify({ title: item.title, achieved: true }) }); await refreshAll(); setMessage('Milestone updated.'); }
+    catch (err) { setMessage(`Could not update milestone: ${err instanceof Error ? err.message : 'Unknown error'}`); }
+    finally { setSavingDurable(false); }
+  };
+
+  const requestPrivacy = async (kind: 'export' | 'deletion') => {
+    setSavingDurable(true);
+    try { await apiFetch(`/api/saas/${kind}`, token, { method: 'POST', body: kind === 'deletion' ? JSON.stringify({ reason: 'Requested from client portal' }) : '{}' }); setPrivacyStatus(kind === 'export' ? 'Export requested. CredX will process it securely.' : 'Deletion request recorded for review.'); await refreshAll(); }
+    catch (err) { setPrivacyStatus(`Could not submit request: ${err instanceof Error ? err.message : 'Unknown error'}`); }
+    finally { setSavingDurable(false); }
+  };
 
   // Store submitted-for-review tasks in localStorage
   const [submittedTasks, setSubmittedTasks] = useState<Set<string>>(() => {
@@ -3874,6 +3891,19 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
 
   return (
     <div className="page-grid">
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Durable account controls</p><h2>Your goals and privacy</h2></div></div>
+        <p className="helper-text">These controls save to your CredX account and reload on a new session.</p>
+        <form onSubmit={(event) => { event.preventDefault(); if (goalDraft.trim()) { setGoals((current) => [...current, goalDraft.trim()].slice(0, 20)); setGoalDraft(''); } }} style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+          <input className="chat-input" value={goalDraft} onChange={(event) => setGoalDraft(event.target.value)} placeholder="Add an onboarding goal" maxLength={80} />
+          <button className="ghost-button" type="submit">Add goal</button>
+        </form>
+        {goals.length ? <ul>{goals.map((goal, index) => <li key={`${goal}-${index}`}>{goal}</li>)}</ul> : <p className="helper-text">No goals saved yet.</p>}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}><button className="ghost-button" type="button" disabled={savingDurable} onClick={saveGoals}>Save goals</button><button className="ghost-button" type="button" disabled={savingDurable} onClick={() => requestPrivacy('export')}>Request data export</button><button className="ghost-button" type="button" disabled={savingDurable} onClick={() => requestPrivacy('deletion')}>Request account deletion</button></div>
+        {privacyStatus ? <p className="helper-text" role="status">{privacyStatus}</p> : null}
+      </section>
+      {durableState?.actionPlan.length ? <section className="panel"><div className="panel-header"><div><p className="eyebrow">Durable action plan</p><h2>Owned action items</h2></div></div>{durableState.actionPlan.map((item) => <div className="portal-task-row" key={item.key}><div className="portal-task-row__body"><strong>{item.title}</strong><span className="portal-task-row__badge">{item.status}</span><button className="portal-task-row__button" type="button" disabled={savingDurable || item.status === 'COMPLETED'} onClick={() => updateAction(item)}>{item.status === 'COMPLETED' ? 'Completed' : 'Mark complete'}</button></div></div>)}</section> : null}
+      {durableState?.milestones.length ? <section className="panel"><div className="panel-header"><div><p className="eyebrow">Milestones</p><h2>Your progress checkpoints</h2></div></div>{durableState.milestones.map((item) => <div className="portal-task-row" key={item.key}><div className="portal-task-row__body"><strong>{item.title}</strong><span className="portal-task-row__badge">{item.achievedAt ? 'Achieved' : 'Open'}</span><button className="portal-task-row__button" type="button" disabled={savingDurable || Boolean(item.achievedAt)} onClick={() => updateMilestone(item)}>{item.achievedAt ? 'Achieved' : 'Mark achieved'}</button></div></div>)}</section> : null}
       <section className="hero-card hero-card--compact">
         <div>
           <p className="eyebrow">Your Progress</p>
@@ -4026,6 +4056,20 @@ function ClientTasksSection({ token, user, client, progress, refreshAll, onTabCh
   );
 }
 
+function ReportReminderBanner({ visible }: { visible: boolean }) {
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem('credx-report-reminder-dismissed') === '1';
+  });
+  if (!visible || dismissed) return null;
+  return (
+    <div role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.85rem 1rem', margin: '0 0 1rem', borderRadius: '12px', background: 'rgba(0,198,251,0.08)', border: '1px solid rgba(0,198,251,0.4)', color: '#0f172a', fontSize: '0.92rem', lineHeight: 1.5 }}>
+      <span>📋 <strong>Add your credit report to unlock your analysis.</strong> Open the <strong>Analysis &amp; Reports</strong> tab to upload your PDF/HTML report or save provider credentials — your free CredX analysis starts once your report is on file.</span>
+      <button type="button" className="ghost-button" style={{ flexShrink: 0 }} onClick={() => { setDismissed(true); if (typeof window !== 'undefined') window.localStorage.setItem('credx-report-reminder-dismissed', '1'); }} aria-label="Dismiss report reminder">Dismiss</button>
+    </div>
+  );
+}
+
 export default function ClientPortalApp({ onboardingOnly = false }: { onboardingOnly?: boolean }) {
   const [token, setToken] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -4045,6 +4089,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const [client, setClient] = useState<Client | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
+  const [durableState, setDurableState] = useState<DurableSaasState | null>(null);
   const [readinessSaving, setReadinessSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
@@ -4058,9 +4103,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
 
   async function refreshAll() {
     if (!token) return;
-    const [sessionResponse, progressResponse] = await Promise.all([
+    const [sessionResponse, progressResponse, durableResponse] = await Promise.all([
       apiFetch<SessionResponse>('/api/auth/me', token),
-      apiFetch<Progress>('/api/progress/me', token)
+      apiFetch<Progress>('/api/progress/me', token),
+      apiFetch<DurableSaasState>('/api/saas/state', token)
     ]);
     const readinessResponse = await apiFetch<ReadinessScore>('/api/progress/readiness', token).catch(() => null);
     const { client: clientResponse, progress: authProgress, ...userResponse } = sessionResponse;
@@ -4068,6 +4114,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     localStorage.setItem(USER_KEY, JSON.stringify(userResponse));
     setClient(clientResponse);
     setProgress(progressResponse ?? authProgress ?? null);
+    setDurableState(durableResponse);
     setReadiness(readinessResponse);
   }
 
@@ -4095,9 +4142,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     Promise.all([
       apiFetch<SessionResponse>('/api/auth/me', token),
       apiFetch<Progress>('/api/progress/me', token),
-      apiFetch<ReadinessScore>('/api/progress/readiness', token).catch(() => null)
+      apiFetch<ReadinessScore>('/api/progress/readiness', token).catch(() => null),
+      apiFetch<DurableSaasState>('/api/saas/state', token).catch(() => null)
     ])
-      .then(([sessionResponse, progressResponse, readinessResponse]) => {
+      .then(([sessionResponse, progressResponse, readinessResponse, durableResponse]) => {
         if (cancelled) return;
         const { client: clientResponse, progress: authProgress, ...userResponse } = sessionResponse;
         setUser(userResponse);
@@ -4105,6 +4153,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         setClient(clientResponse);
         setProgress(progressResponse ?? authProgress ?? null);
         setReadiness(readinessResponse);
+        setDurableState(durableResponse);
       })
       .catch((fetchError) => {
         if (cancelled) return;
@@ -4114,6 +4163,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         setClient(null);
         setProgress(null);
         setReadiness(null);
+        setDurableState(null);
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
       })
@@ -4300,16 +4350,22 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
   const tier2 = !masterclassEnrolled && (paidServicePayment || ['ACTIVE', 'PAST_DUE'].includes(clientStatusUpper));
   const masterclassOnly = masterclassEnrolled && !paidServicePayment && !['RESTRICTED', 'CANCELLED'].includes(clientStatusUpper);
   const completedMasterclassDays = useMemo(
-    () => (progress?.education?.masterclassProgress || []).filter((s): s is string => typeof s === 'string'),
-    [progress?.education?.masterclassProgress]
+    () => Array.from(new Set([...(durableState?.lessons || []).map((lesson) => lesson.lessonKey), ...(progress?.education?.masterclassProgress || [])])).filter((s): s is string => typeof s === 'string'),
+    [durableState?.lessons, progress?.education?.masterclassProgress]
   );
   const passedMasterclassQuizzes = useMemo(
-    () => (progress?.education?.masterclassPassedQuizzes || []).filter((s): s is string => typeof s === 'string'),
-    [progress?.education?.masterclassPassedQuizzes]
+    () => Array.from(new Set([...(durableState?.quizzes || []).filter((quiz) => quiz.passed).map((quiz) => quiz.lessonKey), ...(progress?.education?.masterclassPassedQuizzes || [])])),
+    [durableState?.quizzes, progress?.education?.masterclassPassedQuizzes]
   );
   const masterclassQuizAttempts = useMemo(
-    () => progress?.education?.masterclassQuizAttempts || {},
-    [progress?.education?.masterclassQuizAttempts]
+    () => {
+      const attempts = { ...(progress?.education?.masterclassQuizAttempts || {}) };
+      for (const quiz of durableState?.quizzes || []) {
+        if (!attempts[quiz.lessonKey] || quiz.attempt >= attempts[quiz.lessonKey].count) attempts[quiz.lessonKey] = { count: quiz.attempt, lastAttemptAt: quiz.submittedAt };
+      }
+      return attempts;
+    },
+    [durableState?.quizzes, progress?.education?.masterclassQuizAttempts]
   );
 
   useEffect(() => {
@@ -4331,9 +4387,9 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     if (!token) return;
     if (completedMasterclassDays.includes(slug)) return;
     try {
-      await apiFetch('/api/masterclass/progress', token, {
+      await apiFetch('/api/saas/lessons/' + encodeURIComponent(slug) + '/complete', token, {
         method: 'POST',
-        body: JSON.stringify({ daySlug: slug })
+        body: JSON.stringify({ metadata: { source: 'client-portal' } })
       });
       await refreshAll();
     } catch (err) {
@@ -4349,6 +4405,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     const result = await apiFetch<QuizSubmitResult>('/api/masterclass/quiz', token, {
       method: 'POST',
       body: JSON.stringify({ daySlug: slug, answers })
+    });
+    await apiFetch('/api/saas/quizzes/' + encodeURIComponent(slug) + '/results', token, {
+      method: 'POST',
+      body: JSON.stringify({ score: result.percent, passed: result.passed, answers })
     });
     await refreshAll();
     return result;
@@ -4383,7 +4443,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         { key: 'analysis', label: 'Uploads & Analysis' },
         { key: 'disputes', label: 'Disputes' },
         { key: 'masterclass', label: '5-Day Masterclass' },
-        { key: 'resources', label: 'Credit Builders' }
+        { key: 'resources', label: 'Credit Builders' },
+        { key: 'tasks', label: 'Goals & Tasks' }
       ]
     : tier2
       ? [
@@ -4394,7 +4455,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           { key: 'profile', label: 'Profile' },
           { key: 'activity', label: 'Activity' },
           { key: 'resources', label: 'Credit Builders' },
-          { key: 'tasks', label: 'Tasks' }
+          { key: 'tasks', label: 'Goals & Tasks' }
         ]
       : tier1
         ? [
@@ -4402,13 +4463,15 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
             { key: 'analysis', label: 'Analysis & Reports' },
             { key: 'profile', label: 'Profile' },
-            { key: 'resources', label: 'Credit Builders' }
+            { key: 'resources', label: 'Credit Builders' },
+            { key: 'tasks', label: 'Goals & Tasks' }
           ]
         : [
             { key: 'overview', label: 'Overview' },
             ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
             { key: 'analysis', label: 'Analysis & Reports' },
-            { key: 'profile', label: 'Profile' }
+            { key: 'profile', label: 'Profile' },
+            { key: 'tasks', label: 'Goals & Tasks' }
           ];
 
   // Early returns sit AFTER all hooks to satisfy rules-of-hooks under StrictMode.
@@ -4423,10 +4486,10 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     return (
       <div className="shell client-shell onboarding-shell">
         <main className="main onboarding-main">
-          <header className="topbar"><div><div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">CredX Onboarding</p></div><h1 className="top-title">Complete your signup</h1><p className="helper-text">Review your agreement, finish your intake, and connect your credit monitoring provider.</p></div></header>
+          <header className="topbar"><div><div className="brand-row"><img src={BRAND_LOGO} alt="CredX" className="brand-logo brand-logo--small" /><p className="eyebrow">CredX Onboarding</p></div><h1 className="top-title">Complete your signup</h1><p className="helper-text">Review your agreement, finish your intake, and set your portal password.</p></div></header>
           {error ? <div className="error-banner">{error}</div> : null}
           {(!progress?.onboarding?.completedAt || !progress?.onboarding?.signature?.signedAt || !progress?.onboarding?.signature?.dataUrl) && user ? <OnboardingWizard token={token} user={user} progress={progress} onProgressUpdated={setProgress} /> : null}
-          {progress?.onboarding?.completedAt && progress?.onboarding?.signature?.signedAt && progress?.onboarding?.signature?.dataUrl ? <section className="panel"><div className="empty-state-card">Signup complete. Check your email for the password setup link to access your client portal.</div></section> : null}
+          {progress?.onboarding?.completedAt && progress?.onboarding?.signature?.signedAt && progress?.onboarding?.signature?.dataUrl ? <section className="panel"><div className="empty-state-card">Signup complete — sign in with your new password to open your client portal. You can add your credit report anytime from the Analysis & Reports tab.</div></section> : null}
         </main>
       </div>
     );
@@ -4488,6 +4551,8 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         {error ? <div className="error-banner">{error}</div> : null}
         {client?.portalRestricted ? <div className="error-banner">Your portal access is currently restricted. Contact CredX support for help.</div> : null}
 
+        <ReportReminderBanner visible={!masterclassOnly && !hasCreditReport} />
+
         <div className="page-grid">
           {activeTab === 'overview' ? (
             masterclassOnly ? (
@@ -4510,7 +4575,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                   || client?.analysisSummary
                   || (tier2 ? disputeSummary : tier1
                     ? "Your credit report is on file. Open Analysis & Reports to review your CredX analysis and next steps."
-                    : "First step: pull a fresh credit report from one of our partners below, then upload it for your free CredX analysis.");
+                    : "Add your credit report anytime — open the Analysis & Reports tab and upload your PDF or HTML report, or save your monitoring provider credentials. Your free CredX analysis starts once your report is on file.");
                 const findings = (analysisAny?.keyFindings || []).slice(0, 3);
                 const sExp = typeof progress?.scores?.experian === 'number' ? progress.scores.experian : (analysisAny?.bureauScores || []).find((b: any) => b.bureau === 'EXPERIAN')?.score ?? null;
                 const sEq = typeof progress?.scores?.equifax === 'number' ? progress.scores.equifax : (analysisAny?.bureauScores || []).find((b: any) => b.bureau === 'EQUIFAX')?.score ?? null;
@@ -4560,7 +4625,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                   </div>
                   <div style={{ padding: '0.25rem 0 0' }}>
                     <p style={{ marginBottom: '0.85rem', fontSize: '15px', lineHeight: 1.6 }}>
-                      <strong style={{ color: '#0f172a' }}>If you skipped credit monitoring on the application</strong>, choose one of these two affiliate providers to pull a fresh tri-merge report.
+                      <strong style={{ color: '#0f172a' }}>Ready to pull your report?</strong> Choose one of these two partner providers to get a fresh tri-merge report.
                       Once it's in your hands, come back here and upload — your CredX analysis is generated automatically.
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', margin: '1rem 0 0.75rem' }}>
@@ -4730,7 +4795,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             </>
           ) : null}
 
-          {activeTab === 'tasks' ? <ClientTasksSection token={token} user={user} client={client} progress={progress} refreshAll={refreshAll} onTabChange={setActiveTab} /> : null}
+          {activeTab === 'tasks' ? <ClientTasksSection token={token} user={user} client={client} progress={progress} durableState={durableState} refreshAll={refreshAll} onTabChange={setActiveTab} /> : null}
 
           {!masterclassOnly ? (
             <CrossPromoFooter
@@ -4742,20 +4807,28 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
         </div>
         <SiteFooter />
       </main>
-      <CesarChatWidget token={token} user={user} />
+      <CesarChatWidget token={token} user={user} durableConversations={durableState?.conversations || []} />
     </div>
   );
 }
 
 type CesarChatMessage = { role: 'user' | 'assistant'; content: string; html?: string };
 
-function CesarChatWidget({ token, user }: { token: string; user: User | null }) {
+function CesarChatWidget({ token, user, durableConversations }: { token: string; user: User | null; durableConversations: DurableSaasState['conversations'] }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<CesarChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const greetedRef = useRef(false);
+
+  useEffect(() => {
+    const prior = durableConversations[0];
+    if (!prior) return;
+    setConversationId(prior.id);
+    setMessages((prior.messages || []).map((message) => ({ role: message.role === 'system' ? 'assistant' : message.role, content: message.content })));
+  }, [durableConversations]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -4773,11 +4846,19 @@ function CesarChatWidget({ token, user }: { token: string; user: User | null }) 
   async function requestReply(message: string, history: CesarChatMessage[]) {
     setBusy(true);
     try {
+      let activeConversationId = conversationId;
+      if (!activeConversationId) {
+        const created = await apiFetch<{ conversation: { id: string } }>('/api/saas/conversations', token, { method: 'POST', body: JSON.stringify({ title: 'Cesar guidance' }) });
+        activeConversationId = created.conversation.id;
+        setConversationId(activeConversationId);
+      }
+      if (message && activeConversationId) await apiFetch('/api/saas/conversations/' + encodeURIComponent(activeConversationId) + '/messages', token, { method: 'POST', body: JSON.stringify({ role: 'user', content: message }) });
       const data = await apiFetch<{ reply: string; html: string }>('/api/cesar/chat', token, {
         method: 'POST',
         body: JSON.stringify({ message, history: history.slice(-8).map((m) => ({ role: m.role, content: m.content })) })
       });
       setMessages((current) => [...current, { role: 'assistant', content: data.reply, html: data.html }]);
+      if (activeConversationId) await apiFetch('/api/saas/conversations/' + encodeURIComponent(activeConversationId) + '/messages', token, { method: 'POST', body: JSON.stringify({ role: 'assistant', content: data.reply }) });
     } catch {
       setMessages((current) => [...current, {
         role: 'assistant',
