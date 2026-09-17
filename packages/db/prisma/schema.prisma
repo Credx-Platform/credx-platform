@@ -177,6 +177,32 @@ model SubAgentContact {
   @@index([status])
 }
 
+/// Public "Become an Agent" applications. Contact details and the free-text
+/// motivation are PII and are stored as `gcm.v1:` envelopes (lib/encryption.ts).
+/// Staff review an application and, if approved, create a SubAgent by hand.
+model AgentApplication {
+  id                  String    @id @default(uuid())
+  status              String    @default("NEW")
+  firstNameEncrypted  String
+  lastNameEncrypted   String
+  emailEncrypted      String
+  phoneEncrypted      String
+  motivationEncrypted String?
+  state               String?
+  experience          String?
+  source              String?
+  consentAt           DateTime
+  ipAddress           String?
+  userAgent           String?
+  reviewedAt          DateTime?
+  reviewedById        String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
 model Client {
   id                      String                   @id @default(uuid())
   customerType            String                   @default("DIRECT")

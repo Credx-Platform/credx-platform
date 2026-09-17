@@ -12,6 +12,7 @@ import { applicationsRouter } from './routes/applications.js';
 import { monitoringRouter } from './routes/monitoring.js';
 import { usersRouter } from './routes/users.js';
 import { leadsRouter } from './routes/leads.js';
+import { agentApplicationsRouter } from './routes/agentApplications.js';
 import { clientsRouter } from './routes/clients.js';
 import { disputesRouter } from './routes/disputes.js';
 import { lobRouter } from './routes/lob.js';
@@ -139,6 +140,9 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use('/api/v1/auth/password-setup', authLimiter);
   app.use('/api/leads', leadLimiter);
   app.use('/api/v1/leads', leadLimiter);
+  // POST only: the staff list/review endpoints must not share the public cap.
+  app.post('/api/agent-applications', leadLimiter);
+  app.post('/api/v1/agent-applications', leadLimiter);
   app.use('/api/cesar', cesarLimiter);
   app.use('/api/v1/cesar', cesarLimiter);
 
@@ -149,6 +153,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     app.use(`${prefix}/monitoring`, monitoringRouter);
     app.use(`${prefix}/users`, usersRouter);
     app.use(`${prefix}/leads`, leadsRouter);
+    app.use(`${prefix}/agent-applications`, agentApplicationsRouter);
     app.use(`${prefix}/clients`, clientsRouter);
     app.use(`${prefix}/disputes`, disputesRouter);
     app.use(`${prefix}/disputes/lob`, lobRouter);
