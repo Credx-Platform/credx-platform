@@ -213,7 +213,7 @@
 
     // About is already inside the opening iris, without a blank holding phase.
     const progress=skipAbout?1:clamp((y-aboutTop+view*.72+1)/(aboutTravel+view*.72-80));
-    const entrance=ease(progress/.78),reveal=ease((progress-.04)/.24),clear=ease((progress-.78)/.2);
+    const entrance=ease(progress/.78),reveal=ease((progress-.08)/.62),clear=ease((progress-.78)/.2);
     portalBusy=progress>0&&progress<1;
     const scrollDelta=pendingScroll;pendingScroll=0;advanceStreaks(scrollDelta);
     const bottom=aboutTop+aboutTravel+aboutHeight-y;
@@ -221,7 +221,7 @@
     const focused=about.matches(':focus-within');
     aboutRunway.classList.toggle('about-portal-active',progress>0&&progress<1&&!focused);
     aboutContent.style.clipPath='none';
-    aboutContent.style.transform=`translate3d(0,${(1-reveal)*(width<768?32:44)}px,0)`;
+    aboutContent.style.transform='none';
     aboutContent.style.opacity=String(reveal*(1-exit));
     const diameter=Math.min(width*.72,440);
     const fullScale=Math.hypot(width,view)*1.3/(diameter*.82);
