@@ -1010,3 +1010,84 @@ export async function notifyNewLead(params: { firstName: string; lastName: strin
 
   return result;
 }
+/* ============================================================
+   Agent enrollment (public "Become an Agent" applications)
+   Log lines carry the application id only — never the applicant's
+   contact details, which are stored encrypted.
+   ============================================================ */
+function renderAgentApplicationReceivedEmail(params: { firstName: string }) {
+  const subject = 'We received your CredX agent application';
+  const steps = [
+    'Our partnerships team reviews every application, usually within 2 business days.',
+    'If there is a fit, we will contact you to talk through the program and the CredX affiliate policy.',
+    'Approved agents receive a secure onboarding link to sign the policy and set up their login.'
+  ];
+  const bodyHtml = `
+    <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">Thanks, ${escapeHtml(params.firstName || 'there')}.</h1>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Your application to become a CredX agent has been received. Applying is free and does not commit you to anything.</p>
+    <div style="margin:8px 0 6px;font-family:${EMAIL_FONT};font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${EMAIL_CYAN};">What happens next</div>
+    ${emailNumberedSteps(steps)}
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_MUTED};font-size:14px;line-height:1.7;">Questions in the meantime? Reply to this email or write to <a href="mailto:contact@credxme.com" style="color:${EMAIL_CYAN};">contact@credxme.com</a>.</p>
+  `;
+  const html = renderEmailShell({
+    preheader: 'Your CredX agent application was received. Here is what happens next.',
+    eyebrow: 'Agent Program · Application',
+    bodyHtml
+  });
+  const text = `We received your CredX agent application
+
+Thanks, ${params.firstName || 'there'}.
+
+Your application to become a CredX agent has been received. Applying is free and does not commit you to anything.
+
+What happens next:
+${steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
+
+Questions? Reply to this email or write to contact@credxme.com.
+
+CredX`;
+  return { subject, html, text };
+}
+
+export async function sendAgentApplicationReceivedEmail(params: { applicationId: string; to: string; firstName: string }) {
+  const email = renderAgentApplicationReceivedEmail({ firstName: params.firstName });
+  const result = await sendEmail({ to: params.to, subject: email.subject, html: email.html, text: email.text });
+  console.log('AGENT_APPLICATION_ACK_EMAIL_SEND_RESULT', { applicationId: params.applicationId, result });
+  return { ...email, delivery: result };
+}
+
+export async function notifyNewAgentApplication(params: {
+  applicationId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  state?: string | null;
+  experience?: string | null;
+  motivation?: string | null;
+}) {
+  const to = process.env.LEAD_NOTIFICATION_EMAIL
+    || process.env.ADMIN_ALERT_EMAIL
+    || process.env.BUSINESS_EMAIL
+    || 'contact@credxme.com';
+  const rows: Array<[string, string]> = [
+    ['Name', `${params.firstName} ${params.lastName}`],
+    ['Email', params.email],
+    ['Phone', params.phone],
+    ['State', params.state || 'Not provided'],
+    ['Experience', params.experience || 'Not provided'],
+    ['Why CredX', params.motivation || 'Not provided'],
+    ['Application ID', params.applicationId]
+  ];
+  const subject = `New CredX agent application: ${params.firstName} ${params.lastName}`;
+  const html = `
+    <div style="font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.6;">
+      <h2 style="margin-bottom:12px;">New CredX agent application</h2>
+      ${rows.map(([label, value]) => `<p><strong>${label}:</strong> <span style="white-space:pre-wrap;">${escapeHtml(value)}</span></p>`).join('\n      ')}
+    </div>
+  `;
+  const text = `New CredX agent application\n\n${rows.map(([label, value]) => `${label}: ${value}`).join('\n')}`;
+  const result = await sendEmail({ to, subject, html, text });
+  console.log('AGENT_APPLICATION_NOTIFICATION_SEND_RESULT', { applicationId: params.applicationId, result });
+  return result;
+}

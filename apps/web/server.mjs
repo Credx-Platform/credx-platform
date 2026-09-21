@@ -94,6 +94,7 @@ const staticPageRoutes = new Map([
   ['/signup', 'signup.html'],
   ['/contract', 'signup.html'],
   ['/affiliate-onboarding', 'portal.html'],
+  ['/agent', 'agent.html'],
   ['/portal', 'portal.html'],
   ['/adminportal', 'adminportal.html'],
   ['/team', 'team.html'],
@@ -122,6 +123,7 @@ const prefixPageRoutes = [
   ['/signup/', 'signup.html'],
   ['/contract/', 'signup.html'],
   ['/affiliate-onboarding/', 'portal.html'],
+  ['/agent/', 'agent.html'],
   ['/portal/', 'portal.html'],
   ['/adminportal/', 'adminportal.html'],
   ['/team/', 'team.html'],
@@ -134,7 +136,7 @@ const prefixPageRoutes = [
 // server only sees them on a hard refresh, a bookmark or a shared link. Without
 // an explicit mapping they fell through to the landing page, which silently
 // showed marketing copy to a signed-in admin instead of their workspace.
-const spaSectionRoots = ['/clients', '/disputes', '/leads', '/tasks', '/print', '/sub-agents', '/employees'];
+const spaSectionRoots = ['/clients', '/disputes', '/leads', '/tasks', '/print', '/sub-agents', '/agent-applications', '/employees'];
 for (const root of spaSectionRoots) {
   staticPageRoutes.set(root, 'adminportal.html');
   prefixPageRoutes.push([`${root}/`, 'adminportal.html']);

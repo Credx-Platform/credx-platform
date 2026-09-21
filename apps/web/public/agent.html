@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Become a CredX Agent — CredX</title>
+<meta name="description" content="Apply to partner with CredX as an independent agent. Introduce people to CredX credit education and guided workflows, backed by our platform and support team.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://credxme.com/agent">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#060a12;--bg2:#0b1220;--bg3:#101a2b;--bg4:#182035;
+--cyan:#00c6fb;--cyan2:#00e5ff;--cyan-dim:rgba(0,198,251,.08);--cyan-glow:rgba(0,198,251,.30);
+--white:#f8fafc;--text:#e2e8f0;--muted:#cbd5e1;--muted2:#94a3b8;
+--border:rgba(255,255,255,.08);--border-c:rgba(0,198,251,.28);
+--green:#22c55e;--red:#f87171;
+--font-display:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+--font-body:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font-body);background:var(--bg);color:var(--white);line-height:1.65}
+a{color:inherit}
+.container{max-width:1000px;margin:0 auto;padding:56px clamp(16px,4vw,48px)}
+.back{display:inline-block;margin-bottom:28px;font-size:13px;color:var(--muted2);text-decoration:none}
+.back:hover{color:var(--cyan)}
+.stag{font-size:11px;font-weight:600;color:var(--cyan);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px}
+.stitle{font-size:clamp(30px,4vw,48px);font-weight:700;letter-spacing:-.8px;line-height:1.12;margin-bottom:14px}
+.stitle .accent{color:var(--cyan)}
+.ssub{font-size:16px;color:var(--muted);max-width:620px;line-height:1.7}
+.perks{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:36px}
+.perk{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px 22px}
+.perk-num{font-size:28px;font-weight:700;color:var(--cyan);line-height:1;margin-bottom:10px}
+.perk-title{font-size:15px;font-weight:600;margin-bottom:6px}
+.perk-desc{font-size:13px;color:var(--muted2);line-height:1.7}
+.form-wrap{max-width:660px;margin:48px auto 0;background:var(--bg3);border:1px solid var(--border-c);border-radius:18px;padding:36px clamp(20px,4vw,40px)}
+.form-head{text-align:center;margin-bottom:28px}
+.form-head h2{font-size:26px;font-weight:700;margin-bottom:6px}
+.form-head p{font-size:14px;color:var(--muted2)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.form-row.single{grid-template-columns:1fr}
+.form-group{display:flex;flex-direction:column;gap:5px;min-width:0}
+.form-group input,.form-group select,.form-group textarea{width:100%}
+label{font-size:11px;font-weight:600;color:var(--muted2);letter-spacing:.5px;text-transform:uppercase}
+input,select,textarea{padding:11px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--white);font-size:14px;font-family:var(--font-body);outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--cyan)}
+input::placeholder,textarea::placeholder{color:#64748b}
+select option{background:var(--bg)}
+textarea{resize:vertical;min-height:96px}
+.cb-row{display:flex;align-items:flex-start;gap:10px;margin:18px 0 6px}
+.cb-row input{width:16px;height:16px;accent-color:var(--cyan);flex-shrink:0;margin-top:3px;padding:0}
+.cb-row label{font-size:13px;color:var(--muted2);text-transform:none;letter-spacing:0;font-weight:400;cursor:pointer}
+.form-error{display:none;margin:12px 0 0;padding:11px 14px;border:1px solid rgba(248,113,113,.4);background:rgba(248,113,113,.08);border-radius:8px;color:var(--red);font-size:13px}
+.form-error.show{display:block}
+.form-submit{width:100%;height:48px;margin-top:16px;background:var(--cyan);color:var(--bg);font-family:var(--font-display);font-weight:700;font-size:15px;border:none;border-radius:8px;cursor:pointer;transition:background .2s,box-shadow .2s}
+.form-submit:hover{background:var(--cyan2);box-shadow:0 0 28px var(--cyan-glow)}
+.form-submit:disabled{opacity:.55;cursor:not-allowed}
+.fine{margin-top:14px;font-size:12px;color:#64748b;text-align:center;line-height:1.6}
+.success-panel{display:none;text-align:center;padding:16px 0}
+.success-panel.show{display:block}
+.success-title{font-size:24px;font-weight:700;margin-bottom:8px}
+.success-msg{font-size:14px;color:var(--muted);line-height:1.7;max-width:420px;margin:0 auto}
+.success-link{display:inline-block;margin-top:20px;padding:12px 28px;background:var(--cyan);color:var(--bg);font-weight:700;font-size:14px;border-radius:8px;text-decoration:none}
+footer{border-top:1px solid var(--border);padding:28px clamp(16px,4vw,48px);text-align:center;font-size:12px;color:var(--muted2)}
+footer a{color:var(--muted2)}
+@media(max-width:640px){.form-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="container">
+  <a href="/" class="back">← Back to CredX</a>
+  <div class="stag">Agent Program</div>
+  <h1 class="stitle">Become a <span class="accent">CredX Agent</span></h1>
+  <p class="ssub">Partner with CredX as an independent agent. Introduce the people you already serve to CredX credit education and guided workflows, backed by our platform, training, and support team.</p>
+
+  <div class="perks">
+    <div class="perk">
+      <div class="perk-num">01</div>
+      <div class="perk-title">A proven platform</div>
+      <div class="perk-desc">Your referrals use the same CredX portal, education, and guided workflows as every CredX member.</div>
+    </div>
+    <div class="perk">
+      <div class="perk-num">02</div>
+      <div class="perk-title">Your own referral link</div>
+      <div class="perk-desc">Approved agents get a tracked link and a login to follow the people they introduce.</div>
+    </div>
+    <div class="perk">
+      <div class="perk-num">03</div>
+      <div class="perk-title">Training and support</div>
+      <div class="perk-desc">Onboarding, the CredX affiliate policy, and a team to answer questions as you get started.</div>
+    </div>
+  </div>
+
+  <section class="form-wrap" id="enroll" aria-labelledby="enroll-title">
+    <form id="agent-form" novalidate>
+      <div class="form-head">
+        <h2 id="enroll-title">Agent application</h2>
+        <p>Free to apply. No obligation. We review every application.</p>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="a_first">First name</label><input type="text" id="a_first" name="firstName" autocomplete="given-name" maxlength="80" required></div>
+        <div class="form-group"><label for="a_last">Last name</label><input type="text" id="a_last" name="lastName" autocomplete="family-name" maxlength="80" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="a_email">Email</label><input type="email" id="a_email" name="email" autocomplete="email" maxlength="254" placeholder="you@email.com" required></div>
+        <div class="form-group"><label for="a_phone">Phone</label><input type="tel" id="a_phone" name="phone" autocomplete="tel" maxlength="14" placeholder="(555) 555-0100" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="a_state">State</label><input type="text" id="a_state" name="state" autocomplete="address-level1" maxlength="2" placeholder="NJ" style="text-transform:uppercase"></div>
+        <div class="form-group">
+          <label for="a_experience">Credit industry experience</label>
+          <select id="a_experience" name="experience">
+            <option value="">Select one</option>
+            <option>None — new and ready to learn</option>
+            <option>Some — referred or assisted clients</option>
+            <option>Experienced — run or ran a credit business</option>
+            <option>Licensed professional (real estate, lending, insurance, etc.)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row single">
+        <div class="form-group"><label for="a_why">Why do you want to partner with CredX?</label><textarea id="a_why" name="motivation" maxlength="2000" placeholder="e.g. I'm a mortgage loan officer and want a trusted place to send buyers who need to prepare their credit."></textarea></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="a_title">Professional or social media title</label><input type="text" id="a_title" name="professionalTitle" maxlength="160" placeholder="e.g. Realtor, Credit Educator, Creator"></div>
+        <div class="form-group"><label for="a_social">Social media profiles</label><input type="text" id="a_social" name="socialMedia" maxlength="1000" placeholder="Instagram, TikTok, LinkedIn, YouTube, etc."></div>
+      </div>
+      <div class="form-row single">
+        <div class="form-group"><label for="a_background">Background and references</label><textarea id="a_background" name="backgroundReferences" maxlength="3000" placeholder="Tell us about your background, audience, relevant experience, or professional references."></textarea></div>
+      </div>
+      <div class="cf-turnstile-slot" style="margin:12px 0 0;"></div>
+      <div class="cb-row">
+        <input type="checkbox" id="a_consent" name="consent">
+        <label for="a_consent">The information I submitted is accurate, and I agree to be contacted by CredX about the agent program.</label>
+      </div>
+      <div class="form-error" id="a_error" role="alert"></div>
+      <button type="submit" class="form-submit" id="a_submit">Submit application</button>
+      <p class="fine">Agents may not promise deletions, guaranteed score increases, legal representation, or funding. See our <a href="/privacy">Privacy Policy</a>.</p>
+    </form>
+    <div class="success-panel" id="a_success" role="status">
+      <div class="success-title">Application received</div>
+      <p class="success-msg">Thanks — your agent application was submitted. Check your inbox for a confirmation. Our partnerships team will review it and reach out, usually within 2 business days.</p>
+      <a href="/" class="success-link">Back to CredX</a>
+    </div>
+  </section>
+</main>
+
+<footer>© 2026 CredX · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="mailto:contact@credxme.com">contact@credxme.com</a></footer>
+
+<script>
+(function () {
+  var form = document.getElementById('agent-form');
+  var errorBox = document.getElementById('a_error');
+  var submit = document.getElementById('a_submit');
+  var phone = document.getElementById('a_phone');
+
+  function value(id) { return document.getElementById(id).value.trim(); }
+
+  function showError(message) {
+    errorBox.textContent = message;
+    errorBox.classList.add('show');
+  }
+
+  phone.addEventListener('input', function () {
+    var v = this.value.replace(/\D/g, '').slice(0, 10);
+    if (v.length > 6) v = '(' + v.slice(0, 3) + ') ' + v.slice(3, 6) + '-' + v.slice(6);
+    else if (v.length > 3) v = '(' + v.slice(0, 3) + ') ' + v.slice(3);
+    this.value = v;
+  });
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    errorBox.classList.remove('show');
+
+    var payload = {
+      firstName: value('a_first'),
+      lastName: value('a_last'),
+      email: value('a_email'),
+      phone: value('a_phone'),
+      state: value('a_state').toUpperCase(),
+      experience: document.getElementById('a_experience').value,
+      motivation: value('a_why'),
+      professionalTitle: value('a_title'),
+      socialMedia: value('a_social'),
+      backgroundReferences: value('a_background'),
+      source: 'agent_page',
+      consent: document.getElementById('a_consent').checked
+    };
+
+    if (!payload.firstName || !payload.lastName) return showError('Please enter your first and last name.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) return showError('Please enter a valid email address.');
+    if (payload.phone.replace(/\D/g, '').length < 10) return showError('Please enter a 10-digit phone number.');
+    if (payload.state && !/^[A-Z]{2}$/.test(payload.state)) return showError('Use a 2-letter state code, like NJ.');
+    if (!payload.consent) return showError('Please confirm your information and agree to be contacted.');
+
+    var turnstileToken = (window.CredXTurnstile && window.CredXTurnstile.getToken()) || undefined;
+    if (String(window.CREDX_TURNSTILE_SITE_KEY || '').trim() && !turnstileToken) {
+      return showError('Please complete the security verification before submitting.');
+    }
+    payload.turnstileToken = turnstileToken;
+
+    submit.disabled = true;
+    submit.textContent = 'Submitting…';
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, 20000);
+    try {
+      var res = await fetch('/api/agent-applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      var body = await res.json().catch(function () { return null; });
+      if (!res.ok) throw new Error((body && body.error) || 'Submission failed (' + res.status + ')');
+      form.style.display = 'none';
+      document.getElementById('a_success').classList.add('show');
+    } catch (error) {
+      // Never cache applicant details in the browser; ask them to retry instead.
+      showError(error.name === 'AbortError'
+        ? 'The request timed out. Please try again.'
+        : (error.message || 'Submission failed.') + ' Please try again, or email contact@credxme.com.');
+      submit.disabled = false;
+      submit.textContent = 'Submit application';
+      window.CredXTurnstile && window.CredXTurnstile.reset();
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+})();
+</script>
+<script src="/turnstile-config.js"></script>
+<script src="/turnstile-widget.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onCredXTurnstileLoad" async defer></script>
+</body>
+</html>

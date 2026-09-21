@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma.js';
 import { runChat, aiConfigured, type AiMessage } from '../lib/ai/index.js';
 import { getPrompt, CESAR_GUARDRAILS } from '../lib/ai/prompts.js';
 import { checkAiQuota } from '../lib/ai/quota.js';
+import { withCesarAccess } from '../lib/ai/cesarAccess.js';
 import { getCurrentSubscription, toSubscriptionPlanInput } from '../lib/subscriptions.js';
 import { resolveClientEntitlements } from '../lib/entitlements.js';
 
@@ -59,6 +60,7 @@ interface CesarContext {
   stage: OnboardingStep | null;
   clientId: string | null;
   plan: string | null;
+  canUseCesar: boolean;
 }
 
 interface OnboardingStep {
@@ -248,12 +250,9 @@ async function llmReply(
   message: string,
   history: z.infer<typeof historySchema>,
   ctx: CesarContext
-): Promise<{ reply: CesarReply } | { fail: 'quota' | 'provider' }> {
-  // Per-client AI budget check (cost protection).
-  if (ctx.clientId) {
-    const quota = await checkAiQuota(ctx.clientId, ctx.plan ?? null);
-    if (!quota.allowed) return { fail: 'quota' };
-  }
+): Promise<{ reply: CesarReply } | { fail: 'entitlement' | 'quota' | 'provider' }> {
+  return withCesarAccess<{ reply: CesarReply } | { fail: 'provider' }>(ctx,
+    (clientId) => checkAiQuota(clientId, ctx.plan), async () => {
 
   const messages: AiMessage[] = [
     { role: 'system', content: buildSystemPrompt(ctx) },
@@ -271,6 +270,7 @@ async function llmReply(
   if (!result.ok) return { fail: 'provider' };
   // LLM output is untrusted; never return it as raw HTML — escape it.
   return { reply: { source: 'llm', reply: result.text, html: textToHtml(result.text) } };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -280,7 +280,7 @@ async function llmReply(
 // Optional auth: a valid Bearer token personalizes Cesar; without one he still
 // works as the public pre-sales assistant. A bad/expired token is ignored, not
 // rejected — the landing chat should never hard-fail on a stale token.
-const EMPTY_CTX: CesarContext = { user: null, stage: null, clientId: null, plan: null };
+const EMPTY_CTX: CesarContext = { user: null, stage: null, clientId: null, plan: null, canUseCesar: false };
 
 async function loadContext(authHeader: string | undefined): Promise<CesarContext> {
   if (!authHeader?.startsWith('Bearer ')) return EMPTY_CTX;
@@ -295,19 +295,20 @@ async function loadContext(authHeader: string | undefined): Promise<CesarContext
       ? { status: user.client.status, progress: user.client.progress }
       : null);
     const education = (user.client?.progress?.education as Record<string, unknown> | undefined) ?? {};
-    const plan = user.client
+    const access = user.client
       ? resolveClientEntitlements({
           status: user.client.status,
           serviceTier: user.client.serviceTier,
           masterclassAccess: education.masterclassAccess === true,
           subscription: toSubscriptionPlanInput(await getCurrentSubscription(user.client.id))
-        }).plan
+        })
       : null;
     return {
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, role: user.role },
       stage,
       clientId: user.client?.id ?? null,
-      plan
+      plan: access?.plan ?? null,
+      canUseCesar: access?.entitlements.can_use_cesar === true
     };
   } catch {
     return EMPTY_CTX;

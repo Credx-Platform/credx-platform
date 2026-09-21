@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { createWriteStream, mkdirSync, openSync, closeSync, statSync, unlinkSync } from 'node:fs';
+import { createReadStream, createWriteStream, mkdirSync, openSync, closeSync, statSync, unlinkSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import path from 'node:path';
@@ -47,6 +48,13 @@ mkdirSync(BACKUP_DIR, { recursive: true, mode: 0o700 });
 const dumpPath = path.join(BACKUP_DIR, `credx-prod-${timestamp}.dump`);
 const encryptedPath = `${dumpPath}.gpg`;
 const checksumPath = `${encryptedPath}.sha256`;
+const downloadedPath = `${encryptedPath}.download-verify`;
+
+async function sha256File(filePath) {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(filePath)) hash.update(chunk);
+  return hash.digest('hex');
+}
 const dumpFd = openSync(dumpPath, 'wx', 0o600);
 
 try {
@@ -98,7 +106,13 @@ try {
 
   run('rclone', ['copyto', encryptedPath, `${OFFSITE_REMOTE}/${path.basename(encryptedPath)}`]);
   run('rclone', ['copyto', checksumPath, `${OFFSITE_REMOTE}/${path.basename(checksumPath)}`]);
-  run('rclone', ['check', checksumPath, OFFSITE_REMOTE, '--download', '--one-way']);
+  // Verify the actual encrypted recovery artifact, not only its checksum sidecar.
+  // A successful upload is not evidence that the remote bytes are recoverable.
+  run('rclone', ['copyto', `${OFFSITE_REMOTE}/${path.basename(encryptedPath)}`, downloadedPath]);
+  if (await sha256File(downloadedPath) !== await sha256File(encryptedPath)) {
+    throw new Error('downloaded encrypted backup SHA-256 does not match local artifact');
+  }
+  unlinkSync(downloadedPath);
 
   unlinkSync(dumpPath);
   console.log(`Encrypted backup uploaded and restore-tested: ${path.basename(encryptedPath)}`);

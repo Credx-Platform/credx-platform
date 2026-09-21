@@ -136,6 +136,10 @@ model SubAgent {
   referralCode             String            @unique
   status                   String            @default("ACTIVE")
   notes                    String?
+  publicBio                String?
+  publicHeadshotUrl        String?
+  campaignEnabled          Boolean           @default(false)
+  campaignApprovedAt       DateTime?
   adminUserId              String?           @unique
   adminUser                User?             @relation("SubAgentAdminUser", fields: [adminUserId], references: [id], onDelete: SetNull)
   onboardingTokenHash      String?           @unique
@@ -175,6 +179,32 @@ model SubAgentContact {
   @@index([subAgentId])
   @@index([createdAt])
   @@index([status])
+}
+
+model AgentApplication {
+  id                  String    @id @default(uuid())
+  status              String    @default("NEW")
+  firstNameEncrypted  String
+  lastNameEncrypted   String
+  emailEncrypted      String
+  phoneEncrypted      String
+  motivationEncrypted String?
+  professionalTitleEncrypted String?
+  socialMediaEncrypted String?
+  backgroundReferencesEncrypted String?
+  state               String?
+  experience          String?
+  source              String?
+  consentAt           DateTime
+  ipAddress           String?
+  userAgent           String?
+  reviewedAt          DateTime?
+  reviewedById        String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Client {
@@ -467,10 +497,17 @@ model Task {
   client      Client    @relation(fields: [clientId], references: [id])
   title       String
   description String?
+  category    String    @default("general")
+  priority    String    @default("medium")
   completed   Boolean   @default(false)
   dueAt       DateTime?
+  completedAt DateTime?
+  createdBy   String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([clientId])
+  @@index([completed])
 }
 
 model Note {

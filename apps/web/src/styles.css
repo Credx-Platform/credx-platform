@@ -182,6 +182,26 @@ h1, h2, h3, .eyebrow, .top-title, button { font-family: var(--cx-font-display); 
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
 }
 
+.sidebar-nav-alert { display: flex; align-items: center; gap: 10px; }
+.sidebar-nav-icon { width: 18px; height: 18px; display: inline-flex; flex: 0 0 18px; color: #f472b6; }
+.sidebar-nav-icon svg { width: 18px; height: 18px; }
+.sidebar-nav-badge {
+  min-width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ec4899;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, .12);
+}
+
 .main {
   width: 100%;
   max-width: 100%;

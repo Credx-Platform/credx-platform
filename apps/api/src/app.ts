@@ -31,6 +31,7 @@ import { notificationsRouter } from './routes/notifications.js';
 import { checkinRouter } from './routes/checkin.js';
 import { platformReportsRouter } from './routes/platformReports.js';
 import { aiRouter } from './routes/ai.js';
+import { agentApplicationsRouter } from './routes/agentApplications.js';
 
 export interface CreateAppOptions {
   /** Disable rate limiters (tests / load harness). */
@@ -167,6 +168,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     app.use(`${prefix}/checkin`, checkinRouter);
     app.use(`${prefix}/reports`, platformReportsRouter);
     app.use(`${prefix}/ai`, aiRouter);
+    app.use(`${prefix}/agent-applications`, agentApplicationsRouter);
   }
 
   mountAll('/api');

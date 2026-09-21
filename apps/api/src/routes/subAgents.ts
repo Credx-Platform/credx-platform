@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
+import multer from 'multer';
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { config } from '../config.js';
@@ -7,15 +8,21 @@ import { sendAffiliateOnboardingEmail, sendPasswordSetupEmail } from '../lib/ema
 import { buildPasswordSetupLink, issuePasswordSetupToken } from '../lib/passwordSetup.js';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
+import { put } from '@vercel/blob';
+import { getSignedDocumentUrl } from '../lib/blob-storage.js';
 
 export const subAgentsRouter = Router();
+const headshotUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 const subAgentSchema = z.object({
   name: z.string().min(1).max(120),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().max(40).optional().or(z.literal('')),
   referralCode: z.string().max(80).optional().or(z.literal('')),
-  notes: z.string().max(1000).optional().or(z.literal(''))
+  notes: z.string().max(1000).optional().or(z.literal('')),
+  publicBio: z.string().max(1200).optional().or(z.literal('')),
+  publicHeadshotUrl: z.string().url().max(2000).optional().or(z.literal('')),
+  campaignEnabled: z.boolean().optional()
 });
 
 const contactSchema = z.object({
@@ -37,6 +44,10 @@ const agreementSchema = z.object({
 function cleanOptional(value?: string) {
   const next = value?.trim();
   return next ? next : null;
+}
+
+function isHeadshot(file: Express.Multer.File) {
+  return ['image/jpeg', 'image/png', 'image/webp'].includes(String(file.mimetype || '').toLowerCase());
 }
 
 function slugify(value: string) {
@@ -181,6 +192,22 @@ subAgentsRouter.get('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (_r
   }
 });
 
+subAgentsRouter.get('/public/:code', async (req, res, next) => {
+  try {
+    const subAgent = await prisma.subAgent.findFirst({
+      where: { referralCode: String(req.params.code), status: 'ACTIVE', campaignEnabled: true, campaignApprovedAt: { not: null } },
+      select: { name: true, referralCode: true, publicBio: true, publicHeadshotUrl: true, campaignApprovedAt: true }
+    });
+    if (!subAgent) return res.status(404).json({ error: 'Campaign profile not found' });
+    const headshotUrl = subAgent.publicHeadshotUrl?.startsWith('agent-headshots/')
+      ? await getSignedDocumentUrl(subAgent.publicHeadshotUrl, 15 * 60 * 1000)
+      : subAgent.publicHeadshotUrl;
+    return res.json({ subAgent: { ...subAgent, publicHeadshotUrl: headshotUrl } });
+  } catch (error) {
+    next(error);
+  }
+});
+
 subAgentsRouter.post('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req, res, next) => {
   try {
     const data = subAgentSchema.parse(req.body);
@@ -192,7 +219,11 @@ subAgentsRouter.post('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (r
         email: cleanOptional(data.email),
         phone: cleanOptional(data.phone),
         referralCode,
-        notes: cleanOptional(data.notes)
+        notes: cleanOptional(data.notes),
+        publicBio: cleanOptional(data.publicBio),
+        publicHeadshotUrl: cleanOptional(data.publicHeadshotUrl),
+        campaignEnabled: data.campaignEnabled === true,
+        campaignApprovedAt: data.campaignEnabled === true ? new Date() : null
       },
       include: { contacts: true }
     });
@@ -251,6 +282,9 @@ subAgentsRouter.patch('/:id', requireAuth, requireRole(['STAFF', 'ADMIN']), asyn
         ...(data.email !== undefined ? { email: cleanOptional(data.email) } : {}),
         ...(data.phone !== undefined ? { phone: cleanOptional(data.phone) } : {}),
         ...(data.notes !== undefined ? { notes: cleanOptional(data.notes) } : {}),
+        ...(data.publicBio !== undefined ? { publicBio: cleanOptional(data.publicBio) } : {}),
+        ...(data.publicHeadshotUrl !== undefined ? { publicHeadshotUrl: cleanOptional(data.publicHeadshotUrl) } : {}),
+        ...(data.campaignEnabled !== undefined ? { campaignEnabled: data.campaignEnabled, campaignApprovedAt: data.campaignEnabled ? new Date() : null } : {}),
         ...(data.status !== undefined ? { status: data.status } : {})
       },
       include: {
@@ -287,6 +321,42 @@ subAgentsRouter.get('/me', requireAuth, requireRole(['AFFILIATE']), async (req: 
   } catch (error) {
     next(error);
   }
+});
+
+subAgentsRouter.get('/me/campaign-profile', requireAuth, requireRole(['AFFILIATE']), async (req: AuthedRequest, res, next) => {
+  try {
+    const subAgent = await prisma.subAgent.findUnique({ where: { adminUserId: req.auth!.sub } });
+    if (!subAgent) return res.status(404).json({ error: 'Affiliate profile not found' });
+    let headshotUrl: string | null = null;
+    if (subAgent.publicHeadshotUrl?.startsWith('agent-headshots/')) headshotUrl = await getSignedDocumentUrl(subAgent.publicHeadshotUrl, 15 * 60 * 1000);
+    else if (subAgent.publicHeadshotUrl) headshotUrl = subAgent.publicHeadshotUrl;
+    return res.json({ profile: { publicBio: subAgent.publicBio, headshotUrl, campaignEnabled: subAgent.campaignEnabled, campaignApprovedAt: subAgent.campaignApprovedAt } });
+  } catch (error) { next(error); }
+});
+
+subAgentsRouter.post('/me/campaign-profile', requireAuth, requireRole(['AFFILIATE']), headshotUpload.single('headshot'), async (req: AuthedRequest, res, next) => {
+  try {
+    const subAgent = await prisma.subAgent.findUnique({ where: { adminUserId: req.auth!.sub } });
+    if (!subAgent) return res.status(404).json({ error: 'Affiliate profile not found' });
+    const bio = typeof req.body?.publicBio === 'string' ? req.body.publicBio.trim().slice(0, 1200) : undefined;
+    const file = req.file;
+    if (!bio && !file) return res.status(400).json({ error: 'Add a public bio or upload a headshot.' });
+    if (file && !isHeadshot(file)) return res.status(400).json({ error: 'Headshot must be JPG, PNG, or WebP.' });
+    let storedHeadshot = subAgent.publicHeadshotUrl;
+    if (file) {
+      const safeName = (file.originalname || 'headshot').replace(/[^a-zA-Z0-9.-]/g, '_');
+      const pathname = `agent-headshots/${subAgent.id}/${randomBytes(8).toString('hex')}_${safeName}`;
+      const blob = await put(pathname, file.buffer, { access: 'private', contentType: file.mimetype, addRandomSuffix: false });
+      storedHeadshot = blob.pathname;
+    }
+    const updated = await prisma.subAgent.update({ where: { id: subAgent.id }, data: {
+      ...(bio !== undefined ? { publicBio: bio || null } : {}),
+      ...(file ? { publicHeadshotUrl: storedHeadshot } : {}),
+      campaignEnabled: false,
+      campaignApprovedAt: null
+    } });
+    return res.json({ success: true, pendingApproval: true, subAgent: updated });
+  } catch (error) { next(error); }
 });
 
 subAgentsRouter.get('/onboarding/:token', async (req, res, next) => {
@@ -495,7 +565,7 @@ subAgentsRouter.get('/track/:code', async (req, res, next) => {
       agentName: subAgent.name,
       tracked: '1'
     });
-    return res.redirect(`/signup?${params.toString()}`);
+    return res.redirect(`/?${params.toString()}`);
   } catch (error) {
     next(error);
   }

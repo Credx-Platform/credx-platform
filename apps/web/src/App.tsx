@@ -239,6 +239,10 @@ type SubAgentRecord = {
   referralCode: string;
   status: string;
   notes?: string | null;
+  publicBio?: string | null;
+  publicHeadshotUrl?: string | null;
+  campaignEnabled?: boolean;
+  campaignApprovedAt?: string | null;
   policyAcceptedAt?: string | null;
   createdAt: string;
   contacts: SubAgentContact[];
@@ -248,6 +252,25 @@ type SubAgentRecord = {
     createdAt: string;
     user: { firstName: string; lastName: string; email: string };
   }>;
+};
+
+type AgentApplication = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  motivation: string | null;
+  professionalTitle: string | null;
+  socialMedia: string | null;
+  backgroundReferences: string | null;
+  state: string | null;
+  experience: string | null;
+  source: string;
+  status: 'NEW' | 'CONTACTED' | 'APPROVED' | 'DECLINED';
+  consentAt: string;
+  reviewedAt: string | null;
+  createdAt: string;
 };
 
 type LoginResponse = {
@@ -648,6 +671,9 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
   const [agentEmail, setAgentEmail] = useState('');
   const [agentPhone, setAgentPhone] = useState('');
   const [agentCode, setAgentCode] = useState('');
+  const [agentBio, setAgentBio] = useState('');
+  const [agentHeadshotUrl, setAgentHeadshotUrl] = useState('');
+  const [agentCampaignEnabled, setAgentCampaignEnabled] = useState(false);
   const [savingAgent, setSavingAgent] = useState(false);
   const [refreshingActivity, setRefreshingActivity] = useState(false);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
@@ -847,13 +873,19 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
           name: agentName,
           email: agentEmail,
           phone: agentPhone,
-          referralCode: agentCode
+          referralCode: agentCode,
+          publicBio: agentBio,
+          publicHeadshotUrl: agentHeadshotUrl,
+          campaignEnabled: agentCampaignEnabled
         })
       });
       setAgentName('');
       setAgentEmail('');
       setAgentPhone('');
       setAgentCode('');
+      setAgentBio('');
+      setAgentHeadshotUrl('');
+      setAgentCampaignEnabled(false);
       await onRefresh();
       showNotice('Sub-agent created');
     } catch (createError) {
@@ -899,6 +931,20 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
       setError(sendError instanceof Error ? sendError.message : 'Unable to send affiliate onboarding');
     } finally {
       setEmailingAgentId(null);
+    }
+  };
+
+  const setCampaignApproval = async (agent: SubAgentRecord) => {
+    setError(null);
+    try {
+      await apiFetch<{ subAgent: SubAgentRecord }>(`/api/sub-agents/${agent.id}`, token, {
+        method: 'PATCH',
+        body: JSON.stringify({ campaignEnabled: !agent.campaignEnabled })
+      });
+      await onRefresh();
+      showNotice(agent.campaignEnabled ? `${agent.name} campaign hidden` : `${agent.name} campaign approved and live`, 2600);
+    } catch (approvalError) {
+      setError(approvalError instanceof Error ? approvalError.message : 'Unable to update campaign approval');
     }
   };
 
@@ -1005,6 +1051,18 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
                 <input value={agentCode} onChange={(event) => setAgentCode(event.target.value)} placeholder="jasmine-credit" />
               </label>
             </div>
+            <label>
+              <span>Public campaign bio</span>
+              <textarea value={agentBio} onChange={(event) => setAgentBio(event.target.value)} placeholder="Short approved introduction shown on this agent's CredX landing page." maxLength={1200} rows={3} />
+            </label>
+            <label>
+              <span>Approved headshot URL (optional)</span>
+              <input value={agentHeadshotUrl} onChange={(event) => setAgentHeadshotUrl(event.target.value)} placeholder="https://..." type="url" />
+            </label>
+            <label className="checkbox-row">
+              <input type="checkbox" checked={agentCampaignEnabled} onChange={(event) => setAgentCampaignEnabled(event.target.checked)} />
+              <span>Enable this approved campaign landing page</span>
+            </label>
             <button type="submit" disabled={savingAgent}>{savingAgent ? 'Creating...' : 'Create Sub-Agent Link'}</button>
             {error ? <p className="helper-text helper-text--error">{error}</p> : null}
             {copyNotice ? <p className="helper-text helper-text--success">{copyNotice}</p> : null}
@@ -1116,6 +1174,7 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
                 <tr>
                   <th>Sub Agent</th>
                   <th>Status</th>
+                  <th>Campaign</th>
                   <th>ID / Code</th>
                   <th>Clicks</th>
                   <th>Signups</th>
@@ -1135,6 +1194,7 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
                           <span className="table-subtext">{agent.email || agent.phone || 'No contact info on file'}</span>
                         </td>
                         <td><span className={agent.status === 'ACTIVE' ? 'status-pill status-pill--ok' : 'status-pill status-pill--warning'}>{agent.status}</span></td>
+                        <td><span className={`status-pill ${agent.campaignEnabled ? 'status-pill--ok' : 'status-pill--warning'}`}>{agent.campaignEnabled ? 'Campaign live' : agent.publicBio || agent.publicHeadshotUrl ? 'Campaign pending' : 'No campaign'}</span></td>
                         <td>
                           <strong>{agent.affiliateId}</strong>
                           <span className="table-subtext">{agent.referralCode}</span>
@@ -1157,6 +1217,7 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
                             <button type="button" className="ghost-button" aria-label={`Email ${agent.name} affiliate onboarding`} disabled={!agent.email || emailingAgentId === agent.id} title={!agent.email ? 'Add an email address before sending onboarding' : undefined} onClick={(event) => { event.preventDefault(); event.stopPropagation(); sendAffiliateOnboarding(agent); }}>
                               <span className="action-label-full">{emailingAgentId === agent.id ? 'Sending...' : emailedAgentId === agent.id ? 'Sent' : 'Email'}</span><span className="action-label-short">{emailedAgentId === agent.id ? 'Sent' : 'Email'}</span>
                             </button>
+                            {(agent.publicBio || agent.publicHeadshotUrl) ? <button type="button" className="ghost-button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setCampaignApproval(agent); }}>{agent.campaignEnabled ? 'Hide campaign' : 'Approve campaign'}</button> : null}
                             <button type="button" className="ghost-button danger-button" aria-label={`Delete ${agent.name}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); deleteSubAgent(agent); }}>
                               <span className="action-label-full">Delete</span><span className="action-label-short">Del</span>
                             </button>
@@ -1164,7 +1225,7 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
                         </td>
                       </tr>
                       <tr className="affiliate-usage-row">
-                        <td colSpan={8}>
+                        <td colSpan={9}>
                           <details className="link-usage-details">
                             <summary>View link usage details ({stats.events.length})</summary>
                             <code className="inline-copy-code affiliate-roster-link">{referralUrl(agent.referralCode)}</code>
@@ -1225,6 +1286,56 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
             </table>
           </div>
         ) : <div className="empty-state-card">No sub-agents yet. Create one above to generate the first social link.</div>}
+      </section>
+    </div>
+  );
+}
+
+function AgentApplicationsRoute({ token, applications, onRefresh }: { token: string; applications: AgentApplication[]; onRefresh: () => Promise<void> }) {
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const updateStatus = async (application: AgentApplication, status: AgentApplication['status']) => {
+    setSavingId(application.id);
+    try {
+      await apiFetch(`/api/agent-applications/${application.id}`, token, { method: 'PATCH', body: JSON.stringify({ status }) });
+      await onRefresh();
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const freshCount = applications.filter((application) => application.status === 'NEW').length;
+  return (
+    <div className="page-grid">
+      <section className="hero-card hero-card--compact">
+        <div>
+          <p className="eyebrow">Partnership intake</p>
+          <h2 className="hero-dispute-title">Agent applications</h2>
+          <p>Applications submitted at <strong>credxme.com/agent</strong> are saved here in the encrypted AgentApplication record. New applications stay visible until reviewed.</p>
+        </div>
+        <div className="stat-card"><span>New</span><strong>{freshCount}</strong></div>
+      </section>
+      <section className="panel">
+        <div className="panel-heading">
+          <div><p className="eyebrow">Review queue</p><h3>Agent enrollment requests</h3></div>
+          <button className="ghost-button" type="button" onClick={onRefresh}>Refresh</button>
+        </div>
+        {applications.length ? (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead><tr><th>Applicant</th><th>Contact</th><th>Experience</th><th>Submitted</th><th>Status</th><th>Review</th></tr></thead>
+              <tbody>{applications.map((application) => (
+                <tr key={application.id}>
+                  <td><strong>{[application.firstName, application.lastName].filter(Boolean).join(' ') || 'Unnamed applicant'}</strong><div className="table-subtext">{application.professionalTitle || application.state || 'State not provided'}</div>{application.socialMedia || application.backgroundReferences || application.motivation ? <details><summary>Application details</summary><div className="table-subtext">{application.socialMedia ? `Social: ${application.socialMedia}` : ''}{application.backgroundReferences ? ` Background: ${application.backgroundReferences}` : ''}{application.motivation ? ` Motivation: ${application.motivation}` : ''}</div></details> : null}</td>
+                  <td><div>{application.email || 'No email'}</div><div className="table-subtext">{application.phone || 'No phone'}</div></td>
+                  <td>{application.experience || 'Not provided'}</td>
+                  <td>{formatDate(application.createdAt)}</td>
+                  <td><span className={`status-pill ${application.status === 'NEW' ? 'status-pill--warning' : application.status === 'APPROVED' ? 'status-pill--ok' : ''}`}>{application.status}</span></td>
+                  <td><select aria-label={`Update status for ${application.firstName || 'application'}`} value={application.status} disabled={savingId === application.id} onChange={(event) => updateStatus(application, event.target.value as AgentApplication['status'])}><option>NEW</option><option>CONTACTED</option><option>APPROVED</option><option>DECLINED</option></select></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        ) : <div className="empty-state-card"><strong>No agent applications yet</strong><p>New submissions from credxme.com/agent will appear here.</p></div>}
       </section>
     </div>
   );
@@ -3666,12 +3777,19 @@ function AffiliateDashboard({ token, user, onLogout }: { token: string; user: Us
   const [subAgent, setSubAgent] = useState<SubAgentRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
+  const [campaignBio, setCampaignBio] = useState('');
+  const [campaignHeadshot, setCampaignHeadshot] = useState<File | null>(null);
+  const [campaignSaving, setCampaignSaving] = useState(false);
+  const [campaignMessage, setCampaignMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     apiFetch<{ subAgent: SubAgentRecord }>('/api/sub-agents/me', token)
       .then((response) => {
-        if (!cancelled) setSubAgent(response.subAgent);
+        if (!cancelled) {
+          setSubAgent(response.subAgent);
+          setCampaignBio(response.subAgent.publicBio || '');
+        }
       })
       .catch((loadError) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Unable to load affiliate dashboard');
@@ -3704,6 +3822,29 @@ function AffiliateDashboard({ token, user, onLogout }: { token: string; user: Us
       window.setTimeout(() => setCopyNotice(null), 2200);
     } catch {
       setCopyNotice('Copy unavailable in this browser session');
+    }
+  };
+
+  const submitCampaignProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!campaignBio.trim() && !campaignHeadshot) {
+      setCampaignMessage('Add a short bio or choose a headshot first.');
+      return;
+    }
+    setCampaignSaving(true);
+    setCampaignMessage(null);
+    try {
+      const form = new FormData();
+      form.append('publicBio', campaignBio.trim());
+      if (campaignHeadshot) form.append('headshot', campaignHeadshot);
+      const response = await apiUpload<{ success: boolean; pendingApproval: boolean; subAgent: SubAgentRecord }>('/api/sub-agents/me/campaign-profile', token, form);
+      setSubAgent(response.subAgent);
+      setCampaignHeadshot(null);
+      setCampaignMessage('Submitted for owner approval. Your campaign remains hidden until it is approved.');
+    } catch (saveError) {
+      setCampaignMessage(saveError instanceof Error ? saveError.message : 'Unable to submit campaign profile.');
+    } finally {
+      setCampaignSaving(false);
     }
   };
 
@@ -3747,6 +3888,22 @@ function AffiliateDashboard({ token, user, onLogout }: { token: string; user: Us
               </div>
               <code className="inline-copy-code">{referralLink}</code>
               {copyNotice ? <p className="helper-text helper-text--success">{copyNotice}</p> : null}
+            </section>
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Campaign profile</p>
+                  <h2>Prepare your CredX introduction</h2>
+                  <p className="helper-text">Upload a professional headshot and bio. Nothing is published until the CredX owner approves it.</p>
+                </div>
+                <span className={`status-pill ${subAgent.campaignEnabled ? 'status-pill--ok' : 'status-pill--warning'}`}>{subAgent.campaignEnabled ? 'Approved / Live' : 'Pending approval'}</span>
+              </div>
+              <form className="field-stack" onSubmit={submitCampaignProfile}>
+                <label><span>Public bio</span><textarea value={campaignBio} onChange={(event) => setCampaignBio(event.target.value)} rows={4} maxLength={1200} placeholder="Tell prospects who you are and how you help." /></label>
+                <label><span>Headshot</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setCampaignHeadshot(event.target.files?.[0] || null)} /></label>
+                <button type="submit" disabled={campaignSaving}>{campaignSaving ? 'Submitting...' : 'Submit for approval'}</button>
+                {campaignMessage ? <p className="helper-text helper-text--success">{campaignMessage}</p> : null}
+              </form>
             </section>
             <section className="panel">
               <div className="panel-header">
@@ -3804,6 +3961,7 @@ export default function App() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [subAgents, setSubAgents] = useState<SubAgentRecord[]>([]);
+  const [agentApplications, setAgentApplications] = useState<AgentApplication[]>([]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3823,15 +3981,17 @@ export default function App() {
       apiFetch<{ plans: Plan[] }>('/api/billing/plans', token),
       apiFetch<{ leads: LeadRecord[] }>('/api/leads', token),
       apiFetch<{ subAgents: SubAgentRecord[] }>('/api/sub-agents', token),
+      apiFetch<{ applications: AgentApplication[] }>('/api/agent-applications', token),
       apiFetch<StaffUser[]>('/api/users', token)
     ])
-      .then(([clientsResponse, disputesResponse, plansResponse, leadsResponse, subAgentsResponse, usersResponse]) => {
+      .then(([clientsResponse, disputesResponse, plansResponse, leadsResponse, subAgentsResponse, applicationsResponse, usersResponse]) => {
         if (cancelled) return;
         setClients(clientsResponse.clients);
         setDisputes(disputesResponse.disputes);
         setPlans(plansResponse.plans);
         setLeads(leadsResponse.leads);
         setSubAgents(subAgentsResponse.subAgents);
+        setAgentApplications(applicationsResponse.applications);
         setStaffUsers(usersResponse);
       })
       .catch((fetchError) => {
@@ -3896,6 +4056,7 @@ export default function App() {
     setDisputes([]);
     setLeads([]);
     setSubAgents([]);
+    setAgentApplications([]);
     setStaffUsers([]);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -3909,6 +4070,12 @@ export default function App() {
     ]);
     setSubAgents(subAgentsResponse.subAgents);
     setClients(clientsResponse.clients);
+  };
+
+  const refreshAgentApplications = async () => {
+    if (!token) return;
+    const response = await apiFetch<{ applications: AgentApplication[] }>('/api/agent-applications', token);
+    setAgentApplications(response.applications);
   };
 
   const refreshClients = async () => {
@@ -3949,6 +4116,10 @@ export default function App() {
           <NavLink to="/print">Print Center</NavLink>
           <NavLink to="/tasks">Tasks</NavLink>
           <NavLink to="/sub-agents">Sub Agents</NavLink>
+          <NavLink to="/agent-applications" className="sidebar-nav-alert">
+            <span className="sidebar-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4h0A2.5 2.5 0 0 1 4 13.5v-8Z"/><path d="M8 8h8M8 11.5h5"/></svg></span>
+            <span>Agent Applications</span>{agentApplications.filter((application) => application.status === 'NEW').length ? <span className="sidebar-nav-badge" aria-label={`${agentApplications.filter((application) => application.status === 'NEW').length} new agent applications`}>{agentApplications.filter((application) => application.status === 'NEW').length}</span> : null}
+          </NavLink>
           <NavLink to="/employees">Employees</NavLink>
         </nav>
       </aside>
@@ -3967,6 +4138,8 @@ export default function App() {
                   ? '#22d3ee'
                 : path.startsWith('/sub-agents') || path.startsWith('/employees')
                   ? '#f97316'
+                : path.startsWith('/agent-applications')
+                  ? '#ec4899'
                   : '#00c6fb';
           const sectionLabel = path.startsWith('/disputes')
             ? 'Disputes operations'
@@ -3982,6 +4155,8 @@ export default function App() {
                   ? 'Employee tools'
                 : path.startsWith('/sub-agents')
                   ? 'Sub agents'
+                : path.startsWith('/agent-applications')
+                  ? 'Agent applications'
                   : 'Operations dashboard';
           return (
             <header className="topbar topbar--themed" style={{ ['--section-accent' as string]: accent } as React.CSSProperties}>
@@ -3997,7 +4172,7 @@ export default function App() {
 
         <select
           className="mobile-nav-select"
-          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/print') ? '/print' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : location.pathname.startsWith('/sub-agents') ? '/sub-agents' : location.pathname.startsWith('/employees') ? '/employees' : '/'}
+          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/print') ? '/print' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : location.pathname.startsWith('/sub-agents') ? '/sub-agents' : location.pathname.startsWith('/agent-applications') ? '/agent-applications' : location.pathname.startsWith('/employees') ? '/employees' : '/'}
           onChange={(e) => {
             const value = e.target.value;
             navigate(value);
@@ -4011,6 +4186,7 @@ export default function App() {
           <option value="/print">Print Center</option>
           <option value="/tasks">Tasks</option>
           <option value="/sub-agents">Sub Agents</option>
+          <option value="/agent-applications">Agent Applications</option>
           <option value="/employees">Employees</option>
         </select>
 
@@ -4024,6 +4200,7 @@ export default function App() {
           <Route path="/print" element={<PrintCenterRoute token={token} clients={clients} disputes={disputes} />} />
           <Route path="/tasks" element={<TasksRoute />} />
           <Route path="/sub-agents" element={<SubAgentsRoute token={token} subAgents={subAgents} leads={leads} clients={clients} onRefresh={refreshSubAgents} />} />
+          <Route path="/agent-applications" element={<AgentApplicationsRoute token={token} applications={agentApplications} onRefresh={refreshAgentApplications} />} />
           <Route path="/employees" element={<Employees users={staffUsers} currentUser={user} />} />
         </Routes>
         <SiteFooter />
