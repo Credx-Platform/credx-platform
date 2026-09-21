@@ -15,6 +15,9 @@ const EMAIL_TEXT = '#f8fafc';
 const EMAIL_TEXT_SOFT = '#e2e8f0';
 const EMAIL_TEXT_MUTED = '#cbd5e1';
 const EMAIL_TEXT_DIM = '#94a3b8';
+import { createUnsubscribeToken } from './unsubscribeToken.js';
+import { isSuppressed, type EmailCategory } from './emailSuppression.js';
+
 const EMAIL_CYAN = '#00c6fb';
 const EMAIL_SUCCESS = '#22c55e';
 const EMAIL_FONT = "'IBM Plex Sans',Helvetica,Arial,sans-serif";
@@ -30,14 +33,54 @@ function unsubscribeMailto(): string {
   return `mailto:${UNSUBSCRIBE_EMAIL}?subject=unsubscribe`;
 }
 
+/* Templates are rendered once but sent to one address, so the footer carries a
+   placeholder that sendEmail swaps for that recipient's signed link. */
+export const UNSUBSCRIBE_URL_PLACEHOLDER = '{{CREDX_UNSUBSCRIBE_URL}}';
+
+function trimSlash(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+
+/** Confirmation page the footer button points at. Human-facing, needs a click. */
+export function buildUnsubscribeUrl(email: string): string | null {
+  const base = trimSlash((process.env.APP_URL || '').trim());
+  if (!base) return null;
+  try {
+    return `${base}/unsubscribe?token=${encodeURIComponent(createUnsubscribeToken(email))}`;
+  } catch {
+    return null;
+  }
+}
+
+/** RFC 8058 endpoint mail providers POST to. No confirmation step by design. */
+export function buildOneClickUrl(email: string): string | null {
+  const base = trimSlash((process.env.API_URL || '').trim());
+  if (!base || !base.startsWith('https://')) return null;
+  try {
+    return `${base}/api/unsubscribe/one-click?token=${encodeURIComponent(createUnsubscribeToken(email))}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Swaps the template placeholder for this recipient's signed opt-out link. */
+export function injectUnsubscribeUrl(body: string | undefined, email: string): string | undefined {
+  if (!body || !body.includes(UNSUBSCRIBE_URL_PLACEHOLDER)) return body;
+  // With no APP_URL configured the mailto still gives a working opt-out, which
+  // CAN-SPAM requires -- a dead placeholder in a live send would not.
+  const target = buildUnsubscribeUrl(email) || unsubscribeMailto();
+  return body.split(UNSUBSCRIBE_URL_PLACEHOLDER).join(target);
+}
+
 /** RFC 2369 / RFC 8058 unsubscribe headers for transactional/commercial mail. */
-function listUnsubscribeHeaders(): Record<string, string> {
+function listUnsubscribeHeaders(oneClickUrl?: string | null): Record<string, string> {
   const targets: string[] = [];
-  if (UNSUBSCRIBE_URL) targets.push(`<${UNSUBSCRIBE_URL}>`);
+  const httpTarget = oneClickUrl || UNSUBSCRIBE_URL;
+  if (httpTarget) targets.push(`<${httpTarget}>`);
   targets.push(`<${unsubscribeMailto()}>`);
   const headers: Record<string, string> = { 'List-Unsubscribe': targets.join(', ') };
   // One-Click POST is only valid with an HTTPS endpoint.
-  if (UNSUBSCRIBE_URL) headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+  if (httpTarget) headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
   return headers;
 }
 
@@ -97,7 +140,12 @@ function renderEmailShell(opts: {
           </div>
           <div style="margin-top:10px;color:${EMAIL_TEXT_DIM};font-size:11px;">
             You're receiving this because you started with CredX. If this wasn't you, ignore this email — no account changes are made until you act.
-            To stop receiving these emails, <a href="${unsubscribeMailto()}" style="color:${accent};text-decoration:underline;">unsubscribe here</a>.
+          </div>
+          <div style="margin-top:14px;text-align:center;">
+            <a href="${UNSUBSCRIBE_URL_PLACEHOLDER}" style="display:inline-block;padding:10px 22px;border:1px solid ${EMAIL_BORDER};border-radius:8px;color:${EMAIL_TEXT_DIM};text-decoration:none;font-family:${EMAIL_FONT};font-size:12px;font-weight:600;">Unsubscribe</a>
+            <div style="margin-top:8px;color:${EMAIL_TEXT_DIM};font-size:11px;">
+              Prefer email? <a href="${unsubscribeMailto()}" style="color:${accent};text-decoration:underline;">Send an unsubscribe request</a>.
+            </div>
           </div>
         </td></tr>
       </table>
@@ -313,7 +361,8 @@ export async function sendMasterclassDayEmail(params: { to: string; firstName: s
     throw new Error(`No masterclass content defined for day ${params.day}`);
   }
   const email = renderMasterclassDayEmail({ firstName: params.firstName, portalLink: params.portalLink, day: dayContent });
-  const result = await sendEmail({ to: params.to, subject: email.subject, html: email.html, text: email.text });
+  // Recurring bulk content: the opt-out applies.
+  const result = await sendEmail({ to: params.to, subject: email.subject, html: email.html, text: email.text, category: 'marketing' });
   console.log('MASTERCLASS_DAY_EMAIL_SEND_RESULT', { to: params.to, day: params.day, result });
   return { ...email, delivery: result };
 }
@@ -455,7 +504,32 @@ export interface EmailAttachment {
   contentType?: string;
 }
 
-export async function sendEmail(params: { to: string; subject: string; html?: string; text?: string; attachments?: EmailAttachment[] }): Promise<{ id?: string; provider?: string; skipped?: boolean; reason?: string }> {
+export async function sendEmail(params: {
+  to: string;
+  subject: string;
+  html?: string;
+  text?: string;
+  attachments?: EmailAttachment[];
+  /* Marketing mail honours the opt-out list; transactional mail must still be
+     delivered to someone who unsubscribed (password setup, receipts, legal
+     notices). Defaults to transactional so an unmarked caller can never be
+     silently dropped -- marketing senders opt in explicitly. */
+  category?: EmailCategory;
+}): Promise<{ id?: string; provider?: string; skipped?: boolean; reason?: string }> {
+  const category: EmailCategory = params.category || 'transactional';
+
+  if (category === 'marketing' && (await isSuppressed(params.to))) {
+    return { skipped: true, reason: 'recipient_unsubscribed' };
+  }
+
+  /* Bind the footer button and the List-Unsubscribe header to this recipient. */
+  const oneClickUrl = buildOneClickUrl(params.to);
+  params = {
+    ...params,
+    html: injectUnsubscribeUrl(params.html, params.to),
+    text: injectUnsubscribeUrl(params.text, params.to)
+  };
+
   const resendApiKey = process.env.RESEND_API_KEY;
   const businessEmail = process.env.BUSINESS_EMAIL || 'contact@credxme.com';
   const defaultFrom = `CredX <${businessEmail}>`;
@@ -505,7 +579,7 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
           from: from.name ? `${from.name} <${from.email}>` : from.email,
           to: [params.to],
           subject: params.subject,
-          headers: listUnsubscribeHeaders(),
+          headers: listUnsubscribeHeaders(oneClickUrl),
           ...(params.html ? { html: params.html } : {}),
           ...(params.text ? { text: params.text } : { text: '' }),
           ...(params.attachments?.length
@@ -549,7 +623,7 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
             from: { email: from.email, name: from.name },
             reply_to: { email: process.env.SMTP_REPLY_TO || businessEmail, name: 'CredX' },
             subject: params.subject,
-            headers: listUnsubscribeHeaders(),
+            headers: listUnsubscribeHeaders(oneClickUrl),
             content: [
               ...(params.text ? [{ type: 'text/plain', value: params.text }] : []),
               ...(params.html ? [{ type: 'text/html', value: params.html }] : [])
@@ -602,7 +676,7 @@ export async function sendEmail(params: { to: string; subject: string; html?: st
         from: from.name ? `${from.name} <${from.email}>` : from.email,
         to: params.to,
         subject: params.subject,
-        headers: listUnsubscribeHeaders(),
+        headers: listUnsubscribeHeaders(oneClickUrl),
         replyTo: process.env.SMTP_REPLY_TO || businessEmail,
         ...(params.html ? { html: params.html } : {}),
         ...(params.text ? { text: params.text } : { text: '' }),

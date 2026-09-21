@@ -1227,3 +1227,17 @@ model AccountDeletionRequest {
 
   @@index([clientId, requestedAt])
 }
+
+/// One row per address that has opted out of non-transactional email.
+/// Keyed by lowercased address, not by user id: leads unsubscribe before they
+/// ever have an account, and an opt-out must outlive account deletion.
+model EmailSuppression {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  reason       String    @default("USER_REQUEST")
+  source       String    @default("link")
+  createdAt    DateTime  @default(now())
+  resubscribedAt DateTime?
+
+  @@index([createdAt])
+}

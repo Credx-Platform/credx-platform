@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { suppressEmail } from '../lib/emailSuppression.js';
 
 export const emailEventsRouter = Router();
 
@@ -14,6 +15,9 @@ const sendgridEventSchema = z.object({
   url: z.string().optional(),
   category: z.union([z.string(), z.array(z.string())]).optional()
 }).passthrough();
+
+/** Events that mean "stop sending to this address". */
+const OPT_OUT_EVENTS = new Set(['unsubscribe', 'group_unsubscribe', 'spamreport']);
 
 const trackedEvents = new Set([
   'processed',
@@ -90,6 +94,22 @@ emailEventsRouter.post('/sendgrid', async (req, res, next) => {
       if (!email || !trackedEvents.has(eventName)) {
         skipped += 1;
         continue;
+      }
+
+      /* Opt-outs recorded at the provider have to reach our own suppression
+         list, and they must be honoured even for an address with no client
+         record -- most unsubscribes come from leads, not customers. This runs
+         before the client lookup for exactly that reason. */
+      if (OPT_OUT_EVENTS.has(eventName)) {
+        try {
+          await suppressEmail({
+            email,
+            reason: eventName === 'spamreport' ? 'SPAM_COMPLAINT' : 'USER_REQUEST',
+            source: 'sendgrid'
+          });
+        } catch (error) {
+          console.warn('SENDGRID_SUPPRESSION_FAILED', error instanceof Error ? error.message : String(error));
+        }
       }
 
       const client = await prisma.client.findFirst({
