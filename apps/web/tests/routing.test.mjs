@@ -48,7 +48,7 @@ after(() => child?.kill());
 const skip = () => (hasBuild ? false : 'requires apps/web/dist (run npm run build:web)');
 
 test('published pages resolve and are distinct documents', { skip: skip() }, async () => {
-  const paths = ['/', '/product', '/team', '/financial-readiness', '/pricing', '/terms', '/privacy'];
+  const paths = ['/', '/product', '/team', '/financial-readiness', '/pricing', '/terms', '/privacy', '/agent'];
   const bodies = new Map();
 
   for (const path of paths) {
@@ -96,4 +96,12 @@ test('every response carries the Content-Security-Policy', { skip: skip() }, asy
   assert.match(csp, /https:\/\/www\.paypal\.com/);
   assert.match(csp, /https:\/\/challenges\.cloudflare\.com/);
   assert.match(csp, /https:\/\/fonts\.googleapis\.com/);
+});
+
+test('agent enrollment aliases redirect to /agent', { skip: skip() }, async () => {
+  for (const path of ['/agents', '/agent-enroll']) {
+    const res = await fetch(`${base}${path}`, { redirect: 'manual' });
+    assert.equal(res.status, 308, `${path} should 308`);
+    assert.equal(res.headers.get('location'), '/agent');
+  }
 });

@@ -341,6 +341,17 @@ class ApiError extends Error {
   }
 }
 
+// Non-JSON bodies (e.g. an HTML 404 page or proxy error) become a friendly
+// ApiError instead of surfacing a raw "Unrecognized token" parse error.
+function parseApiBody(text: string, status: number): any {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiError(`Server error (${status}). Please try again or contact support.`, status, null);
+  }
+}
+
 async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has('content-type') && init?.body) headers.set('content-type', 'application/json');
@@ -348,7 +359,7 @@ async function apiFetch<T>(path: string, token?: string, init?: RequestInit): Pr
 
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
+  const body = parseApiBody(text, response.status);
   if (!response.ok) throw new ApiError(body?.error ?? `Request failed: ${response.status}`, response.status, body);
   return body as T;
 }
@@ -360,7 +371,7 @@ async function apiUpload<T>(path: string, token: string, formData: FormData): Pr
     body: formData
   });
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
+  const body = parseApiBody(text, response.status);
   if (!response.ok) throw new Error(body?.error ?? `Request failed: ${response.status}`);
   return body as T;
 }

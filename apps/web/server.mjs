@@ -102,6 +102,7 @@ const staticPageRoutes = new Map([
   ['/masterclass-terms', 'masterclass-terms.html'],
   ['/masterclass-checkout', 'masterclass-checkout.html'],
   ['/pricing', 'pricing.html'],
+  ['/agent', 'agent.html'],
   ['/privacy', 'privacy.html'],
   ['/terms', 'terms.html'],
   ['/croa-disclosure', 'croa-disclosure.html'],
@@ -111,6 +112,8 @@ const staticPageRoutes = new Map([
 
 const routeRedirects = new Map([
   ['/affiliate', '/affiliate-onboarding'],
+  ['/agents', '/agent'],
+  ['/agent-enroll', '/agent'],
   ['/employee', '/adminportal'],
   ['/staff', '/adminportal']
 ]);
