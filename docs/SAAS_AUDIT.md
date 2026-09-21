@@ -10,7 +10,35 @@
 > (Analytics 4→6, Security 7→8, Reliability 7→8). Evidence in
 > [VERIFICATION_2026-09-08.md](VERIFICATION_2026-09-08.md).
 >
-> **This remains a repository score, not a production rating.** Production still
+> **Production re-verified 2026-09-21 (supersedes the paragraph below):** the
+> production-vs-repository gap described in the 2026-09-08 note is **closed**.
+> Railway `@credx/web` now builds `Credx-Platform/credx-platform` @ `main`
+> (`c965658`, PR #13), last deployed 2026-09-21T00:23Z. Live checks against
+> `https://www.credxme.com` and `https://credxapi-production.up.railway.app`:
+>
+> | 2026-09-08 claim | 2026-09-21 observed | Status |
+> | --- | --- | --- |
+> | Prod serves the 2026-08-23 build `04d4d8a` | Serves `main` @ `c965658` | Fixed |
+> | `/product` returns the homepage | 200, 10,033 B distinct page | Fixed |
+> | `/team` returns the homepage | 200, 627 B app shell | Fixed |
+> | `/financial-readiness` returns the homepage | 200, 637 B app shell | Fixed |
+> | `/health/db` 404s | 200 `{"status":"ok","dependency":"database"}` | Fixed |
+> | `/health/queue` 404s | 200, in-process runner live, 0 dead-letter | Fixed |
+> | unknown paths return 200 + index.html | `/zzz-no-such-page` → 404 | Holds |
+> | CSP present on both surfaces | API `default-src 'none'`; web origin-scoped | Holds |
+>
+> Also verified 2026-09-21: `/agent` (agent enrollment) is live at 14,290 B;
+> `/signup`, `/pricing`, `/masterclass`, `/portal`, `/adminportal` all resolve to
+> distinct documents. `npm test` runs **140 tests: 77 pass, 0 fail, 63 skipped** —
+> every skip is an integration test short-circuited by an unset `TEST_DATABASE_URL`.
+> The scores below therefore still describe code, but the code they describe is now
+> the code in production. Two caveats remain unverified from here: prod Prisma
+> migration state, and provider env vars (`POSTHOG_API_KEY`, `SENTRY_DSN`,
+> `ANALYTICS_ENABLED`) — reading Railway production variables was not permitted in
+> this session, so Analytics (6) and Observability (7) keep their unproven-delivery
+> caveat.
+>
+> **Superseded 2026-09-08 note, kept for history:** Production still
 > serves the 2026-08-23 build (commit `04d4d8a`, i.e. pre-transformation): the
 > `saas-transformation` branch is 31 commits ahead of `origin/main` and has never
 > been deployed. Live `/product`, `/team` and `/financial-readiness` still return
