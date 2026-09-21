@@ -108,7 +108,7 @@ export const MASTERCLASS_DAYS: LessonDay[] = [
     day: 2,
     slug: 'day-2-disputes-decoded',
     title: 'The Dispute Process Decoded',
-    eyebrow: 'Day 2 · Disputes & Removals',
+    eyebrow: 'Day 2 · Report Accuracy & Consumer Rights',
     tagline: 'Use your legal rights to fix mistakes',
     accent: '#a855f7',
     summary:

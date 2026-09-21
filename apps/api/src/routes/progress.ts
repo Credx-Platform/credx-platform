@@ -360,6 +360,25 @@ progressRouter.post('/me', requireAuth, async (req: AuthedRequest, res, next) =>
       data: { completedDays, passedQuizzes, scores, disputes, workflow, education }
     });
 
+    // Relational mirrors are the durable source of truth for new clients. Keep
+    // the legacy JSON update above so existing portal builds remain compatible.
+    if (data.completedDay) {
+      await prisma.lessonCompletion.upsert({
+        where: { clientId_lessonKey: { clientId: client.id, lessonKey: data.completedDay } },
+        create: { clientId: client.id, lessonKey: data.completedDay, metadata: { source: 'progress-api' } },
+        update: { completedAt: new Date() }
+      });
+    }
+    if (data.workflow) {
+      const stage = typeof (data.workflow as any).stage === 'string' ? String((data.workflow as any).stage) : 'SIGNUP_RECEIVED';
+      const state = { ...data.workflow };
+      await prisma.workflowState.upsert({
+        where: { clientId: client.id },
+        create: { clientId: client.id, stage, state: state as any },
+        update: { stage, state: state as any, version: { increment: 1 } }
+      });
+    }
+
     // Milestone: a masterclass day was just completed.
     if (data.completedDay && !((client.progress as any).completedDays || []).includes(data.completedDay)) {
       const dayNum = String(data.completedDay).replace(/\D/g, '') || completedDays.length;

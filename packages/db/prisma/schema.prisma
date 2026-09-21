@@ -254,6 +254,15 @@ model Client {
   platformReports         PlatformReport[]
   aiUsage                 AiUsageEvent[]
   progress                ClientProgress?
+  onboardingState         OnboardingState?
+  lessonCompletions       LessonCompletion[]
+  quizResults             QuizResult[]
+  actionPlanItems         ActionPlanItem[]
+  milestones              Milestone[]
+  workflowState           WorkflowState?
+  cesarConversations      CesarConversation[]
+  exportRequests          DataExportRequest[]
+  deletionRequests        AccountDeletionRequest[]
   organizationId          String?
   organization            Organization?            @relation("OrganizationClients", fields: [organizationId], references: [id], onDelete: SetNull)
   orgMembership           OrganizationMember?
@@ -1079,4 +1088,142 @@ model AiUsageEvent {
   @@index([task, createdAt])
   @@index([clientId, createdAt])
   @@index([userId, createdAt])
+}
+
+// Durable product state. These records are the source of truth for the SaaS
+// experience; ClientProgress JSON remains a backwards-compatible read model.
+model OnboardingState {
+  id              String   @id @default(uuid())
+  clientId        String   @unique
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  goals           Json     @default("[]")
+  status          String   @default("PENDING")
+  currentStep     String   @default("goals")
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model LessonCompletion {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lessonKey   String
+  completedAt DateTime @default(now())
+  metadata    Json     @default("{}")
+
+  @@unique([clientId, lessonKey])
+  @@index([clientId, completedAt])
+}
+
+model QuizResult {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lessonKey   String
+  attempt     Int
+  score       Int
+  passed      Boolean
+  answers     Json     @default("{}")
+  submittedAt DateTime @default(now())
+
+  @@unique([clientId, lessonKey, attempt])
+  @@index([clientId, submittedAt])
+}
+
+model ActionPlanItem {
+  id          String    @id @default(uuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  key         String
+  title       String
+  description String?
+  category    String    @default("GENERAL")
+  priority    String    @default("MEDIUM")
+  status      String    @default("OPEN")
+  dueAt       DateTime?
+  completedAt DateTime?
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([clientId, key])
+  @@index([clientId, status])
+}
+
+model Milestone {
+  id          String    @id @default(uuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  key         String
+  title       String
+  description String?
+  achievedAt  DateTime?
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([clientId, key])
+  @@index([clientId, achievedAt])
+}
+
+model WorkflowState {
+  id        String   @id @default(uuid())
+  clientId  String   @unique
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  stage     String   @default("SIGNUP_RECEIVED")
+  state     Json     @default("{}")
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CesarConversation {
+  id        String         @id @default(uuid())
+  clientId  String
+  client    Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title     String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  messages  CesarMessage[]
+
+  @@index([clientId, updatedAt])
+}
+
+model CesarMessage {
+  id             String            @id @default(uuid())
+  conversationId String
+  conversation   CesarConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String            @db.Text
+  metadata       Json              @default("{}")
+  createdAt      DateTime          @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model DataExportRequest {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  status      String   @default("REQUESTED")
+  requestedAt DateTime @default(now())
+  completedAt DateTime?
+  downloadKey String?
+  notes       String?
+
+  @@index([clientId, requestedAt])
+}
+
+model AccountDeletionRequest {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  status      String   @default("REQUESTED")
+  reason      String?
+  requestedAt DateTime @default(now())
+  reviewedAt  DateTime?
+  reviewedBy  String?
+
+  @@index([clientId, requestedAt])
 }

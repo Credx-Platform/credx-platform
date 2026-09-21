@@ -4,7 +4,7 @@ Hi {{first_name}},
 
 Welcome to CredX.
 
-We’re excited to support you on your credit education and financial rebuilding journey. Your inquiry has been received, and the next step is to complete your CredX service agreement so we can begin your onboarding process properly.
+We’re excited to help you organize your credit information, learn how it works, and prepare for your financial goals. Your inquiry has been received, and the next step is to complete your CredX service agreement so we can begin your onboarding process properly.
 
 Next Steps:
 1. Review and sign your CredX contract.
