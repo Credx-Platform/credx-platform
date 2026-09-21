@@ -318,3 +318,79 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 .about-social-placeholder{position:relative;display:grid;grid-template-columns:28px auto;column-gap:8px;align-items:center;width:auto;min-width:120px;height:52px;padding:6px 13px;border:1px dashed rgba(82,196,250,.34);border-radius:14px;background:rgba(9,22,37,.66);color:#d4f1ff}.about-social-placeholder b{grid-row:span 2;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:rgba(0,198,251,.12);color:#73ddfb;font-size:13px}.about-social-placeholder>span{position:static;width:auto;height:auto;overflow:visible;clip-path:none;white-space:nowrap;font-size:11px;font-weight:700}.about-social-placeholder em{grid-column:2;color:#89a4b6;font-size:9px;font-style:normal;line-height:1}.about-social-placeholder:hover{border-style:solid;border-color:#92e8ff}
 @media(max-width:767px){.about-social-placeholder{min-width:112px}.agent-campaign{padding-bottom:30px}}
 @media(max-width:767px){.agent-campaign-socials{justify-content:center}.agent-social-placeholder{min-width:130px}}
+
+/* Light editorial chapters: keep the information surfaces bright and make
+   every label readable without losing the CredX cyan accents. */
+.hero-bridge,
+#funding,
+#get-started,
+#about-runway,
+#about {
+  background:#fff !important;
+  background-image:none !important;
+  color:#183247;
+}
+.hero-bridge{border-top:1px solid #e6eef3}
+.hero-bridge .hero-note,
+#funding .ssub,
+#funding .fr-disc,
+#get-started .ssub,
+#get-started .fcta-note,
+#about p{color:#405b70 !important}
+.hero-bridge .hs-label{color:#587085}
+.hero-bridge .hs-num{color:#00a8d8}
+#funding .stag,#get-started .stag,#about .about-tag{color:#0088b0}
+#funding .stitle,#get-started .stitle,#about h2{color:#142d43}
+.hero-bridge .rc-card{
+  background:linear-gradient(145deg,#ffffff,#f0f7fa)!important;
+  border:1px solid #cddfe8;
+  box-shadow:0 24px 50px -24px rgba(31,75,106,.38),inset 0 1px 0 #fff;
+}
+.hero-bridge .rc-brand{color:#0088b0}.hero-bridge .rc-live{color:#587085}
+.hero-bridge .rc-num,.hero-bridge .rc-fv{color:#142d43;text-shadow:none}
+.hero-bridge .rc-den,.hero-bridge .rc-label,.hero-bridge .rc-fk{color:#587085}
+.hero-bridge .rc-meter{background:#dbe8ee}.hero-bridge .rc-foot{border-top-color:#d6e4eb}
+#funding .fr-item{background:#f7fafc;border-color:#d3e1e8;box-shadow:0 12px 28px -22px rgba(25,64,89,.5)}
+#funding .fr-l{color:#1d3a50}
+#funding .fr-bar{background:#dbe7ed}
+#funding .fr-disc{background:#f2f8fb;border-color:#d3e1e8}
+#funding .fr-disc strong{color:#1b3b50!important}
+#get-started .btn-outline{color:#18364d;border-color:#abc2cf}
+#get-started .btn-outline:hover{color:#006f93;border-color:#00a8d8;background:#eefaff}
+
+/* The profiles are one continuous, airy composition. Explicit grid placement
+   prevents the campaign image from drifting below its biography on mobile. */
+.agent-campaign,#ownerAbout{
+  grid-template-columns:minmax(190px,280px) minmax(0,1fr)!important;
+  column-gap:clamp(48px,7vw,96px)!important;
+  row-gap:clamp(56px,8vw,96px)!important;
+  align-items:center;
+}
+.agent-campaign + #ownerAbout{margin-top:clamp(72px,10vw,140px)}
+.agent-campaign > .about-photo,#ownerAbout > .about-photo{grid-column:1;grid-row:1;justify-self:start}
+.agent-campaign > div,#ownerAbout > div{grid-column:2;grid-row:1;min-width:0}
+.about-photo,
+#about .about-photo{
+  width:min(280px,100%);height:auto;aspect-ratio:3/4;object-fit:cover;object-position:center top;
+  margin:0;border:0!important;outline:0!important;box-shadow:none!important;background:transparent;
+  border-radius:0;
+  -webkit-mask-image:radial-gradient(ellipse 72% 76% at 50% 48%,#000 42%,rgba(0,0,0,.97) 59%,rgba(0,0,0,.52) 78%,transparent 100%);
+  mask-image:radial-gradient(ellipse 72% 76% at 50% 48%,#000 42%,rgba(0,0,0,.97) 59%,rgba(0,0,0,.52) 78%,transparent 100%);
+  clip-path:ellipse(47% 49% at 50% 48%);
+}
+#about .about-role{color:#587085}
+#about .about-name{color:#142d43}
+#about .agent-social-placeholder{background:#f5f9fb;border-color:#bfd4df;color:#27465b}
+#about .agent-social-placeholder b{background:#e5f7fc;color:#0089b2}
+#about .agent-social-placeholder em{color:#648094}
+#about .about-socials{margin-top:clamp(52px,7vw,88px)}
+#about .about-socials a,#about .about-social-placeholder{background:#f5f9fb;color:#1e4057;border-color:#bfd4df;box-shadow:0 8px 18px -12px rgba(23,65,89,.38)}
+#about .about-social-placeholder em{color:#648094}
+
+@media(max-width:767px){
+  .agent-campaign,#ownerAbout{grid-template-columns:minmax(0,1fr)!important;justify-items:center;text-align:center;gap:34px!important}
+  .agent-campaign > .about-photo,#ownerAbout > .about-photo{grid-column:1;grid-row:auto;justify-self:center;width:min(230px,72vw)}
+  .agent-campaign > div,#ownerAbout > div{grid-column:1;grid-row:auto;width:100%}
+  .agent-campaign + #ownerAbout{margin-top:76px}
+  #about .about-socials{margin-top:44px}
+}
