@@ -47,8 +47,18 @@ after(() => child?.kill());
 
 const skip = () => (hasBuild ? false : 'requires apps/web/dist (run npm run build:web)');
 
+test('the unsubscribe page is publicly reachable and excluded from search', { skip: skip() }, async () => {
+  // CAN-SPAM requires the opt-out to work for anyone holding the link, so this
+  // page must never sit behind auth -- and it must not be indexed.
+  const res = await fetch(`${base}/unsubscribe`);
+  assert.equal(res.status, 200, '/unsubscribe must be publicly reachable');
+  const body = await res.text();
+  assert.match(body, /noindex/, 'the opt-out page must not be indexed');
+  assert.match(body, /\/api\/unsubscribe/, 'the page must call the opt-out API');
+});
+
 test('published pages resolve and are distinct documents', { skip: skip() }, async () => {
-  const paths = ['/', '/product', '/team', '/financial-readiness', '/pricing', '/terms', '/privacy', '/agent'];
+  const paths = ['/', '/product', '/team', '/financial-readiness', '/pricing', '/terms', '/privacy', '/agent', '/unsubscribe'];
   const bodies = new Map();
 
   for (const path of paths) {

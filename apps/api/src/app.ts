@@ -34,6 +34,7 @@ import { checkinRouter } from './routes/checkin.js';
 import { platformReportsRouter } from './routes/platformReports.js';
 import { aiRouter } from './routes/ai.js';
 import { saasRouter } from './routes/saas.js';
+import { unsubscribeRouter } from './routes/unsubscribe.js';
 
 export interface CreateAppOptions {
   /** Disable rate limiters (tests / load harness). */
@@ -146,6 +147,9 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.post('/api/v1/agent-applications', leadLimiter);
   app.use('/api/cesar', cesarLimiter);
   app.use('/api/v1/cesar', cesarLimiter);
+  // Unauthenticated and token-guarded, but still public surface.
+  app.use('/api/unsubscribe', leadLimiter);
+  app.use('/api/v1/unsubscribe', leadLimiter);
 
   function mountAll(prefix: string) {
     app.use(`${prefix}/auth`, authRouter);
@@ -166,6 +170,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     app.use(`${prefix}/cesar`, cesarRouter);
     app.use(`${prefix}/sub-agents`, subAgentsRouter);
     app.use(`${prefix}/email-events`, emailEventsRouter);
+    app.use(`${prefix}/unsubscribe`, unsubscribeRouter);
     app.use(`${prefix}/credit-score`, creditScoreRouter);
     app.use(`${prefix}/org`, orgRouter);
     app.use(`${prefix}/funding-readiness`, fundingReadinessRouter);

@@ -107,7 +107,8 @@ const staticPageRoutes = new Map([
   ['/terms', 'terms.html'],
   ['/croa-disclosure', 'croa-disclosure.html'],
   ['/refund-policy', 'refund-policy.html'],
-  ['/cancellation-policy', 'cancellation-policy.html']
+  ['/cancellation-policy', 'cancellation-policy.html'],
+  ['/unsubscribe', 'unsubscribe.html']
 ]);
 
 const routeRedirects = new Map([
@@ -129,7 +130,8 @@ const prefixPageRoutes = [
   ['/adminportal/', 'adminportal.html'],
   ['/team/', 'team.html'],
   ['/financial-readiness/', 'readiness.html'],
-  ['/masterclass-checkout/', 'masterclass-checkout.html']
+  ['/masterclass-checkout/', 'masterclass-checkout.html'],
+  ['/unsubscribe/', 'unsubscribe.html']
 ];
 
 // Client-side routes owned by the admin SPA (src/App.tsx, mounted from

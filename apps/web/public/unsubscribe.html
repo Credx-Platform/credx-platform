@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Email Preferences — CredX</title>
+<meta name="description" content="Unsubscribe from CredX emails.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<style>
+:root{--bg:#060a12;--bg2:#0b1220;--text:#e2e8f0;--muted:#94a3b8;--cyan:#00c6fb;--green:#22c55e;--border:rgba(255,255,255,.08)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;padding:60px 24px;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{max-width:520px;width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:36px 32px;text-align:center}
+.brand{font-size:26px;font-weight:700;color:#fff;letter-spacing:.04em}
+.eyebrow{margin-top:6px;color:var(--cyan);font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase}
+h1{font-size:22px;color:#fff;margin:22px 0 10px}
+p{color:var(--muted);font-size:14px;margin-bottom:14px}
+.addr{color:var(--text);font-weight:600}
+.btn{display:inline-block;border:0;cursor:pointer;background:var(--cyan);color:#0d1420;padding:14px 30px;border-radius:12px;font-weight:700;font-size:15px;font-family:inherit;margin-top:10px}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn-quiet{background:transparent;color:var(--muted);border:1px solid var(--border);font-weight:600;font-size:13px;padding:10px 22px}
+.ok{color:var(--green);font-weight:600}
+.err{color:#f87171;font-weight:600}
+.foot{margin-top:26px;padding-top:18px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">CredX</div>
+  <div class="eyebrow">Email Preferences</div>
+
+  <div id="loading"><h1>Checking your link…</h1></div>
+
+  <div id="confirm" class="hidden">
+    <h1>Unsubscribe from CredX emails?</h1>
+    <p>This stops marketing and course emails to <span class="addr" id="addr"></span>.</p>
+    <p>You'll still get essential messages about your account — password resets, receipts and legal notices.</p>
+    <button class="btn" id="go" type="button">Unsubscribe me</button>
+  </div>
+
+  <div id="done" class="hidden">
+    <h1 class="ok">You're unsubscribed</h1>
+    <p>We've stopped marketing emails to <span class="addr" id="addr2"></span>. It can take a few minutes to take effect.</p>
+    <button class="btn btn-quiet" id="undo" type="button">I did that by mistake — resubscribe</button>
+  </div>
+
+  <div id="failed" class="hidden">
+    <h1 class="err">This link didn't work</h1>
+    <p id="failmsg">The link may be incomplete or out of date.</p>
+    <p>Email <a href="mailto:unsubscribe@credxme.com?subject=unsubscribe">unsubscribe@credxme.com</a> and we'll remove you by hand.</p>
+  </div>
+
+  <div class="foot">
+    <a href="/">credxme.com</a> · <a href="/privacy">Privacy</a> · <a href="mailto:contact@credxme.com">contact@credxme.com</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  var token = new URLSearchParams(location.search).get('token') || '';
+  var el = function (id) { return document.getElementById(id); };
+  var show = function (id) {
+    ['loading', 'confirm', 'done', 'failed'].forEach(function (k) { el(k).classList.add('hidden'); });
+    el(id).classList.remove('hidden');
+  };
+  var fail = function (msg) {
+    if (msg) el('failmsg').textContent = msg;
+    show('failed');
+  };
+
+  if (!token) return fail('This link is missing its unsubscribe code.');
+
+  // Read-only status check. The opt-out itself only happens on POST, so that
+  // mail scanners prefetching this page cannot unsubscribe anyone.
+  fetch('/api/unsubscribe?token=' + encodeURIComponent(token))
+    .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }); })
+    .then(function (res) {
+      if (!res.ok) return fail(res.body && res.body.error);
+      el('addr').textContent = res.body.email;
+      el('addr2').textContent = res.body.email;
+      show(res.body.status === 'unsubscribed' ? 'done' : 'confirm');
+    })
+    .catch(function () { fail('We could not reach the server. Please try again.'); });
+
+  var post = function (path, btn, label, onOk) {
+    btn.disabled = true;
+    btn.textContent = label;
+    fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token })
+    })
+      .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }); })
+      .then(function (res) {
+        if (!res.ok) return fail(res.body && res.body.error);
+        onOk();
+      })
+      .catch(function () { fail('We could not reach the server. Please try again.'); });
+  };
+
+  el('go').addEventListener('click', function () {
+    post('/api/unsubscribe', el('go'), 'Unsubscribing…', function () { show('done'); });
+  });
+
+  el('undo').addEventListener('click', function () {
+    post('/api/unsubscribe/resubscribe', el('undo'), 'Resubscribing…', function () {
+      el('undo').classList.add('hidden');
+      show('confirm');
+    });
+  });
+})();
+</script>
+</body>
+</html>
