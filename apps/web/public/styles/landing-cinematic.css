@@ -113,11 +113,13 @@ section[id]{scroll-margin-top:78px}
 .cinematic-hero .hero-copy{width:100%;max-width:660px;padding:0;z-index:5}
 .cinematic-hero .hero-copy::before{display:none}
 .hero-art{position:relative;inset:auto;width:100%;max-width:620px;height:400px;margin-top:6px;perspective:1000px;perspective-origin:50% 48%}
-.object-merch{width:45%;left:30%;right:auto;top:25%;z-index:5}
-.object-house{width:47%;left:57%;top:0;z-index:2}
-.object-cash{width:39%;left:-2%;top:-2%;z-index:1}
-.object-car{width:48%;right:-1%;bottom:0;z-index:4}
-.object-cards{width:43%;left:0;top:49%;z-index:2;opacity:.75;transform:translate3d(0,0,-12px) scale(.91)}
+/* Compact 1x→3x hero range: each object grows on its own timeline and
+   finishes with enough depth/rotation to create a lightweight 3D illusion. */
+.object-merch{width:30%;left:34%;right:auto;top:28%;z-index:5}
+.object-house{width:31%;left:61%;top:4%;z-index:2}
+.object-cash{width:20%;left:7%;top:4%;z-index:1}
+.object-car{width:32%;right:6%;bottom:4%;z-index:4}
+.object-cards{width:29%;left:5%;top:51%;z-index:2;opacity:.75;transform:translate3d(0,0,-12px) scale(.91)}
 .object-cards img{filter:none;mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
 .orbit-front{display:none}
 @media(min-width:768px){

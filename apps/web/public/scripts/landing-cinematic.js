@@ -29,15 +29,15 @@
  ];
  trails.innerHTML=trailSpecs.map(([plane,left,top,length,angle,duration,delay,alpha],i)=>
   `<span class="data-trail" data-plane="${plane}" style="--left:${left}%;--top:${top}%;--length:${Math.round(length*.4)}px;--angle:${angle}deg;--duration:${duration}s;--delay:${delay}s;--alpha:${alpha};--trail-color:${i===6?'rgba(255,255,255,.8)':'#fff'}"><i></i></span>`).join('');
- // Scene settles rather than zooms: objects open near their final size, so the
- // page reads as ordinary scrolling. End values (to/z1) are unchanged, which
- // keeps the approved final composition and relative sizing exactly as it was.
+ // Compact 1x→3x range: each object starts at a smaller scale and resolves
+ // independently, with staggered timing so the artwork reads as separate
+ // objects popping through the scene instead of one flat still image.
  const depths=[
-  {from:1.02,to:1.10,z0:10,z1:65,rx:3,ry:-8,x:0,y:-14,pointer:8},
-  {from:.99,to:1.06,z0:40,z1:95,rx:-3,ry:9,x:14,y:12,pointer:14},
-  {from:.90,to:.97,z0:-105,z1:-50,rx:5,ry:10,x:-16,y:-16,pointer:3},
-  {from:1.04,to:1.12,z0:30,z1:85,rx:-4,ry:-5,x:0,y:-12,pointer:10},
-  {from:.91,to:.98,z0:-25,z1:30,rx:4,ry:10,x:-12,y:250,pointer:7}
+  {from:.34,to:1.00,z0:10,z1:65,rx:3,ry:-8,x:0,y:-14,pointer:8,delay:.02},
+  {from:.32,to:1.00,z0:40,z1:95,rx:-3,ry:9,x:14,y:12,pointer:14,delay:.14},
+  {from:.30,to:.90,z0:-105,z1:-50,rx:5,ry:10,x:-16,y:-16,pointer:3,delay:.08},
+  {from:.34,to:1.00,z0:30,z1:85,rx:-4,ry:-5,x:0,y:-12,pointer:10,delay:.20},
+  {from:.31,to:.92,z0:-25,z1:30,rx:4,ry:10,x:-12,y:250,pointer:7,delay:.11}
  ];
  function mount(){
   dispose();
@@ -60,7 +60,7 @@
    objects.forEach(o=>{o.style.removeProperty('transform');o.style.removeProperty('opacity');o.querySelector('.object-motion').style.removeProperty('transform')});
    cueRow.style.removeProperty('opacity');copy.style.removeProperty('transform');trails.style.removeProperty('transform');trails.style.removeProperty('opacity');
    titles.forEach(el=>el.style.removeProperty('transform'));
-   sectionData.forEach(s=>{s.el.classList.remove('section-opening');['transform','opacity','filter','clip-path','will-change'].forEach(p=>s.content.style.removeProperty(p))});
+   sectionData.forEach(s=>{s.el.classList.remove('section-opening','section-visible');['transform','opacity','filter','clip-path','will-change'].forEach(p=>s.content.style.removeProperty(p))});
   };
   dispose=()=>{abort.abort();cancelAnimationFrame(raf);observer?.disconnect();resize?.disconnect();reset()};
   if(media.matches){reset();return;}
@@ -89,9 +89,10 @@
      const d=depths[i],travel=.5;
      if(i===4)el.style.opacity=String(.75+approaching*.25);
      // Mobile keeps generous spacing; original aspect ratios remain untouched.
-     const scale=d.from+(d.to-d.from)*approaching;
-     const z=d.z0+(d.z1-d.z0)*approaching;
-     el.style.transform=`translate3d(${d.x*approaching*travel}px,${(i===4?75:d.y)*approaching*travel}px,${z*travel}px) rotateX(${d.rx*(1-approaching)}deg) rotateY(${d.ry*(1-approaching*.65)}deg) scale(${scale})`;
+     const objectProgress=ease(clamp((p-d.delay)/Math.max(.01,1-d.delay)));
+     const scale=d.from+(d.to-d.from)*objectProgress;
+     const z=d.z0+(d.z1-d.z0)*objectProgress;
+     el.style.transform=`translate3d(${d.x*objectProgress*travel}px,${(i===4?75:d.y)*objectProgress*travel}px,${z*travel}px) rotateX(${d.rx*(1-objectProgress)}deg) rotateY(${d.ry*(1-objectProgress*.65)}deg) scale(${scale})`;
      el.querySelector('.object-motion').style.transform=`translate3d(${pointerX*d.pointer}px,${pointerY*d.pointer}px,0)`;
     });
     copy.style.transform=`translate3d(0,${-departing*(mobile?12:28)}px,0)`;
@@ -112,7 +113,7 @@
     const progress=clamp((view*1.02-top)/(Math.min(view*.62,540)));
     const e=glide(progress);
     if(top<0||progress===1){
-     s.done=true;['transform','opacity','filter','clip-path','will-change'].forEach(p=>s.content.style.removeProperty(p));return;
+     s.done=true;s.el.classList.add('section-visible');['transform','opacity','filter','clip-path','will-change'].forEach(p=>s.content.style.removeProperty(p));return;
     }
     s.content.style.willChange='transform, opacity';
     s.content.style.opacity=String(.3+.7*e);
