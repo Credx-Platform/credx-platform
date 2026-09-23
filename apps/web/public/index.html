@@ -105,10 +105,10 @@ h1 .accent{color:var(--cyan);position:relative}
 .hs-num{font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--cyan);letter-spacing:-1px}
 .hs-label{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-top:2px}
 .about{padding:100px clamp(16px,4vw,48px);background:var(--bg2)}
-.about-inner{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:340px 1fr;gap:60px;align-items:center}
-.about-photo{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:16px;border:1px solid var(--border-c);transform:scale(.84);opacity:.82;transition:transform .9s cubic-bezier(.2,.75,.2,1),opacity .7s ease;will-change:transform,opacity}
-.about.section-visible .about-photo{transform:scale(1);opacity:1}
-.about-photo:hover{transform:scale(1.045)!important}
+.about-inner{max-width:1000px;margin:0 auto}
+.agent-campaign,#ownerAbout{display:grid;grid-template-columns:280px 1fr;gap:60px;align-items:center}
+.agent-campaign{padding-bottom:60px;border-bottom:1px solid var(--border-c)}
+.about-photo{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:16px;border:1px solid var(--border-c)}
 .about-tag{font-size:11px;font-weight:600;color:var(--cyan);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:12px}
 .about h2{font-size:32px;font-weight:800;letter-spacing:-.5px;margin-bottom:16px}
 .about p{color:var(--muted);font-size:15px;line-height:1.8;margin-bottom:14px}
@@ -309,8 +309,8 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
  .hs-num{font-size:24px}
  .hero-btns{gap:10px}
  .hero-btns .btn{width:100%;justify-content:center}
- .about-inner{grid-template-columns:1fr;text-align:center;gap:32px}
- .about-photo{max-width:240px;margin:0 auto}
+ .agent-campaign,#ownerAbout{grid-template-columns:1fr;text-align:center;gap:32px}
+ .about-photo{max-width:200px;margin:0 auto}
  .about h2{font-size:26px}
  .stitle{font-size:26px}
  .form-row{grid-template-columns:1fr}
@@ -537,12 +537,12 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
  <div class="hero-atmosphere" aria-hidden="true"><div class="scene-grid"></div><div class="scene-bloom"></div></div>
  <div class="hero-grid">
   <div class="hero-copy hero-inner">
-   <div class="hero-tag">Credit Intelligence &amp; Financial Readiness Platform</div>
-   <h1>Understand your profile. <span class="accent">Prepare for what’s next.</span></h1>
-   <p class="hero-sub">CredX helps you understand your financial profile, organize next steps, track progress, and prepare for better financial decisions—with software at the center and optional professional support when you want a human review.</p>
+   <div class="hero-tag">Credit Intelligence &amp; Financial Readiness Software</div>
+   <h1>Know where you stand. <span class="accent">Know what to do next.</span></h1>
+   <p class="hero-sub">CredX turns your financial profile into a clear readiness score, a personalized action plan, and a step-by-step path toward stronger financial and funding readiness.</p>
    <div class="hero-btns">
-    <a href="/signup" class="btn btn-primary">Start my profile review</a>
-    <a href="#how" class="btn btn-outline">See How CredX Works</a>
+    <a href="/signup" class="btn btn-primary">Get My Readiness Score</a>
+    <a href="#how-it-works" class="btn btn-outline">See How CredX Works</a>
    </div>
    <p class="hero-login-note">Already enrolled? <a href="/portal">Portal login</a></p>
 
@@ -603,8 +603,31 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
    <figure class="yt-card"><button class="yt-frame" type="button" data-yt="KgfgYKByl8s" aria-label="Play: Fix Your Credit Profile Basics: Banks Check Everything!"><img src="https://i.ytimg.com/vi/KgfgYKByl8s/hqdefault.jpg" alt="" width="480" height="360" loading="lazy" decoding="async"><span class="yt-icon" aria-hidden="true"></span></button><figcaption>Fix Your Credit Profile Basics: Banks Check Everything!</figcaption></figure>
   </div>
   <div class="section-cta">
-   <a href="/signup" class="btn btn-primary">Start my free profile review</a>
+   <a href="/signup" class="btn btn-primary">Get my free credit analysis</a>
    <a href="https://www.youtube.com/@credx-coaching" class="btn btn-outline" target="_blank" rel="noopener noreferrer">More on YouTube</a>
+  </div>
+ </div>
+</section>
+
+<section class="agent-cta-section section-fade" id="agent-cta" aria-labelledby="agent-cta-title">
+ <img class="agent-cta-bg" src="/images/agent-team-office.jpg" alt="CredX team collaborating in a bright office" loading="lazy" decoding="async">
+ <div class="container">
+  <div class="agent-cta-card">
+   <div class="agent-cta-copy">
+    <div class="stag">Build with CredX</div>
+    <h2 class="stitle" id="agent-cta-title">Help people take their next clear step.</h2>
+    <p class="ssub">Join a customer-first network of educators, community builders, content creators, and organized support partners who help people discover CredX.</p>
+    <div class="agent-cta-points" aria-label="CredX agent program highlights">
+     <span>Training and platform support</span>
+     <span>Tracked referral tools</span>
+     <span>Clear, responsible communication</span>
+    </div>
+    <div class="section-cta">
+     <a href="/agent" class="btn btn-primary">Explore agent opportunities</a>
+     <a href="/agent" class="btn btn-outline">See how it works</a>
+    </div>
+    <p class="agent-cta-note">Independent agent opportunities are subject to review. No guaranteed income, clients, or credit outcomes.</p>
+   </div>
   </div>
  </div>
 </section>
@@ -669,11 +692,11 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
   <p class="ssub">We review where you are, identify what matters most, and help organize the most practical next steps for your file and your goals.</p>
   <div class="steps">
    <div class="step"><div class="step-num">01</div><div class="step-title">Submit your intake</div><div class="step-desc">Tell us about your current credit situation, goals, and any major obstacles you are dealing with.</div></div>
-   <div class="step"><div class="step-num">02</div><div class="step-title">Get a review</div><div class="step-desc">We organize the information in your file, highlight items to review, and map practical next steps.</div></div>
+   <div class="step"><div class="step-num">02</div><div class="step-title">Get a review</div><div class="step-desc">We assess the file, identify pressure points, and organize dispute or rebuild priorities.</div></div>
    <div class="step"><div class="step-num">03</div><div class="step-title">Follow a plan</div><div class="step-desc">Move through a clearer process with portal visibility, milestone tracking, and strategic support.</div></div>
   </div>
   <div class="section-cta">
-   <a href="/signup" class="btn btn-primary">Start my free profile review</a>
+   <a href="/signup" class="btn btn-primary">Start my free analysis</a>
    <small>No card required to begin.</small>
   </div>
  </div>
@@ -684,19 +707,40 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
   <div class="stag">The platform</div>
   <h2 class="stitle">One workspace for the whole picture.</h2>
   <p class="ssub">CredX is modular. Each part answers a different question about where you stand and what to do next.</p>
-  <div class="md-grid">
-   <div class="md-card"><div class="md-i">&#9678;</div><div class="md-t">Readiness Dashboard</div><div class="md-d">Your score, your factors and your next actions on one screen.</div></div>
-   <div class="md-card"><div class="md-i">&#9650;</div><div class="md-t">Readiness Score</div><div class="md-d">Six weighted factors scored out of 100, saved as snapshots over time.</div></div>
-   <div class="md-card"><div class="md-i">&#9776;</div><div class="md-t">Action Plan</div><div class="md-d">A ranked next-best-action list tied to the factor each one affects.</div></div>
-   <div class="md-card"><div class="md-i">&#9679;</div><div class="md-t">Cesar AI</div><div class="md-d">An AI guide for next steps, available to visitors and signed-in clients.</div></div>
-   <div class="md-card"><div class="md-i">&#9744;</div><div class="md-t">Funding Readiness</div><div class="md-d">Preparation indicators and document checklists before you apply.</div></div>
-   <div class="md-card"><div class="md-i">&#9636;</div><div class="md-t">Business Credit</div><div class="md-d">A nine-item foundation assessment with vendor and tradeline tracking.</div></div>
-   <div class="md-card"><div class="md-i">&#9998;</div><div class="md-t">Learning Center</div><div class="md-d">Structured education, including the 5-Day Masterclass curriculum.</div></div>
-   <div class="md-card"><div class="md-i">&#9993;</div><div class="md-t">Reports &amp; Notifications</div><div class="md-d">Generated readiness reports, in-app alerts and a weekly check-in loop.</div></div>
+  <div class="profile-carousel" data-carousel aria-label="CredX profile tools">
+   <div class="profile-carousel-viewport">
+    <div class="profile-carousel-track">
+     <article class="profile-slide is-active" data-slide="0" aria-roledescription="slide" aria-label="1 of 6">
+      <div class="profile-slide-orb" aria-hidden="true"></div><div class="md-i">&#9678;</div><div class="md-t">Readiness Dashboard</div><div class="md-d">Your score, your factors and your next actions on one screen.</div><div class="profile-mini"><span>READINESS SCORE</span><strong>78</strong><i style="--fill:78%"></i><em>Preparing</em></div>
+     </article>
+     <article class="profile-slide" data-slide="1" aria-roledescription="slide" aria-label="2 of 6" aria-hidden="true">
+      <div class="profile-slide-orb" aria-hidden="true"></div><div class="md-i">&#9650;</div><div class="md-t">Readiness Score</div><div class="md-d">Six weighted factors scored out of 100, saved as snapshots over time.</div><div class="profile-metrics"><b>6</b><span>factors</span><b>100</b><span>point scale</span></div>
+     </article>
+     <article class="profile-slide" data-slide="2" aria-roledescription="slide" aria-label="3 of 6" aria-hidden="true">
+      <div class="profile-slide-orb" aria-hidden="true"></div><div class="md-i">&#9776;</div><div class="md-t">Action Plan</div><div class="md-d">A ranked next-best-action list tied to the factor each one affects.</div><ul class="profile-list"><li><b>HIGH PRIORITY</b> Lower revolving utilization</li><li>Verify business information</li><li>Complete funding profile</li></ul>
+     </article>
+     <article class="profile-slide" data-slide="3" aria-roledescription="slide" aria-label="4 of 6" aria-hidden="true">
+      <div class="profile-slide-orb" aria-hidden="true"></div><div class="md-i">&#9679;</div><div class="md-t">Progress &amp; Cesar AI</div><div class="md-d">Track completed actions and get education-first guidance for the next move.</div><div class="profile-chat"><span>CX</span><p>Lowering utilization may have the highest short-term impact on readiness.</p></div>
+     </article>
+     <article class="profile-slide" data-slide="4" aria-roledescription="slide" aria-label="5 of 6" aria-hidden="true">
+      <div class="profile-slide-orb" aria-hidden="true"></div><div class="md-i">&#9744;</div><div class="md-t">Funding Readiness</div><div class="md-d">Preparation indicators and document checklists before you apply.</div><div class="profile-bars"><span><b>Credit profile</b><i style="--fill:84%"></i></span><span><b>Utilization</b><i style="--fill:64%"></i></span><span><b>Documents</b><i style="--fill:48%"></i></span></div>
+     </article>
+     <article class="profile-slide" data-slide="5" aria-roledescription="slide" aria-label="6 of 6" aria-hidden="true">
+      <div class="profile-slide-orb" aria-hidden="true"></div><div class="md-i">&#9636;</div><div class="md-t">Business Credit</div><div class="md-d">A nine-item foundation assessment with vendor and tradeline tracking.</div><div class="profile-foundation"><span>Business foundation</span><strong>5 / 9</strong><i style="--fill:56%"></i></div>
+     </article>
+    </div>
+   </div>
+   <div class="profile-carousel-controls" aria-label="Profile tool slides">
+    <button type="button" class="profile-carousel-btn" data-carousel-prev aria-label="Previous profile tool">&#8592;</button>
+    <div class="profile-carousel-dots" role="tablist" aria-label="Choose profile tool">
+     <button type="button" class="is-active" role="tab" aria-selected="true" aria-label="Readiness Dashboard" data-carousel-dot="0"></button><button type="button" role="tab" aria-selected="false" aria-label="Readiness Score" data-carousel-dot="1"></button><button type="button" role="tab" aria-selected="false" aria-label="Action Plan" data-carousel-dot="2"></button><button type="button" role="tab" aria-selected="false" aria-label="Progress and Cesar AI" data-carousel-dot="3"></button><button type="button" role="tab" aria-selected="false" aria-label="Funding Readiness" data-carousel-dot="4"></button><button type="button" role="tab" aria-selected="false" aria-label="Business Credit" data-carousel-dot="5"></button>
+    </div>
+    <button type="button" class="profile-carousel-btn" data-carousel-next aria-label="Next profile tool">&#8594;</button>
+   </div>
   </div>
   <p class="hero-note" style="max-width:100%;margin-top:24px">The CredX Readiness Score is a proprietary CredX readiness metric. It is not a consumer credit score, FICO<sup>&reg;</sup> score, funding approval, legal opinion, or guarantee of any credit-report change. Educational tools and analysis are provided as software; any dispute assistance is a separate service under its own written agreement.</p>
   <div class="section-cta">
-   <a href="/signup" class="btn btn-primary">Start my free profile review</a>
+   <a href="/signup" class="btn btn-primary">Get my free credit analysis</a>
    <a href="/product" class="btn btn-outline">Explore the platform</a>
   </div>
  </div>
@@ -800,21 +844,42 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
 <section class="about section-fade" id="about">
  <div class="about-content-space" aria-hidden="true"></div>
  <div class="about-inner">
-  <img class="about-photo" width="600" height="800" loading="eager" fetchpriority="low" decoding="async" src="/images/cesar-profile.jpg" alt="J. Malloy leadership profile for CredX">
-  <div>
-   <div class="about-tag">About CredX</div>
-   <h2>Meet J. Malloy, CEO and creator of CredX.</h2>
-   <p>J. Malloy built CredX to be more than a credit brand. The vision is a structured credit intelligence and financial readiness platform that helps people understand their profile, organize goals, track progress, and make better-prepared decisions.</p>
-   <p>Cesar serves as the AI-assisted CredX guide, helping users understand concepts, dashboard context, readiness steps, and practical next actions. Professional support can extend the platform when human review is needed.</p>
-   <p>The mission is simple, combine clean strategy, real communication, and disciplined execution so every client knows where they stand and what comes next.</p>
-   <div class="about-name">J. Malloy</div>
-   <div class="about-role">CEO, Creator of CredX</div>
+  <div id="agentCampaign" class="agent-campaign" hidden>
+   <img id="agentCampaignPhoto" class="about-photo" width="600" height="800" loading="eager" fetchpriority="low" decoding="async" src="/images/cesar-profile.jpg" alt="Approved CredX campaign agent headshot">
+   <div>
+    <div class="about-tag">Your CredX guide</div>
+    <h2 id="agentCampaignTitle">Meet your CredX agent.</h2>
+    <p id="agentCampaignBio"></p>
+    <div id="agentCampaignName" class="about-name"></div>
+    <div class="about-role">CredX campaign agent</div>
+    <div class="agent-campaign-socials" id="agentCampaignSocials" aria-label="Agent social links">
+     <span class="agent-social-placeholder"><b aria-hidden="true">◎</b><span>Instagram</span><em>Link coming soon</em></span>
+     <span class="agent-social-placeholder"><b aria-hidden="true">f</b><span>Facebook</span><em>Link coming soon</em></span>
+     <span class="agent-social-placeholder"><b aria-hidden="true">♪</b><span>TikTok</span><em>Link coming soon</em></span>
+     <span class="agent-social-placeholder"><b aria-hidden="true">in</b><span>LinkedIn</span><em>Link coming soon</em></span>
+    </div>
+    <p id="agentCampaignReferral" class="agent-referral-note" hidden></p>
+   </div>
+  </div>
+  <div id="ownerAbout">
+   <img class="about-photo" width="600" height="800" loading="eager" fetchpriority="low" decoding="async" src="/images/cesar-profile.jpg" alt="J. Malloy leadership profile for CredX">
+   <div>
+    <div class="about-tag">About CredX</div>
+    <h2>Meet J. Malloy, CEO and creator of CredX.</h2>
+    <p>J. Malloy built CredX to be more than a credit brand. The vision is a structured credit intelligence and financial readiness platform that helps people understand their profile, organize goals, track progress, and make better-prepared decisions.</p>
+    <p>Cesar serves as the AI-assisted CredX guide, helping users understand concepts, dashboard context, readiness steps, and practical next actions. Professional support can extend the platform when human review is needed.</p>
+    <p>The mission is simple, combine clean strategy, real communication, and disciplined execution so every client knows where they stand and what comes next.</p>
+    <div class="about-name">J. Malloy</div>
+    <div class="about-role">CEO, Creator of CredX</div>
+   </div>
   </div>
  </div>
  <nav class="about-socials" aria-label="Follow CredX">
   <a href="https://www.instagram.com/credxme/" target="_blank" rel="noopener noreferrer" aria-label="CredX on Instagram (opens in a new tab)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></svg><span>Instagram</span></a>
   <a href="https://www.youtube.com/@credx-coaching" target="_blank" rel="noopener noreferrer" aria-label="CredX on YouTube (opens in a new tab)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg><span>YouTube</span></a>
   <a href="https://www.facebook.com/profile.php?id=100054365867977" target="_blank" rel="noopener noreferrer" aria-label="CredX on Facebook (opens in a new tab)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z"/></svg><span>Facebook</span></a>
+  <span class="about-social-placeholder" aria-label="TikTok link coming soon"><b aria-hidden="true">♪</b><span>TikTok</span><em>Coming soon</em></span>
+  <span class="about-social-placeholder" aria-label="LinkedIn link coming soon"><b aria-hidden="true">in</b><span>LinkedIn</span><em>Coming soon</em></span>
  </nav>
 </section>
 
@@ -841,7 +906,7 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
   </div>
   <div class="ig-follow">
    <a href="https://www.instagram.com/credxme/" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Follow @credxme</a>
-   <a href="/signup" class="btn btn-outline">Start my free profile review</a>
+   <a href="/signup" class="btn btn-outline">Get my free analysis</a>
    <button class="ig-nav ig-prev" type="button" aria-label="Previous reels" hidden>&lsaquo;</button>
    <button class="ig-nav ig-next" type="button" aria-label="Next reels" hidden>&rsaquo;</button>
   </div>
@@ -857,15 +922,15 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
   <p class="ssub">Each day builds on the last so the DIY client gets a complete credit, business credit, and wealth-building roadmap inside CredX.</p>
   <div class="cur-grid">
    <div class="cur-card"><div class="cur-n">01</div><div class="cur-badge">Day 1</div><h3 class="cur-title">Credit Fundamentals</h3><p class="cur-desc">How scores work, what factors matter, and how to read reports correctly.</p><div class="tags"><span class="tag">FICO</span><span class="tag">Reports</span><span class="tag">Bureaus</span></div></div>
-   <div class="cur-card"><div class="cur-n">02</div><div class="cur-badge">Day 2</div><h3 class="cur-title">Report Accuracy &amp; Consumer Rights</h3><p class="cur-desc">FCRA rights, documentation, and lawful ways to review information you believe is inaccurate.</p><div class="tags"><span class="tag">FCRA</span><span class="tag">Reports</span><span class="tag">Documentation</span></div></div>
+   <div class="cur-card"><div class="cur-n">02</div><div class="cur-badge">Day 2</div><h3 class="cur-title">Disputes & Removals</h3><p class="cur-desc">609 letters, FCRA rights, and lawful dispute workflow principles.</p><div class="tags"><span class="tag">609</span><span class="tag">FCRA</span><span class="tag">Disputes</span></div></div>
    <div class="cur-card"><div class="cur-n">03</div><div class="cur-badge">Day 3</div><h3 class="cur-title">Advanced Strategies</h3><p class="cur-desc">Goodwill letters, pay-for-delete awareness, rescoring, and sequencing.</p><div class="tags"><span class="tag">Strategy</span><span class="tag">Rescoring</span><span class="tag">Negotiation</span></div></div>
-   <div class="cur-card"><div class="cur-n">04</div><div class="cur-badge">Day 4</div><h3 class="cur-title">Positive Credit Habits</h3><p class="cur-desc">Secured cards, builder loans, utilization, and consistent account-management habits.</p><div class="tags"><span class="tag">Secured Cards</span><span class="tag">Builder Loans</span><span class="tag">Utilization</span></div></div>
+   <div class="cur-card"><div class="cur-n">04</div><div class="cur-badge">Day 4</div><h3 class="cur-title">Credit Building</h3><p class="cur-desc">Secured cards, builder loans, utilization, and profile rebuilding habits.</p><div class="tags"><span class="tag">Secured Cards</span><span class="tag">Builder Loans</span><span class="tag">Utilization</span></div></div>
    <div class="cur-card"><div class="cur-n">05</div><div class="cur-badge">Day 5</div><h3 class="cur-title">Business Credit</h3><p class="cur-desc">LLC, EIN, DUNS, Net-30 accounts, and funding-readiness basics.</p><div class="tags"><span class="tag">LLC/EIN</span><span class="tag">DUNS</span><span class="tag">Funding</span></div></div>
    <div class="cur-card"><div class="cur-n">★</div><div class="cur-badge">Bonus Day</div><h3 class="cur-title">Generational Wealth</h3><p class="cur-desc">Real estate, investing, passive income, and long-term wealth structure.</p><div class="tags"><span class="tag">Real Estate</span><span class="tag">Investing</span><span class="tag">Legacy</span></div></div>
   </div>
   <p class="masterclass-note">Masterclass access is handled as a paid education tier or through approved internal promotions.</p>
   <div class="section-cta">
-   <a href="/signup" class="btn btn-primary">Start free</a>
+   <a href="/signup" class="btn btn-primary">Sign up free</a>
    <a href="/masterclass-checkout" class="btn btn-outline">Join the Masterclass</a>
   </div>
  </div>
@@ -901,7 +966,7 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
   <h2 class="stitle">See where you stand.</h2>
   <p class="ssub">Start with an intake review. CredX analyzes your profile, produces your readiness score, and shows you the first actions worth taking.</p>
   <div class="fcta-btns">
-   <a href="/signup" class="btn btn-primary">Start my profile review</a>
+   <a href="/signup" class="btn btn-primary">Get My Readiness Score</a>
    <a href="/pricing" class="btn btn-outline">Compare plans</a>
   </div>
   <p class="fcta-note">No card required to start an intake review. Analysis and consultation come before any credit-related support is billed.</p>
@@ -912,10 +977,10 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
  <div class="footer-inner">
   <div class="footer-brand">
    <img class="f-logo" src="/images/credx-logo-1.jpg" alt="CredX">
-   <div class="footer-tagline">Credit intelligence and financial readiness software for clearer next steps.</div>
+   <div class="footer-tagline">CredX is built to help organize practical credit strategy and stronger next steps.</div>
   </div>
  <div class="footer-col"><h5>Platform</h5><a href="/product">Product</a><a href="#about">About</a><a href="#how">How it Works</a><a href="#pricing">Pricing</a><a href="/portal">Client Portal</a><a href="/agent">Become an Agent</a></div>
- <div class="footer-col"><h5>Support</h5><a href="/signup">Get started</a><a href="#chat">Cesar guidance</a><a href="#faq">FAQ</a><a href="/croa-disclosure">Disclosures</a></div>
+  <div class="footer-col"><h5>Support</h5><a href="/signup">Sign Up</a><a href="#chat">Chat</a><a href="#faq">FAQ</a></div>
   <div class="footer-col"><h5>Contact</h5><a href="tel:+18662733963">866-CREDX-ME</a><a href="mailto:contact@credxme.com">contact@credxme.com</a><a href="https://credxme.com">credxme.com</a></div>
  </div>
  <div class="footer-bottom">
@@ -1111,6 +1176,30 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').match
   document.querySelectorAll('.pg-grid,.fr-grid').forEach(el => io.observe(el));
 })();
 
+/* Product surface carousel: the same portal concepts become one tactile,
+   keyboard-friendly 3D object instead of a long wall of cards. */
+(function profileCarousel(){
+ const root=document.querySelector('[data-carousel]');
+ if(!root)return;
+ const slides=[...root.querySelectorAll('.profile-slide')],dots=[...root.querySelectorAll('[data-carousel-dot]')];
+ const prev=root.querySelector('[data-carousel-prev]'),next=root.querySelector('[data-carousel-next]');
+ let index=0;
+ function render(nextIndex){
+  index=(nextIndex+slides.length)%slides.length;
+  slides.forEach((slide,i)=>{
+   slide.classList.toggle('is-active',i===index);
+   slide.classList.toggle('is-prev',i===(index-1+slides.length)%slides.length);
+   slide.classList.toggle('is-next',i===(index+1)%slides.length);
+   slide.setAttribute('aria-hidden',i===index?'false':'true');
+  });
+  dots.forEach((dot,i)=>{const active=i===index;dot.classList.toggle('is-active',active);dot.setAttribute('aria-selected',active?'true':'false');});
+ }
+ prev?.addEventListener('click',()=>render(index-1));next?.addEventListener('click',()=>render(index+1));dots.forEach((dot,i)=>dot.addEventListener('click',()=>render(i)));
+ root.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'){event.preventDefault();render(index-1)}if(event.key==='ArrowRight'){event.preventDefault();render(index+1)}});
+ let startX=0;root.addEventListener('touchstart',e=>{startX=e.changedTouches[0].clientX},{passive:true});root.addEventListener('touchend',e=>{const delta=e.changedTouches[0].clientX-startX;if(Math.abs(delta)>40)render(index+(delta<0?1:-1))},{passive:true});
+ render(0);
+})();
+
 function showToast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>{t.className='toast';},3200);}
 const faqItems=document.querySelectorAll('.faq-item');faqItems.forEach(item=>{item.querySelector('.faq-q').addEventListener('click',()=>item.classList.toggle('open'));});
 
@@ -1131,14 +1220,14 @@ function appendChatMessage(role,text){
 
 function getCesarReply(message){
  const text=(message||'').toLowerCase();
- if(!text.trim()) return 'Ask me anything about the CredX platform, the 5-Day Masterclass, report education, financing readiness, or financial readiness.';
+ if(!text.trim()) return 'Ask me anything about the CredX program, the 5-Day Masterclass, disputes, financing readiness, or rebuilding your credit.';
  if(text.includes('portal')||text.includes('sign in')||text.includes('login')||text.includes('log in')) return 'If you already have portal access, sign in here: <a href="/portal">CredX Client Portal</a>.<br><br>If you are new and want to get started first, use the sign-up page here: <a href="/signup">Sign Up</a>.';
  if(text.includes('how do i get started')||text.includes('get started')||text.includes('how to start')||text.includes('sign up')||text.includes('signup')||text.includes('apply')) return 'Here\'s the fastest path:<br><br>• <a href="/signup">Sign up for CredX</a><br>• <a href="/portal">Portal login</a> if you already have an account.<br><br>The sign-up page will let you choose the path that fits you best.';
- if(text.includes('help me')||text==='help'||text.includes('what can you help')||text.includes('how can you help')) return 'I can help you choose your next step. If you are new, start here: <a href="/signup">Sign Up</a>. If you already have access, use the <a href="/portal">portal login</a>.<br><br>If you tell me your goal—understand a report, prepare for financing, or organize your financial priorities—I\'ll point you to the best path.';
+ if(text.includes('help me')||text==='help'||text.includes('what can you help')||text.includes('how can you help')) return 'I can help you choose your next step. If you are new, start here: <a href="/signup">Sign Up</a>. If you already have access, use the <a href="/portal">portal login</a>.<br><br>If you tell me your goal—dispute inaccurate items, prepare for financing, or rebuild after collections—I\'ll point you to the best path.';
  if((text.includes('price')||text.includes('cost')||text.includes('pricing')||text.includes('how much'))&&(text.includes('masterclass')||text.includes('diy'))) return 'The CredX 5-Day Masterclass is <strong>$47 one time</strong>. It is the DIY education path with the 5-day curriculum, bonus wealth day, resources, and portal access. You can review the offer here: <a href="/masterclass">5-Day Masterclass</a> or go straight to checkout: <a href="/masterclass-checkout">Masterclass Checkout</a>.';
- if(text.includes('price')||text.includes('cost')||text.includes('pricing')||text.includes('how much')) return 'Here are the current CredX prices:<br><br>• 5-Day Masterclass: <strong>$47 one time</strong><br>• Essential platform + guidance: <strong>$150 after analysis review</strong><br>• Premium professional support: <strong>$447 after analysis review</strong><br>• Family: <strong>$300 after analysis review</strong>, then monthly support based on family size<br><br>You can compare them here: <a href="/pricing">Pricing</a>.';
+ if(text.includes('price')||text.includes('cost')||text.includes('pricing')||text.includes('how much')) return 'Here are the current CredX prices:<br><br>• 5-Day Masterclass: <strong>$47 one time</strong><br>• Essential AI Assistance: <strong>$150 after analysis review</strong><br>• Premium: <strong>$447 after analysis review</strong><br>• Family: <strong>$300 after analysis review</strong>, then monthly support based on family size<br><br>You can compare them here: <a href="/pricing">Pricing</a>.';
  if(text.includes('masterclass')||text.includes('diy')) return 'The 5-Day Masterclass is the DIY path inside CredX. It is <strong>$47 one time</strong> and includes the full 5-day curriculum, bonus wealth day, resources, and portal access. Start here: <a href="/masterclass">5-Day Masterclass</a>.';
- if(text.includes('program')||text.includes('coaching')||text.includes('service')) return 'CredX puts software first: your profile, next actions, and progress live in one workspace. Optional professional support can add human review and follow-through. Start here: <a href="/signup">Get started</a>.';
+ if(text.includes('program')||text.includes('coaching')||text.includes('service')) return 'The CredX Program is the guided path with software, AI support, and coaching. Start on the sign-up page and choose the program option there: <a href="/signup">Sign Up</a>.';
  if(text.includes('financing')||text.includes('mortgage')||text.includes('car')||text.includes('approval')) return 'If your goal is financing readiness, start with the CredX sign-up so your file can be reviewed in context: <a href="/signup">Sign Up</a>.';
  if(text.includes('dispute')||text.includes('collection')||text.includes('inquiry')) return 'CredX can help organize dispute workflow and identify what looks challengeable, but the strongest next step is still getting your file into review. Start here: <a href="/signup">Sign Up</a>.';
  if(text.includes('next step')) return 'Your next step is to submit the short sign-up form and choose your path there: <a href="/signup">Sign Up</a>.';
@@ -1234,17 +1323,53 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
  window.setTimeout(showNudge,15000);
 })();
 
+// Approved agent campaign landing mode. Direct visits remain owner-first.
+(async function loadAgentCampaign(){
+ const params=new URLSearchParams(window.location.search);
+ const code=(params.get('agent')||'').trim();
+ if(!code) return;
+ try{
+  const res=await fetch('/api/sub-agents/public/'+encodeURIComponent(code),{headers:{Accept:'application/json'}});
+  if(!res.ok) return;
+  const data=await res.json(); const agent=data&&data.subAgent;
+  if(!agent) return;
+  const block=document.getElementById('agentCampaign');
+  const photo=document.getElementById('agentCampaignPhoto');
+  const title=document.getElementById('agentCampaignTitle');
+  const bio=document.getElementById('agentCampaignBio');
+  const name=document.getElementById('agentCampaignName');
+  const referral=document.getElementById('agentCampaignReferral');
+  if(!block||!photo||!title||!bio||!name) return;
+  name.textContent=agent.name||'Your CredX agent';
+  title.textContent='Meet '+(agent.name||'your CredX agent')+'.';
+  bio.textContent=agent.publicBio||'Your CredX agent is here to help you take the next clear step toward stronger credit and financial readiness.';
+  if(agent.publicHeadshotUrl) photo.src=agent.publicHeadshotUrl;
+  if(referral){
+   referral.textContent='Referral attribution: signups from this page are tracked to '+(agent.name||'this approved CredX agent')+'.';
+   referral.hidden=false;
+  }
+  block.hidden=false;
+  document.querySelectorAll('a[href="/signup"],a[href^="/signup?"]').forEach(link=>{
+   const href=new URL(link.getAttribute('href'),window.location.origin);
+   href.searchParams.set('agent',agent.referralCode);
+   href.searchParams.set('agentName',agent.name||'');
+   link.setAttribute('href',href.pathname+href.search+href.hash);
+  });
+ }catch(error){ /* standard page fallback */ }
+})();
+
 
 </script>
 <div class="promo-pop" id="promoPop" role="dialog" aria-modal="true" aria-labelledby="promoTitle" aria-describedby="promoText" hidden>
  <div class="promo-card">
   <button class="promo-close" type="button" data-promo-close aria-label="Close">&times;</button>
   <div class="stag">Free for new members</div>
-  <h2 id="promoTitle">Start your free profile review!</h2>
+  <h2 id="promoTitle">Get your free credit analysis now!</h2>
   <p id="promoText">See what is shaping your credit profile and the first actions worth taking. No card required.</p>
-  <a href="/signup" class="btn btn-primary">Start my free profile review</a>
+  <a href="/signup" class="btn btn-primary">Get my free analysis</a>
   <button class="promo-later" type="button" data-promo-close>Maybe later</button>
  </div>
 </div>
 </body>
 </html>
+
