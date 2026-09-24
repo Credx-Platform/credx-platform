@@ -41,7 +41,7 @@ export async function enqueue(
 
 /**
  * Claim the next available job from a queue.
- * Uses row-level locking via transaction to prevent double-processing.
+ * Uses an optimistic conditional update to prevent double-processing.
  */
 export async function claimNextJob(queueName: QueueName, workerId: string) {
   return prisma.$transaction(async (tx) => {
@@ -63,8 +63,17 @@ export async function claimNextJob(queueName: QueueName, workerId: string) {
 
     if (!job) return null;
 
-    const updated = await tx.jobQueue.update({
-      where: { id: job.id },
+    const claimed = await tx.jobQueue.updateMany({
+      where: {
+        id: job.id,
+        queueName,
+        status: { in: ['PENDING', 'RETRYING'] },
+        OR: [
+          { delayUntil: null },
+          { delayUntil: { lte: new Date() } }
+        ],
+        attempts: { lt: tx.jobQueue.fields.maxAttempts as any }
+      },
       data: {
         status: 'ACTIVE',
         attempts: { increment: 1 },
@@ -72,7 +81,8 @@ export async function claimNextJob(queueName: QueueName, workerId: string) {
       }
     });
 
-    return updated;
+    if (claimed.count !== 1) return null;
+    return tx.jobQueue.findUnique({ where: { id: job.id } });
   });
 }
 
@@ -80,7 +90,7 @@ export async function claimNextJob(queueName: QueueName, workerId: string) {
  * Mark a job as completed with an optional result.
  */
 export async function completeJob(jobId: string, result?: Record<string, unknown>) {
-  return prisma.jobQueue.update({
+  const job = await prisma.jobQueue.update({
     where: { id: jobId },
     data: {
       status: 'COMPLETED',
@@ -88,6 +98,13 @@ export async function completeJob(jobId: string, result?: Record<string, unknown
       result: result as any
     }
   });
+  if (job.workerId) {
+    await prisma.workerHeartbeat.updateMany({
+      where: { workerId: job.workerId },
+      data: { jobsProcessed: { increment: 1 } }
+    });
+  }
+  return job;
 }
 
 /**
@@ -99,7 +116,7 @@ export async function failJob(jobId: string, error: string, maxAttempts = 3) {
 
   const shouldRetry = job.attempts < (job.maxAttempts ?? maxAttempts);
 
-  return prisma.jobQueue.update({
+  const updated = await prisma.jobQueue.update({
     where: { id: jobId },
     data: {
       status: shouldRetry ? 'RETRYING' : 'FAILED',
@@ -110,6 +127,13 @@ export async function failJob(jobId: string, error: string, maxAttempts = 3) {
         : null
     }
   });
+  if (updated.workerId) {
+    await prisma.workerHeartbeat.updateMany({
+      where: { workerId: updated.workerId },
+      data: { jobsFailed: { increment: 1 } }
+    });
+  }
+  return updated;
 }
 
 /**
@@ -130,6 +154,18 @@ export async function heartbeatWorker(workerId: string, queueName: QueueName, ho
       lastBeat: new Date()
     }
   });
+}
+
+/**
+ * Remove stale worker rows so /health/queue does not show retired deploy
+ * instances forever. This deletes heartbeat metadata only; jobs stay intact.
+ */
+export async function cleanupStaleWorkerHeartbeats(staleAfterMs = 24 * 60 * 60 * 1000) {
+  const cutoff = new Date(Date.now() - staleAfterMs);
+  const result = await prisma.workerHeartbeat.deleteMany({
+    where: { lastBeat: { lt: cutoff } }
+  });
+  return result.count;
 }
 
 /**

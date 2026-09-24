@@ -427,8 +427,13 @@ billingRouter.post('/confirm', (req, res, next) => confirmProcessorPayment(req, 
 // Explicit PaymentCloud relay endpoint for production payment/subscription wiring.
 billingRouter.post('/paymentcloud/confirm', (req, res, next) => confirmProcessorPayment(req, res, next, 'paymentcloud'));
 
-billingRouter.get('/admin/aging', requireAuth, requireRole(['STAFF', 'ADMIN']), (_req, res) => {
-  res.json({ message: 'Billing retry automation scaffold pending Stripe webhook + scheduler integration.' });
+billingRouter.get('/admin/aging', requireAuth, requireRole(['STAFF', 'ADMIN']), async (_req, res, next) => {
+  try {
+    const { getBillingOpsSnapshot } = await import('../lib/billingOps.js');
+    res.json(await getBillingOpsSnapshot());
+  } catch (error) {
+    next(error);
+  }
 });
 
 billingRouter.get('/webhook', (_req, res) => {

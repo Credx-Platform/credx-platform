@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import {
   claimNextJob,
+  cleanupStaleWorkerHeartbeats,
   completeJob,
   failJob,
   heartbeatWorker,
@@ -50,6 +51,7 @@ export class QueueRunner {
   private stopping = false;
   private loopPromise?: Promise<void>;
   private lastHeartbeatAt = 0;
+  private lastHeartbeatCleanupAt = 0;
   private wakeSleep?: () => void;
 
   constructor(opts: RunnerOptions = {}) {
@@ -137,9 +139,19 @@ export class QueueRunner {
     this.lastHeartbeatAt = now;
     try {
       await heartbeatWorker(this.workerId, this.queues[0], this.hostname);
+      await this.maybeCleanupHeartbeats(now);
     } catch {
       // heartbeat is advisory only
     }
+  }
+
+  private async maybeCleanupHeartbeats(now: number): Promise<void> {
+    const cleanupIntervalMs = Number(process.env.QUEUE_HEARTBEAT_CLEANUP_MS ?? 60 * 60 * 1000);
+    if (cleanupIntervalMs <= 0 || now - this.lastHeartbeatCleanupAt < cleanupIntervalMs) return;
+    this.lastHeartbeatCleanupAt = now;
+    const staleAfterMs = Number(process.env.QUEUE_HEARTBEAT_RETENTION_MS ?? 24 * 60 * 60 * 1000);
+    const deleted = await cleanupStaleWorkerHeartbeats(staleAfterMs);
+    if (deleted > 0) console.log(`[queue] removed ${deleted} stale worker heartbeat row(s)`);
   }
 
   private sleep(ms: number): Promise<void> {
