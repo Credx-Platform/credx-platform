@@ -70,6 +70,8 @@ interface AccountDetail {
   transunion: BureauAccountFields | null;
   paymentHistory: PaymentHistoryGrid | null;
   inconsistencies: string[];
+  /** Absent on analyses generated before the accuracy-rules engine. */
+  accuracyFlags?: Array<{ code: string; severity: 'high' | 'medium' | 'low'; detail: string }>;
 }
 
 interface AccountSummaryRow {
@@ -342,6 +344,11 @@ function AccountDetailBlock({ account }: { account: AccountDetail }) {
         </tbody>
       </table>
       {account.paymentHistory && <PaymentHistoryRow history={account.paymentHistory} />}
+      {account.accuracyFlags?.length ? (
+        <ul className="account-flags" style={{ margin: '8px 0 0', paddingLeft: '18px', color: '#b91c1c', fontSize: '13px' }}>
+          {account.accuracyFlags.map((flag, i) => <li key={`${flag.code}-${i}`}>{flag.detail}</li>)}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -602,6 +609,10 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
   const inconsistencyCount = useMemo(() => {
     if (!analysis) return 0;
     return [...analysis.negativeAccounts, ...analysis.positiveAccounts].reduce((s, a) => s + a.inconsistencies.length, 0);
+  }, [analysis]);
+  const accuracyFlagCount = useMemo(() => {
+    if (!analysis) return 0;
+    return analysis.negativeAccounts.reduce((s, a) => s + (a.accuracyFlags?.length || 0), 0);
   }, [analysis]);
 
   if (loading) {
@@ -884,7 +895,7 @@ export function AnalysisTab({ token, clientId, clientName }: AnalysisTabProps) {
       {disputeOpportunities.length > 0 && (
         <section className="report-section">
           <h2 className="section-title">Dispute Plan & Reasoning</h2>
-          <p className="section-sub">{disputeOpportunities.length} dispute opportunities identified. {inconsistencyCount} based on cross-bureau inconsistencies.</p>
+          <p className="section-sub">{disputeOpportunities.length} dispute opportunities identified. {inconsistencyCount} based on cross-bureau inconsistencies, {accuracyFlagCount} on errors inside a single bureau's record.</p>
           <div className="dispute-list">
             {disputeOpportunities.map((d, i) => (
               <div key={i} className="dispute-card">

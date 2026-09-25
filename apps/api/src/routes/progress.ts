@@ -6,7 +6,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { notifyNewClientSignup } from '../lib/openclaw.js';
 import { config } from '../config.js';
-import { CreditAnalysisService, deriveReportSubject } from '../lib/creditAnalysis.js';
+import { ANALYSIS_ENGINE_VERSION, CreditAnalysisService, deriveReportSubject } from '../lib/creditAnalysis.js';
 import { enqueueJob } from '../lib/jobs.js';
 import { notifyMilestone } from '../lib/notifications.js';
 import { extractReport } from '../lib/reportExtractor.js';
@@ -14,6 +14,7 @@ import { uploadDocument } from '../lib/blob-storage.js';
 import { track } from '../lib/analytics.js';
 import { maybeSendPortalReadyEmail } from '../lib/portalReady.js';
 import { syncReportDerivedClientData } from '../lib/clientReportSync.js';
+import { saveInternalAnalysisAudit } from '../lib/analysisAudit.js';
 import { calculateReadinessScore } from '../lib/readinessScore.js';
 import type { DocumentType, ReadinessScoreSnapshot } from '@prisma/client';
 
@@ -230,11 +231,31 @@ progressRouter.get('/me', requireAuth, async (req: AuthedRequest, res, next) => 
   try {
     const client = await prisma.client.findUnique({
       where: { userId: req.auth!.sub },
-      include: { progress: true, tasks: true, activities: true }
+      include: { user: true, progress: true, tasks: true, activities: true, creditReports: { orderBy: { pulledAt: 'desc' }, include: { tradelines: true } } }
     });
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
-    const progress = client.progress || {};
+    let progress: any = client.progress || {};
+    const storedAnalysis = progress.analysis as { analysisEngineVersion?: string } | null | undefined;
+    if (storedAnalysis && storedAnalysis.analysisEngineVersion !== ANALYSIS_ENGINE_VERSION && client.creditReports.length > 0) {
+      const refreshedAnalysis = CreditAnalysisService.generate({
+        client: client as any,
+        creditReports: client.creditReports as any
+      });
+      await syncReportDerivedClientData(prisma, {
+        client: client as any,
+        analysis: refreshedAnalysis,
+        workflow: progress.workflow
+      });
+      // Refresh the summary only: this runs on portal load, so it must not move
+      // an ACTIVE/PAST_DUE client back to ANALYSIS_READY.
+      await prisma.client.update({
+        where: { id: client.id },
+        data: { analysisSummary: refreshedAnalysis.clientFacingSummary.slice(0, 500) + '...' }
+      });
+      await saveInternalAnalysisAudit(prisma, client.id, refreshedAnalysis);
+      progress = { ...progress, analysis: refreshedAnalysis };
+    }
     return res.json({
       completedDays: (progress as any).completedDays || [],
       passedQuizzes: (progress as any).passedQuizzes || [],
@@ -647,6 +668,8 @@ async function handleSecureDocUpload(client: { id: string; progress: any }, file
               analysisSummary: analysis.clientFacingSummary.slice(0, 500) + '...'
             }
           });
+
+          await saveInternalAnalysisAudit(prisma, clientId, analysis);
 
           if (!existingProgress?.analysis) {
             await prisma.activityEvent.create({
