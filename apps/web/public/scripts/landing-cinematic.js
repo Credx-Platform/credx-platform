@@ -20,7 +20,7 @@
  // Shared smooth acceleration/deceleration. Position follows scroll immediately;
  // no interpolation tail, spring, scroll interception, or synthetic momentum.
  const ease=v=>{v=clamp(v);return v*v*(3-2*v)};
- const art=hero.querySelector('.hero-art'),heroCopy=hero.querySelector('.hero-copy'),heroGrid=hero.querySelector('.hero-grid');
+ const art=hero.querySelector('.hero-art'),artObjects=[...hero.querySelectorAll('.object-motion')],heroCopy=hero.querySelector('.hero-copy'),heroGrid=hero.querySelector('.hero-grid');
  const frames=[...portal.querySelectorAll('.portal-frames i')];
  const dash=portal.querySelector('.dash-ui');
  const tracks=[
@@ -251,12 +251,13 @@
     });
     if(active.has(runway)){
      const p=clamp((y-heroTop-12)/Math.max(1,heroDistance-12)),e=ease(p);
-     // Keep the same eased scroll timing while cutting the prior 2x→4x
-     // composition in half: the artwork should stay clear of the copy and
-     // only reach a controlled 2x endpoint after scrolling.
+     // Each object zooms around its own centre by the same amount, so the
+     // images grow independently instead of as one locked composition.
      const artStartScale=1;
-     const artEndScale=3;
-     art.style.transform=`translate3d(0,${-e*(simple?5:14)}px,0) scale(${artStartScale+(artEndScale-artStartScale)*e})`;
+     const artEndScale=1.85;
+     art.style.transform=`translate3d(0,${-e*(simple?5:14)}px,0)`;
+     const objectScale=`scale(${artStartScale+(artEndScale-artStartScale)*e})`;
+     artObjects.forEach(el=>{el.style.transform=objectScale});
     }
     if(active.has(portal)){
      const p=clamp((y-portalTop+view*.38)/(portalDistance+view*.38));
