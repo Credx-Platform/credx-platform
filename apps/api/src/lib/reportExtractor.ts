@@ -180,6 +180,9 @@ Output schema:
 Rules:
 - Output the JSON object only. No commentary.
 - Group by account: each account appears ONCE in "accounts", with one block per bureau that reports it. If a bureau does not report the account, set that bureau's block to null.
+- Completeness rule: inventory every account and every hard inquiry visible in the report before evaluating accuracy. Never omit an account because it appears current now but has historical 30/60/90+ day late markers, and never collapse a collection, charge-off, utility delinquency, auto deficiency/repo, or late-payment history into a generic summary.
+- Cross-reference rule: preserve every bureau-specific field and payment-history cell so the analyzer can compare the same account across Experian, Equifax, and TransUnion. If creditor names differ but the account number, balance, dates, or payment history indicate the same debt, keep one grouped account with each bureau's original name in its bureau fields.
+- Separate-lane rule: classify hard inquiries as "inquiry" and isNegative false. They must remain available as their own records and must not be treated as negative tradelines or automatic dispute opportunities.
 - "category" rules: "collection" = collection agency or third-party debt buyer; "charge_off" = bank/lender charge-off; "late_payment" = currently or previously past due but not charged off; "derogatory" = repo, foreclosure, bankruptcy, judgment, lien, settled-for-less; "positive" = open or closed in good standing; "inquiry" = hard pull; "public_record" = court/legal record. Use "unknown" only when truly indeterminable.
 - "isNegative" must be true for collection/charge_off/late_payment/derogatory; false for positive/inquiry; null categories use your best judgment.
 - Numbers: extract numeric values only (no $ or commas). Dates in YYYY-MM-DD where possible; otherwise return as written.

@@ -7,6 +7,15 @@ import type {
   BureauScoreSnapshot,
   ExtractedAccount
 } from './reportExtractor.js';
+import {
+  detectAccuracyFlags,
+  detectDuplicateDebts,
+  detectPersonalInfoFlags,
+  type AccuracyFlag,
+  type PersonalInfoFlag
+} from './reportAccuracyRules.js';
+
+export type { AccuracyFlag, PersonalInfoFlag } from './reportAccuracyRules.js';
 
 // =====================================================================
 // MIG-style 3-bureau credit analysis output.
@@ -15,6 +24,8 @@ import type {
 // =====================================================================
 
 export type BureauKey = 'experian' | 'equifax' | 'transunion';
+
+export const ANALYSIS_ENGINE_VERSION = '2026-09-25-accuracy-rules-v4';
 
 export interface BureauSummary {
   bureau: BureauKey;
@@ -58,6 +69,14 @@ export interface DisputeOpportunity {
   perBureauValues?: Partial<Record<BureauKey, string | number | null>>;
 }
 
+export interface InquiryDetail {
+  creditorName: string;
+  accountNumber: string | null;
+  bureaus: BureauKey[];
+  dates: Partial<Record<BureauKey, string | null>>;
+  purpose: Partial<Record<BureauKey, string | null>>;
+}
+
 export interface ActionPhase {
   phase: number;
   title: string;
@@ -96,6 +115,8 @@ export interface AccountDetail {
   paymentHistory: PaymentHistoryGrid | null;
   /** Field keys whose values disagree across bureaus — these get pink-highlighted. */
   inconsistencies: string[];
+  /** Errors inside a single bureau's record (dates, balances, status, comments, obsolescence, duplicates). */
+  accuracyFlags: AccuracyFlag[];
 }
 
 export interface SummaryTiles {
@@ -124,6 +145,7 @@ export interface NextStepBlock {
 }
 
 export interface CreditAnalysis {
+  analysisEngineVersion: string;
   generatedAt: string;
   branding: {
     companyName: string;
@@ -154,6 +176,10 @@ export interface CreditAnalysis {
   personalProfile: PersonalProfile;
   negativeAccounts: AccountDetail[];
   positiveAccounts: AccountDetail[];
+  /** Hard inquiries are tracked separately and never enter account disputes automatically. */
+  inquiries: InquiryDetail[];
+  /** Name / DOB / address disagreements across bureaus (mixed-file indicators). */
+  personalInfoFlags: PersonalInfoFlag[];
   disputeOpportunities: DisputeOpportunity[];
   actionPlan: ActionPhase[];
   nextSteps: NextStepBlock[];
@@ -224,12 +250,34 @@ function moneyOrNull(v: number | null | undefined): number | null {
   return Number.isFinite(v) ? v : null;
 }
 
+type RichPayload = { scores?: BureauScoreSnapshot[]; personalProfile?: PersonalProfile; accounts?: ExtractedAccount[] };
+
+function richOf(report: CreditAnalysisInput['creditReports'][number]): RichPayload | null {
+  const raw = report.rawPayload as { rich?: RichPayload } | null;
+  return raw?.rich?.accounts ? raw.rich : null;
+}
+
 function readRichPayload(creditReports: CreditAnalysisInput['creditReports']) {
   for (const report of creditReports) {
-    const raw = report.rawPayload as { rich?: { scores?: BureauScoreSnapshot[]; personalProfile?: PersonalProfile; accounts?: ExtractedAccount[] } } | null;
-    if (raw?.rich?.accounts) return raw.rich;
+    const rich = richOf(report);
+    if (rich) return rich;
   }
   return null;
+}
+
+/**
+ * Tradeline rows that the rich extraction cannot already account for.
+ * Every upload stores the same rich payload on each of its bureau rows and
+ * derives its Tradeline rows from it, so re-adding those rows would duplicate
+ * every account, and rows from older uploads would resurrect stale accounts.
+ * Only rows from reports without a rich payload (manual entry, legacy
+ * imports) pulled at or after the newest rich upload are unioned in.
+ */
+function supplementalReports(creditReports: CreditAnalysisInput['creditReports']): CreditAnalysisInput['creditReports'] {
+  const richReports = creditReports.filter((r) => richOf(r));
+  if (!richReports.length) return creditReports;
+  const newestRich = Math.max(...richReports.map((r) => new Date(r.pulledAt ?? 0).getTime()));
+  return creditReports.filter((r) => !richOf(r) && new Date(r.pulledAt ?? 0).getTime() >= newestRich);
 }
 
 function buildAccountsFromTradelines(creditReports: CreditAnalysisInput['creditReports']): ExtractedAccount[] {
@@ -240,13 +288,22 @@ function buildAccountsFromTradelines(creditReports: CreditAnalysisInput['creditR
     const bureauKey = PRISMA_TO_KEY[report.bureau];
     if (!bureauKey) continue;
     for (const t of report.tradelines || []) {
-      const key = `${t.creditorName.toUpperCase()}|${t.accountNumber || ''}`;
+      const statusText = `${t.status || ''} ${t.accountType || ''}`;
+      const inferredNegative = t.isNegative || NEGATIVE_SIGNAL.test(statusText);
+      const inferredCategory: AccountCategory = /inquir/i.test(statusText)
+        ? 'inquiry'
+        : /collection/i.test(statusText)
+          ? 'collection'
+          : /charge[\s-]?off/i.test(statusText)
+            ? 'charge_off'
+            : inferredNegative ? 'late_payment' : 'positive';
+      const key = `${t.creditorName.toUpperCase()}|${t.accountNumber || ''}|${inferredCategory}`;
       let entry = byKey.get(key);
       if (!entry) {
         entry = {
           creditorName: t.creditorName,
-          category: t.isNegative ? 'derogatory' : 'positive',
-          isNegative: t.isNegative,
+          category: inferredCategory,
+          isNegative: inferredNegative && inferredCategory !== 'inquiry',
           experian: null,
           equifax: null,
           transunion: null,
@@ -279,14 +336,116 @@ function buildAccountsFromTradelines(creditReports: CreditAnalysisInput['creditR
         creditLimit: null
       };
       entry[bureauKey] = fields;
-      if (t.isNegative) entry.isNegative = true;
+      if (inferredNegative && inferredCategory !== 'inquiry') entry.isNegative = true;
     }
   }
   return Array.from(byKey.values());
 }
 
+function normalizedAccountName(value: string | null | undefined): string {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function reliableAccountNumber(value: string | null | undefined): string | null {
+  const normalized = String(value || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+  return normalized && !/^0+$/.test(normalized) ? normalized : null;
+}
+
+function accountBalance(account: ExtractedAccount): number | null {
+  const fields = account.experian || account.equifax || account.transunion;
+  return fields?.balanceOwed ?? null;
+}
+
+/**
+ * Union rich extraction with persisted bureau tradelines. The rich model is
+ * useful for payment grids, but it must not be allowed to hide a tradeline
+ * that the bureau rows already contain. Matching uses account number plus
+ * balance/category when available so two loans sharing a suffix are not
+ * silently collapsed.
+ */
+function mergeExtractedAccounts(accounts: ExtractedAccount[]): ExtractedAccount[] {
+  const merged = new Map<string, ExtractedAccount>();
+  for (const account of accounts) {
+    const fields = account.experian || account.equifax || account.transunion;
+    const number = reliableAccountNumber(fields?.accountNumber);
+    const balance = accountBalance(account);
+    const category = account.category || 'unknown';
+    const identity = number && balance !== null
+      ? `number:${number}|balance:${balance}`
+      : number
+        ? `number:${number}|category:${category}`
+      : `name:${normalizedAccountName(account.creditorName)}|category:${category}`;
+    const existing = merged.get(identity);
+    if (!existing) {
+      merged.set(identity, { ...account });
+      continue;
+    }
+    const combined: ExtractedAccount = { ...existing, isNegative: existing.isNegative || account.isNegative };
+    for (const bureau of BUREAU_KEYS) {
+      const current = existing[bureau];
+      const incoming = account[bureau];
+      if (!current && incoming) combined[bureau] = incoming;
+      else if (current && incoming) combined[bureau] = { ...incoming, ...current };
+    }
+    if ((!combined.paymentHistory || combined.paymentHistory.months.length === 0) && account.paymentHistory) {
+      combined.paymentHistory = account.paymentHistory;
+    }
+    merged.set(identity, combined);
+  }
+  return Array.from(merged.values());
+}
+
+const NEGATIVE_CATEGORIES = new Set<AccountCategory>(['collection', 'charge_off', 'late_payment', 'derogatory', 'public_record']);
+const NEGATIVE_SIGNAL = /(?:collection|charge[\s-]?off|repossession|\brepo\b|foreclos|past[ -]?due|delinquen|derogatory|settled[ -]?for less|included in (?:bankruptcy|bk)|\b(?:30|60|90|120|150)\s*(?:day|days)?\s*late\b|late payment)/i;
+const POSITIVE_SIGNAL = /(?:no late|never late|paid as agreed|current|positive|on time)/i;
+
+function inferredCategory(account: ExtractedAccount): AccountCategory {
+  if (account.category === 'inquiry') return 'inquiry';
+  if (NEGATIVE_CATEGORIES.has(account.category)) return account.category;
+  const fields = [account.experian, account.equifax, account.transunion].filter(Boolean) as BureauAccountFields[];
+  const text = fields.map((f) => [f.accountType, f.accountStatus, f.paymentStatus, f.accountRating, f.comments, f.accountDescription].filter(Boolean).join(' ')).join(' ');
+  if (/collection/i.test(text)) return 'collection';
+  if (/charge[\s-]?off/i.test(text)) return 'charge_off';
+  if (/repo|foreclos|judg|lien|bankrupt|derogatory|settled[ -]?for less/i.test(text)) return 'derogatory';
+  if (/past[ -]?due|delinquen|late|\b(?:30|60|90|120|150)\s*(?:day|days)?\s*late\b/i.test(text)) return 'late_payment';
+  const history = account.paymentHistory;
+  if (history && [...history.experian, ...history.equifax, ...history.transunion].some((cell) => /^(30|60|90|120|150|CO)$/i.test(String(cell || '').trim()))) return 'late_payment';
+  return account.category;
+}
+
+function normalizeAccountClassification(account: ExtractedAccount): ExtractedAccount {
+  const category = inferredCategory(account);
+  const fields = [account.experian, account.equifax, account.transunion].filter(Boolean) as BureauAccountFields[];
+  const text = fields.map((f) => [f.accountStatus, f.paymentStatus, f.accountRating, f.comments, f.accountDescription].filter(Boolean).join(' ')).join(' ');
+  const historicalLate = account.paymentHistory && [...account.paymentHistory.experian, ...account.paymentHistory.equifax, ...account.paymentHistory.transunion].some((cell) => /^(30|60|90|120|150|CO)$/i.test(String(cell || '').trim()));
+  const explicitLate = /\b(?:30|60|90|120|150)\s*(?:day|days)?\s*late\b/i.test(text);
+  const pastDue = fields.some((f) => typeof f.pastDueAmount === 'number' && f.pastDueAmount > 0);
+  const negative = category !== 'inquiry' && (account.isNegative || NEGATIVE_CATEGORIES.has(category) || Boolean(historicalLate) || pastDue || (NEGATIVE_SIGNAL.test(text) && (!POSITIVE_SIGNAL.test(text) || explicitLate)));
+  return { ...account, category, isNegative: negative };
+}
+
+function buildInquiryDetails(accounts: ExtractedAccount[]): InquiryDetail[] {
+  return accounts
+    .filter((account) => account.category === 'inquiry')
+    .map((account) => {
+      const bureaus = BUREAU_KEYS.filter((bureau) => Boolean(account[bureau]));
+      const dates: Partial<Record<BureauKey, string | null>> = {};
+      const purpose: Partial<Record<BureauKey, string | null>> = {};
+      for (const bureau of bureaus) {
+        dates[bureau] = account[bureau]?.dateReported || account[bureau]?.dateOfLastActivity || null;
+        purpose[bureau] = account[bureau]?.comments || account[bureau]?.accountDescription || null;
+      }
+      const primary = account.experian || account.equifax || account.transunion;
+      return { creditorName: account.creditorName, accountNumber: primary?.accountNumber || null, bureaus, dates, purpose };
+    });
+}
+
 function detectInconsistencies(account: ExtractedAccount): string[] {
   const found: string[] = [];
+  const reportingBureaus = BUREAU_KEYS.filter((bureau) => Boolean(account[bureau]));
+  if (account.isNegative && reportingBureaus.length > 0 && reportingBureaus.length < BUREAU_KEYS.length) {
+    found.push('bureauCoverage');
+  }
   for (const field of COMPARABLE_FIELDS) {
     const values = BUREAU_KEYS
       .map(k => account[k]?.[field])
@@ -302,6 +461,16 @@ function detectInconsistencies(account: ExtractedAccount): string[] {
       const norm = values.map(v => String(v).trim().toLowerCase());
       const unique = new Set(norm);
       if (unique.size > 1) found.push(field);
+    }
+  }
+  const history = account.paymentHistory;
+  if (history?.months?.length) {
+    for (let i = 0; i < history.months.length; i += 1) {
+      const values = [history.experian[i], history.equifax[i], history.transunion[i]]
+        .filter((value): value is string => value !== null && value !== undefined && value !== '');
+      if (values.length >= 2 && new Set(values.map((value) => value.trim().toUpperCase())).size > 1) {
+        found.push(`paymentHistory:${history.months[i]}`);
+      }
     }
   }
   return found;
@@ -592,17 +761,20 @@ function buildFicoFactors(accounts: ExtractedAccount[], tiles: SummaryTiles): Fi
 function buildAccountDetails(accounts: ExtractedAccount[]) {
   const negative: AccountDetail[] = [];
   const positive: AccountDetail[] = [];
-  for (const acc of accounts) {
+  const categorized = accounts.map((account) => ({ account, category: categorizeAccount(account) }));
+  const duplicates = detectDuplicateDebts(categorized);
+  for (const [i, { account: acc, category }] of categorized.entries()) {
     const inconsistencies = detectInconsistencies(acc);
     const detail: AccountDetail = {
       creditorName: acc.creditorName,
-      category: categorizeAccount(acc),
+      category,
       isNegative: acc.isNegative,
       experian: acc.experian,
       equifax: acc.equifax,
       transunion: acc.transunion,
       paymentHistory: acc.paymentHistory,
-      inconsistencies
+      inconsistencies,
+      accuracyFlags: [...detectAccuracyFlags(acc, category), ...(duplicates.get(i) || [])]
     };
     if (acc.isNegative) negative.push(detail);
     else positive.push(detail);
@@ -610,21 +782,76 @@ function buildAccountDetails(accounts: ExtractedAccount[]) {
   return { negative, positive };
 }
 
+const ACCURACY_REASONS: Record<AccuracyFlag['lens'], string> = {
+  date: 'The reported dates are internally impossible or inconsistent. Dates control how long an item may report and how it is scored, so the record is inaccurate as reported and must be corrected or deleted if it cannot be verified.',
+  balance: 'The balance, past-due, or payment fields contradict each other or the account status. An account cannot be accurately reported with amounts that conflict with its own status; request verification of the exact figures.',
+  status: 'The account status contradicts other fields in the same record. Request that the bureau verify which status is accurate and correct the record.',
+  comment: 'The creditor remark does not match the account data. Remarks must be accurate and current; request that the remark be verified and updated or removed.',
+  obsolete: 'Negative information may not be reported more than 7 years plus 180 days after the date of first delinquency (FCRA § 605(c)). Request deletion of the obsolete item.',
+  reaging: 'The activity or delinquency date appears to have been moved later than the payment record supports. Re-aging extends reporting beyond the legal period; request verification of the original date of first delinquency.',
+  payment_history: 'The month-by-month payment grid contradicts the account dates or status. Late marks reported outside the life of the account, or against a never-late status, are inaccurate.',
+  duplicate: 'The same debt appears to be reported more than once with a balance on each listing, which overstates what is owed. Request that the duplicate be deleted or its balance reported as $0.',
+  incomplete: 'The negative item is missing key fields. An incomplete record cannot be fully verified; request that the bureau complete it with verified data or delete it.'
+};
+
 function buildDisputeOpportunities(details: AccountDetail[]): DisputeOpportunity[] {
   const ops: DisputeOpportunity[] = [];
 
   for (const d of details) {
+    // Inquiries have their own review lane. Do not let bureau-field differences
+    // crowd the tradeline dispute queue or imply that every inquiry is unauthorized.
+    if (d.category === 'inquiry') continue;
     if (!d.isNegative && d.inconsistencies.length === 0) continue;
 
     const fields = d.experian || d.equifax || d.transunion;
     const reportingBureaus = BUREAU_KEYS.filter(k => d[k] !== null);
 
-    // One dispute per cell-level inconsistency
-    for (const fieldKey of d.inconsistencies) {
+    // Payment-grid mismatches are grouped into one dispute per account so a
+    // letter lists the months together instead of one line per month.
+    const historyMonths = d.inconsistencies.filter((k) => k.startsWith('paymentHistory:'));
+    if (historyMonths.length) {
+      const history = d.paymentHistory;
+      const monthText = historyMonths.map((key) => {
+        const month = key.slice('paymentHistory:'.length);
+        const index = history?.months.findIndex((label) => label === month) ?? -1;
+        const cells = BUREAU_KEYS
+          .filter((k) => index >= 0 && history?.[k]?.[index])
+          .map((k) => `${BUREAU_DISPLAY[k]} ${history![k][index]}`)
+          .join(', ');
+        return `${month} (${cells})`;
+      });
+      ops.push({
+        accountName: d.creditorName,
+        accountNumber: fields?.accountNumber ?? null,
+        issue: `payment history disagrees across bureaus for ${historyMonths.length} month${historyMonths.length === 1 ? '' : 's'}: ${monthText.join('; ')}`,
+        bureaus: reportingBureaus,
+        reason: 'The same furnisher reports a different payment status for the same month to different bureaus. At most one version can be accurate; request that each bureau verify the month-by-month history and correct or delete the late marks that cannot be verified.',
+        priority: 'high',
+        fieldKey: 'paymentHistory'
+      });
+    }
+
+    // One dispute per remaining cell-level inconsistency
+    for (const fieldKey of d.inconsistencies.filter((k) => !k.startsWith('paymentHistory:'))) {
       const values: Partial<Record<BureauKey, string | number | null>> = {};
-      for (const k of BUREAU_KEYS) {
-        const v = (d[k] as Record<string, unknown> | null)?.[fieldKey];
-        if (v !== undefined) values[k] = v as string | number | null;
+      let fieldLabel = FIELD_LABELS[fieldKey] || fieldKey;
+      if (fieldKey.startsWith('paymentHistory:')) {
+        const month = fieldKey.slice('paymentHistory:'.length);
+        const history = d.paymentHistory;
+        const index = history?.months.findIndex((label) => label === month) ?? -1;
+        for (const k of BUREAU_KEYS) {
+          const row = history?.[k];
+          if (index >= 0 && row?.[index] !== undefined) values[k] = row[index];
+        }
+        fieldLabel = `payment history (${month})`;
+      } else if (fieldKey === 'bureauCoverage') {
+        fieldLabel = 'bureau reporting coverage';
+        for (const k of BUREAU_KEYS) values[k] = d[k] ? 'reported' : 'not reported';
+      } else {
+        for (const k of BUREAU_KEYS) {
+          const v = (d[k] as Record<string, unknown> | null)?.[fieldKey];
+          if (v !== undefined) values[k] = v as string | number | null;
+        }
       }
       const valueText = BUREAU_KEYS
         .filter(k => values[k] !== undefined)
@@ -633,23 +860,45 @@ function buildDisputeOpportunities(details: AccountDetail[]): DisputeOpportunity
       ops.push({
         accountName: d.creditorName,
         accountNumber: fields?.accountNumber ?? null,
-        issue: `${FIELD_LABELS[fieldKey] || fieldKey} disagrees across bureaus (${valueText})`,
+        issue: fieldKey === 'bureauCoverage'
+          ? `negative item is reported to only ${reportingBureaus.length} of 3 bureaus (${valueText})`
+          : `${fieldLabel} disagrees across bureaus (${valueText})`,
         bureaus: reportingBureaus,
-        reason: `Inconsistent reporting on ${FIELD_LABELS[fieldKey] || fieldKey}. Under FCRA § 611 the furnisher must report identical, accurate data to every bureau.`,
-        priority: 'high',
+        reason: fieldKey === 'bureauCoverage'
+          ? 'Coverage alone is not an inaccuracy, but it means only the listed bureau(s) can be asked to verify this item. Compare the fields that are reported for accuracy and completeness.'
+          : `Inconsistent reporting on ${fieldLabel}. Verify the underlying record and request correction only of any inaccurate, incomplete, duplicated, or unverifiable bureau-specific reporting.`,
+        priority: fieldKey === 'bureauCoverage' ? 'low' : 'high',
         fieldKey,
         perBureauValues: values
       });
     }
 
-    // If negative with no cell-level inconsistencies, still queue a generic dispute
-    if (d.isNegative && d.inconsistencies.length === 0) {
+    // Errors inside one bureau's record: sent only to the bureau(s) carrying them.
+    if (d.isNegative) {
+      const byCode = new Map<string, AccuracyFlag[]>();
+      for (const flag of d.accuracyFlags) byCode.set(flag.code, [...(byCode.get(flag.code) || []), flag]);
+      for (const [code, flags] of byCode) {
+        const flagBureaus = Array.from(new Set(flags.map((f) => f.bureau).filter((b): b is BureauKey => b !== null)));
+        ops.push({
+          accountName: d.creditorName,
+          accountNumber: fields?.accountNumber ?? null,
+          issue: Array.from(new Set(flags.map((f) => f.detail))).join(' '),
+          bureaus: flagBureaus.length ? flagBureaus : reportingBureaus,
+          reason: ACCURACY_REASONS[flags[0].lens],
+          priority: flags.some((f) => f.severity === 'high') ? 'high' : flags.some((f) => f.severity === 'medium') ? 'medium' : 'low',
+          fieldKey: `rule:${code}`
+        });
+      }
+    }
+
+    // If negative with no specific finding, still queue a verification review
+    if (d.isNegative && d.inconsistencies.length === 0 && d.accuracyFlags.length === 0) {
       ops.push({
         accountName: d.creditorName,
         accountNumber: fields?.accountNumber ?? null,
         issue: `${categorizeAccount({ ...d, experian: d.experian, equifax: d.equifax, transunion: d.transunion } as ExtractedAccount).replace('_', ' ')} reported negatively`,
         bureaus: reportingBureaus,
-        reason: 'Request method-of-verification and full debt validation. Negative items must be 100% accurate, complete, and verifiable to remain.',
+        reason: 'Review the item for accuracy, completeness, and verifiability. Request correction only for a supported factual error; accurate negative information is not disputable merely because it is adverse.',
         priority: 'medium'
       });
     }
@@ -744,6 +993,7 @@ function buildClientFacingSummary(args: {
   const { client, tiles, details, disputeCount } = args;
   const negativesByCat = details.filter(d => d.isNegative);
   const inconsistencyCount = details.reduce((sum, d) => sum + d.inconsistencies.length, 0);
+  const accuracyFlagCount = details.filter(d => d.isNegative).reduce((sum, d) => sum + d.accuracyFlags.length, 0);
   const timeline = tiles.derogatory.totalNegative > 10 ? '6–12 month' : tiles.derogatory.totalNegative > 5 ? '4–8 month' : '3–6 month';
   return [
     `# Credit Analysis Summary`,
@@ -755,10 +1005,11 @@ function buildClientFacingSummary(args: {
     `- ${negativesByCat.length} negative account${negativesByCat.length === 1 ? '' : 's'} across the three bureaus`,
     `- ${tiles.derogatory.collections} collection${tiles.derogatory.collections === 1 ? '' : 's'}, ${tiles.derogatory.chargeOffs} charge-off${tiles.derogatory.chargeOffs === 1 ? '' : 's'}, ${tiles.derogatory.latePayments} account${tiles.derogatory.latePayments === 1 ? '' : 's'} with late-payment history`,
     `- ${inconsistencyCount} cell-level inconsistenc${inconsistencyCount === 1 ? 'y' : 'ies'} flagged across bureaus`,
+    `- ${accuracyFlagCount} date, balance, status, or comment error${accuracyFlagCount === 1 ? '' : 's'} found inside individual bureau records`,
     `- ${disputeCount} dispute opportunit${disputeCount === 1 ? 'y' : 'ies'} ready to file`,
     ``,
     `## What that means for you`,
-    `Each inconsistency between bureaus is a fact the furnisher reported differently to different agencies — that's a direct FCRA § 611 violation and the easiest items to remove. Negative items reported identically still must be accurate, complete, and verifiable; we'll demand each one be re-investigated and documented.`,
+    `A difference between bureaus is a review lead, not automatic proof of a legal violation. We will identify the exact field, compare the underlying records, and use the FCRA reinvestigation process for supported inaccuracies. Negative items reported identically still must be accurate, complete, and verifiable; accurate negative information is not removed solely because it is unfavorable.`,
     ``,
     `## Estimated timeline`,
     `**${timeline} working window** based on the volume of items. We'll move bureau-by-bureau in 30-day reinvestigation rounds, then escalate to furnishers and CFPB for anything that comes back "verified."`,
@@ -770,7 +1021,7 @@ function buildClientFacingSummary(args: {
 const EDUCATION_SECTION = `
 ### Understanding Your Credit Report
 
-**Three bureaus, three different files.** Equifax, Experian, and TransUnion each maintain a separate report on you. Furnishers (your creditors) do not always report the same data to all three — and any disagreement is, by law, an inaccuracy you can dispute.
+**Three bureaus, three different files.** Equifax, Experian, and TransUnion each maintain a separate report on you. Furnishers do not always report the same data to all three, so a difference is a review lead. It becomes a dispute issue when the reported field is inaccurate, incomplete, duplicated, or unverifiable.
 
 **Five score factors:**
 - **Payment History (35%)** — late payments, collections, charge-offs hit the hardest
@@ -847,9 +1098,13 @@ export class CreditAnalysisService {
     const now = new Date().toISOString();
 
     const rich = readRichPayload(creditReports);
-    const accounts: ExtractedAccount[] = rich?.accounts && rich.accounts.length
-      ? rich.accounts
-      : buildAccountsFromTradelines(creditReports);
+    const extractedRows = buildAccountsFromTradelines(supplementalReports(creditReports));
+    // Never let a partial AI extraction suppress bureau tradeline rows. Union
+    // both sources, then classify from status/comments/history deterministically.
+    const accounts: ExtractedAccount[] = mergeExtractedAccounts([
+      ...(rich?.accounts || []),
+      ...extractedRows
+    ]).map(normalizeAccountClassification);
 
     const personalProfile: PersonalProfile = rich?.personalProfile ?? {
       experian: null, equifax: null, transunion: null, publicRecords: []
@@ -864,6 +1119,8 @@ export class CreditAnalysisService {
     const negativesByCategory = buildNegativesByCategory(accounts);
     const ficoFactors = buildFicoFactors(accounts, tiles);
     const { negative, positive } = buildAccountDetails(accounts);
+    const inquiries = buildInquiryDetails(accounts);
+    const personalInfoFlags = detectPersonalInfoFlags(personalProfile);
     const allDetails = [...negative, ...positive];
     const disputeOpportunities = buildDisputeOpportunities(allDetails);
     const actionPlan = buildActionPlan();
@@ -885,6 +1142,32 @@ export class CreditAnalysisService {
         recommendation: 'Dispute citing FCRA § 611 — furnisher must report identical, accurate data to every bureau.'
       });
     }
+    for (const d of negative) {
+      if (d.accuracyFlags.length === 0) continue;
+      const high = d.accuracyFlags.some((f) => f.severity === 'high');
+      keyFindings.push({
+        id: generateId(),
+        category: d.accuracyFlags.some((f) => f.lens === 'duplicate') ? 'duplicate'
+          : d.accuracyFlags.some((f) => f.lens === 'obsolete') ? 'stale_info' : 'challengeable',
+        severity: high ? 'high' : 'medium',
+        title: `Reporting Error: ${d.creditorName}`,
+        description: d.accuracyFlags.map((f) => f.detail).join(' '),
+        bureausAffected: Array.from(new Set(d.accuracyFlags.map((f) => f.bureau).filter((b): b is BureauKey => b !== null))),
+        accounts: [d.creditorName],
+        recommendation: ACCURACY_REASONS[d.accuracyFlags[0].lens]
+      });
+    }
+    if (personalInfoFlags.length) {
+      keyFindings.push({
+        id: generateId(),
+        category: 'inconsistency',
+        severity: 'medium',
+        title: 'Personal Information Mismatch',
+        description: personalInfoFlags.map((f) => f.detail).join(' '),
+        bureausAffected: BUREAU_KEYS,
+        recommendation: 'Correct personal information first: mismatched names, dates of birth, or addresses can indicate a mixed file, which is where accounts that do not belong to the consumer come from.'
+      });
+    }
     if (tiles.derogatory.totalNegative > 3) {
       keyFindings.push({
         id: generateId(),
@@ -902,6 +1185,7 @@ export class CreditAnalysisService {
     const totalBalance = bureauSummaries.reduce((s, b) => s + b.totalBalance, 0);
 
     return {
+      analysisEngineVersion: ANALYSIS_ENGINE_VERSION,
       generatedAt: now,
       branding: {
         companyName: process.env.BRAND_COMPANY_NAME || 'CredX',
@@ -925,6 +1209,8 @@ export class CreditAnalysisService {
       personalProfile,
       negativeAccounts: negative,
       positiveAccounts: positive,
+      inquiries,
+      personalInfoFlags,
       disputeOpportunities,
       actionPlan,
       nextSteps,

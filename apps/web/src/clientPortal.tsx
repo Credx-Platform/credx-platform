@@ -479,6 +479,9 @@ type NegativeAccountDetail = {
   reason: string;
   dateOpened: string | null;
   lastReported: string | null;
+  inconsistencies: string[];
+  accuracyFlags: string[];
+  bureauDetails: Record<string, any>;
 };
 
 function normalizeBureauName(value: unknown): string {
@@ -509,7 +512,8 @@ function collectNegativeAccountDetails(analysis: any): NegativeAccountDetail[] {
   const byKey = new Map<string, NegativeAccountDetail>();
   for (const item of buckets) {
     const accountName = String(item?.accountName || item?.creditorName || item?.furnisher || item?.name || item?.title || 'Reported account');
-    const accountNumber = item?.accountNumber || item?.account || item?.partialAccountNumber || null;
+    const primaryFields = item?.experian || item?.equifax || item?.transunion || null;
+    const accountNumber = item?.accountNumber || item?.account || item?.partialAccountNumber || primaryFields?.accountNumber || null;
     const bureaus = normalizeBureauList(item?.bureaus || item?.bureau || item?.reportedBureaus);
     const detail: NegativeAccountDetail = {
       accountName,
@@ -522,7 +526,14 @@ function collectNegativeAccountDetails(analysis: any): NegativeAccountDetail[] {
       issue: String(item?.issue || item?.description || item?.finding || 'Negative reporting identified in the analysis.'),
       reason: String(item?.reason || item?.recommendation || item?.recommendedAction || 'Review for inaccurate, incomplete, outdated, inconsistent, or unverifiable reporting.'),
       dateOpened: item?.dateOpened || item?.openedDate || item?.openDate || null,
-      lastReported: item?.lastReported || item?.reportedDate || item?.dateReported || item?.updatedAt || null
+      lastReported: item?.lastReported || item?.reportedDate || item?.dateReported || item?.updatedAt || null,
+      inconsistencies: Array.isArray(item?.inconsistencies) ? item.inconsistencies.map(String) : [],
+      accuracyFlags: Array.isArray(item?.accuracyFlags) ? item.accuracyFlags.map((flag: any) => String(flag?.detail || flag)) : [],
+      bureauDetails: {
+        ...(item?.experian ? { Experian: item.experian } : {}),
+        ...(item?.equifax ? { Equifax: item.equifax } : {}),
+        ...(item?.transunion ? { TransUnion: item.transunion } : {})
+      }
     };
     const key = `${detail.accountName.toLowerCase()}|${detail.accountNumber || ''}`;
     const existing = byKey.get(key);
@@ -530,7 +541,10 @@ function collectNegativeAccountDetails(analysis: any): NegativeAccountDetail[] {
       byKey.set(key, {
         ...existing,
         ...detail,
-        bureaus: Array.from(new Set([...existing.bureaus, ...detail.bureaus]))
+        bureaus: Array.from(new Set([...existing.bureaus, ...detail.bureaus])),
+        inconsistencies: Array.from(new Set([...existing.inconsistencies, ...detail.inconsistencies])),
+        accuracyFlags: Array.from(new Set([...existing.accuracyFlags, ...detail.accuracyFlags])),
+        bureauDetails: { ...existing.bureauDetails, ...detail.bureauDetails }
       });
     } else {
       byKey.set(key, detail);
@@ -2999,6 +3013,8 @@ function buildAnalysisReportHtml(user: User | null, client: Client | null, analy
   const acctSummary = analysis?.accountSummary || {};
   const findings = analysis?.keyFindings || [];
   const disputeOps = analysis?.disputeOpportunities || [];
+  const negativeAccounts = analysis?.negativeAccounts || [];
+  const inquiries = analysis?.inquiries || [];
   const bureaus = analysis?.bureauSummaries || [];
   const plan = analysis?.actionPlan || [];
   const summary = analysis?.clientFacingSummary || '';
@@ -3152,6 +3168,29 @@ function buildAnalysisReportHtml(user: User | null, client: Client | null, analy
         ${f.recommendation ? `<p style="margin:6px 0 0;color:#0f172a;font-weight:600;">→ ${escapeHtml(f.recommendation)}</p>` : ''}
       </div>`).join('')}
   </section>` : ''}
+
+  ${negativeAccounts.length ? `
+  <section class="page">
+    <h1 class="section">Complete Negative-Account Inventory</h1>
+    <div class="section-rule"></div>
+    <p>Every negative tradeline identified in the uploaded report is listed below before dispute opportunities are evaluated. Bureau differences are shown for cross-reference.</p>
+    ${negativeAccounts.map((account: any) => `
+      <div class="item">
+        <div class="top"><strong>${escapeHtml(account.creditorName || '')}</strong><span class="badge b-${escapeHtml(account.inconsistencies?.length || account.accuracyFlags?.length ? 'high' : 'medium')}">${account.inconsistencies?.length || account.accuracyFlags?.length ? 'error found' : 'review'}</span></div>
+        <p style="margin:6px 0 0;color:#475569;font-size:13px;">${escapeHtml(account.category || 'negative account')} · ${escapeHtml(account.accountNumber || 'Account number not shown')}</p>
+        <p style="margin:4px 0 0;color:#0f172a;">${escapeHtml(account.status || 'Status not reported')} · ${account.experian ? 'Experian ' : ''}${account.equifax ? 'Equifax ' : ''}${account.transunion ? 'TransUnion' : ''}</p>
+        ${account.inconsistencies?.length ? `<p style="margin:4px 0 0;color:#dc2626;"><strong>Bureau mismatches:</strong> ${escapeHtml(account.inconsistencies.join(', '))}</p>` : ''}
+        ${account.accuracyFlags?.length ? account.accuracyFlags.map((flag: any) => `<p style="margin:4px 0 0;color:#dc2626;">${escapeHtml(flag.detail || '')}</p>`).join('') : ''}
+        ${!account.inconsistencies?.length && !account.accuracyFlags?.length ? '<p style="margin:4px 0 0;color:#475569;">No cross-bureau mismatch or single-bureau reporting error found; accuracy and verifiability still require review.</p>' : ''}
+      </div>`).join('')}
+  </section>` : ''}
+
+  <section class="page">
+    <h1 class="section">Separate Inquiry Review</h1>
+    <div class="section-rule"></div>
+    <p>Hard inquiries are intentionally separated from negative-account disputes. Review authorization and permissible purpose before challenging an inquiry.</p>
+    ${inquiries.length ? inquiries.map((inquiry: any) => `<div class="item"><strong>${escapeHtml(inquiry.creditorName || '')}</strong><p style="margin:6px 0 0;color:#475569;">${escapeHtml((inquiry.bureaus || []).join(', ') || 'Bureau not listed')} · ${escapeHtml(inquiry.accountNumber || 'Reference not shown')}</p></div>`).join('') : '<p>No hard inquiries were extracted into this separate lane.</p>'}
+  </section>
 
   ${disputeOps.length ? `
   <section class="page">
@@ -3484,6 +3523,7 @@ function AnalysisSection({ token, user, client, progress, refreshAll }: { token:
   const findings = hasAnalysis ? (analysis.keyFindings || []) : [];
   const disputeOps = hasAnalysis ? (analysis.disputeOpportunities || []) : [];
   const negativeAccounts = hasAnalysis ? collectNegativeAccountDetails(analysis) : [];
+  const inquiries = hasAnalysis && Array.isArray(analysis.inquiries) ? analysis.inquiries : [];
   const actionPlan = hasAnalysis ? (analysis.actionPlan || []) : [];
   const bureauSummaries = hasAnalysis ? (analysis.bureauSummaries || []) : [];
   const overallStats = hasAnalysis ? (analysis.overallStats || {}) : {};
@@ -3599,9 +3639,31 @@ function AnalysisSection({ token, user, client, progress, refreshAll }: { token:
                 <li><strong>Last reported</strong><span>{account.lastReported ? String(account.lastReported) : 'Not reported'}</span></li>
                 <li><strong>Finding</strong><span>{account.issue}</span></li>
                 <li><strong>Review reason</strong><span>{account.reason}</span></li>
+                {account.inconsistencies.length ? <li><strong>Bureau mismatches</strong><span>{account.inconsistencies.map((field) => field.replace(/([A-Z])/g, ' $1').toLowerCase()).join(', ')}</span></li> : null}
+                {account.accuracyFlags.length ? <li><strong>Reporting errors</strong><span>{account.accuracyFlags.join(' ')}</span></li> : null}
               </ul>
+              {Object.keys(account.bureauDetails).length > 1 ? (
+                <div className="dispute-meta" style={{ marginTop: '8px', color: '#475569' }}>
+                  <strong>Cross-reference:</strong>{' '}
+                  {Object.entries(account.bureauDetails).map(([bureau, fields]: [string, any]) => `${bureau}: ${fields?.accountStatus || fields?.paymentStatus || 'reported'}${fields?.balanceOwed != null ? ` · $${Number(fields.balanceOwed).toLocaleString()}` : ''}`).join(' · ')}
+                </div>
+              ) : null}
             </div>
           )) : <div className="empty-state-card">No negative accounts identified yet.</div>}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Separate Review Lane</p><h2>Hard inquiries</h2></div></div>
+        <p className="helper-text" style={{ marginTop: 0 }}>Inquiries are listed separately so they do not crowd the negative-account dispute process. Review each one for permissible purpose or authorization before deciding whether to challenge it.</p>
+        <div className="dispute-list">
+          {inquiries.length ? inquiries.map((inquiry: any, idx: number) => (
+            <div key={`${inquiry.creditorName}-${inquiry.accountNumber || idx}`} className="dispute-card-live">
+              <div className="dispute-card-top"><strong>{inquiry.creditorName}</strong><span className="status-badge status-pending">Inquiry review</span></div>
+              <div className="dispute-meta"><span>Account/reference: {inquiry.accountNumber || 'Not shown'}</span><span>Bureaus: {(inquiry.bureaus || []).join(', ') || 'Not listed'}</span></div>
+              <div className="dispute-meta" style={{ marginTop: '4px' }}><span>Dates: {Object.entries(inquiry.dates || {}).map(([bureau, date]) => `${bureau}: ${date || 'not listed'}`).join(' · ') || 'Not listed'}</span></div>
+            </div>
+          )) : <div className="empty-state-card">No hard inquiries were extracted into the separate review lane.</div>}
         </div>
       </section>
 

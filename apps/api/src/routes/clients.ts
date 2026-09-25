@@ -5,13 +5,14 @@ import { randomBytes } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
-import { CreditAnalysisService } from '../lib/creditAnalysis.js';
+import { ANALYSIS_ENGINE_VERSION, CreditAnalysisService } from '../lib/creditAnalysis.js';
 import { dispatchAnalysisEmail } from '../lib/analysisEmailDispatch.js';
 import { decryptPII, encryptPII } from '../lib/encryption.js';
 import { getSignedUrlForStoredDocument } from '../lib/blob-storage.js';
 import { findClientDocumentForUser } from '../lib/tenantQueries.js';
 import { extractReport } from '../lib/reportExtractor.js';
 import { syncReportDerivedClientData } from '../lib/clientReportSync.js';
+import { saveInternalAnalysisAudit } from '../lib/analysisAudit.js';
 import { defaultAffiliateLinks, recommendedAffiliateLinksForAnalysis } from '../lib/affiliateLinks.js';
 import { sendAffiliateReferralEmail } from '../lib/email.js';
 
@@ -333,6 +334,9 @@ clientsRouter.get('/:id', requireAuth, requireRole(['STAFF', 'ADMIN']), async (r
         },
         documents: true,
         activities: {
+          orderBy: { createdAt: 'desc' }
+        },
+        notes: {
           orderBy: { createdAt: 'desc' }
         },
         tasks: true,
@@ -1174,6 +1178,7 @@ clientsRouter.post('/:id/analysis/generate', requireAuth, requireRole(['STAFF', 
         ...analysisReviewWorkflow
       }
     });
+    await saveInternalAnalysisAudit(prisma, id, analysis);
 
     // Also update client status
     await prisma.client.update({
@@ -1364,13 +1369,14 @@ clientsRouter.post('/:id/analysis/auto', requireAuth, async (req: AuthedRequest,
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // Check if analysis already exists
     const existing = await prisma.clientProgress.findUnique({
       where: { clientId: id }
     });
 
-    if (existing?.analysis) {
-      return res.json({ analysis: existing.analysis, cached: true });
+    // Reuse the cached analysis only if it came from the current engine;
+    // anything older is rebuilt so engine fixes reach existing clients.
+    if ((existing?.analysis as { analysisEngineVersion?: string } | null)?.analysisEngineVersion === ANALYSIS_ENGINE_VERSION) {
+      return res.json({ analysis: existing!.analysis, cached: true });
     }
 
     let client = await prisma.client.findUnique({
@@ -1428,6 +1434,7 @@ clientsRouter.post('/:id/analysis/auto', requireAuth, async (req: AuthedRequest,
         }
       }
     });
+    await saveInternalAnalysisAudit(prisma, id, analysis);
 
     await prisma.client.update({
       where: { id },
