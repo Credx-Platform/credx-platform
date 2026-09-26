@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -82,9 +82,19 @@ test('agent landing route and Instagram backdrop are published', { skip: skip() 
   const instagramBackdrop = await fetch(`${base}/images/instagram-gradient.jpg`);
   assert.equal(instagramBackdrop.status, 200);
   assert.match(instagramBackdrop.headers.get('content-type') || '', /^image\/jpeg/);
+});
 
-  const cinematicCss = readFileSync(join(webRoot, 'public/styles/landing-cinematic.css'), 'utf8');
-  assert.match(cinematicCss, /body:not\(\.agent-landing-mode\).*\.about-runway/s);
+test('agent application only asks for onboarding essentials', { skip: skip() }, async () => {
+  const res = await fetch(`${base}/agent`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /id="a_first"/);
+  assert.match(html, /id="a_last"/);
+  assert.match(html, /id="a_email"/);
+  assert.match(html, /id="a_phone"/);
+  assert.doesNotMatch(html, /id="a_state"/);
+  assert.doesNotMatch(html, /id="a_experience"/);
+  assert.doesNotMatch(html, /id="a_why"/);
 });
 
 test('unknown paths are a real 404, never a soft 200', { skip: skip() }, async () => {

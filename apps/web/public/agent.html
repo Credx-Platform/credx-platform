@@ -108,22 +108,6 @@ footer a{color:var(--muted2)}
         <div class="form-group"><label for="a_email">Email</label><input type="email" id="a_email" name="email" autocomplete="email" maxlength="254" placeholder="you@email.com" required></div>
         <div class="form-group"><label for="a_phone">Phone</label><input type="tel" id="a_phone" name="phone" autocomplete="tel" maxlength="14" placeholder="(555) 555-0100" required></div>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label for="a_state">State</label><input type="text" id="a_state" name="state" autocomplete="address-level1" maxlength="2" placeholder="NJ" style="text-transform:uppercase"></div>
-        <div class="form-group">
-          <label for="a_experience">Credit industry experience</label>
-          <select id="a_experience" name="experience">
-            <option value="">Select one</option>
-            <option>None — new and ready to learn</option>
-            <option>Some — referred or assisted clients</option>
-            <option>Experienced — run or ran a credit business</option>
-            <option>Licensed professional (real estate, lending, insurance, etc.)</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row single">
-        <div class="form-group"><label for="a_why">Why do you want to partner with CredX?</label><textarea id="a_why" name="motivation" maxlength="2000" placeholder="e.g. I'm a mortgage loan officer and want a trusted place to send buyers who need to prepare their credit."></textarea></div>
-      </div>
       <div class="cf-turnstile-slot" style="margin:12px 0 0;"></div>
       <div class="cb-row">
         <input type="checkbox" id="a_consent" name="consent">
@@ -173,9 +157,9 @@ footer a{color:var(--muted2)}
       lastName: value('a_last'),
       email: value('a_email'),
       phone: value('a_phone'),
-      state: value('a_state').toUpperCase(),
-      experience: document.getElementById('a_experience').value,
-      motivation: value('a_why'),
+      state: '',
+      experience: '',
+      motivation: '',
       source: 'agent_page',
       consent: document.getElementById('a_consent').checked
     };
@@ -183,7 +167,6 @@ footer a{color:var(--muted2)}
     if (!payload.firstName || !payload.lastName) return showError('Please enter your first and last name.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) return showError('Please enter a valid email address.');
     if (payload.phone.replace(/\D/g, '').length < 10) return showError('Please enter a 10-digit phone number.');
-    if (payload.state && !/^[A-Z]{2}$/.test(payload.state)) return showError('Use a 2-letter state code, like NJ.');
     if (!payload.consent) return showError('Please confirm your information and agree to be contacted.');
 
     var turnstileToken = (window.CredXTurnstile && window.CredXTurnstile.getToken()) || undefined;
