@@ -1389,6 +1389,7 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
   const bio=document.getElementById('agentCampaignBio');
   const name=document.getElementById('agentCampaignName');
   const referral=document.getElementById('agentCampaignReferral');
+  const socials=document.getElementById('agentCampaignSocials');
   if(!block||!photo||!title||!bio||!name) return;
   document.body.classList.add('agent-landing-mode');
   const owner=document.getElementById('ownerAbout');
@@ -1397,6 +1398,27 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
   title.textContent='Meet '+(agent.name||'your CredX agent')+'.';
   bio.textContent=agent.publicBio||'Your CredX agent is here to help you take the next clear step toward stronger credit and financial readiness.';
   if(agent.publicHeadshotUrl) photo.src=agent.publicHeadshotUrl;
+  if(socials&&Array.isArray(agent.socialLinks)&&agent.socialLinks.length){
+   socials.innerHTML='';
+   agent.socialLinks.forEach(item=>{
+    if(!item||!item.url||!item.label) return;
+    const link=document.createElement('a');
+    link.href=item.url;
+    link.target='_blank';
+    link.rel='noopener noreferrer';
+    link.className='agent-social-placeholder';
+    link.setAttribute('aria-label',item.label+' (opens in a new tab)');
+    const icon=document.createElement('b');
+    icon.setAttribute('aria-hidden','true');
+    icon.textContent=item.icon||item.label.charAt(0);
+    const label=document.createElement('span');
+    label.textContent=item.label;
+    const note=document.createElement('em');
+    note.textContent='Profile link';
+    link.append(icon,label,note);
+    socials.appendChild(link);
+   });
+  }
   if(referral){
    referral.textContent='Referral attribution: signups from this page are tracked to '+(agent.name||'this approved CredX agent')+'.';
    referral.hidden=false;

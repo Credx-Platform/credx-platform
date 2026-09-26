@@ -289,6 +289,33 @@ subAgentsRouter.get('/me', requireAuth, requireRole(['AFFILIATE']), async (req: 
   }
 });
 
+subAgentsRouter.get('/public/:code', async (req, res, next) => {
+  try {
+    const subAgent = await prisma.subAgent.findUnique({
+      where: { referralCode: String(req.params.code || '') },
+      select: {
+        name: true,
+        referralCode: true,
+        status: true
+      }
+    });
+    if (!subAgent || subAgent.status !== 'ACTIVE') {
+      return res.status(404).json({ error: 'Sub-agent profile not found' });
+    }
+    return res.json({
+      subAgent: {
+        name: subAgent.name,
+        referralCode: subAgent.referralCode,
+        publicBio: null,
+        publicHeadshotUrl: null,
+        socialLinks: []
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 subAgentsRouter.get('/onboarding/:token', async (req, res, next) => {
   try {
     const tokenHash = hashToken(String(req.params.token || ''));
