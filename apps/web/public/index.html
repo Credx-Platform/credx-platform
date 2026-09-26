@@ -283,9 +283,11 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 .chat-start{min-height:44px;padding:12px 24px;border:0;border-radius:8px;background:var(--cyan);color:var(--bg);font-family:var(--font-display);font-size:13px;font-weight:800;letter-spacing:.02em;cursor:pointer;transition:all .2s}
 .chat-start:hover{background:var(--cyan2);box-shadow:0 0 18px var(--cyan-glow);transform:translateY(-1px)}
 .chat-session[hidden],.chat-landing[hidden]{display:none}
-.chat-intro{text-align:left;background:var(--bg);padding:20px 20px 4px}
-.chat-intro p{margin:0;color:var(--muted);font-size:13px;line-height:1.65}
-.chat-intro strong{color:var(--white)}
+.chat-guide{text-align:center;background:var(--bg);padding:10px 20px 0}
+.chat-guide-link{padding:4px 8px;border:0;background:none;color:var(--cyan);font:600 11px var(--font-body);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.chat-guide-link:hover{color:var(--cyan2)}
+.chat-guide-popover{max-width:360px;margin:8px auto 0;padding:12px 16px;text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:12px;line-height:1.7;box-shadow:0 12px 28px rgba(0,0,0,.16)}
+.chat-guide-popover strong{color:var(--white)}
 .chat-disclaimer{margin:14px 20px 0!important;padding:12px 14px;border:1px solid var(--border);border-radius:8px;color:var(--muted2)!important;font-size:11px!important;line-height:1.55!important}
 .chat-quick-label{margin:0;padding:12px 20px 0;background:var(--bg);color:var(--muted);font-size:12px;font-weight:700}
 .cesar-nudge{position:fixed;bottom:24px;right:24px;z-index:1000;display:none;align-items:flex-start;gap:12px;max-width:320px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border-c);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.35);cursor:pointer;opacity:0;transform:translateY(16px);transition:opacity .45s ease,transform .45s ease}
@@ -834,12 +836,11 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
     <button class="chat-start" id="chatStart" type="button">Start Chat</button>
    </div>
    <div class="chat-session" id="chatSession" hidden>
-    <div class="chat-intro">
-     <p><strong>Hi, I’m CESAR, your CredX AI guide. 👋</strong><br><br>I can help you with:</p>
-     <p>• The CredX 5-Day Masterclass<br>• Your credit and financial readiness<br>• Your CredX action plan<br>• Credit reports and disputes<br>• Funding readiness<br>• Choosing the right CredX tools</p>
-     <p>What would you like help with?</p>
-    </div>
     <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-guide">
+     <button class="chat-guide-link" id="chatGuideToggle" type="button" aria-expanded="false" aria-controls="chatGuidePopover">CESAR guide</button>
+     <div class="chat-guide-popover" id="chatGuidePopover" hidden><strong>I can help with:</strong><br>• The CredX 5-Day Masterclass<br>• Your credit and financial readiness<br>• Your CredX action plan<br>• Credit reports and disputes<br>• Funding readiness<br>• Choosing the right CredX tools</div>
+    </div>
     <div class="chat-input-wrap">
      <input class="chat-input" id="chatInput" placeholder="Ask CESAR a question" aria-label="Ask CESAR a question">
      <button class="chat-send" id="chatSend" type="button" aria-label="Send message">➤</button>
@@ -1231,6 +1232,8 @@ const chatInput=document.getElementById('chatInput');
 const chatLanding=document.getElementById('chatLanding');
 const chatSession=document.getElementById('chatSession');
 const chatStart=document.getElementById('chatStart');
+const chatGuideToggle=document.getElementById('chatGuideToggle');
+const chatGuidePopover=document.getElementById('chatGuidePopover');
 let chatStarted=false;
 
 function startChat(){
@@ -1324,6 +1327,11 @@ chatInput.addEventListener('keydown',(event)=>{ if(event.key==='Enter'){ event.p
 chatStart?.addEventListener('click',()=>{
  startChat();
  window.setTimeout(()=>chatInput?.focus(),50);
+});
+chatGuideToggle?.addEventListener('click',()=>{
+ const open=chatGuideToggle.getAttribute('aria-expanded')==='true';
+ chatGuideToggle.setAttribute('aria-expanded',open?'false':'true');
+ if(chatGuidePopover) chatGuidePopover.hidden=open;
 });
 document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('click',()=>{
  startChat();
