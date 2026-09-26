@@ -483,23 +483,24 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 .about-transition .portal-logo b{-webkit-text-stroke-color:#0089b2}
 .about-gateway i{border-color:rgba(0,137,178,.45);box-shadow:0 0 20px rgba(0,168,211,.12)}
 .about-transition .about-gateway{display:block!important}
-/* Cesar and the profile share one light chapter with room for the opening. */
-#chat{background:var(--cx-profile-surface)!important;color:#183247;padding-bottom:clamp(144px,20vh,224px)}
-#chat .stitle,#chat .chat-agent-name{color:#142d43}
-#chat .ssub{color:#476176}
-#chat .stag,#chat .chat-powered span{color:#0088b0}
-#chat .chat-window{background:var(--cx-profile-surface);border-color:#cbdde6;box-shadow:0 18px 48px -30px rgba(29,53,78,.3)}
-#chat .chat-header,#chat .chat-input-wrap,#chat .chat-quick-actions{background:var(--cx-profile-surface);border-color:#d6e4eb}
-#chat .chat-msg.agent .chat-bubble,#chat .chat-typing{background:#fff;border-color:#d6e4eb;color:#304b64}
-#chat .chat-msg.user .chat-bubble{background:#e5f7fc;border-color:#b8dfe9;color:#183247}
-#chat .chat-bubble a{color:#007c9f}
-#chat .chat-agent-status{color:#24734f}
-#chat .chat-powered,#chat .chat-input::placeholder{color:#587085}
-#chat .chat-input,#chat .chat-quick{background:#fff;border-color:#bfd4df;color:#304b64}
+/* Keep CESAR in the original dark product chapter. The profile surface begins
+   after this section so the portal handoff remains compact and uninterrupted. */
+#chat{background:#040914!important;color:var(--white)}
+#chat .stitle,#chat .chat-agent-name{color:var(--white)}
+#chat .ssub{color:var(--muted)}
+#chat .stag,#chat .chat-powered span{color:var(--cyan)}
+#chat .chat-window{background:var(--bg3);border-color:var(--border-c);box-shadow:0 18px 48px -30px rgba(0,0,0,.55)}
+#chat .chat-header,#chat .chat-input-wrap,#chat .chat-quick-actions,#chat .chat-landing,#chat .chat-guide,#chat .chat-quick-label{background:var(--bg);border-color:var(--border)}
+#chat .chat-msg.agent .chat-bubble,#chat .chat-typing{background:var(--bg);border-color:var(--border);color:var(--muted)}
+#chat .chat-msg.user .chat-bubble{background:var(--cyan-dim);border-color:var(--border-c);color:var(--white)}
+#chat .chat-bubble a{color:var(--cyan)}
+#chat .chat-agent-status{color:var(--green)}
+#chat .chat-powered,#chat .chat-input::placeholder{color:var(--muted2)}
+#chat .chat-input,#chat .chat-quick{background:var(--bg3);border-color:var(--border);color:var(--muted)}
 #chat .chat-input{min-width:0}
-#chat .chat-input:focus,#chat .chat-quick:hover{border-color:#0088b0}
-#chat .chat-msg.user .chat-msg-av{background:#e0edf3;color:#304b64}
-#chat .chat-typing span{background:#587085}
+#chat .chat-input:focus,#chat .chat-quick:hover{border-color:var(--cyan)}
+#chat .chat-msg.user .chat-msg-av{background:var(--bg4);color:var(--muted)}
+#chat .chat-typing span{background:var(--muted)}
 #about{background:transparent!important;padding-top:clamp(96px,12vh,160px)!important}
 @media(max-width:767px){
   .nav{border-bottom-color:transparent}
