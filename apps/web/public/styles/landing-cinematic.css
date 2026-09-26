@@ -501,6 +501,8 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 #chat .chat-input:focus,#chat .chat-quick:hover{border-color:var(--cyan)}
 #chat .chat-msg.user .chat-msg-av{background:var(--bg4);color:var(--muted)}
 #chat .chat-typing span{background:var(--muted)}
+.chat-profile-buffer{height:clamp(280px,42vh,520px);background:var(--cx-profile-surface)}
+#ownerAbout > .about-photo{width:min(280px,100%)}
 #about{background:transparent!important;padding-top:clamp(96px,12vh,160px)!important}
 @media(max-width:767px){
   .nav{border-bottom-color:transparent}
@@ -508,7 +510,8 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
   .about-runway{overflow:visible!important}
   #about{padding-top:96px!important;background:transparent!important}
   #about .about-inner{opacity:1!important;transform:none!important;clip-path:none!important}
-  #about #ownerAbout .about-photo{width:min(115px,36vw)}
+  #about #ownerAbout .about-photo{width:min(230px,72vw)}
+  .chat-profile-buffer{height:clamp(280px,48vh,500px)}
   .profile-carousel{border-color:#d9e5ec;background:#fff;box-shadow:0 18px 48px -30px rgba(29,53,78,.3)}
   .profile-slide{transition:transform .28s ease-out,opacity .2s ease,visibility .2s}
 }

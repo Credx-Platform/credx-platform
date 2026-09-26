@@ -20,7 +20,14 @@
  // Shared smooth acceleration/deceleration. Position follows scroll immediately;
  // no interpolation tail, spring, scroll interception, or synthetic momentum.
  const ease=v=>{v=clamp(v);return v*v*(3-2*v)};
- const art=hero.querySelector('.hero-art'),heroCopy=hero.querySelector('.hero-copy'),heroGrid=hero.querySelector('.hero-grid');
+ const art=hero.querySelector('.hero-art'),objects=[...hero.querySelectorAll('.scene-object')],heroCopy=hero.querySelector('.hero-copy'),heroGrid=hero.querySelector('.hero-grid');
+ const heroDepths=[
+  {from:.62,to:1.10,z0:-180,z1:65,rx:3,ry:-8,x:0,y:-14,pointer:8},
+  {from:.64,to:1.06,z0:-90,z1:95,rx:-3,ry:9,x:14,y:12,pointer:14},
+  {from:.58,to:.97,z0:-300,z1:-50,rx:5,ry:10,x:-16,y:-16,pointer:3},
+  {from:.65,to:1.12,z0:-140,z1:85,rx:-4,ry:-5,x:0,y:-12,pointer:10},
+  {from:.55,to:.98,z0:-300,z1:30,rx:4,ry:10,x:-12,y:250,pointer:7}
+ ];
  const frames=[...portal.querySelectorAll('.portal-frames i')];
  const dash=portal.querySelector('.dash-ui');
  const tracks=[
@@ -62,7 +69,7 @@
   let lastScrollY=scrollY,pendingScroll=0,streakTravel=0,nextStreak=80,flight=0,flightAt=0;
   let slowFrames=0,samples=0,observer,layoutObserver;
   const simple=degraded||weak()||innerWidth<768;
-  const animated=new Set([art,...frames,dash,aboutContent,aboutLogo,aboutTransition,aboutBackdrop,...aboutFrames,...socials]);
+  const animated=new Set([art,...objects,...frames,dash,aboutContent,aboutLogo,aboutTransition,aboutBackdrop,...aboutFrames,...socials]);
   const active=new Set();
   function reset(){
    root.classList.remove('cinematic-ready','narrative-ready','motion-simple');
@@ -70,6 +77,7 @@
    runway.style.removeProperty('--hero-height');runway.style.removeProperty('--pin-top');
    portal.style.removeProperty('--interface-height');portal.style.removeProperty('--interface-pin');
    animated.forEach(el=>{el.style.removeProperty('transform');el.style.removeProperty('opacity');el.style.removeProperty('will-change');el.style.removeProperty('clip-path');el.style.removeProperty('pointer-events')});
+   objects.forEach(el=>el.querySelector('.object-motion')?.style.removeProperty('transform'));
    aboutRunway.classList.remove('about-portal-active');socialRow.classList.remove('social-highlight');aboutSpace.style.removeProperty('height');aboutRunway.style.removeProperty('--about-content-top');
    aboutVeil.style.removeProperty('--iris-radius');
    aboutRunway.style.removeProperty('--about-height');aboutRunway.style.removeProperty('--about-travel');
@@ -250,13 +258,19 @@
      el.style.transform=`translate3d(0,${(1-pop)*22}px,0) scale(${.88+.12*pop})`;
     });
     if(active.has(runway)){
-     const p=clamp((y-heroTop-12)/Math.max(1,heroDistance-12)),e=ease(p);
-     // Keep the same eased scroll timing while cutting the prior 2x→4x
-     // composition in half: the artwork should stay clear of the copy and
-     // only reach a controlled 2x endpoint after scrolling.
-     const artStartScale=1;
-     const artEndScale=3;
-     art.style.transform=`translate3d(0,${-e*(simple?5:14)}px,0) scale(${artStartScale+(artEndScale-artStartScale)*e})`;
+     const p=clamp((y-heroTop-12)/Math.max(1,heroDistance-12)),e=ease(p),travel=.5;
+     // Keep the earlier independent image choreography: each possibility has
+     // its own depth and restrained scale instead of one large composition zoom.
+     art.style.transform='none';
+     objects.forEach((el,i)=>{
+      const d=heroDepths[i];
+      if(!d)return;
+      const scale=d.from+(d.to-d.from)*e;
+      const z=d.z0+(d.z1-d.z0)*e;
+      el.style.transform=`translate3d(${d.x*e*travel}px,${(i===4?75:d.y)*e*travel}px,${z*travel}px) rotateX(${d.rx*(1-e)}deg) rotateY(${d.ry*(1-e*.65)}deg) scale(${scale})`;
+      const motion=el.querySelector('.object-motion');
+      if(motion)motion.style.transform='translate3d(0,0,0)';
+     });
     }
     if(active.has(portal)){
      const p=clamp((y-portalTop+view*.38)/(portalDistance+view*.38));
@@ -334,4 +348,3 @@
  addEventListener('pageshow',()=>resume());
  mount();
 })();
-
