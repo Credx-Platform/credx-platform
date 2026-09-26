@@ -277,6 +277,17 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 .chat-quick-actions{display:flex;gap:6px;flex-wrap:wrap;padding:0 20px 14px;background:var(--bg)}
 .chat-quick{padding:6px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:100px;font-size:11px;color:var(--muted);cursor:pointer;transition:all .2s;font-family:var(--font-body)}
 .chat-quick:hover{border-color:var(--cyan);color:var(--cyan)}
+.chat-landing{padding:clamp(32px,6vw,56px) clamp(24px,6vw,56px);text-align:center;background:var(--bg)}
+.chat-landing h3{margin:0;font-family:var(--font-display);font-size:clamp(20px,3vw,28px);letter-spacing:-.02em;color:var(--white)}
+.chat-landing p{max-width:460px;margin:12px auto 24px;color:var(--muted);font-size:15px;line-height:1.6}
+.chat-start{min-height:44px;padding:12px 24px;border:0;border-radius:8px;background:var(--cyan);color:var(--bg);font-family:var(--font-display);font-size:13px;font-weight:800;letter-spacing:.02em;cursor:pointer;transition:all .2s}
+.chat-start:hover{background:var(--cyan2);box-shadow:0 0 18px var(--cyan-glow);transform:translateY(-1px)}
+.chat-session[hidden],.chat-landing[hidden]{display:none}
+.chat-intro{text-align:left;background:var(--bg);padding:20px 20px 4px}
+.chat-intro p{margin:0;color:var(--muted);font-size:13px;line-height:1.65}
+.chat-intro strong{color:var(--white)}
+.chat-disclaimer{margin:14px 20px 0!important;padding:12px 14px;border:1px solid var(--border);border-radius:8px;color:var(--muted2)!important;font-size:11px!important;line-height:1.55!important}
+.chat-quick-label{margin:0;padding:12px 20px 0;background:var(--bg);color:var(--muted);font-size:12px;font-weight:700}
 .cesar-nudge{position:fixed;bottom:24px;right:24px;z-index:1000;display:none;align-items:flex-start;gap:12px;max-width:320px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border-c);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.35);cursor:pointer;opacity:0;transform:translateY(16px);transition:opacity .45s ease,transform .45s ease}
 .cesar-nudge.show{display:flex;opacity:1;transform:translateY(0)}
 .cesar-nudge-av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),#0055cc);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:13px;color:var(--white);flex-shrink:0}
@@ -812,24 +823,36 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
    <div class="chat-header">
     <div class="chat-agent-av">CX</div>
     <div>
-     <div class="chat-agent-name">Cesar · AI-Assisted CredX Guidance</div>
+     <div class="chat-agent-name">CESAR — CredX AI Guide</div>
      <div class="chat-agent-status">AI-assisted support · human review available</div>
     </div>
     <div class="chat-powered">Powered by <span>CredX</span></div>
    </div>
-   <div class="chat-messages" id="chatMessages">
-    <div class="chat-msg agent"><div class="chat-msg-av">CX</div><div class="chat-bubble">Hi, I'm Cesar, an AI-assisted CredX guide. I can help with education and next steps, but I do not provide legal advice or guaranteed outcomes.</div></div>
-    <div class="chat-msg agent"><div class="chat-msg-av">CX</div><div class="chat-bubble">I can help you understand the CredX program, the 5-Day Masterclass, financing readiness, dispute workflow, and the best next step based on your goals.</div></div>
+   <div class="chat-landing" id="chatLanding">
+    <h3>CESAR — CredX AI Guide</h3>
+    <p>Questions about CredX, your credit, or financial readiness?</p>
+    <button class="chat-start" id="chatStart" type="button">Start Chat</button>
    </div>
-   <div class="chat-input-wrap">
-    <input class="chat-input" id="chatInput" placeholder="Ask about your next step">
-    <button class="chat-send" id="chatSend" type="button">➤</button>
-   </div>
-   <div class="chat-quick-actions">
-    <button class="chat-quick" type="button">Start intake review</button>
-    <button class="chat-quick" type="button">Understand my credit</button>
-    <button class="chat-quick" type="button">Prepare for financing</button>
-    <button class="chat-quick" type="button">Improve approval readiness</button>
+   <div class="chat-session" id="chatSession" hidden>
+    <div class="chat-intro">
+     <p><strong>Hi, I’m CESAR, your CredX AI guide. 👋</strong><br><br>I can help you with:</p>
+     <p>• The CredX 5-Day Masterclass<br>• Your credit and financial readiness<br>• Your CredX action plan<br>• Credit reports and disputes<br>• Funding readiness<br>• Choosing the right CredX tools</p>
+     <p>What would you like help with?</p>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-wrap">
+     <input class="chat-input" id="chatInput" placeholder="Ask CESAR a question" aria-label="Ask CESAR a question">
+     <button class="chat-send" id="chatSend" type="button" aria-label="Send message">➤</button>
+    </div>
+    <p class="chat-quick-label">Quick options:</p>
+    <div class="chat-quick-actions" aria-label="Quick options">
+     <button class="chat-quick" type="button">Improve My Credit</button>
+     <button class="chat-quick" type="button">Funding Readiness</button>
+     <button class="chat-quick" type="button">5-Day Masterclass</button>
+     <button class="chat-quick" type="button">Dispute Questions</button>
+     <button class="chat-quick" type="button">Explore CredX</button>
+    </div>
+    <p class="chat-disclaimer"><em>CESAR provides educational guidance only—not legal advice, credit guarantees, or guaranteed financing outcomes.</em></p>
    </div>
   </div>
  </div>
@@ -1205,6 +1228,18 @@ const faqItems=document.querySelectorAll('.faq-item');faqItems.forEach(item=>{it
 
 const chatMessages=document.getElementById('chatMessages');
 const chatInput=document.getElementById('chatInput');
+const chatLanding=document.getElementById('chatLanding');
+const chatSession=document.getElementById('chatSession');
+const chatStart=document.getElementById('chatStart');
+let chatStarted=false;
+
+function startChat(){
+ if(chatStarted) return;
+ chatStarted=true;
+ if(chatLanding) chatLanding.hidden=true;
+ if(chatSession) chatSession.hidden=false;
+ appendChatMessage('agent', 'Hi, I’m CESAR, your CredX AI guide. 👋<br><br>What would you like help with?');
+}
 
 function appendChatMessage(role,text){
  const row=document.createElement('div');
@@ -1286,7 +1321,12 @@ function sendChat(){
 
 document.getElementById('chatSend').addEventListener('click',sendChat);
 chatInput.addEventListener('keydown',(event)=>{ if(event.key==='Enter'){ event.preventDefault(); sendChat(); }});
+chatStart?.addEventListener('click',()=>{
+ startChat();
+ window.setTimeout(()=>chatInput?.focus(),50);
+});
 document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('click',()=>{
+ startChat();
  const prompt=btn.textContent.trim();
  appendChatMessage('user',prompt);
  deliverCesarReply(prompt);
@@ -1307,6 +1347,7 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
  }
  function openChat(){
   hideNudge(true);
+  startChat();
   const chat=document.getElementById('chat');
   if(chat) chat.scrollIntoView({behavior:'smooth',block:'center'});
   window.setTimeout(()=>{ if(chatInput) chatInput.focus(); },600);
@@ -1372,4 +1413,3 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
 </div>
 </body>
 </html>
-
