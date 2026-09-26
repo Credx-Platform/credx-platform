@@ -1390,6 +1390,9 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
   const name=document.getElementById('agentCampaignName');
   const referral=document.getElementById('agentCampaignReferral');
   if(!block||!photo||!title||!bio||!name) return;
+  document.body.classList.add('agent-landing-mode');
+  const owner=document.getElementById('ownerAbout');
+  if(owner) owner.hidden=true;
   name.textContent=agent.name||'Your CredX agent';
   title.textContent='Meet '+(agent.name||'your CredX agent')+'.';
   bio.textContent=agent.publicBio||'Your CredX agent is here to help you take the next clear step toward stronger credit and financial readiness.';

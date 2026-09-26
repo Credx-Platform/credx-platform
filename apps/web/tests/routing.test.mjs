@@ -74,6 +74,16 @@ test('admin SPA deep links serve the admin bundle, not the landing page', { skip
   }
 });
 
+test('agent landing route and Instagram backdrop are published', { skip: skip() }, async () => {
+  const agentLanding = await fetch(`${base}/agent-landing?agent=demo`);
+  assert.equal(agentLanding.status, 200);
+  assert.match(await agentLanding.text(), /agentCampaign/);
+
+  const instagramBackdrop = await fetch(`${base}/images/instagram-gradient.jpg`);
+  assert.equal(instagramBackdrop.status, 200);
+  assert.match(instagramBackdrop.headers.get('content-type') || '', /^image\/jpeg/);
+});
+
 test('unknown paths are a real 404, never a soft 200', { skip: skip() }, async () => {
   for (const path of ['/this-page-does-not-exist', '/wp-login.php', '/admin-xyz', '/clientsX', '/security']) {
     const res = await fetch(`${base}${path}`);

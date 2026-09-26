@@ -503,6 +503,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 #chat .chat-typing span{background:var(--muted)}
 .chat-profile-buffer{height:clamp(280px,42vh,520px);background:var(--cx-profile-surface)}
 #ownerAbout > .about-photo{width:min(280px,100%)}
+.agent-landing-mode #ownerAbout{display:none!important}
 #about{background:transparent!important;padding-top:clamp(96px,12vh,160px)!important}
 @media(max-width:767px){
   .nav{border-bottom-color:transparent}

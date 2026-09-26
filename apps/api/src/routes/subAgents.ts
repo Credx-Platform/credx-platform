@@ -495,7 +495,7 @@ subAgentsRouter.get('/track/:code', async (req, res, next) => {
       agentName: subAgent.name,
       tracked: '1'
     });
-    return res.redirect(`/signup?${params.toString()}`);
+    return res.redirect(`/agent-landing?${params.toString()}`);
   } catch (error) {
     next(error);
   }
