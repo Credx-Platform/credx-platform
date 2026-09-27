@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <script>
-// Only the campaign landing URL selects an agent; never stored referral state.
-if (['/', '/index.html'].includes(location.pathname) && new URLSearchParams(location.search).get('agent')?.trim()) {
+// Only the dedicated campaign landing URL selects an agent; never the main homepage or stored referral state.
+if (['/agent-landing', '/agent-landing/'].includes(location.pathname) && new URLSearchParams(location.search).get('agent')?.trim()) {
  document.documentElement.classList.add('agent-landing-mode');
 }
 </script>

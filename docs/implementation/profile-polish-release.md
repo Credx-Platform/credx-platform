@@ -26,8 +26,9 @@ baseline, not a redesign. Cinematic JS is unchanged from live.
 ## Actual changes relative to live
 
 - Enforce `[hidden]` on the exact agent/owner/photo selectors, never the runway.
-- Select agent mode only for `/` or `/index.html` with a nonempty `agent` query;
-  no stored referral selection. Hide owner before an agent request completes.
+- Select agent mode only for `/agent-landing` with a nonempty `agent` query;
+  never on the main homepage and never from stored referral state. Hide owner
+  before an agent request completes.
 - No owner-image fallback in the agent card. Missing/failed agent headshots stay
   hidden; invalid or unavailable agents do not show an unrelated owner profile.
 - Apply inter-profile margin only when the agent card is not hidden.

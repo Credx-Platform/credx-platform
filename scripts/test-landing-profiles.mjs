@@ -20,7 +20,7 @@ try {
    });
    // Old referral storage must not select a profile on the ordinary homepage.
    await page.addInitScript(()=>localStorage.setItem('agent','stale-referral'));
-   await page.goto(base+(mode==='owner'?'/':'/?agent=fixture'),{waitUntil:'networkidle'});
+   await page.goto(base+(mode==='owner'?'/':'/agent-landing?agent=fixture'),{waitUntil:'networkidle'});
    await page.evaluate(()=>document.fonts.ready);
    assert.equal(calls,mode==='owner'?0:1);
    const visible=selector=>page.locator(selector).evaluate(e=>getComputedStyle(e).display!=='none');
