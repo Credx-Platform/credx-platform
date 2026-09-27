@@ -429,7 +429,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
   row-gap:clamp(56px,8vw,96px)!important;
   align-items:center;
 }
-.agent-campaign + #ownerAbout{margin-top:clamp(72px,10vw,140px)}
+.agent-campaign:not([hidden]) + #ownerAbout{margin-top:clamp(72px,10vw,140px)}
 .agent-campaign > .about-photo,#ownerAbout > .about-photo{grid-column:1;grid-row:1;justify-self:start}
 .agent-campaign > div,#ownerAbout > div{grid-column:2;grid-row:1;min-width:0}
 .agent-campaign > .about-photo{width:min(196px,100%)}
@@ -456,7 +456,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
   .agent-campaign > .about-photo{grid-column:1;grid-row:auto;justify-self:center;width:min(161px,52vw)}
   #ownerAbout > .about-photo{grid-column:1;grid-row:auto;justify-self:center;width:min(230px,72vw)}
   .agent-campaign > div,#ownerAbout > div{grid-column:1;grid-row:auto;width:100%}
-  .agent-campaign + #ownerAbout{margin-top:76px}
+  .agent-campaign:not([hidden]) + #ownerAbout{margin-top:76px}
   #about .about-socials{margin-top:44px}
 }
 
@@ -483,23 +483,29 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 .about-transition .portal-logo b{-webkit-text-stroke-color:#0089b2}
 .about-gateway i{border-color:rgba(0,137,178,.45);box-shadow:0 0 20px rgba(0,168,211,.12)}
 .about-transition .about-gateway{display:block!important}
-/* Cesar and the profile share one light chapter with room for the opening. */
-#chat{background:var(--cx-profile-surface)!important;color:#183247;padding-bottom:clamp(144px,20vh,224px)}
-#chat .stitle,#chat .chat-agent-name{color:#142d43}
-#chat .ssub{color:#476176}
-#chat .stag,#chat .chat-powered span{color:#0088b0}
-#chat .chat-window{background:var(--cx-profile-surface);border-color:#cbdde6;box-shadow:0 18px 48px -30px rgba(29,53,78,.3)}
-#chat .chat-header,#chat .chat-input-wrap,#chat .chat-quick-actions{background:var(--cx-profile-surface);border-color:#d6e4eb}
-#chat .chat-msg.agent .chat-bubble,#chat .chat-typing{background:#fff;border-color:#d6e4eb;color:#304b64}
-#chat .chat-msg.user .chat-bubble{background:#e5f7fc;border-color:#b8dfe9;color:#183247}
-#chat .chat-bubble a{color:#007c9f}
-#chat .chat-agent-status{color:#24734f}
-#chat .chat-powered,#chat .chat-input::placeholder{color:#587085}
-#chat .chat-input,#chat .chat-quick{background:#fff;border-color:#bfd4df;color:#304b64}
+/* Keep CESAR in the original dark product chapter. The profile surface begins
+   after this section so the portal handoff remains compact and uninterrupted. */
+#chat{background:#040914!important;color:var(--white)}
+#chat .stitle,#chat .chat-agent-name{color:var(--white)}
+#chat .ssub{color:var(--muted)}
+#chat .stag,#chat .chat-powered span{color:var(--cyan)}
+#chat .chat-window{background:var(--bg3);border-color:var(--border-c);box-shadow:0 18px 48px -30px rgba(0,0,0,.55)}
+#chat .chat-header,#chat .chat-input-wrap,#chat .chat-quick-actions,#chat .chat-landing,#chat .chat-guide,#chat .chat-quick-label{background:var(--bg);border-color:var(--border)}
+#chat .chat-msg.agent .chat-bubble,#chat .chat-typing{background:var(--bg);border-color:var(--border);color:var(--muted)}
+#chat .chat-msg.user .chat-bubble{background:var(--cyan-dim);border-color:var(--border-c);color:var(--white)}
+#chat .chat-bubble a{color:var(--cyan)}
+#chat .chat-agent-status{color:var(--green)}
+#chat .chat-powered,#chat .chat-input::placeholder{color:var(--muted2)}
+#chat .chat-input,#chat .chat-quick{background:var(--bg3);border-color:var(--border);color:var(--muted)}
 #chat .chat-input{min-width:0}
-#chat .chat-input:focus,#chat .chat-quick:hover{border-color:#0088b0}
-#chat .chat-msg.user .chat-msg-av{background:#e0edf3;color:#304b64}
-#chat .chat-typing span{background:#587085}
+#chat .chat-input:focus,#chat .chat-quick:hover{border-color:var(--cyan)}
+#chat .chat-msg.user .chat-msg-av{background:var(--bg4);color:var(--muted)}
+#chat .chat-typing span{background:var(--muted)}
+.chat-profile-buffer{height:clamp(280px,42vh,520px);background:var(--cx-profile-surface)}
+#ownerAbout > .about-photo{width:min(280px,100%)}
+.agent-landing-mode #ownerAbout{display:none!important}
+/* Layout display rules must not override route-selected profile visibility. */
+#agentCampaign[hidden],#ownerAbout[hidden],#agentCampaignPhoto[hidden]{display:none!important}
 #about{background:transparent!important;padding-top:clamp(96px,12vh,160px)!important}
 @media(max-width:767px){
   .nav{border-bottom-color:transparent}
@@ -507,7 +513,8 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
   .about-runway{overflow:visible!important}
   #about{padding-top:96px!important;background:transparent!important}
   #about .about-inner{opacity:1!important;transform:none!important;clip-path:none!important}
-  #about #ownerAbout .about-photo{width:min(115px,36vw)}
+  #about #ownerAbout .about-photo{width:min(230px,72vw)}
+  .chat-profile-buffer{height:clamp(280px,48vh,500px)}
   .profile-carousel{border-color:#d9e5ec;background:#fff;box-shadow:0 18px 48px -30px rgba(29,53,78,.3)}
   .profile-slide{transition:transform .28s ease-out,opacity .2s ease,visibility .2s}
 }

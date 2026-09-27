@@ -2,6 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script>
+// Only the campaign landing URL selects an agent; never stored referral state.
+if (['/', '/index.html'].includes(location.pathname) && new URLSearchParams(location.search).get('agent')?.trim()) {
+ document.documentElement.classList.add('agent-landing-mode');
+}
+</script>
 <title>CredX — Credit Intelligence & Financial Readiness Platform</title>
 <meta name="description" content="CredX is an AI-assisted credit intelligence and financial readiness platform for profile analysis, education, action plans, progress tracking, and optional professional support.">
 <link rel="canonical" href="https://credxme.com/">
@@ -277,6 +283,19 @@ footer{background:var(--bg);border-top:1px solid var(--border);padding:48px clam
 .chat-quick-actions{display:flex;gap:6px;flex-wrap:wrap;padding:0 20px 14px;background:var(--bg)}
 .chat-quick{padding:6px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:100px;font-size:11px;color:var(--muted);cursor:pointer;transition:all .2s;font-family:var(--font-body)}
 .chat-quick:hover{border-color:var(--cyan);color:var(--cyan)}
+.chat-landing{padding:clamp(32px,6vw,56px) clamp(24px,6vw,56px);text-align:center;background:var(--bg)}
+.chat-landing h3{margin:0;font-family:var(--font-display);font-size:clamp(20px,3vw,28px);letter-spacing:-.02em;color:var(--white)}
+.chat-landing p{max-width:460px;margin:12px auto 24px;color:var(--muted);font-size:15px;line-height:1.6}
+.chat-start{min-height:44px;padding:12px 24px;border:0;border-radius:8px;background:var(--cyan);color:var(--bg);font-family:var(--font-display);font-size:13px;font-weight:800;letter-spacing:.02em;cursor:pointer;transition:all .2s}
+.chat-start:hover{background:var(--cyan2);box-shadow:0 0 18px var(--cyan-glow);transform:translateY(-1px)}
+.chat-session[hidden],.chat-landing[hidden]{display:none}
+.chat-guide{text-align:center;background:var(--bg);padding:10px 20px 0}
+.chat-guide-link{padding:4px 8px;border:0;background:none;color:var(--cyan);font:600 11px var(--font-body);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.chat-guide-link:hover{color:var(--cyan2)}
+.chat-guide-popover{max-width:360px;margin:8px auto 0;padding:12px 16px;text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:12px;line-height:1.7;box-shadow:0 12px 28px rgba(0,0,0,.16)}
+.chat-guide-popover strong{color:var(--white)}
+.chat-disclaimer{margin:14px 20px 0!important;padding:12px 14px;border:1px solid var(--border);border-radius:8px;color:var(--muted2)!important;font-size:11px!important;line-height:1.55!important}
+.chat-quick-label{margin:0;padding:12px 20px 0;background:var(--bg);color:var(--muted);font-size:12px;font-weight:700}
 .cesar-nudge{position:fixed;bottom:24px;right:24px;z-index:1000;display:none;align-items:flex-start;gap:12px;max-width:320px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border-c);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.35);cursor:pointer;opacity:0;transform:translateY(16px);transition:opacity .45s ease,transform .45s ease}
 .cesar-nudge.show{display:flex;opacity:1;transform:translateY(0)}
 .cesar-nudge-av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),#0055cc);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:13px;color:var(--white);flex-shrink:0}
@@ -509,8 +528,8 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
 .hero-overlay{background:linear-gradient(180deg,transparent 80%,var(--bg))}
 .md-card,.pg-card,.pl-item{backdrop-filter:blur(12px);box-shadow:inset 0 1px rgba(153,231,255,.045),0 18px 48px rgba(0,0,0,.15)}
 </style>
-<link rel="stylesheet" href="/styles/landing-cinematic.css">
-<script defer src="/scripts/landing-cinematic.js"></script>
+<link rel="stylesheet" href="/styles/landing-cinematic.css?v=profile-polish-20260928">
+<script defer src="/scripts/landing-cinematic.js?v=profile-polish-20260928"></script>
 <script defer src="/scripts/landing-intro.js"></script>
 <script defer src="/scripts/landing-promo.js"></script>
 
@@ -610,7 +629,6 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
 </section>
 
 <section class="agent-cta-section section-fade" id="agent-cta" aria-labelledby="agent-cta-title">
- <img class="agent-cta-bg" src="/images/agent-team-office.jpg" alt="CredX team collaborating in a bright office" loading="lazy" decoding="async">
  <div class="container">
   <div class="agent-cta-card">
    <div class="agent-cta-copy">
@@ -812,29 +830,41 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
    <div class="chat-header">
     <div class="chat-agent-av">CX</div>
     <div>
-     <div class="chat-agent-name">Cesar · AI-Assisted CredX Guidance</div>
+     <div class="chat-agent-name">CESAR — CredX AI Guide</div>
      <div class="chat-agent-status">AI-assisted support · human review available</div>
     </div>
     <div class="chat-powered">Powered by <span>CredX</span></div>
    </div>
-   <div class="chat-messages" id="chatMessages">
-    <div class="chat-msg agent"><div class="chat-msg-av">CX</div><div class="chat-bubble">Hi, I'm Cesar, an AI-assisted CredX guide. I can help with education and next steps, but I do not provide legal advice or guaranteed outcomes.</div></div>
-    <div class="chat-msg agent"><div class="chat-msg-av">CX</div><div class="chat-bubble">I can help you understand the CredX program, the 5-Day Masterclass, financing readiness, dispute workflow, and the best next step based on your goals.</div></div>
+   <div class="chat-landing" id="chatLanding">
+    <h3>CESAR — CredX AI Guide</h3>
+    <p>Questions about CredX, your credit, or financial readiness?</p>
+    <button class="chat-start" id="chatStart" type="button">Start Chat</button>
    </div>
-   <div class="chat-input-wrap">
-    <input class="chat-input" id="chatInput" placeholder="Ask about your next step">
-    <button class="chat-send" id="chatSend" type="button">➤</button>
-   </div>
-   <div class="chat-quick-actions">
-    <button class="chat-quick" type="button">Start intake review</button>
-    <button class="chat-quick" type="button">Understand my credit</button>
-    <button class="chat-quick" type="button">Prepare for financing</button>
-    <button class="chat-quick" type="button">Improve approval readiness</button>
+   <div class="chat-session" id="chatSession" hidden>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-guide">
+     <button class="chat-guide-link" id="chatGuideToggle" type="button" aria-expanded="false" aria-controls="chatGuidePopover">CESAR guide</button>
+     <div class="chat-guide-popover" id="chatGuidePopover" hidden><strong>I can help with:</strong><br>• The CredX 5-Day Masterclass<br>• Your credit and financial readiness<br>• Your CredX action plan<br>• Credit reports and disputes<br>• Funding readiness<br>• Choosing the right CredX tools</div>
+    </div>
+    <div class="chat-input-wrap">
+     <input class="chat-input" id="chatInput" placeholder="Ask CESAR a question" aria-label="Ask CESAR a question">
+     <button class="chat-send" id="chatSend" type="button" aria-label="Send message">➤</button>
+    </div>
+    <p class="chat-quick-label">Quick options:</p>
+    <div class="chat-quick-actions" aria-label="Quick options">
+     <button class="chat-quick" type="button">Improve My Credit</button>
+     <button class="chat-quick" type="button">Funding Readiness</button>
+     <button class="chat-quick" type="button">5-Day Masterclass</button>
+     <button class="chat-quick" type="button">Dispute Questions</button>
+     <button class="chat-quick" type="button">Explore CredX</button>
+    </div>
+    <p class="chat-disclaimer"><em>CESAR provides educational guidance only—not legal advice, credit guarantees, or guaranteed financing outcomes.</em></p>
    </div>
   </div>
  </div>
 </section>
 
+<div class="chat-profile-buffer" aria-hidden="true"></div>
 <div class="about-backdrop" aria-hidden="true"></div>
 <div class="about-transition" aria-hidden="true">
  <div class="about-veil"></div>
@@ -845,7 +875,7 @@ body{background-image:radial-gradient(ellipse at 85% 15%,rgba(0,169,211,.08),tra
  <div class="about-content-space" aria-hidden="true"></div>
  <div class="about-inner">
   <div id="agentCampaign" class="agent-campaign" hidden>
-   <img id="agentCampaignPhoto" class="about-photo" width="600" height="800" loading="eager" fetchpriority="low" decoding="async" src="/images/cesar-profile.jpg" alt="Approved CredX campaign agent headshot">
+   <img id="agentCampaignPhoto" class="about-photo" width="600" height="800" loading="lazy" decoding="async" hidden alt="CredX campaign agent headshot">
    <div>
     <div class="about-tag">Your CredX guide</div>
     <h2 id="agentCampaignTitle">Meet your CredX agent.</h2>
@@ -1205,6 +1235,20 @@ const faqItems=document.querySelectorAll('.faq-item');faqItems.forEach(item=>{it
 
 const chatMessages=document.getElementById('chatMessages');
 const chatInput=document.getElementById('chatInput');
+const chatLanding=document.getElementById('chatLanding');
+const chatSession=document.getElementById('chatSession');
+const chatStart=document.getElementById('chatStart');
+const chatGuideToggle=document.getElementById('chatGuideToggle');
+const chatGuidePopover=document.getElementById('chatGuidePopover');
+let chatStarted=false;
+
+function startChat(){
+ if(chatStarted) return;
+ chatStarted=true;
+ if(chatLanding) chatLanding.hidden=true;
+ if(chatSession) chatSession.hidden=false;
+ appendChatMessage('agent', 'Hi, I’m CESAR, your CredX AI guide. 👋<br><br>What would you like help with?');
+}
 
 function appendChatMessage(role,text){
  const row=document.createElement('div');
@@ -1286,7 +1330,17 @@ function sendChat(){
 
 document.getElementById('chatSend').addEventListener('click',sendChat);
 chatInput.addEventListener('keydown',(event)=>{ if(event.key==='Enter'){ event.preventDefault(); sendChat(); }});
+chatStart?.addEventListener('click',()=>{
+ startChat();
+ window.setTimeout(()=>chatInput?.focus(),50);
+});
+chatGuideToggle?.addEventListener('click',()=>{
+ const open=chatGuideToggle.getAttribute('aria-expanded')==='true';
+ chatGuideToggle.setAttribute('aria-expanded',open?'false':'true');
+ if(chatGuidePopover) chatGuidePopover.hidden=open;
+});
 document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('click',()=>{
+ startChat();
  const prompt=btn.textContent.trim();
  appendChatMessage('user',prompt);
  deliverCesarReply(prompt);
@@ -1307,6 +1361,7 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
  }
  function openChat(){
   hideNudge(true);
+  startChat();
   const chat=document.getElementById('chat');
   if(chat) chat.scrollIntoView({behavior:'smooth',block:'center'});
   window.setTimeout(()=>{ if(chatInput) chatInput.focus(); },600);
@@ -1325,6 +1380,7 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
 
 // Approved agent campaign landing mode. Direct visits remain owner-first.
 (async function loadAgentCampaign(){
+ if(!document.documentElement.classList.contains('agent-landing-mode')) return;
  const params=new URLSearchParams(window.location.search);
  const code=(params.get('agent')||'').trim();
  if(!code) return;
@@ -1339,11 +1395,41 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
   const bio=document.getElementById('agentCampaignBio');
   const name=document.getElementById('agentCampaignName');
   const referral=document.getElementById('agentCampaignReferral');
+  const socials=document.getElementById('agentCampaignSocials');
   if(!block||!photo||!title||!bio||!name) return;
+  document.body.classList.add('agent-landing-mode');
+  const owner=document.getElementById('ownerAbout');
+  if(owner) owner.hidden=true;
   name.textContent=agent.name||'Your CredX agent';
   title.textContent='Meet '+(agent.name||'your CredX agent')+'.';
   bio.textContent=agent.publicBio||'Your CredX agent is here to help you take the next clear step toward stronger credit and financial readiness.';
-  if(agent.publicHeadshotUrl) photo.src=agent.publicHeadshotUrl;
+  if(agent.publicHeadshotUrl){
+   photo.alt=(agent.name||'Your CredX agent')+' profile';
+   photo.onerror=()=>{photo.hidden=true;};
+   photo.src=agent.publicHeadshotUrl;
+   photo.hidden=false;
+  }
+  if(socials&&Array.isArray(agent.socialLinks)&&agent.socialLinks.length){
+   socials.innerHTML='';
+   agent.socialLinks.forEach(item=>{
+    if(!item||!item.url||!item.label) return;
+    const link=document.createElement('a');
+    link.href=item.url;
+    link.target='_blank';
+    link.rel='noopener noreferrer';
+    link.className='agent-social-placeholder';
+    link.setAttribute('aria-label',item.label+' (opens in a new tab)');
+    const icon=document.createElement('b');
+    icon.setAttribute('aria-hidden','true');
+    icon.textContent=item.icon||item.label.charAt(0);
+    const label=document.createElement('span');
+    label.textContent=item.label;
+    const note=document.createElement('em');
+    note.textContent='Profile link';
+    link.append(icon,label,note);
+    socials.appendChild(link);
+   });
+  }
   if(referral){
    referral.textContent='Referral attribution: signups from this page are tracked to '+(agent.name||'this approved CredX agent')+'.';
    referral.hidden=false;
@@ -1355,7 +1441,7 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
    href.searchParams.set('agentName',agent.name||'');
    link.setAttribute('href',href.pathname+href.search+href.hash);
   });
- }catch(error){ /* standard page fallback */ }
+ }catch(error){ /* Keep both profiles hidden when the requested agent is unavailable. */ }
 })();
 
 
@@ -1372,4 +1458,3 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
 </div>
 </body>
 </html>
-
