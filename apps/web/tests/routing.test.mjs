@@ -62,6 +62,15 @@ test('published pages resolve and are distinct documents', { skip: skip() }, asy
   assert.equal(distinct.size, paths.length, 'each route must serve its own document');
 });
 
+test('dedicated agent campaign route serves the landing document', { skip: skip() }, async () => {
+  const landing = await (await fetch(`${base}/`)).text();
+  for (const path of ['/agent-landing', '/agent-landing/fixture-agent']) {
+    const res = await fetch(`${base}${path}`);
+    assert.equal(res.status, 200, `${path} should be 200`);
+    assert.equal(await res.text(), landing, `${path} must serve the landing document`);
+  }
+});
+
 test('admin SPA deep links serve the admin bundle, not the landing page', { skip: skip() }, async () => {
   const admin = await (await fetch(`${base}/adminportal`)).text();
   const landing = await (await fetch(`${base}/`)).text();
