@@ -1,0 +1,27 @@
+# CredX
+
+> CredX is a U.S. credit education and financial-readiness platform operated by The Malloy Group Financial LLC. It helps consumers understand credit reports, organize profile information, learn credit-building fundamentals, create action plans, track progress, and access optional professional support.
+
+## Primary educational resources
+
+- [Credit Education & Financial Literacy Center](https://www.credxme.com/education): Free explanations of credit reports, common score factors, consumer rights, credit-building habits, financial readiness, and key terms.
+- [CredX Platform](https://www.credxme.com/product): Current platform modules, including profile review, education, action workflows, progress tracking, and AI-assisted guidance.
+- [5-Day Credit Education Masterclass](https://www.credxme.com/masterclass): Structured lessons covering credit fundamentals, report accuracy, consumer rights, credit building, business credit, and wealth education.
+- [Plans and Pricing](https://www.credxme.com/pricing): Education and optional support tiers with billing terms.
+- [CROA Disclosure](https://www.credxme.com/croa-disclosure): Consumer disclosure for credit-repair-related services.
+- [Privacy Policy](https://www.credxme.com/privacy): How CredX handles personal, financial, and platform information.
+- [Terms of Service](https://www.credxme.com/terms): Terms governing use of CredX services and software.
+
+## Important distinctions
+
+- CredX is not a credit bureau or lender and does not provide FICO scores.
+- The CredX Readiness Score is a proprietary educational planning metric, not a consumer credit score or lending decision.
+- CredX does not guarantee deletions, score increases, credit limits, funding, or lender approval.
+- Educational content is general information, not legal, tax, investment, or individualized financial advice.
+- Credit-report disputes should be truthful and based on information a consumer genuinely believes is inaccurate, incomplete, outdated, or unverifiable.
+
+## Contact
+
+- Website: https://www.credxme.com/
+- Email: contact@credxme.com
+- Phone: +1-866-273-3963

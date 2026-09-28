@@ -89,6 +89,7 @@ const securityHeaders = {
 };
 
 const staticPageRoutes = new Map([
+  ['/education', 'education.html'],
   ['/product', 'product.html'],
   ['/start', 'start.html'],
   ['/signup', 'signup.html'],
@@ -120,6 +121,7 @@ const routeRedirects = new Map([
 
 // Prefix routes serve their page for any subpath (client-side routing / promo slugs).
 const prefixPageRoutes = [
+  ['/education/', 'education.html'],
   ['/start/', 'start.html'],
   ['/product/', 'product.html'],
   ['/signup/', 'signup.html'],
