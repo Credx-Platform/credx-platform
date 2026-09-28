@@ -30,6 +30,10 @@ const validBody = {
   phone: '(555) 555-0100',
   state: 'nj',
   experience: 'Some — referred or assisted clients',
+  primaryPlatform: 'Instagram',
+  audienceSize: '10,000–24,999',
+  socialProfile: 'https://instagram.com/averycreates',
+  contentFocus: 'Financial education for first-time home buyers.',
   motivation: 'I work with first-time home buyers.',
   consent: true
 };
@@ -43,6 +47,7 @@ before(async () => {
   ctx.server = createApp({ disableRateLimits: true }).listen(0);
   await new Promise((r) => ctx.server.once('listening', r));
   ctx.base = `http://127.0.0.1:${(ctx.server.address() as AddressInfo).port}`;
+  await ctx.prisma.subAgent.deleteMany({ where: { applicationId: { not: null } } });
   await ctx.prisma.agentApplication.deleteMany({});
   await ctx.prisma.user.deleteMany({ where: { email: 'agent-reviewer@t.com' } });
   const staff = await ctx.prisma.user.create({ data: { email: 'agent-reviewer@t.com', passwordHash: 'x', firstName: 'S', lastName: 'R', role: 'STAFF' } });
@@ -79,6 +84,9 @@ test('POST /api/agent-applications stores PII encrypted and reports email delive
   assert.ok(!JSON.stringify(row).includes('agent-applicant'), 'no plaintext email in the row');
   assert.equal(row.state, 'NJ');
   assert.equal(row.source, 'agent_page');
+  assert.equal(row.primaryPlatform, 'Instagram');
+  assert.equal(row.audienceSize, '10,000–24,999');
+  assert.match(row.socialProfileEncrypted, /^gcm\.v1:/);
 
   const audit = await ctx.prisma.auditLog.findFirst({ where: { entityType: 'AgentApplication', entityId: ctx.id } });
   assert.equal(audit?.action, 'AGENT_APPLICATION_SUBMITTED');
@@ -93,6 +101,7 @@ test('GET /api/agent-applications is staff-only and decrypts', { skip }, async (
   assert.equal(app.email, EMAIL);
   assert.equal(app.firstName, 'Avery');
   assert.equal(app.phone, '(555) 555-0100');
+  assert.equal(app.socialProfile, 'https://instagram.com/averycreates');
 });
 
 test('PATCH /api/agent-applications/:id updates review status', { skip }, async () => {
@@ -102,4 +111,22 @@ test('PATCH /api/agent-applications/:id updates review status', { skip }, async 
   assert.equal(status, 200);
   assert.equal(body.application.status, 'CONTACTED');
   assert.ok(body.application.reviewedAt);
+});
+
+test('POST /api/agent-applications/:id/approve creates one versioned Creator Partner record', { skip }, async () => {
+  const first = await req(`/api/agent-applications/${ctx.id}/approve`, { method: 'POST', token: ctx.staffToken });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.application.status, 'APPROVED');
+  assert.equal(first.body.subAgent.programTier, 'CREATOR');
+  assert.equal(first.body.subAgent.initialCommissionBps, 3000);
+  assert.equal(first.body.subAgent.recurringCommissionBps, 1500);
+  assert.equal(first.body.subAgent.recurringMonths, 12);
+  assert.equal(first.body.subAgent.overrideCommissionBps, 500);
+  assert.equal(first.body.subAgent.payoutHoldDays, 30);
+  assert.equal(first.body.subAgent.policyVersion, 'creator-partner-v1-2026-09-28');
+
+  const second = await req(`/api/agent-applications/${ctx.id}/approve`, { method: 'POST', token: ctx.staffToken });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.alreadyApproved, true);
+  assert.equal(await ctx.prisma.subAgent.count({ where: { applicationId: ctx.id } }), 1);
 });

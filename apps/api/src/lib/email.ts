@@ -373,50 +373,50 @@ function renderAffiliateOnboardingEmail(params: {
   referralLink: string;
   onboardingLink: string;
 }) {
-  const subject = 'Welcome to the CredX Affiliate Program';
+  const subject = 'Welcome to the CredX Creator Partner Program';
   const steps = [
-    'Review the CredX affiliate policy and sign the acknowledgment.',
-    'After signing, create your secure sub-agent admin login.',
-    'Copy your affiliate link and use it in your social bio, stories, posts, texts, or direct messages.',
-    'Send prospects to the link. CredX tracks clicks, source, IP, device, signups, and referrals back to your affiliate record.'
+    'Review and sign the CredX Creator Partner Agreement.',
+    'Create your secure Partner Dashboard login.',
+    'Review the disclosure and approved-claims rules before posting.',
+    'Copy your tracking link and publish your first approved CredX promotion.'
   ];
   const bodyHtml = `
     <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">Welcome to CredX, ${params.name || 'partner'}.</h1>
     <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">CredX helps consumers understand their credit reports, identify inaccurate or unverifiable negative reporting, prepare lawful dispute strategy, and rebuild stronger financial habits through education, guided workflows, and credit improvement services.</p>
     <div style="margin:18px 0;padding:16px;background:${EMAIL_CARD_INNER};border:1px solid ${EMAIL_BORDER};border-radius:10px;">
-      <strong style="display:block;color:${EMAIL_TEXT};font-size:13px;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Your affiliate details</strong>
-      <div style="color:${EMAIL_TEXT_MUTED};font-size:14px;line-height:1.7;">Affiliate ID: <strong style="color:${EMAIL_CYAN};">${params.affiliateId}</strong><br />Referral code: <strong style="color:${EMAIL_CYAN};">${params.referralCode}</strong><br />Link: <span style="color:${EMAIL_TEXT};word-break:break-all;">${params.referralLink}</span></div>
+      <strong style="display:block;color:${EMAIL_TEXT};font-size:13px;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Your partner details</strong>
+      <div style="color:${EMAIL_TEXT_MUTED};font-size:14px;line-height:1.7;">Partner ID: <strong style="color:${EMAIL_CYAN};">${params.affiliateId}</strong><br />Tracking code: <strong style="color:${EMAIL_CYAN};">${params.referralCode}</strong><br />Link: <span style="color:${EMAIL_TEXT};word-break:break-all;">${params.referralLink}</span></div>
     </div>
-    <div style="margin:8px 0 6px;font-family:${EMAIL_FONT};font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${EMAIL_CYAN};">How to use your affiliate link</div>
+    <div style="margin:8px 0 6px;font-family:${EMAIL_FONT};font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${EMAIL_CYAN};">Activate your partnership</div>
     ${emailNumberedSteps(steps)}
-    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:15px;line-height:1.7;">Use your link anywhere you are introducing people to CredX. Do not promise deletions, guaranteed score increases, legal representation, or guaranteed funding. Keep your message simple: CredX reviews credit-report issues, helps build lawful strategy, and supports the client journey.</p>
-    ${emailButton(params.onboardingLink, 'Review policy and set up login')}
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:15px;line-height:1.7;">Creator Partners earn commission-based residual income on qualifying collected payments under the signed agreement. Earnings are not guaranteed. Clearly disclose your paid relationship with CredX, use approved claims, and never promise deletions, score increases, approvals, funding, or legal results.</p>
+    ${emailButton(params.onboardingLink, 'Review agreement and activate')}
     <p style="margin:18px 0 0;color:${EMAIL_TEXT_DIM};font-size:12px;line-height:1.6;">If the button doesn't open, copy and paste this link into your browser:<br /><span style="color:${EMAIL_TEXT};word-break:break-all;font-size:12px;">${params.onboardingLink}</span></p>
   `;
   const html = renderEmailShell({
-    preheader: 'Review the CredX affiliate policy, sign it, and set up your sub-agent admin login.',
-    eyebrow: 'Affiliate · Onboarding',
+    preheader: 'Review the Creator Partner Agreement and activate your CredX dashboard.',
+    eyebrow: 'Creator Partner · Onboarding',
     bodyHtml
   });
-  const text = `Welcome to the CredX Affiliate Program
+  const text = `Welcome to the CredX Creator Partner Program
 
 Hi ${params.name || 'partner'},
 
 CredX helps consumers understand their credit reports, identify inaccurate or unverifiable negative reporting, prepare lawful dispute strategy, and rebuild stronger financial habits through education, guided workflows, and credit improvement services.
 
-Affiliate ID: ${params.affiliateId}
-Referral code: ${params.referralCode}
+Partner ID: ${params.affiliateId}
+Tracking code: ${params.referralCode}
 Referral link: ${params.referralLink}
 
-How to use your affiliate link:
-1. Review the CredX affiliate policy and sign the acknowledgment.
-2. After signing, create your secure sub-agent admin login.
-3. Copy your affiliate link and use it in your social bio, stories, posts, texts, or direct messages.
-4. Send prospects to the link. CredX tracks clicks, source, IP, device, signups, and referrals back to your affiliate record.
+Activate your partnership:
+1. Review and sign the CredX Creator Partner Agreement.
+2. Create your secure Partner Dashboard login.
+3. Review the disclosure and approved-claims rules before posting.
+4. Copy your tracking link and publish your first approved CredX promotion.
 
-Do not promise deletions, guaranteed score increases, legal representation, or guaranteed funding.
+Creator Partners earn commission-based residual income on qualifying collected payments under the signed agreement. Earnings are not guaranteed. Clearly disclose your paid relationship with CredX. Do not promise deletions, guaranteed score increases, legal representation, approvals, or guaranteed funding.
 
-Review policy and set up login:
+Review agreement and activate:
 ${params.onboardingLink}
 
 CredX`;
@@ -1017,29 +1017,29 @@ export async function notifyNewLead(params: { firstName: string; lastName: strin
    contact details, which are stored encrypted.
    ============================================================ */
 function renderAgentApplicationReceivedEmail(params: { firstName: string }) {
-  const subject = 'We received your CredX agent application';
+  const subject = 'We received your CredX Creator Partner application';
   const steps = [
     'Our partnerships team reviews every application, usually within 2 business days.',
-    'If there is a fit, we will contact you to talk through the program and the CredX affiliate policy.',
-    'Approved agents receive a secure onboarding link to sign the policy and set up their login.'
+    'If there is a fit, we will contact you to talk through your audience, content, and the partnership.',
+    'Approved creators receive a secure link to sign the agreement, complete compliance training, and activate their Partner Dashboard.'
   ];
   const bodyHtml = `
     <h1 style="margin:0 0 14px;font-family:${EMAIL_FONT};font-size:26px;line-height:1.25;color:${EMAIL_TEXT};font-weight:700;">Thanks, ${escapeHtml(params.firstName || 'there')}.</h1>
-    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Your application to become a CredX agent has been received. Applying is free and does not commit you to anything.</p>
+    <p style="margin:0 0 14px;color:${EMAIL_TEXT_SOFT};font-size:16px;line-height:1.7;">Your application to become a CredX Creator Partner has been received. Applying is free and does not commit you to anything.</p>
     <div style="margin:8px 0 6px;font-family:${EMAIL_FONT};font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${EMAIL_CYAN};">What happens next</div>
     ${emailNumberedSteps(steps)}
     <p style="margin:0 0 14px;color:${EMAIL_TEXT_MUTED};font-size:14px;line-height:1.7;">Questions in the meantime? Reply to this email or write to <a href="mailto:contact@credxme.com" style="color:${EMAIL_CYAN};">contact@credxme.com</a>.</p>
   `;
   const html = renderEmailShell({
-    preheader: 'Your CredX agent application was received. Here is what happens next.',
-    eyebrow: 'Agent Program · Application',
+    preheader: 'Your CredX Creator Partner application was received. Here is what happens next.',
+    eyebrow: 'Creator Partner · Application',
     bodyHtml
   });
-  const text = `We received your CredX agent application
+  const text = `We received your CredX Creator Partner application
 
 Thanks, ${params.firstName || 'there'}.
 
-Your application to become a CredX agent has been received. Applying is free and does not commit you to anything.
+Your application to become a CredX Creator Partner has been received. Applying is free and does not commit you to anything.
 
 What happens next:
 ${steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}
@@ -1065,6 +1065,10 @@ export async function notifyNewAgentApplication(params: {
   phone: string;
   state?: string | null;
   experience?: string | null;
+  primaryPlatform?: string | null;
+  audienceSize?: string | null;
+  socialProfile?: string | null;
+  contentFocus?: string | null;
   motivation?: string | null;
 }) {
   const to = process.env.LEAD_NOTIFICATION_EMAIL
@@ -1077,17 +1081,21 @@ export async function notifyNewAgentApplication(params: {
     ['Phone', params.phone],
     ['State', params.state || 'Not provided'],
     ['Experience', params.experience || 'Not provided'],
+    ['Primary platform', params.primaryPlatform || 'Not provided'],
+    ['Audience size', params.audienceSize || 'Not provided'],
+    ['Social profile', params.socialProfile || 'Not provided'],
+    ['Content focus', params.contentFocus || 'Not provided'],
     ['Why CredX', params.motivation || 'Not provided'],
     ['Application ID', params.applicationId]
   ];
-  const subject = `New CredX agent application: ${params.firstName} ${params.lastName}`;
+  const subject = `New CredX Creator Partner application: ${params.firstName} ${params.lastName}`;
   const html = `
     <div style="font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.6;">
-      <h2 style="margin-bottom:12px;">New CredX agent application</h2>
+      <h2 style="margin-bottom:12px;">New CredX Creator Partner application</h2>
       ${rows.map(([label, value]) => `<p><strong>${label}:</strong> <span style="white-space:pre-wrap;">${escapeHtml(value)}</span></p>`).join('\n      ')}
     </div>
   `;
-  const text = `New CredX agent application\n\n${rows.map(([label, value]) => `${label}: ${value}`).join('\n')}`;
+  const text = `New CredX Creator Partner application\n\n${rows.map(([label, value]) => `${label}: ${value}`).join('\n')}`;
   const result = await sendEmail({ to, subject, html, text });
   console.log('AGENT_APPLICATION_NOTIFICATION_SEND_RESULT', { applicationId: params.applicationId, result });
   return result;

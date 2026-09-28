@@ -240,6 +240,12 @@ type SubAgentRecord = {
   status: string;
   notes?: string | null;
   policyAcceptedAt?: string | null;
+  programTier?: 'CREATOR' | 'AMBASSADOR' | 'PARTNER';
+  initialCommissionBps?: number;
+  recurringCommissionBps?: number;
+  recurringMonths?: number;
+  overrideCommissionBps?: number;
+  payoutHoldDays?: number;
   createdAt: string;
   contacts: SubAgentContact[];
   referredClients?: Array<{
@@ -248,6 +254,23 @@ type SubAgentRecord = {
     createdAt: string;
     user: { firstName: string; lastName: string; email: string };
   }>;
+};
+
+type AgentApplicationRecord = {
+  id: string;
+  status: 'NEW' | 'CONTACTED' | 'APPROVED' | 'DECLINED';
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  state?: string | null;
+  experience?: string | null;
+  primaryPlatform?: string | null;
+  audienceSize?: string | null;
+  socialProfile?: string | null;
+  contentFocus?: string | null;
+  motivation?: string | null;
+  createdAt: string;
 };
 
 type LoginResponse = {
@@ -648,6 +671,8 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
   const [agentEmail, setAgentEmail] = useState('');
   const [agentPhone, setAgentPhone] = useState('');
   const [agentCode, setAgentCode] = useState('');
+  const [agentTier, setAgentTier] = useState<'CREATOR' | 'AMBASSADOR' | 'PARTNER'>('CREATOR');
+  const [recruitedBySubAgentId, setRecruitedBySubAgentId] = useState('');
   const [savingAgent, setSavingAgent] = useState(false);
   const [refreshingActivity, setRefreshingActivity] = useState(false);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
@@ -657,6 +682,17 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
   const [emailingAgentId, setEmailingAgentId] = useState<string | null>(null);
   const [emailedAgentId, setEmailedAgentId] = useState<string | null>(null);
   const [selectedLeadAgentId, setSelectedLeadAgentId] = useState<string>('ALL');
+  const [applications, setApplications] = useState<AgentApplicationRecord[]>([]);
+  const [approvingApplicationId, setApprovingApplicationId] = useState<string | null>(null);
+
+  const loadApplications = async () => {
+    const response = await apiFetch<{ applications: AgentApplicationRecord[] }>('/api/agent-applications', token);
+    setApplications(response.applications);
+  };
+
+  useEffect(() => {
+    loadApplications().catch((loadError) => setError(loadError instanceof Error ? loadError.message : 'Unable to load Creator Partner applications'));
+  }, [token]);
 
   const activeAgents = subAgents.filter((agent) => agent.status === 'ACTIVE');
   const totalLinkEvents = subAgents.reduce((sum, agent) => sum + (agent.contacts?.length || 0), 0);
@@ -828,7 +864,7 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
     setError(null);
     try {
       await onRefresh();
-      showNotice('Sub-agent activity and signup scan refreshed', 2600);
+      showNotice('Creator Partner activity and signup scan refreshed', 2600);
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : 'Unable to refresh sub-agent activity');
     } finally {
@@ -847,15 +883,19 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
           name: agentName,
           email: agentEmail,
           phone: agentPhone,
-          referralCode: agentCode
+          referralCode: agentCode,
+          programTier: agentTier,
+          recruitedBySubAgentId
         })
       });
       setAgentName('');
       setAgentEmail('');
       setAgentPhone('');
       setAgentCode('');
+      setAgentTier('CREATOR');
+      setRecruitedBySubAgentId('');
       await onRefresh();
-      showNotice('Sub-agent created');
+      showNotice('Creator Partner created');
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : 'Unable to create sub-agent');
     } finally {
@@ -869,7 +909,7 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
     try {
       await apiFetch<{ success: boolean }>(`/api/sub-agents/${agent.id}`, token, { method: 'DELETE' });
       await onRefresh();
-      showNotice('Sub-agent deleted');
+      showNotice('Creator Partner deleted');
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete sub-agent');
     }
@@ -899,6 +939,36 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
       setError(sendError instanceof Error ? sendError.message : 'Unable to send affiliate onboarding');
     } finally {
       setEmailingAgentId(null);
+    }
+  };
+
+  const approveCreatorPartner = async (application: AgentApplicationRecord) => {
+    if (!window.confirm(`Approve ${application.firstName} ${application.lastName} as a Creator Partner and send the agreement email?`)) return;
+    setApprovingApplicationId(application.id);
+    setError(null);
+    try {
+      const response = await apiFetch<{ onboardingEmail?: { skipped?: boolean; reason?: string } }>(`/api/agent-applications/${application.id}/approve`, token, { method: 'POST' });
+      await Promise.all([loadApplications(), onRefresh()]);
+      if (response.onboardingEmail?.skipped) {
+        showNotice('Partner approved; onboarding email needs to be resent', 3200);
+      } else {
+        showNotice(`Creator Partner approved and onboarding sent to ${application.email}`, 3200);
+      }
+    } catch (approveError) {
+      setError(approveError instanceof Error ? approveError.message : 'Unable to approve Creator Partner');
+    } finally {
+      setApprovingApplicationId(null);
+    }
+  };
+
+  const updatePartnerTier = async (agent: SubAgentRecord, programTier: 'CREATOR' | 'AMBASSADOR' | 'PARTNER') => {
+    setError(null);
+    try {
+      await apiFetch(`/api/sub-agents/${agent.id}`, token, { method: 'PATCH', body: JSON.stringify({ programTier }) });
+      await onRefresh();
+      showNotice(`${agent.name} moved to ${programTier.charAt(0) + programTier.slice(1).toLowerCase()}`);
+    } catch (tierError) {
+      setError(tierError instanceof Error ? tierError.message : 'Unable to update partner tier');
     }
   };
 
@@ -963,12 +1033,12 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
     <div className="page-grid subagent-page">
       <section className="hero-card hero-card--compact subagent-hero">
         <div>
-          <p className="eyebrow">Sub-agent network</p>
-          <h1>Referral Agents &amp; Contacts</h1>
-          <p>Create a custom social link for each sub-agent. Link events are tracked back to that person so you can see who is sending attention to CredX.</p>
+          <p className="eyebrow">Creator Partner network</p>
+          <h1>Creator Partners &amp; Referrals</h1>
+          <p>Review applicants, approve partners, and track each creator's link activity and referred signups.</p>
         </div>
         <div className="hero-stats">
-          <div className="stat-card"><span>Sub Agents</span><strong>{subAgents.length}</strong></div>
+          <div className="stat-card"><span>Partners</span><strong>{subAgents.length}</strong></div>
           <div className="stat-card"><span>Active</span><strong>{activeAgents.length}</strong></div>
           <div className="stat-card"><span>Link Events</span><strong>{totalLinkEvents}</strong></div>
           <div className="stat-card"><span>Registrations</span><strong>{totalRegistrations}</strong></div>
@@ -977,18 +1047,23 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
         </div>
       </section>
 
+      <section className="panel">
+        <div className="panel-header"><div><p className="eyebrow">Applications</p><h2>Creator Partner approvals</h2><p className="helper-text">Approval creates the Creator account, assigns the base commission schedule, and emails the secure agreement link.</p></div></div>
+        {applications.length ? <div className="table-wrapper"><table className="data-table"><thead><tr><th>Applicant</th><th>Audience</th><th>Profile</th><th>Submitted</th><th>Status</th><th>Action</th></tr></thead><tbody>{applications.map((application) => <tr key={application.id}><td><strong>{application.firstName} {application.lastName}</strong><span className="table-subtext">{application.email} · {application.phone}</span></td><td>{application.primaryPlatform || 'Not provided'}<span className="table-subtext">{application.audienceSize || 'Audience not provided'}</span></td><td>{application.socialProfile ? <a href={application.socialProfile} target="_blank" rel="noreferrer">Open profile</a> : '—'}<span className="table-subtext">{application.contentFocus || application.motivation || 'No content notes'}</span></td><td>{formatDate(application.createdAt)}</td><td><span className={application.status === 'APPROVED' ? 'status-pill status-pill--ok' : application.status === 'DECLINED' ? 'status-pill status-pill--warning' : 'status-pill'}>{application.status}</span></td><td>{application.status === 'APPROVED' ? 'Onboarded' : <button type="button" className="ghost-button" disabled={approvingApplicationId === application.id} onClick={() => approveCreatorPartner(application)}>{approvingApplicationId === application.id ? 'Approving...' : 'Approve & Send'}</button>}</td></tr>)}</tbody></table></div> : <div className="empty-state-card"><strong>No Creator Partner applications yet</strong><p>New applications from /agent will appear here.</p></div>}
+      </section>
+
       <section className="panel two-col affiliate-setup-grid">
         <div>
           <div className="panel-header">
             <div>
-              <p className="eyebrow">Hire a sub-agent</p>
-              <h2>Create their custom link</h2>
-              <p className="helper-text">Give this link to the sub-agent for Instagram, TikTok, Facebook, or any profile bio. Every click records as a link event under that affiliate.</p>
+              <p className="eyebrow">Direct partner setup</p>
+              <h2>Create a Creator Partner</h2>
+              <p className="helper-text">Use this for an already-approved creator. Public applicants should normally be approved from the application list above.</p>
             </div>
           </div>
           <form className="field-stack" onSubmit={createSubAgent}>
             <label>
-              <span>Sub-agent name</span>
+              <span>Creator Partner name</span>
               <input value={agentName} onChange={(event) => setAgentName(event.target.value)} placeholder="Example: Jasmine Smith" required />
             </label>
             <label>
@@ -1005,7 +1080,11 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
                 <input value={agentCode} onChange={(event) => setAgentCode(event.target.value)} placeholder="jasmine-credit" />
               </label>
             </div>
-            <button type="submit" disabled={savingAgent}>{savingAgent ? 'Creating...' : 'Create Sub-Agent Link'}</button>
+            <div className="field-grid">
+              <label><span>Starting tier</span><select value={agentTier} onChange={(event) => setAgentTier(event.target.value as typeof agentTier)}><option value="CREATOR">Creator — 30% initial</option><option value="AMBASSADOR">Ambassador — 35% initial</option><option value="PARTNER">Partner — 40% initial</option></select></label>
+              <label><span>Recruited by</span><select value={recruitedBySubAgentId} onChange={(event) => setRecruitedBySubAgentId(event.target.value)}><option value="">No recruiting partner</option>{activeAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>
+            </div>
+            <button type="submit" disabled={savingAgent}>{savingAgent ? 'Creating...' : 'Create Partner Link'}</button>
             {error ? <p className="helper-text helper-text--error">{error}</p> : null}
             {copyNotice ? <p className="helper-text helper-text--success">{copyNotice}</p> : null}
           </form>
@@ -1019,10 +1098,10 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
             </div>
           </div>
           <ol className="setup-steps">
-            <li><strong>Create the sub-agent</strong><span>CredX generates a custom tracking link tied to their name and code.</span></li>
+            <li><strong>Create the partner</strong><span>CredX generates a custom tracking link tied to their name and code.</span></li>
             <li><strong>They post the link</strong><span>The link can go in Instagram bio, stories, posts, TikTok, Facebook, or DMs.</span></li>
-            <li><strong>Prospect clicks</strong><span>The click is saved as a link event under that sub-agent, then the prospect is sent to signup.</span></li>
-            <li><strong>Admin reviews link usage</strong><span>Open the dropdown under an affiliate to see clicks, IPs, source pages, device data, and registrations.</span></li>
+            <li><strong>Prospect clicks</strong><span>The click is saved as a link event under that Creator Partner, then the prospect is sent to signup.</span></li>
+            <li><strong>Admin reviews link usage</strong><span>Open the dropdown under a partner to see clicks, IPs, source pages, device data, and registrations.</span></li>
           </ol>
         </div>
       </section>
@@ -1030,18 +1109,18 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
       <section className="panel" id="subagent-new-leads">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Sub-agent leads</p>
-            <h2>New leads by time</h2>
-            <p className="helper-text">Use this when more than one sub-agent has fresh activity. Rows are newest first and click through to the client record or filtered lead row.</p>
+            <p className="eyebrow">Creator Partner leads</p>
+            <h2>New referrals by time</h2>
+            <p className="helper-text">Use this when more than one partner has fresh activity. Rows are newest first and click through to the client record or filtered lead row.</p>
           </div>
           <div className="lead-toolbar">
             <select
               className="search-input"
               value={selectedLeadAgentId}
               onChange={(event) => setSelectedLeadAgentId(event.target.value)}
-              aria-label="Filter new leads by sub-agent"
+              aria-label="Filter new leads by Creator Partner"
             >
-              <option value="ALL">All sub-agents</option>
+              <option value="ALL">All Creator Partners</option>
               {subAgents.map((agent) => (
                 <option key={agent.id} value={agent.id}>{agent.name}</option>
               ))}
@@ -1057,7 +1136,7 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
               <thead>
                 <tr>
                   <th>Lead</th>
-                  <th>Sub-agent</th>
+                  <th>Creator Partner</th>
                   <th>Email</th>
                   <th>Phone</th>
                   <th>Interest</th>
@@ -1092,8 +1171,8 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
           </div>
         ) : (
           <div className="empty-state-card">
-            <strong>No new sub-agent leads in this view</strong>
-            <p>Click Refresh Scan after a test signup or switch back to all sub-agents.</p>
+            <strong>No new Creator Partner leads in this view</strong>
+            <p>Click Refresh Scan after a test signup or switch back to all partners.</p>
           </div>
         )}
       </section>
@@ -1101,9 +1180,9 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Sub-agent roster</p>
+            <p className="eyebrow">Creator Partner roster</p>
             <h2>Links ready to share</h2>
-            <p className="helper-text">Copy the link and give it to the sub-agent for their social profiles.</p>
+            <p className="helper-text">Copy the link and give it to the partner for approved social content.</p>
           </div>
           <button type="button" className="ghost-button" onClick={refreshActivityScan} disabled={refreshingActivity}>
             {refreshingActivity ? 'Scanning...' : 'Refresh Scan'}
@@ -1138,6 +1217,7 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
                         <td>
                           <strong>{agent.affiliateId}</strong>
                           <span className="table-subtext">{agent.referralCode}</span>
+                          <select aria-label={`Program tier for ${agent.name}`} value={agent.programTier || 'CREATOR'} onChange={(event) => updatePartnerTier(agent, event.target.value as 'CREATOR' | 'AMBASSADOR' | 'PARTNER')}><option value="CREATOR">Creator · 30%</option><option value="AMBASSADOR">Ambassador · 35%</option><option value="PARTNER">Partner · 40%</option></select>
                         </td>
                         <td>{stats.clicks}</td>
                         <td>
@@ -1213,7 +1293,7 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
                                 </table>
                               </div>
                             ) : (
-                              <div className="empty-state-card">No link events for this affiliate yet.</div>
+                              <div className="empty-state-card">No link events for this partner yet.</div>
                             )}
                           </details>
                         </td>
@@ -1224,7 +1304,7 @@ function SubAgentsRoute({ token, subAgents, leads, clients, onRefresh }: { token
               </tbody>
             </table>
           </div>
-        ) : <div className="empty-state-card">No sub-agents yet. Create one above to generate the first social link.</div>}
+        ) : <div className="empty-state-card">No Creator Partners yet. Create one above to generate the first social link.</div>}
       </section>
     </div>
   );
@@ -3604,7 +3684,7 @@ function AffiliateDashboard({ token, user, onLogout }: { token: string; user: Us
     if (!referralLink) return;
     try {
       await navigator.clipboard.writeText(referralLink);
-      setCopyNotice('Affiliate link copied');
+      setCopyNotice('Partner link copied');
       window.setTimeout(() => setCopyNotice(null), 2200);
     } catch {
       setCopyNotice('Copy unavailable in this browser session');
@@ -3616,7 +3696,7 @@ function AffiliateDashboard({ token, user, onLogout }: { token: string; user: Us
       <main className="main">
         <header className="topbar topbar--themed" style={{ ['--section-accent' as string]: '#00c6fb' } as React.CSSProperties}>
           <div>
-            <h1 className="top-title">Affiliate dashboard</h1>
+            <h1 className="top-title">Partner Dashboard</h1>
             <p className="helper-text">Signed in as {user.email}</p>
           </div>
           <div className="topbar-actions">
@@ -3630,27 +3710,36 @@ function AffiliateDashboard({ token, user, onLogout }: { token: string; user: Us
           <div className="page-grid subagent-page">
             <section className="hero-card hero-card--compact subagent-hero">
               <div>
-                <p className="eyebrow">CredX affiliate</p>
+                <p className="eyebrow">CredX Creator Partner</p>
                 <h1>{subAgent.name}</h1>
-                <p>Use your link in posts, bios, messages, and campaigns. CredX tracks the activity back to your affiliate record.</p>
+                <p>Use your link in approved posts, bios, messages, and campaigns. Clearly disclose your paid relationship with CredX every time you promote it.</p>
               </div>
               <div className="hero-stats">
                 <div className="stat-card"><span>Clicks</span><strong>{clicks}</strong></div>
                 <div className="stat-card"><span>Signups</span><strong>{signups}</strong></div>
                 <div className="stat-card"><span>Unique IPs</span><strong>{uniqueIps}</strong></div>
-                <div className="stat-card"><span>Affiliate ID</span><strong>{subAgent.affiliateId}</strong></div>
+                <div className="stat-card"><span>Partner ID</span><strong>{subAgent.affiliateId}</strong></div>
               </div>
             </section>
             <section className="panel">
               <div className="panel-header">
                 <div>
-                  <p className="eyebrow">Your link</p>
-                  <h2>Affiliate link</h2>
+                  <p className="eyebrow">Your tracking</p>
+                  <h2>Creator Partner link</h2>
                 </div>
                 <button type="button" className="ghost-button" onClick={copyLink}>Copy link</button>
               </div>
               <code className="inline-copy-code">{referralLink}</code>
               {copyNotice ? <p className="helper-text helper-text--success">{copyNotice}</p> : null}
+            </section>
+            <section className="panel">
+              <div className="panel-header"><div><p className="eyebrow">Before you post</p><h2>Required disclosure and claims rules</h2></div></div>
+              <ol className="setup-steps">
+                <li><strong>Disclose the relationship</strong><span>Use clear language such as “Paid partner of CredX” or “I may earn a commission” where people will see it.</span></li>
+                <li><strong>Use approved language</strong><span>Describe education, credit-report organization, guided workflows, and financial readiness. Do not improvise performance claims.</span></li>
+                <li><strong>Never guarantee results</strong><span>No promises of deletions, score increases, approvals, funding, credit limits, timelines, or legal outcomes.</span></li>
+                <li><strong>Protect customer data</strong><span>Send prospects through your tracking link. Never collect reports, Social Security numbers, IDs, or payment information yourself.</span></li>
+              </ol>
             </section>
             <section className="panel">
               <div className="panel-header">
@@ -3852,7 +3941,7 @@ export default function App() {
           <NavLink to="/disputes">Disputes</NavLink>
           <NavLink to="/print">Print Center</NavLink>
           <NavLink to="/tasks">Tasks</NavLink>
-          <NavLink to="/sub-agents">Sub Agents</NavLink>
+          <NavLink to="/sub-agents">Creator Partners</NavLink>
           <NavLink to="/employees">Employees</NavLink>
         </nav>
       </aside>
@@ -3914,7 +4003,7 @@ export default function App() {
           <option value="/disputes">Disputes</option>
           <option value="/print">Print Center</option>
           <option value="/tasks">Tasks</option>
-          <option value="/sub-agents">Sub Agents</option>
+          <option value="/sub-agents">Creator Partners</option>
           <option value="/employees">Employees</option>
         </select>
 

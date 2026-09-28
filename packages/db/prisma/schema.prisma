@@ -143,12 +143,26 @@ model SubAgent {
   policyAcceptedAt         DateTime?
   policySignature          String?
   policyIpAddress          String?
+  policyVersion            String?
+  programTier              String            @default("CREATOR")
+  initialCommissionBps     Int               @default(3000)
+  recurringCommissionBps   Int               @default(1500)
+  recurringMonths          Int               @default(12)
+  overrideCommissionBps    Int               @default(500)
+  payoutHoldDays           Int               @default(30)
+  applicationId            String?           @unique
+  application              AgentApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  recruitedBySubAgentId    String?
+  recruitedBy              SubAgent?         @relation("PartnerRecruiting", fields: [recruitedBySubAgentId], references: [id], onDelete: SetNull)
+  recruitedPartners        SubAgent[]         @relation("PartnerRecruiting")
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
   contacts                 SubAgentContact[]
   referredClients          Client[]          @relation("ClientReferralSubAgent")
 
   @@index([status])
+  @@index([programTier])
+  @@index([recruitedBySubAgentId])
 }
 
 model SubAgentContact {
@@ -190,6 +204,10 @@ model AgentApplication {
   motivationEncrypted String?
   state               String?
   experience          String?
+  primaryPlatform     String?
+  audienceSize        String?
+  socialProfileEncrypted String?
+  contentFocusEncrypted String?
   source              String?
   consentAt           DateTime
   ipAddress           String?
@@ -198,6 +216,7 @@ model AgentApplication {
   reviewedById        String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+  approvedSubAgent    SubAgent?
 
   @@index([status])
   @@index([createdAt])

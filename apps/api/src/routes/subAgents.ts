@@ -7,6 +7,7 @@ import { sendAffiliateOnboardingEmail, sendPasswordSetupEmail } from '../lib/ema
 import { buildPasswordSetupLink, issuePasswordSetupToken } from '../lib/passwordSetup.js';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
+import { CREATOR_PARTNER_POLICY_VERSION } from './agentApplications.js';
 
 export const subAgentsRouter = Router();
 
@@ -15,7 +16,9 @@ const subAgentSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().max(40).optional().or(z.literal('')),
   referralCode: z.string().max(80).optional().or(z.literal('')),
-  notes: z.string().max(1000).optional().or(z.literal(''))
+  notes: z.string().max(1000).optional().or(z.literal('')),
+  programTier: z.enum(['CREATOR', 'AMBASSADOR', 'PARTNER']).optional(),
+  recruitedBySubAgentId: z.string().uuid().optional().or(z.literal(''))
 });
 
 const contactSchema = z.object({
@@ -192,7 +195,11 @@ subAgentsRouter.post('/', requireAuth, requireRole(['STAFF', 'ADMIN']), async (r
         email: cleanOptional(data.email),
         phone: cleanOptional(data.phone),
         referralCode,
-        notes: cleanOptional(data.notes)
+        notes: cleanOptional(data.notes),
+        programTier: data.programTier || 'CREATOR',
+        initialCommissionBps: data.programTier === 'AMBASSADOR' ? 3500 : data.programTier === 'PARTNER' ? 4000 : 3000,
+        recruitedBySubAgentId: cleanOptional(data.recruitedBySubAgentId),
+        policyVersion: CREATOR_PARTNER_POLICY_VERSION
       },
       include: { contacts: true }
     });
@@ -251,7 +258,12 @@ subAgentsRouter.patch('/:id', requireAuth, requireRole(['STAFF', 'ADMIN']), asyn
         ...(data.email !== undefined ? { email: cleanOptional(data.email) } : {}),
         ...(data.phone !== undefined ? { phone: cleanOptional(data.phone) } : {}),
         ...(data.notes !== undefined ? { notes: cleanOptional(data.notes) } : {}),
-        ...(data.status !== undefined ? { status: data.status } : {})
+        ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.programTier !== undefined ? {
+          programTier: data.programTier,
+          initialCommissionBps: data.programTier === 'AMBASSADOR' ? 3500 : data.programTier === 'PARTNER' ? 4000 : 3000
+        } : {}),
+        ...(data.recruitedBySubAgentId !== undefined ? { recruitedBySubAgentId: cleanOptional(data.recruitedBySubAgentId) } : {})
       },
       include: {
         contacts: { orderBy: { createdAt: 'desc' }, take: 50 }
@@ -301,7 +313,13 @@ subAgentsRouter.get('/onboarding/:token', async (req, res, next) => {
         affiliateId: true,
         referralCode: true,
         onboardingTokenExpiresAt: true,
-        policyAcceptedAt: true
+        policyAcceptedAt: true,
+        programTier: true,
+        initialCommissionBps: true,
+        recurringCommissionBps: true,
+        recurringMonths: true,
+        overrideCommissionBps: true,
+        payoutHoldDays: true
       }
     });
     if (!subAgent || !subAgent.onboardingTokenExpiresAt || subAgent.onboardingTokenExpiresAt.getTime() < Date.now()) {
@@ -314,7 +332,13 @@ subAgentsRouter.get('/onboarding/:token', async (req, res, next) => {
         affiliateId: subAgent.affiliateId,
         referralCode: subAgent.referralCode,
         referralLink: referralUrl(subAgent.referralCode),
-        policyAcceptedAt: subAgent.policyAcceptedAt
+        policyAcceptedAt: subAgent.policyAcceptedAt,
+        programTier: subAgent.programTier,
+        initialCommissionBps: subAgent.initialCommissionBps,
+        recurringCommissionBps: subAgent.recurringCommissionBps,
+        recurringMonths: subAgent.recurringMonths,
+        overrideCommissionBps: subAgent.overrideCommissionBps,
+        payoutHoldDays: subAgent.payoutHoldDays
       }
     });
   } catch (error) {
@@ -378,6 +402,7 @@ subAgentsRouter.post('/onboarding/:token/sign', async (req, res, next) => {
         policyAcceptedAt: new Date(),
         policySignature: data.signature.trim(),
         policyIpAddress: clientIp(req),
+        policyVersion: CREATOR_PARTNER_POLICY_VERSION,
         onboardingTokenHash: null,
         onboardingTokenExpiresAt: null
       }
