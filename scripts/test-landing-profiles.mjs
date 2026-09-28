@@ -34,6 +34,27 @@ try {
    if(['missing-photo','broken-photo'].includes(mode))assert.equal(await visible('#agentCampaignPhoto'),false);
    assert(await visible('#aboutRunway'),'Runway must remain present');
    assert.equal(await page.locator('#chat').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(4, 9, 20)');
+   const handoff=await page.evaluate(()=>{
+    const section=document.querySelector('.profile-handoff');
+    const portal=document.querySelector('.profile-handoff-portal');
+    const transition=document.querySelector('.about-transition');
+    const about=document.querySelector('#aboutRunway');
+    return {
+     height:section.offsetHeight,
+     sectionBottom:section.offsetTop+section.offsetHeight,
+     aboutTop:about.offsetTop,
+     portalDisplay:getComputedStyle(portal).display,
+     transitionDisplay:getComputedStyle(transition).display
+    };
+   });
+   if(width<768){
+    assert(handoff.height>=420,'Mobile handoff must leave a deliberate white transition zone');
+    assert.equal(handoff.portalDisplay,'grid','Mobile handoff portal must be visible');
+    assert.equal(handoff.transitionDisplay,'none','Mobile must use the stable in-flow portal instead of the fixed overlay');
+    assert(handoff.aboutTop>=handoff.sectionBottom,'Profile must begin after the portal handoff');
+   }else{
+    assert.equal(handoff.portalDisplay,'none','Desktop keeps the existing scroll-owned portal');
+   }
    if(mode==='owner'||mode==='agent') {
     const end=await page.locator('#aboutRunway').evaluate(e=>e.offsetTop+e.offsetHeight);
     // Exercise actual scroll, including the preceding chat and portal handoff.
