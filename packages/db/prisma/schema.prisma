@@ -136,6 +136,10 @@ model SubAgent {
   referralCode             String            @unique
   status                   String            @default("ACTIVE")
   notes                    String?
+  publicBio                String?
+  publicHeadshotUrl        String?
+  campaignEnabled          Boolean           @default(false)
+  campaignApprovedAt       DateTime?
   adminUserId              String?           @unique
   adminUser                User?             @relation("SubAgentAdminUser", fields: [adminUserId], references: [id], onDelete: SetNull)
   onboardingTokenHash      String?           @unique
@@ -202,6 +206,9 @@ model AgentApplication {
   emailEncrypted      String
   phoneEncrypted      String
   motivationEncrypted String?
+  professionalTitleEncrypted String?
+  socialMediaEncrypted String?
+  backgroundReferencesEncrypted String?
   state               String?
   experience          String?
   primaryPlatform     String?
