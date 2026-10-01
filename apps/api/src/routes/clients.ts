@@ -971,31 +971,32 @@ clientsRouter.post('/:id/regenerate-letters', requireAuth, requireRole(['STAFF',
     if (!client) return res.status(404).json({ error: 'Client not found' });
     if (!client.progress?.analysis) return res.status(400).json({ error: 'No credit analysis found. Upload credit report and generate analysis first.' });
 
-    // Step 1: Clear old dispute items and letters
-    const disputeItems = await prisma.disputeItem.findMany({
-      where: { clientId: id },
-      select: { id: true }
-    });
-    const disputeItemIds = disputeItems.map(d => d.id);
-
-    if (disputeItemIds.length) {
-      await prisma.disputeRound.deleteMany({
-        where: { disputeItemId: { in: disputeItemIds } }
-      });
-      await prisma.disputeItem.deleteMany({ where: { clientId: id } });
-    }
-
-    await prisma.document.deleteMany({
-      where: { clientId: id, type: 'DISPUTE_LETTER' }
-    });
-
-    // Step 2: Activate / regenerate
+    // Old dispute items and letters are cleared only after every activation
+    // gate passes, so a blocked regeneration leaves the existing letters intact.
     const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
     const result = await activateClientDisputeCampaign(id, {
       stateReviewOverride: req.body?.stateReviewOverride === true,
       analysisReviewOverride: req.body?.analysisReviewOverride === true,
       analysisOverrideReason: req.body?.analysisOverrideReason,
-      overrideBy: req.auth?.sub
+      overrideBy: req.auth?.sub,
+      beforeGenerate: async () => {
+        const disputeItems = await prisma.disputeItem.findMany({
+          where: { clientId: id },
+          select: { id: true }
+        });
+        const disputeItemIds = disputeItems.map(d => d.id);
+
+        if (disputeItemIds.length) {
+          await prisma.disputeRound.deleteMany({
+            where: { disputeItemId: { in: disputeItemIds } }
+          });
+          await prisma.disputeItem.deleteMany({ where: { clientId: id } });
+        }
+
+        await prisma.document.deleteMany({
+          where: { clientId: id, type: 'DISPUTE_LETTER' }
+        });
+      }
     });
 
     // Step 3: Fetch the newly created documents

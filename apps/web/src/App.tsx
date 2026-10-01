@@ -1841,6 +1841,42 @@ function clientWorkspacePath(client: Pick<ClientRecord, 'id' | 'status'>): strin
   return `/clients/${client.id}?tab=${client.status === 'ANALYSIS_READY' ? 'analysis' : 'overview'}`;
 }
 
+type CampaignResult = { success: boolean; lettersGenerated: number; errors?: string[] };
+
+/**
+ * POSTs to a dispute-campaign endpoint (activate / regenerate-letters) and walks
+ * staff through the logged overrides the API asks for: a written reason for a
+ * pending analysis review, then a confirm for a review-required state.
+ */
+async function runDisputeCampaignWithOverrides(path: string, token: string): Promise<CampaignResult> {
+  const post = (body: Record<string, unknown>) =>
+    apiFetch<CampaignResult>(path, token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  const findError = (res: CampaignResult, code: string) =>
+    res.success ? undefined : res.errors?.find((e) => e.startsWith(code));
+
+  let overrides: Record<string, unknown> = {};
+  let res = await post(overrides);
+
+  const analysisMsg = findError(res, 'ANALYSIS_REVIEW_REQUIRED');
+  if (analysisMsg) {
+    const reason = window.prompt(`${analysisMsg.replace('ANALYSIS_REVIEW_REQUIRED: ', '')}\n\nEnter the reason for overriding the pending analysis review. This is logged for compliance.`);
+    if (!reason?.trim()) return res;
+    overrides = { analysisReviewOverride: true, analysisOverrideReason: reason.trim() };
+    res = await post(overrides);
+  }
+
+  const stateMsg = findError(res, 'STATE_REVIEW_REQUIRED');
+  if (stateMsg && confirm(`${stateMsg.replace('STATE_REVIEW_REQUIRED: ', '')}\n\nOverride and proceed anyway? This is logged for compliance.`)) {
+    res = await post({ ...overrides, stateReviewOverride: true });
+  }
+
+  return res;
+}
+
 function ClientDetailRoute({ token }: { token: string }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -2221,36 +2257,7 @@ function ClientDetailRoute({ token }: { token: string }) {
                         if (!confirm(`Activate ${fullName} and generate Round 1 dispute letters? No payment is taken now — the fee is billed only after the analysis review is completed and the cancellation window has passed.`)) return;
                         setSaving(true);
                         try {
-                          const activateOnce = (override: boolean) =>
-                            apiFetch<{ success: boolean; lettersGenerated: number; errors?: string[] }>(`/api/clients/${client.id}/activate`, token, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify(override ? { stateReviewOverride: true } : {})
-                            });
-                          let res = await activateOnce(false);
-                          let analysisOverrideBody: Record<string, unknown> = {};
-                          if (!res.success && res.errors?.some((e) => e.startsWith('ANALYSIS_REVIEW_REQUIRED'))) {
-                            const msg = res.errors.find((e) => e.startsWith('ANALYSIS_REVIEW_REQUIRED')) || '';
-                            const reason = window.prompt(`${msg.replace('ANALYSIS_REVIEW_REQUIRED: ', '')}\n\nEnter the reason for overriding the pending analysis review. This is logged for compliance.`);
-                            if (reason?.trim()) {
-                              analysisOverrideBody = { analysisReviewOverride: true, analysisOverrideReason: reason.trim() };
-                              res = await apiFetch<{ success: boolean; lettersGenerated: number; errors?: string[] }>(`/api/clients/${client.id}/activate`, token, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(analysisOverrideBody)
-                              });
-                            }
-                          }
-                          if (!res.success && res.errors?.some((e) => e.startsWith('STATE_REVIEW_REQUIRED'))) {
-                            const msg = res.errors.find((e) => e.startsWith('STATE_REVIEW_REQUIRED')) || '';
-                            if (confirm(`${msg.replace('STATE_REVIEW_REQUIRED: ', '')}\n\nOverride and proceed anyway? This is logged for compliance.`)) {
-                              res = await apiFetch<{ success: boolean; lettersGenerated: number; errors?: string[] }>(`/api/clients/${client.id}/activate`, token, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ ...analysisOverrideBody, stateReviewOverride: true })
-                              });
-                            }
-                          }
+                          const res = await runDisputeCampaignWithOverrides(`/api/clients/${client.id}/activate`, token);
                           if (res.success) {
                             alert(`✅ ${fullName} is now ACTIVE. ${res.lettersGenerated} dispute letter(s) generated. Bill the setup fee after the analysis review is completed and confirmed.`);
                             const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
@@ -2328,16 +2335,16 @@ function ClientDetailRoute({ token }: { token: string }) {
                       className="ghost-button"
                       style={{ borderColor: '#00c6fb', color: '#00c6fb' }}
                       onClick={async () => {
-                        if (!confirm(`Regenerate dispute letters for ${fullName}? This will delete old dispute items and letters, then create fresh ones from the current analysis.`)) return;
+                        if (!confirm(`Regenerate dispute letters for ${fullName}? Old dispute items and letters are replaced with fresh ones from the current analysis. If a review check blocks it, the existing letters are kept.`)) return;
                         setSaving(true);
                         try {
-                          const res = await apiFetch<{ success: boolean; lettersGenerated: number; documents: any[] }>(`/api/clients/${client.id}/regenerate-letters`, token, { method: 'POST' });
+                          const res = await runDisputeCampaignWithOverrides(`/api/clients/${client.id}/regenerate-letters`, token);
                           if (res.success) {
                             alert(`✅ Regenerated ${res.lettersGenerated} dispute letter(s) for ${fullName}.`);
                             const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
                             setClient(updated.client);
                           } else {
-                            alert('Regeneration completed but no letters were generated. Check analysis data.');
+                            alert(`Regeneration blocked — existing letters were kept:\n${(res.errors || ['No letters were generated. Check analysis data.']).join('\n')}`);
                           }
                         } catch (err) {
                           alert(`Regeneration failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
