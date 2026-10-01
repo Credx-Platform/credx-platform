@@ -1094,6 +1094,8 @@ clientsRouter.post('/:id/activate', requireAuth, requireRole(['STAFF', 'ADMIN'])
     const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
     const result = await activateClientDisputeCampaign(id, {
       stateReviewOverride: req.body?.stateReviewOverride === true,
+      analysisReviewOverride: req.body?.analysisReviewOverride === true,
+      analysisOverrideReason: req.body?.analysisOverrideReason,
       overrideBy: req.auth?.sub
     });
 
