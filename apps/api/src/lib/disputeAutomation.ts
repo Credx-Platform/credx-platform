@@ -792,6 +792,8 @@ export async function activateClientDisputeCampaign(
     analysisReviewOverride?: boolean;
     analysisOverrideReason?: string;
     overrideBy?: string;
+    /** Runs only after every activation gate has passed, before letters are generated. */
+    beforeGenerate?: () => Promise<void>;
   }
 ): Promise<{
   success: boolean;
@@ -888,6 +890,8 @@ export async function activateClientDisputeCampaign(
         }
       });
     }
+
+    if (opts?.beforeGenerate) await opts.beforeGenerate();
 
     const analysis = client.progress.analysis as unknown as CreditAnalysis;
 
