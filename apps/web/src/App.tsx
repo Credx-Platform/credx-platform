@@ -1303,7 +1303,7 @@ function Overview({ clients, disputes, plans, leadPipelineCount }: { clients: Cl
           <h2>Analysis to Upgrade Pipeline</h2>
           <div className="quick-actions quick-actions--plans">
             {clients.filter((client) => ['INTAKE_RECEIVED', 'ANALYSIS_READY', 'UPGRADE_OFFERED', 'PAST_DUE', 'RESTRICTED'].includes(client.status)).slice(0, 4).map((client) => (
-              <div key={client.id} className="plan-card clickable-card" onClick={() => navigate(`/clients/${client.id}?tab=overview`)}>
+              <div key={client.id} className="plan-card clickable-card" onClick={() => navigate(`/clients/${client.id}?tab=${client.status === 'ANALYSIS_READY' ? 'analysis' : 'overview'}`)}>
                 <strong>{client.user.firstName} {client.user.lastName}</strong>
                 <span>Status {statusLabel(client.status)}</span>
                 <span>Timeline {client.estimatedTimelineMonths ? `${client.estimatedTimelineMonths} months` : 'Pending analysis'}</span>
@@ -1708,7 +1708,7 @@ function Clients({ clients, subAgents, token, onRefresh }: { clients: ClientReco
             </thead>
             <tbody>
               {filteredClients.length ? filteredClients.map((client) => (
-                <tr key={client.id} className="clickable-row" onClick={() => navigate(`/clients/${client.id}`)}>
+                <tr key={client.id} className="clickable-row" onClick={() => navigate(clientWorkspacePath(client))}>
                   <td>
                     <strong>{client.user.firstName} {client.user.lastName}</strong>
                     <div className="cell-subtext">{client.user.email}</div>
@@ -1836,6 +1836,10 @@ function Employees({ users, currentUser }: { users: StaffUser[]; currentUser: Us
 }
 
 type ClientWorkspaceTab = 'overview' | 'profile' | 'documents' | 'disputes' | 'activity' | 'analysis';
+
+function clientWorkspacePath(client: Pick<ClientRecord, 'id' | 'status'>): string {
+  return `/clients/${client.id}?tab=${client.status === 'ANALYSIS_READY' ? 'analysis' : 'overview'}`;
+}
 
 function ClientDetailRoute({ token }: { token: string }) {
   const { id } = useParams();
@@ -2027,9 +2031,9 @@ function ClientDetailRoute({ token }: { token: string }) {
   const tabs: Array<{ key: ClientWorkspaceTab; label: string }> = [
     { key: 'overview', label: 'Overview' },
     { key: 'profile', label: 'Profile' },
+    { key: 'analysis', label: 'Analysis' },
     { key: 'documents', label: 'Documents' },
     { key: 'disputes', label: 'Disputes' },
-    { key: 'analysis', label: 'Analysis' },
     { key: 'activity', label: 'Activity' }
   ];
 
@@ -2224,10 +2228,27 @@ function ClientDetailRoute({ token }: { token: string }) {
                               body: JSON.stringify(override ? { stateReviewOverride: true } : {})
                             });
                           let res = await activateOnce(false);
+                          let analysisOverrideBody: Record<string, unknown> = {};
+                          if (!res.success && res.errors?.some((e) => e.startsWith('ANALYSIS_REVIEW_REQUIRED'))) {
+                            const msg = res.errors.find((e) => e.startsWith('ANALYSIS_REVIEW_REQUIRED')) || '';
+                            const reason = window.prompt(`${msg.replace('ANALYSIS_REVIEW_REQUIRED: ', '')}\n\nEnter the reason for overriding the pending analysis review. This is logged for compliance.`);
+                            if (reason?.trim()) {
+                              analysisOverrideBody = { analysisReviewOverride: true, analysisOverrideReason: reason.trim() };
+                              res = await apiFetch<{ success: boolean; lettersGenerated: number; errors?: string[] }>(`/api/clients/${client.id}/activate`, token, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(analysisOverrideBody)
+                              });
+                            }
+                          }
                           if (!res.success && res.errors?.some((e) => e.startsWith('STATE_REVIEW_REQUIRED'))) {
                             const msg = res.errors.find((e) => e.startsWith('STATE_REVIEW_REQUIRED')) || '';
                             if (confirm(`${msg.replace('STATE_REVIEW_REQUIRED: ', '')}\n\nOverride and proceed anyway? This is logged for compliance.`)) {
-                              res = await activateOnce(true);
+                              res = await apiFetch<{ success: boolean; lettersGenerated: number; errors?: string[] }>(`/api/clients/${client.id}/activate`, token, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ ...analysisOverrideBody, stateReviewOverride: true })
+                              });
                             }
                           }
                           if (res.success) {

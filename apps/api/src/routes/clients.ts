@@ -12,6 +12,7 @@ import { getSignedUrlForStoredDocument } from '../lib/blob-storage.js';
 import { findClientDocumentForUser } from '../lib/tenantQueries.js';
 import { extractReport } from '../lib/reportExtractor.js';
 import { syncReportDerivedClientData } from '../lib/clientReportSync.js';
+import { saveInternalAnalysisAudit } from '../lib/analysisAudit.js';
 import { defaultAffiliateLinks, recommendedAffiliateLinksForAnalysis } from '../lib/affiliateLinks.js';
 import { sendAffiliateReferralEmail } from '../lib/email.js';
 
@@ -333,6 +334,9 @@ clientsRouter.get('/:id', requireAuth, requireRole(['STAFF', 'ADMIN']), async (r
         },
         documents: true,
         activities: {
+          orderBy: { createdAt: 'desc' }
+        },
+        notes: {
           orderBy: { createdAt: 'desc' }
         },
         tasks: true,
@@ -989,6 +993,8 @@ clientsRouter.post('/:id/regenerate-letters', requireAuth, requireRole(['STAFF',
     const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
     const result = await activateClientDisputeCampaign(id, {
       stateReviewOverride: req.body?.stateReviewOverride === true,
+      analysisReviewOverride: req.body?.analysisReviewOverride === true,
+      analysisOverrideReason: req.body?.analysisOverrideReason,
       overrideBy: req.auth?.sub
     });
 
@@ -1174,6 +1180,7 @@ clientsRouter.post('/:id/analysis/generate', requireAuth, requireRole(['STAFF', 
         ...analysisReviewWorkflow
       }
     });
+    await saveInternalAnalysisAudit(prisma, id, analysis);
 
     // Also update client status
     await prisma.client.update({
@@ -1364,14 +1371,14 @@ clientsRouter.post('/:id/analysis/auto', requireAuth, async (req: AuthedRequest,
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // Check if analysis already exists
     const existing = await prisma.clientProgress.findUnique({
       where: { clientId: id }
     });
 
-    if (existing?.analysis) {
-      return res.json({ analysis: existing.analysis, cached: true });
-    }
+    // This endpoint is called after a report upload. Rebuild from the current
+    // parsed report instead of returning a stale cached analysis; the analyzer
+    // now unions rich extraction with bureau tradeline rows and writes a new
+    // admin audit note on every regeneration.
 
     let client = await prisma.client.findUnique({
       where: { id },
@@ -1428,6 +1435,7 @@ clientsRouter.post('/:id/analysis/auto', requireAuth, async (req: AuthedRequest,
         }
       }
     });
+    await saveInternalAnalysisAudit(prisma, id, analysis);
 
     await prisma.client.update({
       where: { id },

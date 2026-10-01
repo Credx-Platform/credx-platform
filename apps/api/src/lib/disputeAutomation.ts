@@ -787,7 +787,12 @@ Dispute Preparation & Financial Strategy Support`;
 
 export async function activateClientDisputeCampaign(
   clientId: string,
-  opts?: { stateReviewOverride?: boolean; overrideBy?: string }
+  opts?: {
+    stateReviewOverride?: boolean;
+    analysisReviewOverride?: boolean;
+    analysisOverrideReason?: string;
+    overrideBy?: string;
+  }
 ): Promise<{
   success: boolean;
   lettersGenerated: number;
@@ -813,6 +818,40 @@ export async function activateClientDisputeCampaign(
 
     if (!client.progress?.analysis) {
       return { success: false, lettersGenerated: 0, emailSent: false, errors: ['No credit analysis found. Upload credit report first.'] };
+    }
+
+    const analysisReview = (client.progress.workflow as any)?.analysisReview || {};
+    const analysisReviewCompleted = Boolean(analysisReview.completedAt);
+    if (!analysisReviewCompleted) {
+      if (!opts?.analysisReviewOverride) {
+        return {
+          success: false,
+          lettersGenerated: 0,
+          emailSent: false,
+          errors: ['ANALYSIS_REVIEW_REQUIRED: Analysis review has not been completed and confirmed. An authorized staff override is required to proceed.']
+        };
+      }
+      const reason = String(opts.analysisOverrideReason || '').trim();
+      if (!reason) {
+        return {
+          success: false,
+          lettersGenerated: 0,
+          emailSent: false,
+          errors: ['ANALYSIS_OVERRIDE_REASON_REQUIRED: Provide a reason before overriding the pending analysis review.']
+        };
+      }
+      await prisma.activityEvent.create({
+        data: {
+          clientId,
+          type: 'ANALYSIS_REVIEW_OVERRIDE',
+          message: 'Pending analysis review overridden by authorized staff before dispute activation.',
+          metadata: {
+            overrideBy: opts.overrideBy || 'unknown',
+            reason,
+            analysisReviewStage: analysisReview.stage || null
+          }
+        }
+      });
     }
 
     // CROA work gate: no paid dispute work until the service agreement is signed
