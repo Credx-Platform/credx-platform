@@ -850,6 +850,8 @@ disputesRouter.post('/auto-generate', requireAuth, requireRole(['STAFF', 'ADMIN'
     const { activateClientDisputeCampaign } = await import('../lib/disputeAutomation.js');
     const result = await activateClientDisputeCampaign(clientId, {
       stateReviewOverride: req.body?.stateReviewOverride === true,
+      analysisReviewOverride: req.body?.analysisReviewOverride === true,
+      analysisOverrideReason: req.body?.analysisOverrideReason,
       overrideBy: (req as AuthedRequest).auth?.sub
     });
 
