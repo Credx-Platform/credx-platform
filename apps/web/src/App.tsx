@@ -1988,11 +1988,14 @@ function ClientDetailRoute({ token }: { token: string }) {
     if (!client) return;
     setSaving(true);
     try {
-      const response = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}/status`, token, {
+      await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}/status`, token, {
         method: 'PATCH',
         body: JSON.stringify({ status: statusValue })
       });
-      setClient(response.client);
+      // The PATCH response omits progress/analysis, which gates the Activate,
+      // Regenerate Letters and fee buttons — reload the full client instead.
+      const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
+      setClient(updated.client);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save status');
     } finally {
@@ -2016,13 +2019,15 @@ function ClientDetailRoute({ token }: { token: string }) {
       if (!profilePayload.ssnFull) {
         delete (profilePayload as Partial<typeof profilePayload>).ssnFull;
       }
-      const response = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}/profile`, token, {
+      await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}/profile`, token, {
         method: 'PATCH',
         body: JSON.stringify(profilePayload)
       });
-      setClient(response.client);
-      setStatusValue(response.client.status);
-      hydrateProfileForm(response.client);
+      // Same as saveStatus: the PATCH response is partial, so reload the full client.
+      const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
+      setClient(updated.client);
+      setStatusValue(updated.client.status);
+      hydrateProfileForm(updated.client);
       setEditingProfile(false);
       setProfileNotice('Profile updated');
     } catch (err) {
