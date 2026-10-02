@@ -39,7 +39,11 @@ type ClientProgress = {
   education?: ClientEducationProgress;
   analysis?: unknown;
   scores?: { equifax?: number | null; experian?: number | null; transunion?: number | null };
-  workflow?: { stage?: string; next?: string[] };
+  workflow?: {
+    stage?: string;
+    next?: string[];
+    analysisReview?: { readyAt?: string | null; completedAt?: string | null; method?: string | null; notes?: string | null };
+  };
   uploadedDocs?: Array<{ name?: string; fileName?: string; type?: string; uploadedAt?: string; secure?: boolean; sizeBytes?: number }>;
   onboarding?: {
     status?: string;
@@ -1877,6 +1881,91 @@ async function runDisputeCampaignWithOverrides(path: string, token: string): Pro
   return res;
 }
 
+const ANALYSIS_REVIEW_METHOD_LABELS: Record<string, string> = {
+  portal: 'Client confirmed in portal',
+  phone: 'Phone consultation',
+  video: 'Video call',
+  in_person: 'In-person meeting'
+};
+
+/**
+ * Lets staff record that the analysis was walked through with the client
+ * outside the portal (usually by phone). Completing it here clears the same
+ * review gate as the client's in-portal confirmation, so Activate and billing
+ * no longer need an override.
+ */
+function AnalysisReviewPanel({ client, token, onRecorded }: { client: ClientDetail; token: string; onRecorded: () => Promise<void> }) {
+  const review = client.progress?.workflow?.analysisReview;
+  const [method, setMethod] = useState<'phone' | 'video' | 'in_person'>('phone');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function recordReview() {
+    if (!confirm(`Record that you reviewed the analysis with ${client.user.firstName || 'this client'} by ${ANALYSIS_REVIEW_METHOD_LABELS[method].toLowerCase()}? This counts as the client's review confirmation and is logged with your account.`)) return;
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      await apiFetch<{ success: boolean }>(`/api/clients/${client.id}/analysis-review/complete`, token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method, notes: notes.trim() || undefined })
+      });
+      setNotes('');
+      await onRecorded();
+    } catch (err) {
+      setMessage(`Could not record the review: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div>
+      <h3>Analysis review</h3>
+      {review?.completedAt ? (
+        <ul className="detail-list">
+          <li><strong>Status</strong><span style={{ color: '#16a34a', fontWeight: 600 }}>✅ Completed</span></li>
+          <li><strong>How</strong><span>{ANALYSIS_REVIEW_METHOD_LABELS[review.method || ''] || review.method || '—'}</span></li>
+          <li><strong>When</strong><span>{formatDate(review.completedAt)}</span></li>
+          {review.notes ? <li><strong>Notes</strong><span>{review.notes}</span></li> : null}
+        </ul>
+      ) : (
+        <>
+          <p className="helper-text">
+            Waiting on the client to confirm their analysis. If you went over it with them yourself, record it here — this replaces the client's in-portal confirmation and unlocks Activate and billing.
+          </p>
+          <div className="field-grid">
+            <label>
+              <span>Reviewed with client by</span>
+              <select value={method} onChange={(e) => setMethod(e.target.value as typeof method)}>
+                <option value="phone">Phone consultation</option>
+                <option value="video">Video call</option>
+                <option value="in_person">In-person meeting</option>
+              </select>
+            </label>
+            <label>
+              <span>Notes (optional)</span>
+              <textarea rows={2} maxLength={2000} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Walked through all negative items, client agreed with the plan" />
+            </label>
+          </div>
+          <div className="client-workspace-actions">
+            <button
+              className="ghost-button"
+              style={{ borderColor: '#22c55e', color: '#16a34a', fontWeight: 600 }}
+              onClick={recordReview}
+              disabled={submitting}
+            >
+              {submitting ? 'Saving...' : '✅ Mark Analysis Review Complete'}
+            </button>
+          </div>
+        </>
+      )}
+      {message ? <p className="helper-text">{message}</p> : null}
+    </div>
+  );
+}
+
 function ClientDetailRoute({ token }: { token: string }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -2240,6 +2329,17 @@ function ClientDetailRoute({ token }: { token: string }) {
               </div>
               <SignupIntakePanel onboarding={client.progress?.onboarding || null} />
               <MonitoringCredentialsPanel onboarding={client.progress?.onboarding || null} />
+              {client.progress?.analysis ? (
+                <AnalysisReviewPanel
+                  client={client}
+                  token={token}
+                  onRecorded={async () => {
+                    const updated = await apiFetch<{ client: ClientDetail }>(`/api/clients/${client.id}`, token);
+                    setClient(updated.client);
+                    setStatusValue(updated.client.status);
+                  }}
+                />
+              ) : null}
               <div>
                 <h3>Admin controls</h3>
                 <div className="field-grid">
