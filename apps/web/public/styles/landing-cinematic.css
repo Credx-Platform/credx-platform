@@ -20,7 +20,9 @@ section[id]{scroll-margin-top:80px}
 .cinematic-hero .hero-sub{font-size:16px;line-height:1.65;max-width:620px;margin:0 auto 22px}
 .cinematic-hero .hero-btns{justify-content:center;gap:12px}
 .cinematic-hero .btn{padding-inline:24px;justify-content:center}
-.cinematic-hero .hero-login-note{font-size:11px;margin-top:12px}
+.cinematic-hero .hero-login-note{font-size:11px;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+.cinematic-hero .hero-admin-login{display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border:1px solid var(--border-c);border-radius:6px;background:rgba(6,11,19,.72);color:var(--cyan);font-size:10px;font-weight:700;letter-spacing:.2px}
+.cinematic-hero .hero-admin-login:hover{border-color:var(--cyan);background:rgba(0,198,251,.08);color:var(--cyan2)}
 .cinematic-hero .hero-btns .btn-outline{background:rgba(6,11,19,.85)}
 .hero-art{position:relative;width:min(1080px,100%,var(--hero-art-cap,max(420px,calc((100svh - 520px) * 2.1))));aspect-ratio:2.1;height:auto;margin:0 auto;pointer-events:none;z-index:2;transform-origin:50% 50%;transform:translate3d(0,0,0) scale(1)}
 .cinematic-hero .scene-object img{filter:saturate(.84) brightness(.82);transition:filter 1.1s var(--motion-ease),opacity 1.1s var(--motion-ease)}
@@ -168,7 +170,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
  .cinematic-hero.hero{height:auto;min-height:100svh;justify-content:flex-start}
  .hero-art{width:min(360px,100%)}
 }
-@media(max-height:560px){.hero-art{transform:none!important}}
+@media(max-height:560px){.hero-art,.object-motion{transform:none!important}}
 @media(prefers-reduced-motion:reduce){
  .data-trails,.portal-frames,.about-gateway,.journey-cue{display:none!important}
  .hero-runway,.interface-runway{height:auto!important}
@@ -325,6 +327,9 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 .agent-cta-section{padding-block:clamp(56px,5vw,84px)!important}
 .agent-cta-section::after{background:linear-gradient(90deg,rgba(4,16,28,.97) 0%,rgba(4,16,28,.9) 42%,rgba(4,16,28,.62) 100%),linear-gradient(180deg,rgba(4,16,28,.28),rgba(4,16,28,.52))}
 @media(max-width:767px){.agent-cta-section::after{background:linear-gradient(180deg,rgba(4,16,28,.94),rgba(4,16,28,.8) 50%,rgba(4,16,28,.96))}}
+/* The generic .section-fade::after is a 120px bottom strip at .8 opacity;
+   without this the scrim never covers the photo and the copy is unreadable. */
+.agent-cta-section::before,.agent-cta-section::after{top:0;right:0;bottom:0;left:0;height:auto;opacity:1}
 
 /* Dark text tokens for the white/soft-gray product surface. Inline notes are
    overridden here so light text never disappears on the carousel background. */
@@ -341,6 +346,10 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 /* Agent campaign social placeholders stay visually ready without pretending a
    profile exists before the owner adds and approves its URL. */
 .agent-campaign-socials{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}.agent-social-placeholder{display:grid;grid-template-columns:28px auto;column-gap:8px;align-items:center;min-width:136px;padding:9px 12px;border:1px dashed rgba(91,155,185,.42);border-radius:12px;background:rgba(8,22,38,.32);color:#cde8f3}.agent-social-placeholder b{grid-row:span 2;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:rgba(0,198,251,.12);color:#73ddfb;font-size:13px}.agent-social-placeholder span{font-size:12px;font-weight:700;letter-spacing:.02em}.agent-social-placeholder em{color:#89a4b6;font-size:10px;font-style:normal}.agent-social-placeholder:hover{border-style:solid;border-color:rgba(0,198,251,.62);background:rgba(0,198,251,.08)}.agent-referral-note{margin:14px 0 0!important;padding:10px 12px;border-radius:12px;background:#eef6fa;border:1px solid #c9dde7;color:#38566d!important;font-size:12px!important;line-height:1.45!important}
+/* display:grid on .agent-campaign beats the [hidden] attribute, which put a
+   placeholder agent card (owner photo, "link coming soon") on every direct
+   visit. It may only appear when ?agent= resolves to an approved agent. */
+.agent-campaign[hidden]{display:none!important}
 .agent-campaign{border-bottom:0;padding-bottom:clamp(42px,6vw,76px)}
 .agent-campaign-socials .agent-social-placeholder{min-width:112px;padding:7px 9px;border-radius:10px}.agent-campaign-socials .agent-social-placeholder b{width:24px;height:24px;border-radius:7px;font-size:11px}.agent-campaign-socials .agent-social-placeholder span{font-size:11px}.agent-campaign-socials .agent-social-placeholder em{font-size:9px}
 .about-social-placeholder{position:relative;display:grid;grid-template-columns:28px auto;column-gap:8px;align-items:center;width:auto;min-width:120px;height:52px;padding:6px 13px;border:1px dashed rgba(82,196,250,.34);border-radius:14px;background:rgba(9,22,37,.66);color:#d4f1ff}.about-social-placeholder b{grid-row:span 2;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:rgba(0,198,251,.12);color:#73ddfb;font-size:13px}.about-social-placeholder>span{position:static;width:auto;height:auto;overflow:visible;clip-path:none;white-space:nowrap;font-size:11px;font-weight:700}.about-social-placeholder em{grid-column:2;color:#89a4b6;font-size:9px;font-style:normal;line-height:1}.about-social-placeholder:hover{border-style:solid;border-color:#92e8ff}
@@ -466,13 +475,11 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 .about-transition .about-gateway{display:block!important}
 #about,.about-portal-active,#about-runway{border-top:0!important;border-bottom:0!important}
 #about .about-photo{
-  width:min(140px,50%);
-  justify-self:center;
   background:transparent;
   mix-blend-mode:multiply;
   clip-path:none!important;
-  -webkit-mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,#000 0 48%,rgba(0,0,0,.92) 62%,rgba(0,0,0,.45) 80%,transparent 100%);
-  mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,#000 0 48%,rgba(0,0,0,.92) 62%,rgba(0,0,0,.45) 80%,transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 78% 82% at 50% 48%,#000 0 42%,rgba(0,0,0,.98) 57%,rgba(0,0,0,.72) 74%,rgba(0,0,0,.24) 90%,transparent 100%);
+  mask-image:radial-gradient(ellipse 78% 82% at 50% 48%,#000 0 42%,rgba(0,0,0,.98) 57%,rgba(0,0,0,.72) 74%,rgba(0,0,0,.24) 90%,transparent 100%);
 }
 
 /* Keep the iris on the profile surface throughout its reveal. Dark fixed
@@ -483,23 +490,9 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 .about-transition .portal-logo b{-webkit-text-stroke-color:#0089b2}
 .about-gateway i{border-color:rgba(0,137,178,.45);box-shadow:0 0 20px rgba(0,168,211,.12)}
 .about-transition .about-gateway{display:block!important}
-/* Cesar and the profile share one light chapter with room for the opening. */
-#chat{background:var(--cx-profile-surface)!important;color:#183247;padding-bottom:clamp(144px,20vh,224px)}
-#chat .stitle,#chat .chat-agent-name{color:#142d43}
-#chat .ssub{color:#476176}
-#chat .stag,#chat .chat-powered span{color:#0088b0}
-#chat .chat-window{background:var(--cx-profile-surface);border-color:#cbdde6;box-shadow:0 18px 48px -30px rgba(29,53,78,.3)}
-#chat .chat-header,#chat .chat-input-wrap,#chat .chat-quick-actions{background:var(--cx-profile-surface);border-color:#d6e4eb}
-#chat .chat-msg.agent .chat-bubble,#chat .chat-typing{background:#fff;border-color:#d6e4eb;color:#304b64}
-#chat .chat-msg.user .chat-bubble{background:#e5f7fc;border-color:#b8dfe9;color:#183247}
-#chat .chat-bubble a{color:#007c9f}
-#chat .chat-agent-status{color:#24734f}
-#chat .chat-powered,#chat .chat-input::placeholder{color:#587085}
-#chat .chat-input,#chat .chat-quick{background:#fff;border-color:#bfd4df;color:#304b64}
-#chat .chat-input{min-width:0}
-#chat .chat-input:focus,#chat .chat-quick:hover{border-color:#0088b0}
-#chat .chat-msg.user .chat-msg-av{background:#e0edf3;color:#304b64}
-#chat .chat-typing span{background:#587085}
+/* Cesar keeps the CredX blue chat surface; only the extra room for the
+   opening iris carries over from the light profile chapter. */
+#chat{padding-bottom:clamp(144px,20vh,224px)}
 #about{background:transparent!important;padding-top:clamp(96px,12vh,160px)!important}
 @media(max-width:767px){
   .nav{border-bottom-color:transparent}
@@ -507,7 +500,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
   .about-runway{overflow:visible!important}
   #about{padding-top:96px!important;background:transparent!important}
   #about .about-inner{opacity:1!important;transform:none!important;clip-path:none!important}
-  #about #ownerAbout .about-photo{width:min(115px,36vw)}
+  #about .about-photo{-webkit-mask-image:radial-gradient(ellipse 78% 82% at 50% 48%,#000 0 38%,rgba(0,0,0,.97) 55%,rgba(0,0,0,.68) 74%,rgba(0,0,0,.2) 90%,transparent 100%);mask-image:radial-gradient(ellipse 78% 82% at 50% 48%,#000 0 38%,rgba(0,0,0,.97) 55%,rgba(0,0,0,.68) 74%,rgba(0,0,0,.2) 90%,transparent 100%)}
   .profile-carousel{border-color:#d9e5ec;background:#fff;box-shadow:0 18px 48px -30px rgba(29,53,78,.3)}
   .profile-slide{transition:transform .28s ease-out,opacity .2s ease,visibility .2s}
 }
