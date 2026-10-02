@@ -3364,6 +3364,74 @@ type AdminTask = {
   clientEmail?: string;
 };
 
+type AdminEmailTemplate = { key: string; label: string; subject: string; body: string };
+
+function AdminEmailTemplatesRoute() {
+  const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '';
+  const [clients, setClients] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<AdminEmailTemplate[]>([]);
+  const [clientId, setClientId] = useState('');
+  const [templateKey, setTemplateKey] = useState('');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const selectedClient = clients.find((client) => client.id === clientId);
+  const values: Record<string, string> = {
+    '{{first_name}}': selectedClient?.user?.firstName || 'there',
+    '{{last_name}}': selectedClient?.user?.lastName || '',
+    '{{full_name}}': `${selectedClient?.user?.firstName || ''} ${selectedClient?.user?.lastName || ''}`.trim(),
+    '{{email}}': selectedClient?.user?.email || '',
+    '{{portal_url}}': 'https://credxme.com/portal'
+  };
+  const preview = (value: string) => Object.entries(values).reduce((text, [key, replacement]) => text.replaceAll(key, replacement), value);
+
+  useEffect(() => {
+    const token = localStorage.getItem('credx-admin-token');
+    if (!token) return;
+    const headers = { authorization: `Bearer ${token}` };
+    Promise.all([
+      fetch(`${API_BASE}/api/clients`, { headers }).then((response) => response.json()),
+      fetch(`${API_BASE}/api/admin-email/templates`, { headers }).then((response) => response.json())
+    ]).then(([clientData, templateData]) => {
+      setClients(clientData.clients || []);
+      const nextTemplates = templateData.templates || [];
+      setTemplates(nextTemplates);
+      if (nextTemplates[0]) { setTemplateKey(nextTemplates[0].key); setSubject(nextTemplates[0].subject); setBody(nextTemplates[0].body); }
+    }).catch(() => setStatus('Unable to load email templates.'));
+  }, [API_BASE]);
+
+  const chooseTemplate = (key: string) => {
+    const template = templates.find((item) => item.key === key);
+    setTemplateKey(key);
+    if (template) { setSubject(template.subject); setBody(template.body); }
+  };
+
+  const send = async () => {
+    const token = localStorage.getItem('credx-admin-token');
+    if (!token || !clientId || !subject.trim() || !body.trim()) return;
+    if (!confirm(`Send this email to ${selectedClient?.user?.email || 'the selected client'}?`)) return;
+    setSending(true); setStatus(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/admin-email/send`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ clientId, templateKey, subject, body }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Email send failed');
+      setStatus(data.sent ? `Sent to ${data.email}.` : 'Email provider skipped the send; check provider configuration.');
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Email send failed.'); }
+    finally { setSending(false); }
+  };
+
+  return <div className="page-grid">
+    <section className="panel"><p className="eyebrow">Admin communications</p><h2>Email Templates</h2><p className="helper-text">Choose a client, edit the structured message, and send it manually. Every send is recorded on the client activity log.</p>
+      <div className="field-grid"><label><span>Client</span><select value={clientId} onChange={(event) => setClientId(event.target.value)}><option value="">Select client...</option>{clients.map((client) => <option key={client.id} value={client.id}>{`${client.user?.firstName || ''} ${client.user?.lastName || ''}`.trim() || client.user?.email}</option>)}</select></label><label><span>Template</span><select value={templateKey} onChange={(event) => chooseTemplate(event.target.value)}>{templates.map((template) => <option key={template.key} value={template.key}>{template.label}</option>)}</select></label><label><span>Subject</span><input value={subject} onChange={(event) => setSubject(event.target.value)} /></label></div>
+      <label style={{ display: 'grid', gap: '6px', marginTop: '12px' }}><span>Message</span><textarea rows={12} value={body} onChange={(event) => setBody(event.target.value)} /></label>
+      <p className="helper-text">Dynamic fields: <code>{'{{first_name}}'}</code> <code>{'{{last_name}}'}</code> <code>{'{{full_name}}'}</code> <code>{'{{email}}'}</code> <code>{'{{portal_url}}'}</code></p><div className="client-workspace-actions"><button type="button" onClick={send} disabled={sending || !clientId}>{sending ? 'Sending...' : 'Send Email'}</button></div>{status ? <p className="helper-text">{status}</p> : null}
+    </section>
+    <section className="panel"><p className="eyebrow">Preview</p><h2>{preview(subject) || 'Subject'}</h2><pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', color: '#cbd5e1', lineHeight: 1.6 }}>{preview(body) || 'Select a client and template.'}</pre></section>
+  </div>;
+}
+
 function TasksRoute() {
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -3895,6 +3963,7 @@ export default function App() {
           <NavLink to="/disputes">Disputes</NavLink>
           <NavLink to="/print">Print Center</NavLink>
           <NavLink to="/tasks">Tasks</NavLink>
+          <NavLink to="/emails">Email Templates</NavLink>
           <NavLink to="/sub-agents">Sub Agents</NavLink>
           <NavLink to="/employees">Employees</NavLink>
         </nav>
@@ -3912,6 +3981,8 @@ export default function App() {
                   ? '#22c55e'
                 : path.startsWith('/tasks')
                   ? '#22d3ee'
+                : path.startsWith('/emails')
+                  ? '#00c6fb'
                 : path.startsWith('/sub-agents') || path.startsWith('/employees')
                   ? '#f97316'
                   : '#00c6fb';
@@ -3925,6 +3996,8 @@ export default function App() {
                 ? 'Lead pipeline'
                 : path.startsWith('/tasks')
                   ? 'Task checklist'
+                : path.startsWith('/emails')
+                  ? 'Email templates'
                 : path.startsWith('/employees')
                   ? 'Employee tools'
                 : path.startsWith('/sub-agents')
@@ -3944,7 +4017,7 @@ export default function App() {
 
         <select
           className="mobile-nav-select"
-          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/print') ? '/print' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : location.pathname.startsWith('/sub-agents') ? '/sub-agents' : location.pathname.startsWith('/employees') ? '/employees' : '/'}
+          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/print') ? '/print' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : location.pathname.startsWith('/emails') ? '/emails' : location.pathname.startsWith('/sub-agents') ? '/sub-agents' : location.pathname.startsWith('/employees') ? '/employees' : '/'}
           onChange={(e) => {
             const value = e.target.value;
             navigate(value);
@@ -3957,6 +4030,7 @@ export default function App() {
           <option value="/disputes">Disputes</option>
           <option value="/print">Print Center</option>
           <option value="/tasks">Tasks</option>
+          <option value="/emails">Email Templates</option>
           <option value="/sub-agents">Sub Agents</option>
           <option value="/employees">Employees</option>
         </select>
@@ -3970,6 +4044,7 @@ export default function App() {
           <Route path="/disputes" element={<DisputesRoute token={token} disputes={disputes} clients={clients} />} />
           <Route path="/print" element={<PrintCenterRoute token={token} clients={clients} disputes={disputes} />} />
           <Route path="/tasks" element={<TasksRoute />} />
+          <Route path="/emails" element={<AdminEmailTemplatesRoute />} />
           <Route path="/sub-agents" element={<SubAgentsRoute token={token} subAgents={subAgents} leads={leads} clients={clients} onRefresh={refreshSubAgents} />} />
           <Route path="/employees" element={<Employees users={staffUsers} currentUser={user} />} />
         </Routes>
