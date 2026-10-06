@@ -515,14 +515,14 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
   .nav{border-bottom-color:transparent}
   html,html.smooth-scroll{scroll-behavior:auto!important}
   .profile-handoff{height:auto;min-height:clamp(440px,68svh,620px);padding:clamp(64px,10svh,96px) 24px}
-  .profile-handoff-portal{display:grid}
-  .about-transition,.about-backdrop{display:none!important;opacity:0!important}
-  .about-transition .about-gateway{display:none!important}
+  /* Phones use the same opening iris as desktop (driven by the script);
+     the buffer above the profile is the empty surface it opens on. */
+  .profile-handoff::before{display:none}
   .about-runway,.narrative-ready .about-runway{height:auto!important;overflow:visible!important}
   #about,.narrative-ready #about{position:relative!important;top:auto!important;min-height:0!important;padding-top:72px!important;background:transparent!important}
   .about-content-space{display:none!important;height:0!important}
   .about-portal-active #about .about-inner{position:relative!important;top:auto!important;left:auto!important;translate:none!important;width:auto!important}
-  #about .about-inner{opacity:1!important;transform:none!important;clip-path:none!important}
+  #about .about-inner{clip-path:none!important}
   #about #ownerAbout .about-photo{width:min(230px,72vw)}
   .profile-carousel{border-color:#d9e5ec;background:#fff;box-shadow:0 18px 48px -30px rgba(29,53,78,.3)}
   .profile-slide{transition:transform .28s ease-out,opacity .2s ease,visibility .2s}
