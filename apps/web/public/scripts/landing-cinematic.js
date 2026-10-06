@@ -187,7 +187,7 @@
    const heroStyle=getComputedStyle(hero);
    const spare=hero.clientHeight-parseFloat(heroStyle.paddingTop)-parseFloat(heroStyle.paddingBottom)
     -heroCopy.offsetHeight-(parseFloat(getComputedStyle(heroGrid).rowGap)||0);
-   hero.style.setProperty('--hero-art-cap',`${Math.max(240,spare*(width<768?1.25:2.1))}px`);
+   hero.style.setProperty('--hero-art-cap',`${Math.max(240,spare*(width<768?1.1:1.35))}px`);
    runway.style.setProperty('--hero-height',`${h}px`);
    runway.style.setProperty('--pin-top',`${Math.min(0,view-h)}px`);
    portal.style.setProperty('--interface-height',`${dh}px`);
@@ -198,7 +198,7 @@
    portalDistance=Math.max(1,portal.offsetHeight-dh);
    aboutSpace.style.height=`${aboutContent.offsetHeight}px`;
    aboutRunway.style.setProperty('--about-content-top',`${80+parseFloat(getComputedStyle(about).paddingTop)}px`);
-   aboutHeight=about.offsetHeight;aboutTravel=view*.62;socialOffset=socialRow.offsetTop;
+   aboutHeight=about.offsetHeight;aboutTravel=view*.36;socialOffset=socialRow.offsetTop;
    aboutRunway.style.setProperty('--about-height',`${aboutHeight}px`);
    aboutRunway.style.setProperty('--about-travel',`${aboutTravel}px`);
    aboutTop=aboutRunway.getBoundingClientRect().top+scrollY;
@@ -216,8 +216,8 @@
 
     // Start the full-screen iris only after the chat chapter clears the header.
     // It must never cover the still-visible conversation with a moving block.
-    const progress=skipAbout?1:clamp((y-aboutTop+80)/aboutTravel);
-    const entrance=ease(progress/.78),reveal=ease((progress-.08)/.62),clear=ease((progress-.78)/.2);
+    const progress=skipAbout?1:clamp((y-aboutTop+40)/aboutTravel);
+    const entrance=ease(progress/.62),reveal=ease((progress-.04)/.46),clear=ease((progress-.68)/.18);
     portalBusy=progress>0&&progress<1;
     const scrollDelta=pendingScroll;pendingScroll=0;advanceStreaks(scrollDelta);
     const bottom=aboutTop+aboutTravel+aboutHeight-y;
@@ -251,11 +251,10 @@
     });
     if(active.has(runway)){
      const p=clamp((y-heroTop-12)/Math.max(1,heroDistance-12)),e=ease(p);
-     // Keep the same eased scroll timing while cutting the prior 2x→4x
-     // composition in half: the artwork should stay clear of the copy and
-     // only reach a controlled 2x endpoint after scrolling.
+     // Keep the artwork close to its source size. The landing page should
+     // reveal the complete composition, not zoom into cropped details.
      const artStartScale=1;
-     const artEndScale=3;
+     const artEndScale=1.12;
      art.style.transform=`translate3d(0,${-e*(simple?5:14)}px,0) scale(${artStartScale+(artEndScale-artStartScale)*e})`;
     }
     if(active.has(portal)){
@@ -334,4 +333,3 @@
  addEventListener('pageshow',()=>resume());
  mount();
 })();
-

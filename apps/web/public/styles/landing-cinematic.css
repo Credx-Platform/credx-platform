@@ -429,6 +429,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
   row-gap:clamp(56px,8vw,96px)!important;
   align-items:center;
 }
+.agent-campaign[hidden]{display:none!important}
 .agent-campaign + #ownerAbout{margin-top:clamp(72px,10vw,140px)}
 .agent-campaign > .about-photo,#ownerAbout > .about-photo{grid-column:1;grid-row:1;justify-self:start}
 .agent-campaign > div,#ownerAbout > div{grid-column:2;grid-row:1;min-width:0}
