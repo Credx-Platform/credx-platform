@@ -48,7 +48,7 @@ after(() => child?.kill());
 const skip = () => (hasBuild ? false : 'requires apps/web/dist (run npm run build:web)');
 
 test('published pages resolve and are distinct documents', { skip: skip() }, async () => {
-  const paths = ['/', '/product', '/team', '/financial-readiness', '/pricing', '/terms', '/privacy', '/agent'];
+  const paths = ['/', '/education', '/product', '/team', '/financial-readiness', '/pricing', '/terms', '/privacy', '/agent'];
   const bodies = new Map();
 
   for (const path of paths) {
