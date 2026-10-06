@@ -1427,7 +1427,9 @@ document.querySelectorAll('.chat-quick').forEach(btn=>btn.addEventListener('clic
    referral.textContent='Referral attribution: signups from this page are tracked to '+(agent.name||'this approved CredX agent')+'.';
    referral.hidden=false;
   }
-  block.hidden=false;
+  // Keep the public homepage owner-first. Agent campaign profiles are not
+  // rendered into the main landing flow; About remains James's profile only.
+  block.hidden=true;
   document.querySelectorAll('a[href="/signup"],a[href^="/signup?"]').forEach(link=>{
    const href=new URL(link.getAttribute('href'),window.location.origin);
    href.searchParams.set('agent',agent.referralCode);

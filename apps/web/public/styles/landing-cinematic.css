@@ -22,7 +22,7 @@ section[id]{scroll-margin-top:80px}
 .cinematic-hero .btn{padding-inline:24px;justify-content:center}
 .cinematic-hero .hero-login-note{font-size:11px;margin-top:12px}
 .cinematic-hero .hero-btns .btn-outline{background:rgba(6,11,19,.85)}
-.hero-art{position:relative;width:min(1080px,100%,var(--hero-art-cap,max(420px,calc((100svh - 520px) * 2.1))));aspect-ratio:2.1;height:auto;margin:0 auto;pointer-events:none;z-index:2;transform-origin:50% 50%;transform:translate3d(0,0,0) scale(1)}
+.hero-art{position:relative;width:min(880px,100%,var(--hero-art-cap,max(420px,calc((100svh - 520px) * 1.7))));aspect-ratio:2.1;height:auto;margin:0 auto;pointer-events:none;z-index:2;transform-origin:50% 50%;transform:translate3d(0,0,0) scale(1)}
 .cinematic-hero .scene-object img{filter:saturate(.84) brightness(.82);transition:filter 1.1s var(--motion-ease),opacity 1.1s var(--motion-ease)}
 .cinematic-hero.scene-active .scene-object img{filter:saturate(1.18) contrast(1.04) brightness(1.04)}
 .scene-object{position:absolute;transform:none;opacity:1;backface-visibility:hidden}
@@ -124,7 +124,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
  .cinematic-hero.hero{height:auto;min-height:0;padding-top:84px}
  .cinematic-ready .hero-runway{height:auto}
  .cinematic-ready .cinematic-hero{position:relative;top:0}
- .hero-art{width:min(1080px,100%)}
+ .hero-art{width:min(880px,100%)}
  .journey-cue{display:none}
 }
 @media(min-width:768px) and (max-width:1100px){
@@ -285,7 +285,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
    the profile-tool carousel. */
 .section-fade{position:relative;isolation:isolate;padding-top:clamp(112px,10vw,168px);padding-bottom:clamp(112px,10vw,168px)}
 .section-fade::before{content:'';position:absolute;left:50%;top:-34px;width:min(220px,42vw);height:68px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(ellipse,rgba(0,198,251,.22),transparent 68%);filter:blur(7px);opacity:.7;pointer-events:none}
-.ig-section{position:relative;isolation:isolate;overflow:hidden;background-color:#ff5a70;background-image:linear-gradient(135deg,rgba(29,28,107,.18),rgba(255,0,135,.04) 48%,rgba(255,183,58,.14)),url('/images/instagram-gradient.jpg') !important;background-position:center;background-size:cover;background-repeat:no-repeat;padding-top:clamp(104px,12vw,170px);padding-bottom:clamp(104px,12vw,170px)}
+.ig-section{position:relative;isolation:isolate;overflow:hidden;background-color:#ff5a70;background-image:radial-gradient(circle at 18% 18%,rgba(255,219,92,.8),transparent 28%),radial-gradient(circle at 82% 16%,rgba(188,52,255,.72),transparent 34%),radial-gradient(circle at 68% 82%,rgba(255,75,116,.82),transparent 38%),linear-gradient(135deg,#feda75 0%,#fa7e1e 28%,#d62976 54%,#962fbf 78%,#4f5bd5 100%) !important;background-position:center;background-size:cover;background-repeat:no-repeat;padding-top:clamp(104px,12vw,170px);padding-bottom:clamp(104px,12vw,170px)}
 .ig-section::before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(135deg,rgba(29,28,107,.3),rgba(255,0,135,.08) 48%,rgba(255,183,58,.22));mix-blend-mode:multiply}
 .ig-section::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:100px;background:linear-gradient(180deg,transparent,#040914);pointer-events:none}
 .ig-section .container,.ig-section .ig-track{position:relative;z-index:1}.ig-section .stitle,.ig-section .ssub,.ig-section .stag{color:#fff;text-shadow:0 2px 20px rgba(25,0,50,.25)}.ig-section .ig-track{margin-top:48px}
@@ -435,7 +435,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 .agent-campaign > .about-photo{width:min(196px,100%)}
 .about-photo,
 #about .about-photo{
-  width:min(280px,100%);height:auto;aspect-ratio:3/4;object-fit:cover;object-position:center top;
+  width:min(280px,100%);height:auto;aspect-ratio:3/4;object-fit:contain;object-position:center;
   margin:0;border:0!important;outline:0!important;box-shadow:none!important;background:transparent;
   border-radius:0;
   -webkit-mask-image:radial-gradient(ellipse 72% 76% at 50% 48%,#000 42%,rgba(0,0,0,.97) 59%,rgba(0,0,0,.52) 78%,transparent 100%);
@@ -484,7 +484,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 .about-gateway i{border-color:rgba(0,137,178,.45);box-shadow:0 0 20px rgba(0,168,211,.12)}
 .about-transition .about-gateway{display:block!important}
 /* Cesar and the profile share one light chapter with room for the opening. */
-#chat{background:var(--cx-profile-surface)!important;color:#183247;padding-bottom:clamp(144px,20vh,224px)}
+#chat{background:var(--cx-profile-surface)!important;color:#183247;padding-bottom:clamp(72px,10vh,112px)}
 #chat .stitle,#chat .chat-agent-name{color:#142d43}
 #chat .ssub{color:#476176}
 #chat .stag,#chat .chat-powered span{color:#0088b0}
