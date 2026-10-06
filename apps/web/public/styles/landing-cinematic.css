@@ -430,6 +430,15 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
   align-items:center;
 }
 .agent-campaign[hidden]{display:none!important}
+.chat-profile-buffer{height:clamp(280px,42vh,520px);background:var(--cx-profile-surface)}
+.profile-handoff{position:relative;isolation:isolate;display:grid;place-items:center;overflow:hidden}
+.profile-handoff::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(0,168,211,.11),transparent 38%);pointer-events:none}
+.profile-handoff-portal{--portal-size:clamp(220px,62vw,350px);position:relative;z-index:1;display:none;width:var(--portal-size);height:var(--portal-size);place-items:center;border-radius:50%}
+.profile-handoff-portal i{position:absolute;inset:12%;border:2px solid rgba(0,145,185,.58);border-radius:50%;box-shadow:0 0 22px rgba(0,168,211,.13),inset 0 0 18px rgba(0,168,211,.07)}
+.profile-handoff-portal i:nth-of-type(2){inset:4%;border-width:1px;border-color:rgba(56,177,213,.38)}
+.profile-handoff-portal i:nth-of-type(3){inset:-7%;border-width:1px;border-color:rgba(75,171,202,.18);box-shadow:0 0 48px rgba(0,168,211,.08)}
+.profile-handoff-mark{position:relative;z-index:2;font:700 clamp(34px,10vw,54px)/1 'IBM Plex Sans',sans-serif;letter-spacing:-.06em;color:transparent;-webkit-text-stroke:1px #167b9b;text-shadow:0 0 22px rgba(0,145,185,.13)}
+.profile-handoff-mark b{color:transparent;-webkit-text-stroke-color:#0089b2}
 .agent-campaign + #ownerAbout{margin-top:clamp(72px,10vw,140px)}
 .agent-campaign > .about-photo,#ownerAbout > .about-photo{grid-column:1;grid-row:1;justify-self:start}
 .agent-campaign > div,#ownerAbout > div{grid-column:2;grid-row:1;min-width:0}
@@ -467,7 +476,7 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 .about-transition .about-gateway{display:block!important}
 #about,.about-portal-active,#about-runway{border-top:0!important;border-bottom:0!important}
 #about .about-photo{
-  width:min(140px,50%);
+  width:min(230px,50%);
   justify-self:center;
   background:transparent;
   mix-blend-mode:multiply;
@@ -505,10 +514,16 @@ section.section-fade,.hero-bridge,.interface-runway{background-color:#040914;bac
 @media(max-width:767px){
   .nav{border-bottom-color:transparent}
   html,html.smooth-scroll{scroll-behavior:auto!important}
-  .about-runway{overflow:visible!important}
-  #about{padding-top:96px!important;background:transparent!important}
+  .profile-handoff{height:auto;min-height:clamp(440px,68svh,620px);padding:clamp(64px,10svh,96px) 24px}
+  .profile-handoff-portal{display:grid}
+  .about-transition,.about-backdrop{display:none!important;opacity:0!important}
+  .about-transition .about-gateway{display:none!important}
+  .about-runway,.narrative-ready .about-runway{height:auto!important;overflow:visible!important}
+  #about,.narrative-ready #about{position:relative!important;top:auto!important;min-height:0!important;padding-top:72px!important;background:transparent!important}
+  .about-content-space{display:none!important;height:0!important}
+  .about-portal-active #about .about-inner{position:relative!important;top:auto!important;left:auto!important;translate:none!important;width:auto!important}
   #about .about-inner{opacity:1!important;transform:none!important;clip-path:none!important}
-  #about #ownerAbout .about-photo{width:min(115px,36vw)}
+  #about #ownerAbout .about-photo{width:min(230px,72vw)}
   .profile-carousel{border-color:#d9e5ec;background:#fff;box-shadow:0 18px 48px -30px rgba(29,53,78,.3)}
   .profile-slide{transition:transform .28s ease-out,opacity .2s ease,visibility .2s}
 }
