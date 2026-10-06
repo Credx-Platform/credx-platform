@@ -55,9 +55,9 @@
  function mount(){
   dispose();
   const abort=new AbortController(),opts={passive:true,signal:abort.signal};
-  let skipAbout=location.hash==='#about',socialAnnounced=false,socialOffset=0;
+  let skipAbout=location.hash==='#about',socialAnnounced=false;
   let raf=0,dirty=true,paused=false,view=innerHeight,width=innerWidth,portalBusy=false;
-  let heroTop=0,heroDistance=1,portalTop=0,portalDistance=1,aboutTop=0,aboutHeight=1,aboutTravel=1;
+  let heroTop=0,heroDistance=1,portalTop=0,portalDistance=1,aboutTop=0,aboutHeight=1,aboutTravel=1,aboutFlow=false,artHeight=0;
   const darts=[];
   let lastScrollY=scrollY,pendingScroll=0,streakTravel=0,nextStreak=80,flight=0,flightAt=0;
   let slowFrames=0,samples=0,observer,layoutObserver;
@@ -198,7 +198,10 @@
    portalDistance=Math.max(1,portal.offsetHeight-dh);
    aboutSpace.style.height=`${aboutContent.offsetHeight}px`;
    aboutRunway.style.setProperty('--about-content-top',`${80+parseFloat(getComputedStyle(about).paddingTop)}px`);
-   aboutHeight=about.offsetHeight;aboutTravel=view*.36;socialOffset=socialRow.offsetTop;
+   // Phones keep the profile in normal flow (no pinned runway), so the iris
+   // is timed against the section's own approach instead of a spacer.
+   aboutFlow=width<768;artHeight=art.offsetHeight;
+   aboutHeight=about.offsetHeight;aboutTravel=view*(aboutFlow?.62:.72);
    aboutRunway.style.setProperty('--about-height',`${aboutHeight}px`);
    aboutRunway.style.setProperty('--about-travel',`${aboutTravel}px`);
    aboutTop=aboutRunway.getBoundingClientRect().top+scrollY;
@@ -214,33 +217,40 @@
     if(dirty)measure();
     const y=scrollY;
 
-    // Start the full-screen iris only after the chat chapter clears the header.
-    // It must never cover the still-visible conversation with a moving block.
-    const progress=skipAbout?1:clamp((y-aboutTop+40)/aboutTravel);
-    const entrance=ease(progress/.62),reveal=ease((progress-.04)/.46),clear=ease((progress-.68)/.18);
+    // Read the social row before any writes this frame (its own transform is
+    // never set, only its links', so this is its true on-screen position).
+    const socialTop=socialRow.getBoundingClientRect().top;
+
+    // The portal opens first on an empty surface; the profile only fades in
+    // once the iris has cleared the screen, so it is revealed *through* the
+    // portal rather than shown and then circled. Desktop starts after the
+    // chat chapter clears the header; phones start as the section approaches.
+    const progress=skipAbout?1:clamp((y-aboutTop+(aboutFlow?view*.72:40))/aboutTravel);
+    const entrance=ease(progress/.6),reveal=ease((progress-.52)/.3),clear=ease((progress-.8)/.18);
     portalBusy=progress>0&&progress<1;
     const scrollDelta=pendingScroll;pendingScroll=0;advanceStreaks(scrollDelta);
-    const bottom=aboutTop+aboutTravel+aboutHeight-y;
+    const bottom=aboutTop+(aboutFlow?0:aboutTravel)+aboutHeight-y;
     const exit=ease((view*.32-bottom)/(view*.38));
     const focused=about.matches(':focus-within');
     aboutRunway.classList.toggle('about-portal-active',progress>0&&progress<1&&!focused);
     aboutContent.style.clipPath='none';
-    aboutContent.style.transform='none';
-    aboutContent.style.opacity=String(reveal*(1-exit));
+    aboutContent.style.transform=focused||reveal>=1?'none':`scale(${.96+.04*reveal})`;
+    aboutContent.style.opacity=String(focused?1:reveal*(1-exit));
     const diameter=Math.min(width*.72,440);
     const fullScale=Math.hypot(width,view)*1.3/(diameter*.82);
     const ringScale=.62+entrance*(fullScale-.62);
     aboutVeil.style.setProperty('--iris-radius',`${diameter*.41*ringScale}px`);
-    const curtain=focused?0:ease(progress/.04)*(1-clear);
+    const curtain=focused?0:ease(progress/.08)*(1-clear);
     aboutTransition.style.opacity=String(curtain);aboutBackdrop.style.opacity=String(curtain);
     aboutFrames.forEach((el,i)=>{
      el.style.transform=`scale(${.62+entrance*(fullScale-.62)+i*.1}) rotate(${entrance*(i%2?16:-12)}deg)`;
      el.style.opacity=String((1-clear)*(.92-i*.22));
     });
     aboutLogo.style.transform=`scale(${.85+entrance*.18})`;
-    aboutLogo.style.opacity=String(1-ease(progress/.14));
-    const socialCenter=aboutTop+Math.min(Math.max(y+80-aboutTop,0),aboutTravel)+socialOffset+26-y;
-    const socialReveal=ease((view*.8-socialCenter)/(view*.3));
+    aboutLogo.style.opacity=String(1-ease((progress-.16)/.26));
+    // Socials are fully up by the time the row is 25% up the screen.
+    const socialCenter=socialTop+26;
+    const socialReveal=Math.min(reveal,ease((view*.97-socialCenter)/(view*.22)));
     if(socialReveal>.25&&!socialAnnounced){socialAnnounced=true;socialRow.classList.add('social-highlight')}
     socials.forEach((el,i)=>{
      const pop=ease((socialReveal-i*.025)/.95);
@@ -251,11 +261,13 @@
     });
     if(active.has(runway)){
      const p=clamp((y-heroTop-12)/Math.max(1,heroDistance-12)),e=ease(p);
-     // Keep the artwork close to its source size. The landing page should
-     // reveal the complete composition, not zoom into cropped details.
+     // The composition pops toward the viewer without cropping: it grows to
+     // 1.3x (1.22x on phones, where it already spans the width) and drifts
+     // down so its top edge stays clear of the headline and buttons above.
      const artStartScale=1;
-     const artEndScale=1.12;
-     art.style.transform=`translate3d(0,${-e*(simple?5:14)}px,0) scale(${artStartScale+(artEndScale-artStartScale)*e})`;
+     const artEndScale=width<768?1.22:1.3;
+     const scale=artStartScale+(artEndScale-artStartScale)*e;
+     art.style.transform=`translate3d(0,${(scale-1)*artHeight*.3-e*(simple?5:14)}px,0) scale(${scale})`;
     }
     if(active.has(portal)){
      const p=clamp((y-portalTop+view*.38)/(portalDistance+view*.38));
@@ -320,7 +332,7 @@
   // Images below the fold may alter the document after initial layout.
   document.querySelectorAll('img').forEach(img=>{if(!img.complete)img.addEventListener('load',()=>{dirty=true;schedule()},{once:true,signal:abort.signal})});
   measure();schedule();
-  const showAbout=()=>scrollTo({top:aboutTop+aboutTravel-80,behavior:'instant'});
+  const showAbout=()=>scrollTo({top:aboutFlow?aboutTop-80:aboutTop+aboutTravel-80,behavior:'instant'});
   if(location.hash==='#about')showAbout();
   addEventListener('hashchange',()=>{if(location.hash==='#about'){skipAbout=true;showAbout();schedule()}},{signal:abort.signal});
   document.querySelectorAll('a[href="#about"]').forEach(link=>link.addEventListener('click',e=>{
