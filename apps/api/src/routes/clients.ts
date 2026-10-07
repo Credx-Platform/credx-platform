@@ -831,6 +831,89 @@ clientsRouter.post('/me/analysis-review/complete', requireAuth, async (req: Auth
   }
 });
 
+const STAFF_REVIEW_METHODS = {
+  phone: 'phone consultation',
+  video: 'video call',
+  in_person: 'in-person meeting'
+} as const;
+
+const staffAnalysisReviewSchema = z.object({
+  method: z.enum(['phone', 'video', 'in_person']),
+  notes: z.string().trim().max(2000).optional()
+});
+
+// Staff records that the analysis was reviewed with the client outside the
+// portal (e.g. over the phone). Same effect as the client confirming in-portal.
+clientsRouter.post('/:id/analysis-review/complete', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req: AuthedRequest, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const data = staffAnalysisReviewSchema.parse(req.body ?? {});
+    const client = await prisma.client.findUnique({
+      where: { id },
+      include: { progress: true }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client.analysisSummary && !client.progress?.analysis) {
+      return res.status(400).json({ error: 'Analysis is not ready yet. Generate the analysis first.' });
+    }
+
+    const nowIso = new Date().toISOString();
+    const existingWorkflow = ((client.progress?.workflow as any) || {});
+    const preActivation = ['LEAD', 'STUDENT', 'CONTRACT_SENT', 'INTAKE_RECEIVED', 'ANALYSIS_READY'].includes(client.status);
+    const nextWorkflow = {
+      ...existingWorkflow,
+      ...(preActivation
+        ? { stage: 'analysis_review_completed', next: ['choose_plan', 'complete_payment'] }
+        : {}),
+      updatedAt: nowIso,
+      analysisReview: {
+        ...(existingWorkflow.analysisReview || {}),
+        readyAt: existingWorkflow.analysisReview?.readyAt || nowIso,
+        completedAt: nowIso,
+        method: data.method,
+        completedBy: req.auth!.sub,
+        notes: data.notes || null
+      }
+    };
+
+    if (client.progress) {
+      await prisma.clientProgress.update({
+        where: { clientId: client.id },
+        data: { workflow: nextWorkflow }
+      });
+    } else {
+      await prisma.clientProgress.create({
+        data: { clientId: client.id, workflow: nextWorkflow }
+      });
+    }
+
+    const { createPendingSetupBill } = await import('../lib/billingActivation.js');
+    await createPendingSetupBill(client.id, client.serviceTier);
+
+    if (preActivation) {
+      await prisma.client.update({
+        where: { id: client.id },
+        data: { status: 'UPGRADE_OFFERED', upgradeOfferedAt: new Date(), portalRestricted: false }
+      });
+    }
+
+    const label = STAFF_REVIEW_METHODS[data.method];
+    await prisma.activityEvent.create({
+      data: {
+        clientId: client.id,
+        type: 'ANALYSIS_REVIEW_COMPLETED',
+        message: `Analysis reviewed with client by ${label}; recorded by staff.`,
+        metadata: { method: data.method, completedAt: nowIso, completedBy: req.auth!.sub, notes: data.notes || null }
+      }
+    });
+
+    return res.json({ success: true, workflow: nextWorkflow });
+  } catch (error) {
+    next(error);
+  }
+});
+
 clientsRouter.delete('/:id', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req: AuthedRequest, res, next) => {
   try {
     const id = String(req.params.id);
