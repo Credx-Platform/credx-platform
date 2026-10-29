@@ -3372,10 +3372,12 @@ function AdminEmailTemplatesRoute() {
   const [templates, setTemplates] = useState<AdminEmailTemplate[]>([]);
   const [clientId, setClientId] = useState('');
   const [templateKey, setTemplateKey] = useState('');
+  const [templateLabel, setTemplateLabel] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const selectedClient = clients.find((client) => client.id === clientId);
   const values: Record<string, string> = {
@@ -3398,14 +3400,39 @@ function AdminEmailTemplatesRoute() {
       setClients(clientData.clients || []);
       const nextTemplates = templateData.templates || [];
       setTemplates(nextTemplates);
-      if (nextTemplates[0]) { setTemplateKey(nextTemplates[0].key); setSubject(nextTemplates[0].subject); setBody(nextTemplates[0].body); }
+      if (nextTemplates[0]) { setTemplateKey(nextTemplates[0].key); setTemplateLabel(nextTemplates[0].label); setSubject(nextTemplates[0].subject); setBody(nextTemplates[0].body); }
     }).catch(() => setStatus('Unable to load email templates.'));
   }, [API_BASE]);
 
   const chooseTemplate = (key: string) => {
     const template = templates.find((item) => item.key === key);
     setTemplateKey(key);
-    if (template) { setSubject(template.subject); setBody(template.body); }
+    if (template) { setTemplateLabel(template.label); setSubject(template.subject); setBody(template.body); }
+  };
+
+  const newTemplate = () => {
+    setTemplateKey('');
+    setTemplateLabel('');
+    setSubject('');
+    setBody('');
+    setStatus('Enter a template key, label, subject, and message, then save it.');
+  };
+
+  const saveTemplate = async () => {
+    const token = localStorage.getItem('credx-admin-token');
+    const key = templateKey.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const label = templateLabel.trim();
+    if (!token || !key || !label || !subject.trim() || !body.trim()) return;
+    setSaving(true); setStatus(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/admin-email/templates`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ key, label, subject, body }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Template save failed');
+      setTemplates((current) => [...current.filter((item) => item.key !== data.template.key), data.template].sort((a, b) => a.label.localeCompare(b.label)));
+      setTemplateKey(data.template.key); setTemplateLabel(data.template.label);
+      setStatus(`Saved template “${data.template.label}”. No email was sent.`);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'Template save failed.'); }
+    finally { setSaving(false); }
   };
 
   const send = async () => {
@@ -3423,10 +3450,10 @@ function AdminEmailTemplatesRoute() {
   };
 
   return <div className="page-grid">
-    <section className="panel"><p className="eyebrow">Admin communications</p><h2>Email Templates</h2><p className="helper-text">Choose a client, edit the structured message, and send it manually. Every send is recorded on the client activity log.</p>
-      <div className="field-grid"><label><span>Client</span><select value={clientId} onChange={(event) => setClientId(event.target.value)}><option value="">Select client...</option>{clients.map((client) => <option key={client.id} value={client.id}>{`${client.user?.firstName || ''} ${client.user?.lastName || ''}`.trim() || client.user?.email}</option>)}</select></label><label><span>Template</span><select value={templateKey} onChange={(event) => chooseTemplate(event.target.value)}>{templates.map((template) => <option key={template.key} value={template.key}>{template.label}</option>)}</select></label><label><span>Subject</span><input value={subject} onChange={(event) => setSubject(event.target.value)} /></label></div>
+    <section className="panel"><p className="eyebrow">Admin communications</p><h2>Email Templates</h2><p className="helper-text">Create and save reusable templates without sending them. Choose a verified client only when you are ready to preview and manually confirm a real send. Every save and send is audited.</p>
+      <div className="field-grid"><label><span>Client</span><select value={clientId} onChange={(event) => setClientId(event.target.value)}><option value="">Select client...</option>{clients.map((client) => <option key={client.id} value={client.id}>{`${client.user?.firstName || ''} ${client.user?.lastName || ''}`.trim() || client.user?.email}</option>)}</select></label><label><span>Template</span><select value={templateKey} onChange={(event) => chooseTemplate(event.target.value)}><option value="">New template...</option>{templates.map((template) => <option key={template.key} value={template.key}>{template.label}</option>)}</select></label><label><span>Template name</span><input value={templateLabel} onChange={(event) => setTemplateLabel(event.target.value)} placeholder="Analysis review follow-up" /></label><label><span>Template key</span><input value={templateKey} onChange={(event) => setTemplateKey(event.target.value)} placeholder="analysis_review_follow_up" /></label><label><span>Subject</span><input value={subject} onChange={(event) => setSubject(event.target.value)} /></label></div>
       <label style={{ display: 'grid', gap: '6px', marginTop: '12px' }}><span>Message</span><textarea rows={12} value={body} onChange={(event) => setBody(event.target.value)} /></label>
-      <p className="helper-text">Dynamic fields: <code>{'{{first_name}}'}</code> <code>{'{{last_name}}'}</code> <code>{'{{full_name}}'}</code> <code>{'{{email}}'}</code> <code>{'{{portal_url}}'}</code></p><div className="client-workspace-actions"><button type="button" onClick={send} disabled={sending || !clientId}>{sending ? 'Sending...' : 'Send Email'}</button></div>{status ? <p className="helper-text">{status}</p> : null}
+      <p className="helper-text">Dynamic fields: <code>{'{{first_name}}'}</code> <code>{'{{last_name}}'}</code> <code>{'{{full_name}}'}</code> <code>{'{{email}}'}</code> <code>{'{{portal_url}}'}</code>. Never place SSNs or identity documents in a message.</p><div className="client-workspace-actions"><button type="button" onClick={newTemplate}>New Template</button><button type="button" onClick={saveTemplate} disabled={saving || !templateKey.trim() || !templateLabel.trim()}>{saving ? 'Saving...' : 'Save Template'}</button><button type="button" onClick={send} disabled={sending || !clientId || !templateKey}>{sending ? 'Sending...' : 'Review & Send Email'}</button></div>{status ? <p className="helper-text">{status}</p> : null}
     </section>
     <section className="panel"><p className="eyebrow">Preview</p><h2>{preview(subject) || 'Subject'}</h2><pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', color: '#cbd5e1', lineHeight: 1.6 }}>{preview(body) || 'Select a client and template.'}</pre></section>
   </div>;
