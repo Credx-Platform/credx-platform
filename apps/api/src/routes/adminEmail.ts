@@ -6,7 +6,7 @@ import { sendEmail } from '../lib/email.js';
 
 export const adminEmailRouter = Router();
 
-const templates = [
+const builtInTemplates = [
   {
     key: 'welcome',
     label: 'Welcome / next steps',
@@ -30,16 +30,36 @@ const templates = [
     label: 'Dispute preparation / review',
     subject: 'CredX — dispute preparation update',
     body: 'Hi {{first_name}},\n\nYour dispute preparation is ready for review in the secure CredX portal. Please review the listed accounts, bureaus, and reasons before approving the next step.\n\nCredX Support'
+  },
+  {
+    key: 'analysis_review_follow_up',
+    label: 'Analysis review follow-up',
+    subject: 'CredX — thank you for reviewing your analysis',
+    body: 'Hi {{first_name}},\n\nThank you for reviewing your CredX analysis. Please sign in to your secure portal to confirm the review and complete any remaining account-verification steps.\n\nIf requested in your portal, enter your Social Security number and upload verification documents only through the secure portal. Do not send sensitive identity information by email or text.\n\nCredX Support'
   }
 ] as const;
 
-const templateKeys = new Set(templates.map((template) => template.key));
+const templateKeySchema = z.string().trim().min(2).max(80).regex(/^[a-z0-9_]+$/, 'Use lowercase letters, numbers, and underscores only.');
 const sendSchema = z.object({
   clientId: z.string().min(1),
-  templateKey: z.string().refine((key) => templateKeys.has(key as typeof templates[number]['key']), 'Unknown email template.'),
+  templateKey: templateKeySchema,
   subject: z.string().trim().min(1).max(180),
   body: z.string().trim().min(1).max(20000)
 });
+const templateSchema = z.object({
+  key: templateKeySchema,
+  label: z.string().trim().min(2).max(120),
+  subject: z.string().trim().min(1).max(180),
+  body: z.string().trim().min(1).max(20000)
+});
+
+async function listTemplates() {
+  const saved = await prisma.adminEmailTemplate.findMany({ where: { active: true }, orderBy: [{ label: 'asc' }] });
+  const overrides = new Map(saved.map((template) => [template.key, template]));
+  const merged = builtInTemplates.map((template) => overrides.get(template.key) || template);
+  for (const template of saved) if (!builtInTemplates.some((item) => item.key === template.key)) merged.push(template as any);
+  return merged.map(({ key, label, subject, body }) => ({ key, label, subject, body }));
+}
 
 function merge(text: string, values: Record<string, string>): string {
   return text.replace(/{{\s*([a-z_]+)\s*}}/gi, (_match, key: string) => values[key.toLowerCase()] ?? '');
@@ -49,13 +69,37 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] || character));
 }
 
-adminEmailRouter.get('/templates', requireAuth, requireRole(['STAFF', 'ADMIN']), (_req, res) => {
-  res.json({ templates });
+adminEmailRouter.get('/templates', requireAuth, requireRole(['STAFF', 'ADMIN']), async (_req, res, next) => {
+  try {
+    res.json({ templates: await listTemplates() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminEmailRouter.post('/templates', requireAuth, requireRole(['ADMIN']), async (req: any, res, next) => {
+  try {
+    const data = templateSchema.parse(req.body);
+    const actor = req.auth?.sub || null;
+    const template = await prisma.adminEmailTemplate.upsert({
+      where: { key: data.key },
+      create: { ...data, createdBy: actor, updatedBy: actor },
+      update: { label: data.label, subject: data.subject, body: data.body, active: true, updatedBy: actor }
+    });
+    await prisma.auditLog.create({
+      data: { userId: actor, action: 'ADMIN_EMAIL_TEMPLATE_SAVED', entityType: 'AdminEmailTemplate', entityId: template.id, metadata: { key: template.key, label: template.label } }
+    });
+    res.status(201).json({ template: { key: template.key, label: template.label, subject: template.subject, body: template.body } });
+  } catch (error) {
+    next(error);
+  }
 });
 
 adminEmailRouter.post('/send', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req: any, res, next) => {
   try {
     const data = sendSchema.parse(req.body);
+    const templates = await listTemplates();
+    if (!templates.some((template) => template.key === data.templateKey)) return res.status(400).json({ error: 'Unknown email template.' });
     const client = await prisma.client.findUnique({ where: { id: data.clientId }, include: { user: true } });
     if (!client?.user?.email) return res.status(404).json({ error: 'Client or verified email not found.' });
 
