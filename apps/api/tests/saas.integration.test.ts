@@ -10,6 +10,17 @@ if (TEST_DB) {
 }
 
 const ctx = {} as { prisma: any; base: string; server: any; one: string; two: string; admin: string; oneClient: string; twoClient: string };
+const TEST_EMAILS = ['saas-one@test.invalid', 'saas-two@test.invalid', 'saas-admin@test.invalid'];
+
+async function cleanupFixtures() {
+  if (!ctx.prisma) return;
+  const clientFilter = { client: { user: { email: { in: TEST_EMAILS } } } };
+  await ctx.prisma.activityEvent.deleteMany({ where: clientFilter });
+  await ctx.prisma.task.deleteMany({ where: clientFilter });
+  await ctx.prisma.client.deleteMany({ where: { user: { email: { in: TEST_EMAILS } } } });
+  await ctx.prisma.user.deleteMany({ where: { email: { in: TEST_EMAILS } } });
+}
+
 async function req(token: string, path: string, init: RequestInit = {}) {
   const response = await fetch(`${ctx.base}${path}`, { ...init, headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...(init.headers || {}) } });
   return { status: response.status, body: await response.json().catch(() => ({})) };
@@ -25,8 +36,7 @@ before(async () => {
   await new Promise((resolve) => ctx.server.once('listening', resolve));
   ctx.base = `http://127.0.0.1:${(ctx.server.address() as AddressInfo).port}`;
   const p = ctx.prisma;
-  await p.client.deleteMany({ where: { user: { email: { in: ['saas-one@test.invalid', 'saas-two@test.invalid'] } } } });
-  await p.user.deleteMany({ where: { email: { in: ['saas-one@test.invalid', 'saas-two@test.invalid', 'saas-admin@test.invalid'] } } });
+  await cleanupFixtures();
   const one = await p.user.create({ data: { email: 'saas-one@test.invalid', passwordHash: 'x', firstName: 'One', lastName: 'Test', client: { create: { status: 'ACTIVE', progress: { create: {} } } } } });
   const two = await p.user.create({ data: { email: 'saas-two@test.invalid', passwordHash: 'x', firstName: 'Two', lastName: 'Test', client: { create: { status: 'ACTIVE', progress: { create: {} } } } } });
   const admin = await p.user.create({ data: { email: 'saas-admin@test.invalid', passwordHash: 'x', firstName: 'Admin', lastName: 'Test', role: 'ADMIN' } });
@@ -37,7 +47,12 @@ before(async () => {
   ctx.admin = jwt.sign({ sub: admin.id, email: admin.email, role: 'ADMIN' }, config.jwtSecret);
 });
 
-after(async () => { if (skip || !ctx.prisma) return; ctx.server?.close(); await ctx.prisma.$disconnect(); });
+after(async () => {
+  if (skip || !ctx.prisma) return;
+  await cleanupFixtures();
+  ctx.server?.close();
+  await ctx.prisma.$disconnect();
+});
 
 test('durable state writes reload across fresh requests and enforce ownership', { skip }, async () => {
   assert.equal((await req(ctx.one, '/api/saas/onboarding', { method: 'PUT', body: JSON.stringify({ goals: ['funding'], currentStep: 'profile' }) })).status, 200);
