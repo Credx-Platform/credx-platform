@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   findPrivacySecurityAction,
   PRIVACY_SECURITY_AGENCIES,
@@ -24,4 +25,17 @@ test('privacy request keys are stable and action titles describe the requested w
   assert.equal(privacySecurityRequestKey('chexsystems', 'DISPUTE'), 'privacy-security:chexsystems:dispute');
   assert.equal(privacySecurityActionTitle('Experian', 'FREEZE'), 'Freeze Experian file');
   assert.equal(privacySecurityActionTitle('ChexSystems', 'DISPUTE'), 'Prepare dispute for ChexSystems');
+});
+
+test('privacy request runtime uses tables already present in production', async () => {
+  const [routes, jobs] = await Promise.all([
+    readFile(new URL('../src/routes/saas.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../src/lib/jobHandlers.ts', import.meta.url), 'utf8')
+  ]);
+  const privacyRoutes = routes.slice(routes.indexOf("saasRouter.get('/privacy-security'"), routes.indexOf("saasRouter.put('/action-plan/:key'"));
+  const privacyJobs = jobs.slice(jobs.indexOf("name: 'prepare-privacy-security-request'"));
+  assert.doesNotMatch(privacyRoutes, /actionPlanItem/);
+  assert.doesNotMatch(privacyJobs, /actionPlanItem/);
+  assert.match(routes, /privacyRequestCategory = 'privacy_security_request'/);
+  assert.match(privacyJobs, /privacy_security_request/);
 });
