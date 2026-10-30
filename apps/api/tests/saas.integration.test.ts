@@ -9,7 +9,7 @@ if (TEST_DB) {
   process.env.JWT_SECRET ||= 'test-secret';
 }
 
-const ctx = {} as { prisma: any; base: string; server: any; one: string; two: string; oneClient: string; twoClient: string };
+const ctx = {} as { prisma: any; base: string; server: any; one: string; two: string; admin: string; oneClient: string; twoClient: string };
 async function req(token: string, path: string, init: RequestInit = {}) {
   const response = await fetch(`${ctx.base}${path}`, { ...init, headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...(init.headers || {}) } });
   return { status: response.status, body: await response.json().catch(() => ({})) };
@@ -26,13 +26,15 @@ before(async () => {
   ctx.base = `http://127.0.0.1:${(ctx.server.address() as AddressInfo).port}`;
   const p = ctx.prisma;
   await p.client.deleteMany({ where: { user: { email: { in: ['saas-one@test.invalid', 'saas-two@test.invalid'] } } } });
-  await p.user.deleteMany({ where: { email: { in: ['saas-one@test.invalid', 'saas-two@test.invalid'] } } });
+  await p.user.deleteMany({ where: { email: { in: ['saas-one@test.invalid', 'saas-two@test.invalid', 'saas-admin@test.invalid'] } } });
   const one = await p.user.create({ data: { email: 'saas-one@test.invalid', passwordHash: 'x', firstName: 'One', lastName: 'Test', client: { create: { status: 'ACTIVE', progress: { create: {} } } } } });
   const two = await p.user.create({ data: { email: 'saas-two@test.invalid', passwordHash: 'x', firstName: 'Two', lastName: 'Test', client: { create: { status: 'ACTIVE', progress: { create: {} } } } } });
+  const admin = await p.user.create({ data: { email: 'saas-admin@test.invalid', passwordHash: 'x', firstName: 'Admin', lastName: 'Test', role: 'ADMIN' } });
   ctx.oneClient = (await p.client.findUniqueOrThrow({ where: { userId: one.id } })).id;
   ctx.twoClient = (await p.client.findUniqueOrThrow({ where: { userId: two.id } })).id;
   ctx.one = jwt.sign({ sub: one.id, email: one.email, role: 'CLIENT' }, config.jwtSecret);
   ctx.two = jwt.sign({ sub: two.id, email: two.email, role: 'CLIENT' }, config.jwtSecret);
+  ctx.admin = jwt.sign({ sub: admin.id, email: admin.email, role: 'ADMIN' }, config.jwtSecret);
 });
 
 after(async () => { if (skip || !ctx.prisma) return; ctx.server?.close(); await ctx.prisma.$disconnect(); });
@@ -73,4 +75,54 @@ test('workflow optimistic concurrency rejects stale writers', { skip }, async ()
   assert.equal(second.body.workflow.version, 2);
   const stale = await req(ctx.one, '/api/saas/workflow', { method: 'PUT', body: JSON.stringify({ stage: 'stale', state: {}, expectedVersion: 1 }) });
   assert.equal(stale.status, 409);
+});
+
+test('privacy and security requests require consent, persist, and enforce ownership', { skip }, async () => {
+  const noConsent = await req(ctx.one, '/api/saas/privacy-security/requests', {
+    method: 'POST',
+    body: JSON.stringify({ agencyCode: 'experian', command: 'FREEZE', consent: false })
+  });
+  assert.equal(noConsent.status, 400);
+
+  const unsupported = await req(ctx.one, '/api/saas/privacy-security/requests', {
+    method: 'POST',
+    body: JSON.stringify({ agencyCode: 'experian', command: 'DISPUTE', consent: true })
+  });
+  assert.equal(unsupported.status, 400);
+
+  const created = await req(ctx.one, '/api/saas/privacy-security/requests', {
+    method: 'POST',
+    body: JSON.stringify({ agencyCode: 'chexsystems', command: 'DISPUTE', consent: true })
+  });
+  assert.equal(created.status, 202);
+  assert.equal(created.body.request.category, 'PRIVACY_SECURITY');
+  assert.equal(created.body.request.metadata.agencyCode, 'chexsystems');
+  assert.equal(created.body.request.metadata.command, 'DISPUTE');
+  const requestId = created.body.request.id;
+
+  const oneState = await req(ctx.one, '/api/saas/privacy-security');
+  assert.equal(oneState.status, 200);
+  assert.ok(oneState.body.agencies.some((agency: any) => agency.code === 'chexsystems'));
+  assert.ok(oneState.body.requests.some((request: any) => request.id === requestId));
+
+  const adminState = await req(ctx.admin, `/api/saas/admin/privacy-security/${ctx.oneClient}`);
+  assert.equal(adminState.status, 200);
+  assert.ok(adminState.body.requests.some((request: any) => request.id === requestId));
+  assert.equal((await req(ctx.one, `/api/saas/admin/privacy-security/${ctx.oneClient}`)).status, 403);
+
+  const otherState = await req(ctx.two, '/api/saas/privacy-security');
+  assert.equal(otherState.status, 200);
+  assert.equal(otherState.body.requests.some((request: any) => request.id === requestId), false);
+  assert.equal((await req(ctx.two, `/api/saas/privacy-security/requests/${requestId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ outcome: 'CLIENT_COMPLETED' })
+  })).status, 404);
+
+  const completed = await req(ctx.one, `/api/saas/privacy-security/requests/${requestId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ outcome: 'CLIENT_COMPLETED' })
+  });
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.request.status, 'COMPLETED');
+  assert.equal(completed.body.request.metadata.stage, 'CLIENT_CONFIRMED_COMPLETE');
 });

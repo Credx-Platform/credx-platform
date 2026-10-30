@@ -1,95 +1,212 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
-type Status = 'Not Started' | 'In Progress' | 'Completed';
+export type PrivacySecurityCommand = 'FREEZE' | 'UNFREEZE' | 'REQUEST_REPORT' | 'OPT_OUT' | 'DISPUTE';
 
-type Agency = {
-  name: string;
-  category: 'Major Bureaus' | 'Specialty Reporting' | 'Banking Reports';
-  actionLabel: string;
+export type PrivacySecurityAgencyAction = {
+  command: PrivacySecurityCommand;
+  label: string;
   url: string;
-  note: string;
 };
 
-const agencies: Agency[] = [
-  { name: 'Experian', category: 'Major Bureaus', actionLabel: 'Manage Freeze', url: 'https://www.experian.com/help/credit-freeze/', note: 'Freeze or unfreeze your Experian credit file.' },
-  { name: 'Equifax', category: 'Major Bureaus', actionLabel: 'Manage Freeze', url: 'https://www.equifax.com/personal/credit-report-services/credit-freeze/', note: 'Freeze or unfreeze your Equifax credit file.' },
-  { name: 'TransUnion', category: 'Major Bureaus', actionLabel: 'Manage Freeze', url: 'https://www.transunion.com/credit-freeze', note: 'Freeze or unfreeze your TransUnion credit file.' },
-  { name: 'LexisNexis', category: 'Specialty Reporting', actionLabel: 'Freeze / Opt Out', url: 'https://consumer.risk.lexisnexis.com/', note: 'Manage eligible consumer disclosure, freeze, and opt-out actions.' },
-  { name: 'Innovis', category: 'Specialty Reporting', actionLabel: 'Manage Freeze', url: 'https://www.innovis.com/personal/securityFreeze', note: 'Manage an Innovis security freeze.' },
-  { name: 'CoreLogic', category: 'Specialty Reporting', actionLabel: 'Consumer Resources', url: 'https://www.corelogic.com/privacy-policy/', note: 'Access CoreLogic consumer privacy and disclosure resources.' },
-  { name: 'ChexSystems', category: 'Banking Reports', actionLabel: 'Open ChexSystems', url: 'https://www.chexsystems.com/', note: 'Request reports, review banking records, and manage disputes.' },
-  { name: 'Early Warning Services', category: 'Banking Reports', actionLabel: 'Consumer Services', url: 'https://www.earlywarning.com/consumer-information', note: 'Access consumer disclosure and dispute resources.' }
-];
+export type PrivacySecurityAgency = {
+  code: string;
+  name: string;
+  category: 'Major Bureaus' | 'Specialty Reporting' | 'Banking Reports';
+  note: string;
+  actions: PrivacySecurityAgencyAction[];
+};
 
-export default function PrivacySecurityCommandPost() {
-  const [statuses, setStatuses] = useState<Record<string, Status>>({});
-  const grouped = useMemo(() => agencies.reduce<Record<string, Agency[]>>((acc, agency) => {
+export type PrivacySecurityRequest = {
+  id: string;
+  key: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  completedAt?: string | null;
+  updatedAt: string;
+  metadata?: {
+    agencyCode?: string;
+    agencyName?: string;
+    command?: PrivacySecurityCommand;
+    stage?: string;
+    officialUrl?: string;
+    requestedAt?: string;
+  };
+};
+
+export type PrivacySecurityState = {
+  agencies: PrivacySecurityAgency[];
+  requests: PrivacySecurityRequest[];
+};
+
+type Props = {
+  loadState: () => Promise<PrivacySecurityState>;
+  requestAction: (input: { agencyCode: string; command: PrivacySecurityCommand; consent: true }) => Promise<unknown>;
+  resolveAction: (id: string, outcome: 'CLIENT_COMPLETED' | 'CANCELLED') => Promise<unknown>;
+};
+
+const stageLabels: Record<string, string> = {
+  REQUESTED: 'Requested',
+  CLIENT_ACTION_REQUIRED: 'Client action required',
+  CLIENT_CONFIRMED_COMPLETE: 'Completed',
+  CANCELLED: 'Cancelled'
+};
+
+function requestFor(requests: PrivacySecurityRequest[], agencyCode: string, command: PrivacySecurityCommand) {
+  return requests.find((request) => request.metadata?.agencyCode === agencyCode && request.metadata?.command === command);
+}
+
+export default function PrivacySecurityCommandPost({ loadState, requestAction, resolveAction }: Props) {
+  const [state, setState] = useState<PrivacySecurityState>({ agencies: [], requests: [] });
+  const [selected, setSelected] = useState<{ agency: PrivacySecurityAgency; action: PrivacySecurityAgencyAction } | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    const next = await loadState();
+    setState(next);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    loadState()
+      .then((next) => { if (!cancelled) setState(next); })
+      .catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Unable to load privacy and security actions.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [loadState]);
+
+  const grouped = useMemo(() => state.agencies.reduce<Record<string, Agency[]>>((acc, agency) => {
     (acc[agency.category] ||= []).push(agency);
     return acc;
-  }, {}), []);
+  }, {}), [state.agencies]);
+  const completed = state.requests.filter((request) => request.status === 'COMPLETED').length;
+  const active = state.requests.filter((request) => ['OPEN', 'IN_PROGRESS'].includes(request.status)).length;
 
-  const completed = Object.values(statuses).filter((value) => value === 'Completed').length;
+  const submit = async () => {
+    if (!selected || !consent) return;
+    const id = `${selected.agency.code}:${selected.action.command}`;
+    setPending(id);
+    setError(null);
+    try {
+      await requestAction({ agencyCode: selected.agency.code, command: selected.action.command, consent: true });
+      await refresh();
+      setSelected(null);
+      setConsent(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to create this request.');
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const resolve = async (request: PrivacySecurityRequest, outcome: 'CLIENT_COMPLETED' | 'CANCELLED') => {
+    setPending(request.id);
+    setError(null);
+    try {
+      await resolveAction(request.id, outcome);
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update this request.');
+    } finally {
+      setPending(null);
+    }
+  };
 
   return (
-    <section className="card" aria-labelledby="privacy-security-title">
-      <div className="section-heading-row">
+    <>
+      <section className="hero-card hero-card--section privacy-security-hero">
         <div>
           <p className="eyebrow">CredX Client Protection</p>
-          <h2 id="privacy-security-title">Credit Privacy & Security Command Post</h2>
-          <p>Manage freezes, opt-outs, specialty reports, banking-report disputes, and your Caesar-assisted progress in one place.</p>
+          <h1>Privacy &amp; Security</h1>
+          <p>Request and track credit-file freezes, specialty reports, banking-report actions, and dispute preparation from one secure workspace.</p>
         </div>
-        <div className="status-pill">{completed} of {agencies.length} marked complete</div>
-      </div>
+        <div className="privacy-security-summary" aria-label="Privacy and security request summary">
+          <strong>{active}</strong><span>active</span>
+          <strong>{completed}</strong><span>completed</span>
+        </div>
+      </section>
 
-      <div className="notice-card">
-        <strong>Self-reported tracking:</strong> CredX helps you organize and track actions. Agency portals remain the source of record, and you control final submission and identity verification.
-      </div>
+      <section className="panel privacy-security-notice">
+        <strong>You stay in control.</strong>
+        <p>CredX can prepare, organize, queue, and track your request. You complete any identity verification, credentials, CAPTCHA, and final authorization required by the official reporting-company portal.</p>
+      </section>
 
-      {Object.entries(grouped).map(([category, items]) => (
-        <div key={category} className="privacy-agency-group">
-          <h3>{category}</h3>
+      {error ? <div className="error-banner" role="alert">{error}</div> : null}
+      {loading ? <section className="panel"><p>Loading privacy and security options…</p></section> : null}
+
+      {!loading && Object.entries(grouped).map(([category, agencies]) => (
+        <section key={category} className="panel privacy-agency-group">
+          <div className="panel-header"><div><p className="eyebrow">Protection Directory</p><h2>{category}</h2></div></div>
           <div className="privacy-agency-grid">
-            {items.map((agency) => {
-              const status = statuses[agency.name] ?? 'Not Started';
-              return (
-                <article key={agency.name} className="privacy-agency-card">
-                  <div>
-                    <h4>{agency.name}</h4>
-                    <p>{agency.note}</p>
-                  </div>
-                  <div className="privacy-agency-actions">
-                    <a className="ghost-button" href={agency.url} target="_blank" rel="noreferrer">{agency.actionLabel} →</a>
-                    <select
-                      aria-label={`${agency.name} status`}
-                      value={status}
-                      onChange={(event) => setStatuses((current) => ({ ...current, [agency.name]: event.target.value as Status }))}
-                    >
-                      <option>Not Started</option>
-                      <option>In Progress</option>
-                      <option>Completed</option>
-                    </select>
-                  </div>
-                </article>
-              );
-            })}
+            {agencies.map((agency) => (
+              <article key={agency.code} className={`privacy-agency-card${agency.code === 'chexsystems' ? ' privacy-agency-card--featured' : ''}`}>
+                <div>
+                  <h3>{agency.name}</h3>
+                  <p>{agency.note}</p>
+                </div>
+                <div className="privacy-command-list">
+                  {agency.actions.map((action) => {
+                    const request = requestFor(state.requests, agency.code, action.command);
+                    const stage = request?.metadata?.stage || (request?.status === 'COMPLETED' ? 'CLIENT_CONFIRMED_COMPLETE' : request?.status === 'DISMISSED' ? 'CANCELLED' : '');
+                    const isActive = request && ['OPEN', 'IN_PROGRESS'].includes(request.status);
+                    return (
+                      <div className="privacy-command-row" key={action.command}>
+                        <div>
+                          <strong>{action.label}</strong>
+                          {request ? <span className={`privacy-request-status privacy-request-status--${request.status.toLowerCase()}`}>{stageLabels[stage] || request.status.replace(/_/g, ' ')}</span> : null}
+                        </div>
+                        <div className="privacy-command-actions">
+                          <a href={action.url} target="_blank" rel="noopener noreferrer" className="ghost-button">Official site ↗</a>
+                          {!isActive ? <button type="button" onClick={() => { setSelected({ agency, action }); setConsent(false); }}>{request?.status === 'COMPLETED' ? 'Request again' : action.label}</button> : null}
+                        </div>
+                        {request && isActive ? (
+                          <div className="privacy-request-controls">
+                            <button type="button" disabled={pending === request.id} onClick={() => void resolve(request, 'CLIENT_COMPLETED')}>Mark complete</button>
+                            <button type="button" className="ghost-button" disabled={pending === request.id} onClick={() => void resolve(request, 'CANCELLED')}>Cancel request</button>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+            ))}
           </div>
-        </div>
+        </section>
       ))}
 
-      <div className="privacy-caesar-panel">
-        <div>
-          <p className="eyebrow">Caesar Activity Center</p>
-          <h3>Assisted actions</h3>
-          <p>Caesar can prepare forms, organize documents, and guide the workflow. Client action is required for identity checks, CAPTCHAs, credentials, and final authorization.</p>
-        </div>
-        <div className="privacy-status-flow">Not Started → Caesar Preparing → Client Action Required → Submitted → Waiting for Response → Completed</div>
-      </div>
+      <section className="panel privacy-workflow-panel">
+        <div className="panel-header"><div><p className="eyebrow">ChexSystems Dispute Workflow</p><h2>From report request to tracked response</h2></div></div>
+        <ol className="privacy-workflow-steps">
+          <li>Request the consumer disclosure</li>
+          <li>Upload the report and supporting evidence securely</li>
+          <li>CredX prepares a factual dispute for review</li>
+          <li>You approve and complete any required final submission</li>
+          <li>Track the investigation response window and result</li>
+        </ol>
+      </section>
 
-      <div className="privacy-chexsystems-panel">
-        <p className="eyebrow">ChexSystems Workspace</p>
-        <h3>Report and dispute workflow</h3>
-        <div className="privacy-status-flow">Get Report → Review Accounts → Start Dispute → Upload Evidence → Track 30-Day Window → Results → Next Action</div>
-      </div>
-    </section>
+      {selected ? (
+        <div className="privacy-confirmation-backdrop" role="presentation" onClick={() => setSelected(null)}>
+          <section className="privacy-confirmation-card" role="dialog" aria-modal="true" aria-labelledby="privacy-confirmation-title" onClick={(event) => event.stopPropagation()}>
+            <p className="eyebrow">Confirm command</p>
+            <h2 id="privacy-confirmation-title">{selected.action.label} — {selected.agency.name}</h2>
+            <p>CredX will prepare and track this request. No password, security answer, or third-party credential is requested here.</p>
+            <label className="privacy-consent-row">
+              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+              <span>I authorize CredX to prepare and track this request. I understand that I may need to complete identity verification, CAPTCHA, credentials, and final authorization on the official agency site.</span>
+            </label>
+            <div className="privacy-confirmation-actions">
+              <button type="button" className="ghost-button" onClick={() => setSelected(null)}>Cancel</button>
+              <button type="button" disabled={!consent || pending !== null} onClick={() => void submit()}>{pending ? 'Submitting…' : 'Submit request'}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </>
   );
 }

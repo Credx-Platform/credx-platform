@@ -4,6 +4,7 @@ import { DisputeManager } from './components/DisputeManager';
 import { AnalysisTab } from './components/AnalysisTab';
 import { renderBestPrintHtml } from './printing';
 import { SiteFooter } from './components/SiteFooter.js';
+import type { PrivacySecurityState } from './components/PrivacySecurityCommandPost';
 
 type Plan = {
   code: string;
@@ -1835,7 +1836,60 @@ function Employees({ users, currentUser }: { users: StaffUser[]; currentUser: Us
   );
 }
 
-type ClientWorkspaceTab = 'overview' | 'profile' | 'documents' | 'disputes' | 'activity' | 'analysis';
+type ClientWorkspaceTab = 'overview' | 'profile' | 'documents' | 'disputes' | 'privacy-security' | 'activity' | 'analysis';
+
+function AdminPrivacySecurityPanel({ token, clientId }: { token: string; clientId: string }) {
+  const [state, setState] = useState<PrivacySecurityState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setState(null);
+    setError(null);
+    apiFetch<PrivacySecurityState>(`/api/saas/admin/privacy-security/${encodeURIComponent(clientId)}`, token)
+      .then((next) => { if (!cancelled) setState(next); })
+      .catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Unable to load privacy and security requests.'); });
+    return () => { cancelled = true; };
+  }, [clientId, token]);
+
+  if (error) return <div className="error-banner">{error}</div>;
+  if (!state) return <p className="helper-text">Loading privacy and security requests…</p>;
+  if (!state.requests.length) {
+    return (
+      <div>
+        <h3>Privacy &amp; Security requests</h3>
+        <p className="helper-text">No freeze, report, opt-out, or specialty-report dispute requests have been submitted by this client.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="client-section-stack">
+      <div>
+        <h3>Privacy &amp; Security requests</h3>
+        <p className="helper-text">Monitor customer-authorized preparation and handoff. Identity verification, credentials, CAPTCHA, and final authorization remain with the client.</p>
+      </div>
+      <div className="privacy-admin-list">
+        {state.requests.map((request) => {
+          const agency = state.agencies.find((candidate) => candidate.code === request.metadata?.agencyCode);
+          const action = agency?.actions.find((candidate) => candidate.command === request.metadata?.command);
+          const stage = request.metadata?.stage || request.status;
+          return (
+            <article className="privacy-admin-card" key={request.id}>
+              <div>
+                <span className={`privacy-request-status privacy-request-status--${request.status.toLowerCase()}`}>{stage.replace(/_/g, ' ')}</span>
+                <h4>{request.title}</h4>
+                <p>{request.description || 'Customer-authorized request.'}</p>
+                <small>Updated {formatDate(request.updatedAt)}</small>
+              </div>
+              {action ? <a className="ghost-button" href={action.url} target="_blank" rel="noopener noreferrer">Official site ↗</a> : null}
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function clientWorkspacePath(client: Pick<ClientRecord, 'id' | 'status'>): string {
   return `/clients/${client.id}?tab=${client.status === 'ANALYSIS_READY' ? 'analysis' : 'overview'}`;
@@ -2075,6 +2129,7 @@ function ClientDetailRoute({ token }: { token: string }) {
     { key: 'analysis', label: 'Analysis' },
     { key: 'documents', label: 'Documents' },
     { key: 'disputes', label: 'Disputes' },
+    { key: 'privacy-security', label: 'Privacy & Security' },
     { key: 'activity', label: 'Activity' }
   ];
 
@@ -2578,6 +2633,10 @@ function ClientDetailRoute({ token }: { token: string }) {
                 ) : <p className="helper-text">No dispute items for this client yet.</p>}
               </div>
             </div>
+          ) : null}
+
+          {activeTab === 'privacy-security' ? (
+            <AdminPrivacySecurityPanel token={token} clientId={client.id} />
           ) : null}
 
           {activeTab === 'activity' ? (
