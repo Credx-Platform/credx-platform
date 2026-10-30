@@ -1,11 +1,15 @@
 import { usePageFade } from './platformMotion';
-import React, { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import MasterclassDashboard from './components/MasterclassDashboard';
 import CreditScoreWidget from './components/CreditScoreWidget';
 import { MASTERCLASS_DAYS, type LessonDay } from './masterclassCurriculum';
 import { FILING_WORKFLOWS, type FilingWorkflow } from './filingWorkflows';
 import { renderBestPrintHtml } from './printing';
 import { SiteFooter } from './components/SiteFooter.js';
+import PrivacySecurityCommandPost, {
+  type PrivacySecurityCommand,
+  type PrivacySecurityState
+} from './components/PrivacySecurityCommandPost';
 
 type User = {
   id: string;
@@ -183,7 +187,7 @@ type WizardState = {
   monitorPassword: string;
 };
 
-type PortalTab = 'overview' | 'profile' | 'monitoring' | 'disputes' | 'activity' | 'resources' | 'tasks' | 'analysis' | 'masterclass';
+type PortalTab = 'overview' | 'profile' | 'monitoring' | 'disputes' | 'privacy-security' | 'activity' | 'resources' | 'tasks' | 'analysis' | 'masterclass';
 
 export type QuizSubmitResult = {
   passed: boolean;
@@ -648,6 +652,7 @@ const SECTION_THEMES: Record<Exclude<PortalTab, 'overview'>, SectionTheme> = {
   profile: { title: 'Your Profile', desc: 'Personal info, secure documents, and identity verification details.', accent: '#a855f7' },
   monitoring: { title: 'Report Sources', desc: 'Now lives inside Analysis & Reports — upload a report or choose a third-party report provider.', accent: '#00c6fb' },
   disputes: { title: 'Disputes', desc: 'Track active dispute items, bureau status, and round progression.', accent: '#f59e0b' },
+  'privacy-security': { title: 'Privacy & Security', desc: 'Request and track freezes, specialty reports, banking-report actions, and dispute preparation.', accent: '#14b8a6' },
   activity: { title: 'Activity', desc: 'Timeline of what just happened on your file and what comes next.', accent: '#2dd4bf' },
   resources: { title: 'Credit Builders', desc: 'Partner tools and accounts that can help you establish positive account history.', accent: '#84cc16' },
   tasks: { title: 'Tasks', desc: 'Your action items and what CredX needs from you next.', accent: '#ec4899' },
@@ -4441,6 +4446,27 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
     }
   };
 
+  const loadPrivacySecurityState = useCallback(async () => {
+    if (!token) throw new Error('Sign in to load privacy and security actions.');
+    return apiFetch<PrivacySecurityState>('/api/saas/privacy-security', token);
+  }, [token]);
+
+  const requestPrivacySecurityAction = useCallback(async (input: { agencyCode: string; command: PrivacySecurityCommand; consent: true }) => {
+    if (!token) throw new Error('Sign in to create a privacy or security request.');
+    return apiFetch('/api/saas/privacy-security/requests', token, {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  }, [token]);
+
+  const resolvePrivacySecurityAction = useCallback(async (id: string, outcome: 'CLIENT_COMPLETED' | 'CANCELLED') => {
+    if (!token) throw new Error('Sign in to update a privacy or security request.');
+    return apiFetch(`/api/saas/privacy-security/requests/${encodeURIComponent(id)}`, token, {
+      method: 'PATCH',
+      body: JSON.stringify({ outcome })
+    });
+  }, [token]);
+
   // Progressive tier unlock:
   // Tier 0: paid client just landed in portal — Overview + Profile only.
   // Tier 1: report uploaded → Analysis tab unlocks.
@@ -4463,6 +4489,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           ...(masterclassEnrolled ? [{ key: 'masterclass' as PortalTab, label: 'Masterclass' }] : []),
           { key: 'analysis', label: 'Analysis & Reports' },
           { key: 'disputes', label: 'Dispute Workflow' },
+          { key: 'privacy-security', label: 'Privacy & Security' },
           { key: 'profile', label: 'Profile' },
           { key: 'activity', label: 'Activity' },
           { key: 'resources', label: 'Credit Builders' },
@@ -4789,6 +4816,14 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
                 refreshAll={refreshAll}
               />
             )
+          ) : null}
+
+          {activeTab === 'privacy-security' ? (
+            <PrivacySecurityCommandPost
+              loadState={loadPrivacySecurityState}
+              requestAction={requestPrivacySecurityAction}
+              resolveAction={resolvePrivacySecurityAction}
+            />
           ) : null}
 
           {activeTab === 'masterclass' ? (

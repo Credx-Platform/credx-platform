@@ -74,6 +74,18 @@ test('admin SPA deep links serve the admin bundle, not the landing page', { skip
   }
 });
 
+test('privacy and security workspace is wired into client and admin bundles', { skip: skip() }, async () => {
+  const bundleText = async (path) => {
+    const html = await (await fetch(`${base}${path}`)).text();
+    const scriptPaths = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((match) => match[1]);
+    assert.ok(scriptPaths.length, `${path} should load a JavaScript bundle`);
+    return (await Promise.all(scriptPaths.map(async (src) => (await fetch(`${base}${src}`)).text()))).join('\n');
+  };
+
+  assert.match(await bundleText('/portal'), /ChexSystems Dispute Workflow/);
+  assert.match(await bundleText('/adminportal'), /Privacy & Security requests/);
+});
+
 test('unknown paths are a real 404, never a soft 200', { skip: skip() }, async () => {
   for (const path of ['/this-page-does-not-exist', '/wp-login.php', '/admin-xyz', '/clientsX', '/security']) {
     const res = await fetch(`${base}${path}`);
