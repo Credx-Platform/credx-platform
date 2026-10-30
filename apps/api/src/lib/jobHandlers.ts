@@ -70,17 +70,32 @@ export function registerAllJobs(): void {
     handler: async (payload) => {
       const { prisma } = await import('./prisma.js');
       const { writeAuditLog } = await import('./audit.js');
-      const actionPlanItemId = String(payload.actionPlanItemId || '');
+      const privacySecurityRequestId = String(payload.privacySecurityRequestId || '');
       const clientId = String(payload.clientId || '');
-      if (!actionPlanItemId || !clientId) return { prepared: false, reason: 'missing_request_identity' };
+      if (!privacySecurityRequestId || !clientId) return { prepared: false, reason: 'missing_request_identity' };
 
-      const item = await prisma.actionPlanItem.findFirst({
-        where: { id: actionPlanItemId, clientId, category: 'PRIVACY_SECURITY' }
+      const item = await prisma.task.findFirst({
+        where: { id: privacySecurityRequestId, clientId, category: 'privacy_security_request' }
       });
       if (!item) return { prepared: false, reason: 'request_missing' };
-      const metadata = (item.metadata && typeof item.metadata === 'object' ? item.metadata : {}) as Record<string, any>;
+      const requestEvents = await prisma.activityEvent.findMany({
+        where: { clientId, type: { in: ['PRIVACY_SECURITY_REQUESTED', 'PRIVACY_SECURITY_PREPARED'] } },
+        orderBy: { createdAt: 'asc' }
+      });
+      const matchingEvents = requestEvents.filter((event) => {
+        const eventData = event.metadata && typeof event.metadata === 'object' && !Array.isArray(event.metadata)
+          ? event.metadata as Record<string, any>
+          : {};
+        return eventData.privacySecurityRequestId === item.id;
+      });
+      const requested = matchingEvents.find((event) => event.type === 'PRIVACY_SECURITY_REQUESTED');
+      const alreadyPrepared = matchingEvents.some((event) => event.type === 'PRIVACY_SECURITY_PREPARED');
+      if (!requested) return { prepared: false, reason: 'request_event_missing' };
+      const metadata = requested.metadata && typeof requested.metadata === 'object' && !Array.isArray(requested.metadata)
+        ? requested.metadata as Record<string, any>
+        : {};
       const requestedAt = String(metadata.requestedAt || '');
-      if (metadata.preparedForRequestedAt === requestedAt && metadata.stage === 'CLIENT_ACTION_REQUIRED') {
+      if (alreadyPrepared) {
         return { prepared: true, requestId: item.id, idempotent: true };
       }
 
@@ -101,19 +116,6 @@ export function registerAllJobs(): void {
       });
 
       await prisma.$transaction(async (tx) => {
-        await tx.actionPlanItem.update({
-          where: { id: item.id },
-          data: {
-            status: 'IN_PROGRESS',
-            metadata: {
-              ...metadata,
-              stage: 'CLIENT_ACTION_REQUIRED',
-              preparedAt: preparedAt.toISOString(),
-              preparedForRequestedAt: requestedAt,
-              clientActionRequired: true
-            }
-          }
-        });
         if (existingTask) {
           await tx.task.update({
             where: { id: existingTask.id },
@@ -142,7 +144,7 @@ export function registerAllJobs(): void {
               : 'Complete identity verification and final authorization on the official agency site.',
             href: '/portal',
             dedupeKey,
-            metadata: { actionPlanItemId: item.id, agencyName, command }
+            metadata: { privacySecurityRequestId: item.id, agencyName, command }
           },
           update: {
             title: `${agencyName} request is ready for your action`,
@@ -150,7 +152,7 @@ export function registerAllJobs(): void {
               ? 'Upload the report and supporting evidence so the dispute can be prepared.'
               : 'Complete identity verification and final authorization on the official agency site.',
             readAt: null,
-            metadata: { actionPlanItemId: item.id, agencyName, command }
+            metadata: { privacySecurityRequestId: item.id, agencyName, command }
           }
         });
         await tx.activityEvent.create({
@@ -158,13 +160,19 @@ export function registerAllJobs(): void {
             clientId,
             type: 'PRIVACY_SECURITY_PREPARED',
             message: `${agencyName} request prepared; client action is required.`,
-            metadata: { actionPlanItemId: item.id, command, preparedAt: preparedAt.toISOString() }
+            metadata: {
+              privacySecurityRequestId: item.id,
+              command,
+              preparedAt: preparedAt.toISOString(),
+              preparedForRequestedAt: requestedAt,
+              clientActionRequired: true
+            }
           }
         });
       });
       await writeAuditLog({
         action: 'PRIVACY_SECURITY_PREPARED',
-        entityType: 'ActionPlanItem',
+        entityType: 'Task',
         entityId: item.id,
         metadata: { clientId, command }
       });
