@@ -11,7 +11,7 @@ export type PrivacySecurityAgencyAction = {
 export type PrivacySecurityAgency = {
   code: string;
   name: string;
-  category: 'Major Bureaus' | 'Specialty Reporting' | 'Banking Reports';
+  category: 'Credit Bureaus' | 'Specialty & Third-Party Reports' | 'ChexSystems';
   note: string;
   actions: PrivacySecurityAgencyAction[];
 };
@@ -43,6 +43,8 @@ type Props = {
   loadState: () => Promise<PrivacySecurityState>;
   requestAction: (input: { agencyCode: string; command: PrivacySecurityCommand; consent: true }) => Promise<unknown>;
   resolveAction: (id: string, outcome: 'CLIENT_COMPLETED' | 'CANCELLED') => Promise<unknown>;
+  mode?: 'client' | 'admin';
+  clientLabel?: string;
 };
 
 const stageLabels: Record<string, string> = {
@@ -56,7 +58,7 @@ function requestFor(requests: PrivacySecurityRequest[], agencyCode: string, comm
   return requests.find((request) => request.metadata?.agencyCode === agencyCode && request.metadata?.command === command);
 }
 
-export default function PrivacySecurityCommandPost({ loadState, requestAction, resolveAction }: Props) {
+export default function PrivacySecurityCommandPost({ loadState, requestAction, resolveAction, mode = 'client', clientLabel }: Props) {
   const [state, setState] = useState<PrivacySecurityState>({ agencies: [], requests: [] });
   const [selected, setSelected] = useState<{ agency: PrivacySecurityAgency; action: PrivacySecurityAgencyAction } | null>(null);
   const [consent, setConsent] = useState(false);
@@ -79,7 +81,7 @@ export default function PrivacySecurityCommandPost({ loadState, requestAction, r
     return () => { cancelled = true; };
   }, [loadState]);
 
-  const grouped = useMemo(() => state.agencies.reduce<Record<string, Agency[]>>((acc, agency) => {
+  const grouped = useMemo(() => state.agencies.reduce<Record<string, PrivacySecurityAgency[]>>((acc, agency) => {
     (acc[agency.category] ||= []).push(agency);
     return acc;
   }, {}), [state.agencies]);
@@ -120,9 +122,9 @@ export default function PrivacySecurityCommandPost({ loadState, requestAction, r
     <>
       <section className="hero-card hero-card--section privacy-security-hero">
         <div>
-          <p className="eyebrow">CredX Client Protection</p>
-          <h1>Privacy &amp; Security</h1>
-          <p>Request and track credit-file freezes, specialty reports, banking-report actions, and dispute preparation from one secure workspace.</p>
+          <p className="eyebrow">{mode === 'admin' ? 'CredX Staff Workspace' : 'CredX Client Protection'}</p>
+          <h1>{mode === 'admin' && clientLabel ? `Privacy & Security — ${clientLabel}` : 'Privacy & Security'}</h1>
+          <p>Open official reporting-company pages and keep a dated record of freezes, specialty reports, and ChexSystems actions.</p>
         </div>
         <div className="privacy-security-summary" aria-label="Privacy and security request summary">
           <strong>{active}</strong><span>active</span>
@@ -131,8 +133,10 @@ export default function PrivacySecurityCommandPost({ loadState, requestAction, r
       </section>
 
       <section className="panel privacy-security-notice">
-        <strong>You stay in control.</strong>
-        <p>CredX can prepare, organize, queue, and track your request. You complete any identity verification, credentials, CAPTCHA, and final authorization required by the official reporting-company portal.</p>
+        <strong>{mode === 'admin' ? 'Confirm authorization before starting.' : 'You stay in control.'}</strong>
+        <p>{mode === 'admin'
+          ? 'Staff may open and track an authorized request for this client. The client completes identity verification, credentials, CAPTCHA, freeze PIN handling, and final authorization on the official reporting-company portal.'
+          : 'Use the direct official links below. CredX can also organize and track the step, while you complete identity verification, credentials, CAPTCHA, freeze PIN handling, and final authorization on the reporting-company portal.'}</p>
       </section>
 
       {error ? <div className="error-banner" role="alert">{error}</div> : null}
@@ -160,8 +164,8 @@ export default function PrivacySecurityCommandPost({ loadState, requestAction, r
                           {request ? <span className={`privacy-request-status privacy-request-status--${request.status.toLowerCase()}`}>{stageLabels[stage] || request.status.replace(/_/g, ' ')}</span> : null}
                         </div>
                         <div className="privacy-command-actions">
-                          <a href={action.url} target="_blank" rel="noopener noreferrer" className="ghost-button">Official site ↗</a>
-                          {!isActive ? <button type="button" onClick={() => { setSelected({ agency, action }); setConsent(false); }}>{request?.status === 'COMPLETED' ? 'Request again' : action.label}</button> : null}
+                          <a href={action.url} target="_blank" rel="noopener noreferrer" className="ghost-button">Open official site ↗</a>
+                          {!isActive ? <button type="button" onClick={() => { setSelected({ agency, action }); setConsent(false); }}>{request?.status === 'COMPLETED' ? 'Track again' : mode === 'admin' ? 'Start for client' : 'Track this step'}</button> : null}
                         </div>
                         {request && isActive ? (
                           <div className="privacy-request-controls">
@@ -190,15 +194,37 @@ export default function PrivacySecurityCommandPost({ loadState, requestAction, r
         </ol>
       </section>
 
+      <section className="panel privacy-workflow-panel">
+        <div className="panel-header"><div><p className="eyebrow">Activity Log</p><h2>Freeze and reporting history</h2></div></div>
+        {state.requests.length ? (
+          <div className="privacy-admin-list">
+            {[...state.requests].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).map((request) => (
+              <article className="privacy-admin-card" key={request.id}>
+                <div>
+                  <span className={`privacy-request-status privacy-request-status--${request.status.toLowerCase()}`}>{(request.metadata?.stage || request.status).replace(/_/g, ' ')}</span>
+                  <h4>{request.title}</h4>
+                  <small>Started {request.metadata?.requestedAt ? new Date(request.metadata.requestedAt).toLocaleString() : new Date(request.updatedAt).toLocaleString()}</small>
+                  {request.completedAt ? <small> · Completed {new Date(request.completedAt).toLocaleString()}</small> : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : <p className="helper-text">No freezes or reporting actions have been logged for this client yet.</p>}
+      </section>
+
       {selected ? (
         <div className="privacy-confirmation-backdrop" role="presentation" onClick={() => setSelected(null)}>
           <section className="privacy-confirmation-card" role="dialog" aria-modal="true" aria-labelledby="privacy-confirmation-title" onClick={(event) => event.stopPropagation()}>
             <p className="eyebrow">Confirm command</p>
             <h2 id="privacy-confirmation-title">{selected.action.label} — {selected.agency.name}</h2>
-            <p>CredX will prepare and track this request. No password, security answer, or third-party credential is requested here.</p>
+            <p>{mode === 'admin'
+              ? 'CredX will open a dated tracking record for this client. Do not enter or store a password, security answer, freeze PIN, or CAPTCHA response here.'
+              : 'CredX will open a dated tracking record. No password, security answer, freeze PIN, or third-party credential is requested here.'}</p>
             <label className="privacy-consent-row">
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-              <span>I authorize CredX to prepare and track this request. I understand that I may need to complete identity verification, CAPTCHA, credentials, and final authorization on the official agency site.</span>
+              <span>{mode === 'admin'
+                ? 'I confirm the client authorized CredX to start and track this action. I understand the client must complete identity verification, credentials, CAPTCHA, freeze PIN handling, and final authorization.'
+                : 'I authorize CredX to prepare and track this request. I understand that I must complete identity verification, credentials, CAPTCHA, freeze PIN handling, and final authorization on the official agency site.'}</span>
             </label>
             <div className="privacy-confirmation-actions">
               <button type="button" className="ghost-button" onClick={() => setSelected(null)}>Cancel</button>

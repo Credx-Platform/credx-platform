@@ -79,11 +79,25 @@ test('privacy and security workspace is wired into client and admin bundles', { 
     const html = await (await fetch(`${base}${path}`)).text();
     const scriptPaths = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((match) => match[1]);
     assert.ok(scriptPaths.length, `${path} should load a JavaScript bundle`);
-    return (await Promise.all(scriptPaths.map(async (src) => (await fetch(`${base}${src}`)).text()))).join('\n');
+    const visited = new Set();
+    const readBundle = async (src) => {
+      if (visited.has(src)) return '';
+      visited.add(src);
+      const body = await (await fetch(`${base}${src}`)).text();
+      const childPaths = [...body.matchAll(/(?:from|import)\s*\(?["'](\.\/[^"']+\.js)["']/g)]
+        .map((match) => new URL(match[1], `${base}${src}`).pathname);
+      return `${body}\n${(await Promise.all(childPaths.map(readBundle))).join('\n')}`;
+    };
+    return (await Promise.all(scriptPaths.map(readBundle))).join('\n');
   };
 
-  assert.match(await bundleText('/portal'), /ChexSystems Dispute Workflow/);
-  assert.match(await bundleText('/adminportal'), /Privacy & Security requests/);
+  const clientBundle = await bundleText('/portal');
+  const adminBundle = await bundleText('/adminportal');
+  for (const marker of ['ChexSystems Dispute Workflow', 'Freeze and reporting history', 'platform-section-select']) {
+    assert.match(clientBundle, new RegExp(marker));
+    assert.match(adminBundle, new RegExp(marker));
+  }
+  assert.match(adminBundle, /Start for client/);
 });
 
 test('unknown paths are a real 404, never a soft 200', { skip: skip() }, async () => {

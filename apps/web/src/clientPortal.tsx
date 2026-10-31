@@ -10,6 +10,7 @@ import PrivacySecurityCommandPost, {
   type PrivacySecurityCommand,
   type PrivacySecurityState
 } from './components/PrivacySecurityCommandPost';
+import { PlatformPageChrome } from './components/PlatformPageChrome';
 
 type User = {
   id: string;
@@ -4512,6 +4513,15 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
             { key: 'tasks', label: 'Goals & Tasks' }
           ];
 
+  const portalMainRef = useRef<HTMLElement>(null);
+  const activeTabLabel = navItems.find((item) => item.key === activeTab)?.label || 'Dashboard';
+  const activeSectionTheme = activeTab !== 'overview' && (activeTab in SECTION_THEMES)
+    ? SECTION_THEMES[activeTab as Exclude<PortalTab, 'overview'>]
+    : null;
+  const activeAccent = activeTab === 'masterclass' && activeMcDay
+    ? activeMcDay.accent
+    : (activeSectionTheme?.accent || '#00c6fb');
+
   // Early returns sit AFTER all hooks to satisfy rules-of-hooks under StrictMode.
   if (!token) {
     if (onboardingOnly) {
@@ -4541,7 +4551,7 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           {navItems.map((item) => <button key={item.key} type="button" className={`tab ${activeTab === item.key ? 'active' : ''}`} onClick={() => setActiveTab(item.key)}>{item.label}</button>)}
         </nav>
       </aside>
-      <main className="main">
+      <main className="main" ref={portalMainRef}>
         {showWelcome && user ? (
           <div className={`welcome-toast${welcomeLeaving ? ' welcome-toast--leaving' : ''}`} role="status">
             <div className="welcome-toast-content">
@@ -4553,38 +4563,17 @@ export default function ClientPortalApp({ onboardingOnly = false }: { onboarding
           </div>
         ) : null}
 
-        {(() => {
-          const tabLabel = navItems.find((item) => item.key === activeTab)?.label || 'Dashboard';
-          const isMc = activeTab === 'masterclass';
-          const sectionTheme = activeTab !== 'overview' && (activeTab in SECTION_THEMES) ? SECTION_THEMES[activeTab as Exclude<PortalTab, 'overview'>] : null;
-          const accent = isMc && activeMcDay ? activeMcDay.accent : (sectionTheme?.accent || '#00c6fb');
-          const topbarStyle = { ['--section-accent' as string]: accent } as CSSProperties;
-          return (
-            <header className="topbar topbar--themed" style={topbarStyle}>
-              <div>
-                <h1 className="top-title">{tabLabel}</h1>
-              </div>
-              <div className="topbar-actions">
-                <NotificationBell token={token} />
-                <button className="ghost-button" onClick={handleLogout}>Sign out</button>
-              </div>
-            </header>
-          );
-        })()}
-
-        <select
-          className="mobile-nav-select"
+        <PlatformPageChrome
+          rootRef={portalMainRef}
+          title={activeTabLabel}
+          accent={activeAccent}
+          actions={<><NotificationBell token={token} /><button className="ghost-button" onClick={handleLogout}>Sign out</button></>}
+          options={navItems.map((item) => ({ value: item.key, label: item.label }))}
           value={activeTab}
-          onChange={(e) => {
-            const value = e.target.value;
-            setActiveTab(value as PortalTab);
-          }}
-          aria-label="Portal section"
-        >
-          {navItems.map((item) => (
-            <option key={item.key} value={item.key}>{item.label}</option>
-          ))}
-        </select>
+          onChange={(value) => setActiveTab(value as PortalTab)}
+          selectLabel="Portal section"
+          refreshKey={`${activeTab}:${activeMcDay?.slug || ''}`}
+        />
 
         {error ? <div className="error-banner">{error}</div> : null}
         {client?.portalRestricted ? <div className="error-banner">Your portal access is currently restricted. Contact CredX support for help.</div> : null}
