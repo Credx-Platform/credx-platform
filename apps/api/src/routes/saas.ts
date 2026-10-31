@@ -96,6 +96,115 @@ async function privacySecurityRequests(clientId: string) {
   });
 }
 
+type PrivacySecurityRequestInput = {
+  agencyCode: string;
+  command: PrivacySecurityCommand;
+};
+
+type PrivacySecurityActor = {
+  userId: string;
+  role: 'CLIENT' | 'STAFF' | 'ADMIN';
+  authorizationSource: 'CLIENT_PORTAL' | 'STAFF_ATTESTATION';
+};
+
+async function createPrivacySecurityRequest(clientId: string, data: PrivacySecurityRequestInput, actor: PrivacySecurityActor) {
+  const matched = findPrivacySecurityAction(data.agencyCode, data.command);
+  if (!matched) return null;
+
+  const now = new Date();
+  const key = privacySecurityRequestKey(matched.agency.code, data.command);
+  const title = privacySecurityActionTitle(matched.agency.name, data.command);
+  const metadata = {
+    agencyCode: matched.agency.code,
+    agencyName: matched.agency.name,
+    command: data.command,
+    stage: 'REQUESTED',
+    officialUrl: matched.action.url,
+    requestedAt: now.toISOString(),
+    consentRecordedAt: now.toISOString(),
+    authorizationSource: actor.authorizationSource,
+    initiatedByRole: actor.role,
+    initiatedByUserId: actor.userId,
+    automationScope: 'PREPARATION_TRACKING_AND_CLIENT_HANDOFF',
+    clientActionRequired: true
+  };
+
+  const description = `CredX will prepare and track this ${matched.agency.name} request. The client completes any required identity verification, credentials, CAPTCHA, freeze PIN handling, and final authorization on the official site.`;
+  const requestTask = await prisma.$transaction(async (tx) => {
+    const item = await tx.task.create({
+      data: {
+        clientId,
+        title,
+        description,
+        category: privacyRequestCategory,
+        priority: data.command === 'DISPUTE' ? 'high' : 'medium',
+        createdBy: `privacy-security-request:${matched.agency.code}:${data.command.toLowerCase()}`
+      }
+    });
+    await tx.activityEvent.create({
+      data: {
+        clientId,
+        type: 'PRIVACY_SECURITY_REQUESTED',
+        message: `${matched.agency.name}: ${matched.action.label} requested by ${actor.role.toLowerCase()}.`,
+        metadata: {
+          privacySecurityRequestId: item.id,
+          key,
+          title,
+          description,
+          priority: data.command === 'DISPUTE' ? 'HIGH' : 'MEDIUM',
+          ...metadata
+        }
+      }
+    });
+    return item;
+  });
+
+  await writeAuditLog({
+    userId: actor.userId,
+    action: 'PRIVACY_SECURITY_REQUESTED',
+    entityType: 'Task',
+    entityId: requestTask.id,
+    metadata: { clientId, agencyCode: matched.agency.code, command: data.command, authorizationSource: actor.authorizationSource }
+  });
+  const queued = await enqueueJob('disputes', 'prepare-privacy-security-request', {
+    clientId,
+    privacySecurityRequestId: requestTask.id
+  }, { priority: data.command === 'DISPUTE' ? 10 : 5, maxAttempts: 3 });
+  const request = (await privacySecurityRequests(clientId)).find((item) => item.id === requestTask.id);
+  return { request, queued };
+}
+
+async function resolvePrivacySecurityRequest(clientId: string, requestId: string, outcome: 'CLIENT_COMPLETED' | 'CANCELLED', actorUserId: string) {
+  const existing = await prisma.task.findFirst({
+    where: { id: requestId, clientId, category: privacyRequestCategory }
+  });
+  if (!existing) return null;
+  const completed = outcome === 'CLIENT_COMPLETED';
+  const changedAt = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.task.update({
+      where: { id: existing.id },
+      data: { completed: true, completedAt: changedAt }
+    });
+    await tx.activityEvent.create({
+      data: {
+        clientId,
+        type: completed ? 'PRIVACY_SECURITY_COMPLETED' : 'PRIVACY_SECURITY_CANCELLED',
+        message: `${existing.title} ${completed ? 'marked complete' : 'cancelled'}.`,
+        metadata: { privacySecurityRequestId: existing.id, clientUpdatedAt: changedAt.toISOString(), updatedByUserId: actorUserId }
+      }
+    });
+  });
+  await writeAuditLog({
+    userId: actorUserId,
+    action: completed ? 'PRIVACY_SECURITY_COMPLETED' : 'PRIVACY_SECURITY_CANCELLED',
+    entityType: 'Task',
+    entityId: existing.id,
+    metadata: { clientId }
+  });
+  return (await privacySecurityRequests(clientId)).find((item) => item.id === existing.id);
+}
+
 /** One durable bootstrap response for the portal. No client-side cache is authoritative. */
 saasRouter.get('/state', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
@@ -187,67 +296,13 @@ saasRouter.post('/privacy-security/requests', requireAuth, async (req: AuthedReq
       command: z.enum(['FREEZE', 'UNFREEZE', 'REQUEST_REPORT', 'OPT_OUT', 'DISPUTE']),
       consent: z.literal(true)
     }).parse(req.body);
-    const matched = findPrivacySecurityAction(data.agencyCode, data.command);
-    if (!matched) return res.status(400).json({ error: 'That action is not available for this reporting company.' });
-
-    const now = new Date();
-    const key = privacySecurityRequestKey(matched.agency.code, data.command);
-    const title = privacySecurityActionTitle(matched.agency.name, data.command as PrivacySecurityCommand);
-    const metadata = {
-      agencyCode: matched.agency.code,
-      agencyName: matched.agency.name,
-      command: data.command,
-      stage: 'REQUESTED',
-      officialUrl: matched.action.url,
-      requestedAt: now.toISOString(),
-      consentRecordedAt: now.toISOString(),
-      automationScope: 'PREPARATION_TRACKING_AND_CLIENT_HANDOFF',
-      clientActionRequired: true
-    };
-
-    const description = `CredX will prepare and track this ${matched.agency.name} request. The client completes any required identity verification, credentials, CAPTCHA, and final authorization on the official site.`;
-    const requestTask = await prisma.$transaction(async (tx) => {
-      const item = await tx.task.create({
-        data: {
-          clientId: client.id,
-          title,
-          description,
-          category: privacyRequestCategory,
-          priority: data.command === 'DISPUTE' ? 'high' : 'medium',
-          createdBy: `privacy-security-request:${matched.agency.code}:${data.command.toLowerCase()}`
-        }
-      });
-      await tx.activityEvent.create({
-        data: {
-          clientId: client.id,
-          type: 'PRIVACY_SECURITY_REQUESTED',
-          message: `${matched.agency.name}: ${matched.action.label} requested.`,
-          metadata: {
-            privacySecurityRequestId: item.id,
-            key,
-            title,
-            description,
-            priority: data.command === 'DISPUTE' ? 'HIGH' : 'MEDIUM',
-            ...metadata
-          }
-        }
-      });
-      return item;
-    });
-
-    await writeAuditLog({
+    const result = await createPrivacySecurityRequest(client.id, data, {
       userId: req.auth!.sub,
-      action: 'PRIVACY_SECURITY_REQUESTED',
-      entityType: 'Task',
-      entityId: requestTask.id,
-      metadata: { agencyCode: matched.agency.code, command: data.command }
+      role: 'CLIENT',
+      authorizationSource: 'CLIENT_PORTAL'
     });
-    const queued = await enqueueJob('disputes', 'prepare-privacy-security-request', {
-      clientId: client.id,
-      privacySecurityRequestId: requestTask.id
-    }, { priority: data.command === 'DISPUTE' ? 10 : 5, maxAttempts: 3 });
-    const refreshed = (await privacySecurityRequests(client.id)).find((request) => request.id === requestTask.id);
-    res.status(202).json({ request: refreshed, queued });
+    if (!result) return res.status(400).json({ error: 'That action is not available for this reporting company.' });
+    res.status(202).json(result);
   } catch (error) { next(error); }
 });
 
@@ -255,36 +310,8 @@ saasRouter.patch('/privacy-security/requests/:id', requireAuth, async (req: Auth
   try {
     const client = await ownClient(req, res); if (!client) return;
     const data = z.object({ outcome: z.enum(['CLIENT_COMPLETED', 'CANCELLED']) }).parse(req.body);
-    const existing = await prisma.task.findFirst({
-      where: { id: String(req.params.id), clientId: client.id, category: privacyRequestCategory }
-    });
-    if (!existing) return res.status(404).json({ error: 'Privacy or security request not found.' });
-    const completed = data.outcome === 'CLIENT_COMPLETED';
-    const changedAt = new Date();
-    await prisma.$transaction(async (tx) => {
-      await tx.task.update({
-        where: { id: existing.id },
-        data: {
-          completed: true,
-          completedAt: changedAt
-        }
-      });
-      await tx.activityEvent.create({
-        data: {
-          clientId: client.id,
-          type: completed ? 'PRIVACY_SECURITY_COMPLETED' : 'PRIVACY_SECURITY_CANCELLED',
-          message: `${existing.title} ${completed ? 'marked complete' : 'cancelled'} by client.`,
-          metadata: { privacySecurityRequestId: existing.id, clientUpdatedAt: changedAt.toISOString() }
-        }
-      });
-    });
-    await writeAuditLog({
-      userId: req.auth!.sub,
-      action: completed ? 'PRIVACY_SECURITY_COMPLETED' : 'PRIVACY_SECURITY_CANCELLED',
-      entityType: 'Task',
-      entityId: existing.id
-    });
-    const request = (await privacySecurityRequests(client.id)).find((item) => item.id === existing.id);
+    const request = await resolvePrivacySecurityRequest(client.id, String(req.params.id), data.outcome, req.auth!.sub);
+    if (!request) return res.status(404).json({ error: 'Privacy or security request not found.' });
     res.json({ request });
   } catch (error) { next(error); }
 });
@@ -362,5 +389,35 @@ saasRouter.get('/admin/privacy-security/:clientId', requireAuth, requireRole(['S
     if (!client) return res.status(404).json({ error: 'Client not found.' });
     const requests = await privacySecurityRequests(clientId);
     res.json({ agencies: PRIVACY_SECURITY_AGENCIES, requests });
+  } catch (error) { next(error); }
+});
+
+saasRouter.post('/admin/privacy-security/:clientId/requests', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req: AuthedRequest, res, next) => {
+  try {
+    const clientId = String(req.params.clientId);
+    const client = await prisma.client.findUnique({ where: { id: clientId }, select: { id: true } });
+    if (!client) return res.status(404).json({ error: 'Client not found.' });
+    const data = z.object({
+      agencyCode: z.string().trim().min(1).max(80),
+      command: z.enum(['FREEZE', 'UNFREEZE', 'REQUEST_REPORT', 'OPT_OUT', 'DISPUTE']),
+      authorizationConfirmed: z.literal(true)
+    }).parse(req.body);
+    const result = await createPrivacySecurityRequest(clientId, data, {
+      userId: req.auth!.sub,
+      role: req.auth!.role === 'ADMIN' ? 'ADMIN' : 'STAFF',
+      authorizationSource: 'STAFF_ATTESTATION'
+    });
+    if (!result) return res.status(400).json({ error: 'That action is not available for this reporting company.' });
+    res.status(202).json(result);
+  } catch (error) { next(error); }
+});
+
+saasRouter.patch('/admin/privacy-security/:clientId/requests/:id', requireAuth, requireRole(['STAFF', 'ADMIN']), async (req: AuthedRequest, res, next) => {
+  try {
+    const clientId = String(req.params.clientId);
+    const data = z.object({ outcome: z.enum(['CLIENT_COMPLETED', 'CANCELLED']) }).parse(req.body);
+    const request = await resolvePrivacySecurityRequest(clientId, String(req.params.id), data.outcome, req.auth!.sub);
+    if (!request) return res.status(404).json({ error: 'Privacy or security request not found.' });
+    res.json({ request });
   } catch (error) { next(error); }
 });

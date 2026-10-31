@@ -125,6 +125,24 @@ test('privacy and security requests require consent, persist, and enforce owners
   assert.ok(adminState.body.requests.some((request: any) => request.id === requestId));
   assert.equal((await req(ctx.one, `/api/saas/admin/privacy-security/${ctx.oneClient}`)).status, 403);
 
+  const missingAuthorization = await req(ctx.admin, `/api/saas/admin/privacy-security/${ctx.oneClient}/requests`, {
+    method: 'POST',
+    body: JSON.stringify({ agencyCode: 'nctue', command: 'FREEZE', authorizationConfirmed: false })
+  });
+  assert.equal(missingAuthorization.status, 400);
+  const adminCreated = await req(ctx.admin, `/api/saas/admin/privacy-security/${ctx.oneClient}/requests`, {
+    method: 'POST',
+    body: JSON.stringify({ agencyCode: 'nctue', command: 'FREEZE', authorizationConfirmed: true })
+  });
+  assert.equal(adminCreated.status, 202);
+  assert.equal(adminCreated.body.request.metadata.authorizationSource, 'STAFF_ATTESTATION');
+  const adminCompleted = await req(ctx.admin, `/api/saas/admin/privacy-security/${ctx.oneClient}/requests/${adminCreated.body.request.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ outcome: 'CLIENT_COMPLETED' })
+  });
+  assert.equal(adminCompleted.status, 200);
+  assert.equal(adminCompleted.body.request.status, 'COMPLETED');
+
   const otherState = await req(ctx.two, '/api/saas/privacy-security');
   assert.equal(otherState.status, 200);
   assert.equal(otherState.body.requests.some((request: any) => request.id === requestId), false);

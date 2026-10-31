@@ -1,10 +1,11 @@
-import React, { FormEvent, useEffect, useMemo, useState } from 'react';
+import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DisputeManager } from './components/DisputeManager';
 import { AnalysisTab } from './components/AnalysisTab';
 import { renderBestPrintHtml } from './printing';
 import { SiteFooter } from './components/SiteFooter.js';
-import type { PrivacySecurityState } from './components/PrivacySecurityCommandPost';
+import PrivacySecurityCommandPost, { type PrivacySecurityCommand, type PrivacySecurityState } from './components/PrivacySecurityCommandPost';
+import { PlatformPageChrome } from './components/PlatformPageChrome';
 
 type Plan = {
   code: string;
@@ -1838,56 +1839,39 @@ function Employees({ users, currentUser }: { users: StaffUser[]; currentUser: Us
 
 type ClientWorkspaceTab = 'overview' | 'profile' | 'documents' | 'disputes' | 'privacy-security' | 'activity' | 'analysis';
 
-function AdminPrivacySecurityPanel({ token, clientId }: { token: string; clientId: string }) {
-  const [state, setState] = useState<PrivacySecurityState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+function AdminPrivacySecurityPanel({ token, clientId, clientLabel }: { token: string; clientId: string; clientLabel: string }) {
+  const loadState = useCallback(() => apiFetch<PrivacySecurityState>(
+    `/api/saas/admin/privacy-security/${encodeURIComponent(clientId)}`,
+    token
+  ), [clientId, token]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setState(null);
-    setError(null);
-    apiFetch<PrivacySecurityState>(`/api/saas/admin/privacy-security/${encodeURIComponent(clientId)}`, token)
-      .then((next) => { if (!cancelled) setState(next); })
-      .catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Unable to load privacy and security requests.'); });
-    return () => { cancelled = true; };
-  }, [clientId, token]);
+  const requestAction = useCallback((input: { agencyCode: string; command: PrivacySecurityCommand; consent: true }) => apiFetch(
+    `/api/saas/admin/privacy-security/${encodeURIComponent(clientId)}/requests`,
+    token,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        agencyCode: input.agencyCode,
+        command: input.command,
+        authorizationConfirmed: input.consent
+      })
+    }
+  ), [clientId, token]);
 
-  if (error) return <div className="error-banner">{error}</div>;
-  if (!state) return <p className="helper-text">Loading privacy and security requests…</p>;
-  if (!state.requests.length) {
-    return (
-      <div>
-        <h3>Privacy &amp; Security requests</h3>
-        <p className="helper-text">No freeze, report, opt-out, or specialty-report dispute requests have been submitted by this client.</p>
-      </div>
-    );
-  }
+  const resolveAction = useCallback((id: string, outcome: 'CLIENT_COMPLETED' | 'CANCELLED') => apiFetch(
+    `/api/saas/admin/privacy-security/${encodeURIComponent(clientId)}/requests/${encodeURIComponent(id)}`,
+    token,
+    { method: 'PATCH', body: JSON.stringify({ outcome }) }
+  ), [clientId, token]);
 
   return (
-    <div className="client-section-stack">
-      <div>
-        <h3>Privacy &amp; Security requests</h3>
-        <p className="helper-text">Monitor customer-authorized preparation and handoff. Identity verification, credentials, CAPTCHA, and final authorization remain with the client.</p>
-      </div>
-      <div className="privacy-admin-list">
-        {state.requests.map((request) => {
-          const agency = state.agencies.find((candidate) => candidate.code === request.metadata?.agencyCode);
-          const action = agency?.actions.find((candidate) => candidate.command === request.metadata?.command);
-          const stage = request.metadata?.stage || request.status;
-          return (
-            <article className="privacy-admin-card" key={request.id}>
-              <div>
-                <span className={`privacy-request-status privacy-request-status--${request.status.toLowerCase()}`}>{stage.replace(/_/g, ' ')}</span>
-                <h4>{request.title}</h4>
-                <p>{request.description || 'Customer-authorized request.'}</p>
-                <small>Updated {formatDate(request.updatedAt)}</small>
-              </div>
-              {action ? <a className="ghost-button" href={action.url} target="_blank" rel="noopener noreferrer">Official site ↗</a> : null}
-            </article>
-          );
-        })}
-      </div>
-    </div>
+    <PrivacySecurityCommandPost
+      mode="admin"
+      clientLabel={clientLabel}
+      loadState={loadState}
+      requestAction={requestAction}
+      resolveAction={resolveAction}
+    />
   );
 }
 
@@ -2636,7 +2620,7 @@ function ClientDetailRoute({ token }: { token: string }) {
           ) : null}
 
           {activeTab === 'privacy-security' ? (
-            <AdminPrivacySecurityPanel token={token} clientId={client.id} />
+            <AdminPrivacySecurityPanel token={token} clientId={client.id} clientLabel={`${client.user.firstName} ${client.user.lastName}`.trim()} />
           ) : null}
 
           {activeTab === 'activity' ? (
@@ -3737,6 +3721,7 @@ function TasksRoute() {
 }
 
 function AffiliateDashboard({ token, user, onLogout }: { token: string; user: User; onLogout: () => void }) {
+  const mainRef = useRef<HTMLElement>(null);
   const [subAgent, setSubAgent] = useState<SubAgentRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
@@ -3783,16 +3768,14 @@ function AffiliateDashboard({ token, user, onLogout }: { token: string; user: Us
 
   return (
     <div className="shell affiliate-admin-shell">
-      <main className="main">
-        <header className="topbar topbar--themed" style={{ ['--section-accent' as string]: '#00c6fb' } as React.CSSProperties}>
-          <div>
-            <h1 className="top-title">Affiliate dashboard</h1>
-            <p className="helper-text">Signed in as {user.email}</p>
-          </div>
-          <div className="topbar-actions">
-            <button className="ghost-button" onClick={onLogout}>Sign out</button>
-          </div>
-        </header>
+      <main className="main" ref={mainRef}>
+        <PlatformPageChrome
+          rootRef={mainRef}
+          title="Affiliate dashboard"
+          accent="#00c6fb"
+          actions={<button className="ghost-button" onClick={onLogout}>Sign out</button>}
+          refreshKey="affiliate-dashboard"
+        />
         {error ? <div className="error-banner">{error}</div> : null}
         {!subAgent ? (
           <section className="panel"><p className="helper-text">Loading affiliate dashboard...</p></section>
@@ -3882,6 +3865,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
+  const adminMainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -4009,6 +3993,60 @@ export default function App() {
     return <AffiliateDashboard token={token} user={user} onLogout={handleLogout} />;
   }
 
+  const adminPath = location.pathname;
+  const adminAccent = adminPath.startsWith('/disputes')
+    ? '#f59e0b'
+    : adminPath.startsWith('/print')
+      ? '#14b8a6'
+      : adminPath.startsWith('/clients')
+        ? '#a855f7'
+        : adminPath.startsWith('/leads')
+          ? '#22c55e'
+          : adminPath.startsWith('/tasks')
+            ? '#22d3ee'
+            : adminPath.startsWith('/emails')
+              ? '#00c6fb'
+              : adminPath.startsWith('/sub-agents') || adminPath.startsWith('/employees')
+                ? '#f97316'
+                : '#00c6fb';
+  const adminSectionLabel = adminPath.startsWith('/disputes')
+    ? 'Disputes operations'
+    : adminPath.startsWith('/print')
+      ? 'Print center'
+      : adminPath.startsWith('/clients')
+        ? 'Client management'
+        : adminPath.startsWith('/leads')
+          ? 'Lead pipeline'
+          : adminPath.startsWith('/tasks')
+            ? 'Task checklist'
+            : adminPath.startsWith('/emails')
+              ? 'Email templates'
+              : adminPath.startsWith('/employees')
+                ? 'Employee tools'
+                : adminPath.startsWith('/sub-agents')
+                  ? 'Sub agents'
+                  : 'Operations dashboard';
+  const adminSectionPath = adminPath.startsWith('/disputes') ? '/disputes'
+    : adminPath.startsWith('/print') ? '/print'
+      : adminPath.startsWith('/clients') ? '/clients'
+        : adminPath.startsWith('/leads') ? '/leads'
+          : adminPath.startsWith('/tasks') ? '/tasks'
+            : adminPath.startsWith('/emails') ? '/emails'
+              : adminPath.startsWith('/sub-agents') ? '/sub-agents'
+                : adminPath.startsWith('/employees') ? '/employees'
+                  : '/';
+  const adminNavOptions = [
+    { value: '/', label: 'Overview' },
+    { value: '/leads', label: 'Leads' },
+    { value: '/clients', label: 'Clients' },
+    { value: '/disputes', label: 'Disputes' },
+    { value: '/print', label: 'Print Center' },
+    { value: '/tasks', label: 'Tasks' },
+    { value: '/emails', label: 'Email Templates' },
+    { value: '/sub-agents', label: 'Sub Agents' },
+    { value: '/employees', label: 'Employees' }
+  ];
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -4027,72 +4065,18 @@ export default function App() {
           <NavLink to="/employees">Employees</NavLink>
         </nav>
       </aside>
-      <main className="main">
-        {(() => {
-          const path = location.pathname;
-          const accent = path.startsWith('/disputes')
-            ? '#f59e0b'
-            : path.startsWith('/print')
-              ? '#14b8a6'
-            : path.startsWith('/clients')
-              ? '#a855f7'
-                : path.startsWith('/leads')
-                  ? '#22c55e'
-                : path.startsWith('/tasks')
-                  ? '#22d3ee'
-                : path.startsWith('/emails')
-                  ? '#00c6fb'
-                : path.startsWith('/sub-agents') || path.startsWith('/employees')
-                  ? '#f97316'
-                  : '#00c6fb';
-          const sectionLabel = path.startsWith('/disputes')
-            ? 'Disputes operations'
-            : path.startsWith('/print')
-              ? 'Print center'
-            : path.startsWith('/clients')
-              ? 'Client management'
-              : path.startsWith('/leads')
-                ? 'Lead pipeline'
-                : path.startsWith('/tasks')
-                  ? 'Task checklist'
-                : path.startsWith('/emails')
-                  ? 'Email templates'
-                : path.startsWith('/employees')
-                  ? 'Employee tools'
-                : path.startsWith('/sub-agents')
-                  ? 'Sub agents'
-                  : 'Operations dashboard';
-          return (
-            <header className="topbar topbar--themed" style={{ ['--section-accent' as string]: accent } as React.CSSProperties}>
-              <div>
-                <h1 className="top-title">{sectionLabel}</h1>
-              </div>
-              <div className="topbar-actions">
-                <button className="ghost-button" onClick={handleLogout}>Sign out</button>
-              </div>
-            </header>
-          );
-        })()}
-
-        <select
-          className="mobile-nav-select"
-          value={location.pathname.startsWith('/disputes') ? '/disputes' : location.pathname.startsWith('/print') ? '/print' : location.pathname.startsWith('/clients') ? '/clients' : location.pathname.startsWith('/leads') ? '/leads' : location.pathname.startsWith('/tasks') ? '/tasks' : location.pathname.startsWith('/emails') ? '/emails' : location.pathname.startsWith('/sub-agents') ? '/sub-agents' : location.pathname.startsWith('/employees') ? '/employees' : '/'}
-          onChange={(e) => {
-            const value = e.target.value;
-            navigate(value);
-          }}
-          aria-label="Admin section"
-        >
-          <option value="/">Overview</option>
-          <option value="/leads">Leads</option>
-          <option value="/clients">Clients</option>
-          <option value="/disputes">Disputes</option>
-          <option value="/print">Print Center</option>
-          <option value="/tasks">Tasks</option>
-          <option value="/emails">Email Templates</option>
-          <option value="/sub-agents">Sub Agents</option>
-          <option value="/employees">Employees</option>
-        </select>
+      <main className="main" ref={adminMainRef}>
+        <PlatformPageChrome
+          rootRef={adminMainRef}
+          title={adminSectionLabel}
+          accent={adminAccent}
+          actions={<button className="ghost-button" onClick={handleLogout}>Sign out</button>}
+          options={adminNavOptions}
+          value={adminSectionPath}
+          onChange={navigate}
+          selectLabel="Admin section"
+          refreshKey={location.pathname}
+        />
 
         {error ? <div className="error-banner">{error}</div> : null}
         <Routes>

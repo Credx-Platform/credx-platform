@@ -9,7 +9,18 @@ import {
 } from '../src/lib/privacySecurity.js';
 
 test('privacy and security catalog exposes only approved commands with HTTPS destinations', () => {
-  assert.ok(PRIVACY_SECURITY_AGENCIES.length >= 8);
+  assert.ok(PRIVACY_SECURITY_AGENCIES.length >= 13);
+  assert.deepEqual(
+    new Set(PRIVACY_SECURITY_AGENCIES.map((agency) => agency.category)),
+    new Set(['Credit Bureaus', 'Specialty & Third-Party Reports', 'ChexSystems'])
+  );
+  const requiredAgencies = [
+    'experian', 'equifax', 'transunion', 'lexisnexis', 'nctue', 'datax-teletrack',
+    'clarity-services', 'factortrust', 'microbilt', 'corelogic-cotality', 'chexsystems'
+  ];
+  for (const agencyCode of requiredAgencies) {
+    assert.ok(PRIVACY_SECURITY_AGENCIES.some((agency) => agency.code === agencyCode), `${agencyCode} should be listed`);
+  }
   for (const agency of PRIVACY_SECURITY_AGENCIES) {
     assert.ok(agency.actions.length > 0, `${agency.name} needs at least one action`);
     for (const action of agency.actions) {
@@ -18,6 +29,7 @@ test('privacy and security catalog exposes only approved commands with HTTPS des
     }
   }
   assert.equal(findPrivacySecurityAction('experian', 'DISPUTE'), null);
+  assert.equal(findPrivacySecurityAction('corelogic-cotality', 'FREEZE'), null);
   assert.equal(findPrivacySecurityAction('unknown', 'FREEZE'), null);
 });
 
@@ -38,4 +50,6 @@ test('privacy request runtime uses tables already present in production', async 
   assert.doesNotMatch(privacyJobs, /actionPlanItem/);
   assert.match(routes, /privacyRequestCategory = 'privacy_security_request'/);
   assert.match(privacyJobs, /privacy_security_request/);
+  assert.match(routes, /admin\/privacy-security\/:clientId\/requests/);
+  assert.match(routes, /authorizationSource: 'STAFF_ATTESTATION'/);
 });
